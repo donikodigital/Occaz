@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Transport Partagé",
+    "slug": "transport-partage",
+    "scheme": "transportpartage",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#FAFAF9"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.transportpartage.app"
+    },
+    "android": {
+      "package": "com.transportpartage.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#FAFAF9"
+      }
+    },
+    "plugins": ["expo-router", "expo-font", "expo-secure-store"],
+    "extra": {
+      "apiUrl": "https://api.transport-partage.example.com/api/v1"
+    }
+  }
+}

@@ -1,0 +1,1406 @@
+// =============================================================================
+// schema.prisma — Plateforme régionale de transport partagé (Trajets + Envois)
+// Version : v1.0.0
+// -----------------------------------------------------------------------------
+// Changelog
+//   v1.0.0 — Schéma complet initial. Couvre les Parties I à XV du cahier des
+//            charges optimisé, et applique les 12 décisions de la Partie VII
+//            (UUID partout, soft delete, argent en entier + devise, verrou
+//            optimiste sur le wallet, PostGIS, Location hybride GPS/texte,
+//            Document polymorphique, PlatformSetting, AuditLog générique,
+//            Translation générique, capacité trajet en deux compteurs).
+// -----------------------------------------------------------------------------
+// Notes d'implémentation (à lire avant migration)
+//   1. Argent : tous les montants sont des BigInt exprimés dans la plus
+//      petite unité de la devise (GNF/XOF n'ont pas de sous-unité, donc un
+//      montant "brut"). BigInt plutôt que Int pour ne jamais risquer un
+//      dépassement sur un solde de portefeuille cumulé. Chaque montant est
+//      toujours accompagné d'une relation ou d'un code vers Currency.
+//   2. Géospatial : le champ `geoPoint` sur Location est un type PostGIS non
+//      modélisable nativement par Prisma (Unsupported). Il est créé par la
+//      migration mais doit être peuplé et interrogé via SQL brut
+//      ($executeRaw / $queryRaw), jamais via Prisma Client directement.
+//      Après la première migration, ajouter manuellement :
+//        CREATE INDEX idx_locations_geo ON locations USING GIST ("geoPoint");
+//      (pas de @map sur ce champ, donc la colonne réelle est "geoPoint",
+//      sensible à la casse — toujours la citer entre guillemets en SQL brut.)
+//   3. Concurrence financière : Wallet.balance ne doit jamais être modifié
+//      par un simple UPDATE. Toute écriture doit incrémenter Wallet.version
+//      (verrou optimiste) et passer par la création d'une WalletTransaction
+//      dans la même transaction SQL.
+//   4. Secrets : les champs comme mobileMoneyNumber, bankAccountRef,
+//      refreshTokenHash doivent être chiffrés au repos / restreints en accès
+//      conformément à la section Sécurité du cahier des charges. Aucune clé
+//      secrète de prestataire ne doit être stockée ici : PaymentProvider.config
+//      ne contient que des identifiants publics (endpoint, merchant id...),
+//      jamais de secret — les secrets restent en variables d'environnement.
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum AccountType {
+  CUSTOMER
+  DRIVER
+  SUPPORT
+  SUPERADMIN
+}
+
+enum DriverAccountStatus {
+  PENDING
+  IN_VERIFICATION
+  VALIDATED
+  SUSPENDED
+  BLOCKED
+  DEACTIVATED
+}
+
+enum VehicleType {
+  SEDAN
+  SUV
+  MINIVAN
+  MINIBUS
+  PICKUP
+  MOTORCYCLE
+  TRUCK
+  OTHER
+}
+
+enum DocumentOwnerType {
+  DRIVER
+  VEHICLE
+  CUSTOMER
+  DISPUTE
+  SHIPMENT
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum GeocodeTrust {
+  EXACT
+  APPROX
+  MANUAL
+}
+
+enum TripStatus {
+  DRAFT
+  PUBLISHED
+  BOOKING_PENDING
+  CONFIRMED
+  DRIVER_ARRIVED
+  PASSENGER_PICKED_UP
+  IN_PROGRESS
+  ARRIVED
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  REFUNDED
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  PAID
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  REFUNDED
+  DISPUTED
+}
+
+enum ShipmentStatus {
+  CREATED
+  SEARCHING_DRIVER
+  DRIVER_ASSIGNED
+  PICKUP_PENDING
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERY_PENDING
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentProviderType {
+  ORANGE_MONEY
+  MOBILE_MONEY_XOF
+  CARD
+  BANK_TRANSFER
+  OTHER
+}
+
+enum WalletTransactionType {
+  BOOKING_REVENUE
+  SHIPMENT_REVENUE
+  COMMISSION
+  REFUND
+  PAYOUT
+  ADJUSTMENT
+  CANCELLATION_FEE
+}
+
+enum WalletTransactionStatus {
+  PENDING
+  COMPLETED
+  REVERSED
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum OtpPurpose {
+  TRIP_PICKUP
+  TRIP_DROPOFF
+  SHIPMENT_PICKUP
+  SHIPMENT_DELIVERY
+  LOGIN
+  PHONE_VERIFICATION
+}
+
+enum OtpStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  FAILED
+}
+
+enum VerificationType {
+  PHONE
+  IDENTITY
+  DRIVER_LICENSE
+  VEHICLE_REGISTRATION
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DisputeStatus {
+  OPENED
+  UNDER_REVIEW
+  WAITING_FOR_CUSTOMER
+  WAITING_FOR_DRIVER
+  INVESTIGATION
+  RESOLVED
+  CLOSED
+}
+
+enum DisputePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DisputeResolutionType {
+  FULL_REFUND
+  PARTIAL_REFUND
+  DRIVER_PAYOUT
+  SHARED_RESPONSIBILITY
+  CANCELLATION
+  SANCTION
+  SUSPENSION
+  NO_ACTION
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+}
+
+enum NotificationType {
+  BOOKING
+  PAYMENT
+  DRIVER_ACCEPTED
+  DRIVER_REJECTED
+  DEPARTURE_IMMINENT
+  ARRIVAL
+  OTP
+  DELIVERY
+  DRIVER_PAYMENT
+  DISPUTE
+  REFUND
+  STATUS_CHANGE
+  SUPPORT_MESSAGE
+}
+
+enum RatingRole {
+  CUSTOMER_TO_DRIVER
+  DRIVER_TO_CUSTOMER
+}
+
+enum CancellationInitiator {
+  CUSTOMER
+  DRIVER
+  SYSTEM
+  SUPPORT
+}
+
+enum ServiceType {
+  TRIP
+  SHIPMENT
+}
+
+// =============================================================================
+// IDENTITÉ & ACCÈS — Partie II
+// =============================================================================
+
+model User {
+  id              String      @id @default(uuid())
+  phone           String      @unique
+  email           String?     @unique
+  passwordHash    String?
+  accountType     AccountType
+  isPhoneVerified Boolean     @default(false)
+  isActive        Boolean     @default(true)
+  isSuspended     Boolean     @default(false)
+  suspendedReason String?
+  lastLoginAt     DateTime?
+
+  // 2FA obligatoire pour SuperAdmin / recommandé pour Support (section 3.1).
+  // twoFactorSecret est chiffré au repos — jamais loggé ni renvoyé en clair.
+  twoFactorSecret     String?
+  isTwoFactorEnabled  Boolean @default(false)
+
+  customerProfile CustomerProfile?
+  driverProfile   DriverProfile?
+
+  userRoles UserRole[]
+  devices   Device[]
+  sessions  Session[]
+
+  verificationsAsSubject  Verification[] @relation("VerificationSubject")
+  verificationsAsReviewer Verification[] @relation("VerificationReviewer")
+  documentsVerified       Document[]     @relation("DocumentVerifier")
+
+  ratingsGiven    Rating[] @relation("RatingFrom")
+  ratingsReceived Rating[] @relation("RatingTo")
+
+  disputesOpened     Dispute[]           @relation("DisputeOpener")
+  disputesAssigned   Dispute[]           @relation("DisputeAgent")
+  disputeMessages    DisputeMessage[]
+  disputeResolutions DisputeResolution[]
+
+  messagesSent Message[]
+
+  notifications                Notification[]
+  auditLogs                    AuditLog[]
+  platformSettingsUpdated      PlatformSetting[]
+  walletTransactionsTriggered  WalletTransaction[]
+  otpCodes                     OtpCode[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([accountType])
+  @@map("users")
+}
+
+model Role {
+  id          String  @id @default(uuid())
+  key         String  @unique // ex: superadmin, support_agent, support_supervisor, finance_manager
+  name        String
+  description String?
+
+  permissions RolePermission[]
+  userRoles   UserRole[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  key         String  @unique // ex: trip.read, dispute.resolve, refund.create, driver.verify
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// UserRole porte la portée géographique (countryId) — recommandation Partie II :
+// un agent support peut être limité aux litiges de son pays.
+model UserRole {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id])
+  countryId  String?
+  country    Country? @relation(fields: [countryId], references: [id])
+  assignedAt DateTime @default(now())
+
+  @@unique([userId, roleId, countryId])
+  @@map("user_roles")
+}
+
+model Device {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  platform   String // ios | android | web
+  pushToken  String?
+  isTrusted  Boolean   @default(false)
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  sessions Session[]
+
+  @@index([userId])
+  @@map("devices")
+}
+
+// Le refresh token n'est jamais stocké en clair : seul son hash est conservé,
+// ce qui permet la révocation par appareil (section Authentification).
+model Session {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  deviceId         String?
+  device           Device?  @relation(fields: [deviceId], references: [id])
+  refreshTokenHash String
+  ipAddress        String?
+  userAgent        String?
+  isRevoked        Boolean  @default(false)
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// =============================================================================
+// PROFILS — Partie II
+// =============================================================================
+
+model CustomerProfile {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+  firstName   String
+  lastName    String
+  photoUrl    String?
+  countryId   String?
+  country     Country?  @relation(fields: [countryId], references: [id])
+  cityId      String?
+  city        City?     @relation(fields: [cityId], references: [id])
+  dateOfBirth DateTime? @db.Date
+
+  bookings      Booking[]
+  shipments     Shipment[]
+  conversations Conversation[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("customer_profiles")
+}
+
+model DriverProfile {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+  firstName   String
+  lastName    String
+  photoUrl    String?
+  countryId   String
+  country     Country   @relation(fields: [countryId], references: [id])
+  cityId      String
+  city        City      @relation(fields: [cityId], references: [id])
+  dateOfBirth DateTime? @db.Date
+
+  status          DriverAccountStatus @default(PENDING)
+  isVerifiedBadge Boolean             @default(false)
+
+  // Sensible — à chiffrer au repos / accès restreint (section Sécurité, 10.10)
+  mobileMoneyNumber String?
+  bankAccountRef    String?
+
+  cancellationCount       Int @default(0)
+  completedTripsCount     Int @default(0)
+  completedShipmentsCount Int @default(0)
+  // Cache dénormalisé, recalculé à chaque nouvelle note reçue (section 25
+  // "Système de confiance" — le profil chauffeur doit afficher sa note
+  // sans agréger toutes les Rating à chaque affichage).
+  averageRating           Float?
+  ratingsCount            Int    @default(0)
+
+  vehicles      Vehicle[]
+  trips         Trip[]
+  wallet        Wallet?
+  verifications Verification[]
+  conversations Conversation[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("driver_profiles")
+}
+
+model Vehicle {
+  id                 String         @id @default(uuid())
+  driverId           String
+  driver             DriverProfile  @relation(fields: [driverId], references: [id])
+  brand              String
+  model              String
+  year               Int?
+  color              String?
+  plateNumber        String         @unique
+  type               VehicleType    @default(SEDAN)
+  totalSeats         Int
+  photoUrl           String?
+  verificationStatus DocumentStatus @default(PENDING)
+
+  trips Trip[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([driverId])
+  @@map("vehicles")
+}
+
+// Modèle polymorphique unique pour tous les justificatifs (pièce d'identité,
+// permis, carte grise, preuve de litige...) — décision Partie VII 7.2, évite
+// une table par type de document.
+model Document {
+  id              String            @id @default(uuid())
+  ownerType       DocumentOwnerType
+  ownerId         String
+  type            String // ex: national_id, driver_license, vehicle_registration
+  storageKey      String
+  status          DocumentStatus    @default(PENDING)
+  verifiedAt      DateTime?
+  verifiedById    String?
+  verifiedBy      User?             @relation("DocumentVerifier", fields: [verifiedById], references: [id])
+  expiresAt       DateTime?
+  rejectionReason String?
+
+  verifications   Verification[]
+  disputeEvidence DisputeEvidence[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([ownerType, ownerId])
+  @@map("documents")
+}
+
+// =============================================================================
+// GÉOGRAPHIE — Partie VIII
+// =============================================================================
+
+model Country {
+  id                   String    @id @default(uuid())
+  isoCode              String    @unique // GN, SN, ML...
+  name                 String
+  phoneCode            String
+  defaultCurrencyId    String?
+  defaultCurrency      Currency? @relation("CountryDefaultCurrency", fields: [defaultCurrencyId], references: [id])
+  isActive             Boolean   @default(true)
+  isCrossBorderEnabled Boolean   @default(false)
+
+  regions              Region[]
+  cities               City[]
+  customerProfiles     CustomerProfile[]
+  driverProfiles       DriverProfile[]
+  userRoles            UserRole[]
+  commissionRules      CommissionRule[]
+  cancellationPolicies CancellationPolicy[]
+  shipmentCategories   ShipmentCategory[]
+  paymentProviders     PaymentProvider[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("countries")
+}
+
+model Currency {
+  id            String  @id @default(uuid())
+  isoCode       String  @unique // GNF, XOF...
+  name          String
+  symbol        String?
+  decimalDigits Int     @default(0) // 0 pour GNF et XOF
+
+  countriesDefault    Country[]            @relation("CountryDefaultCurrency")
+  trips               Trip[]
+  bookings            Booking[]
+  shipments           Shipment[]
+  payments            Payment[]
+  paymentTransactions PaymentTransaction[]
+  wallets             Wallet[]
+  walletTransactions  WalletTransaction[]
+  payouts             Payout[]
+  commissionRules     CommissionRule[]
+  cancellationFees    CancellationPolicy[]
+  disputeResolutions  DisputeResolution[]
+  shipmentCategories  ShipmentCategory[]
+
+  @@map("currencies")
+}
+
+model Region {
+  id        String  @id @default(uuid())
+  countryId String
+  country   Country @relation(fields: [countryId], references: [id])
+  name      String
+
+  prefectures Prefecture[]
+
+  @@index([countryId])
+  @@map("regions")
+}
+
+model Prefecture {
+  id       String @id @default(uuid())
+  regionId String
+  region   Region @relation(fields: [regionId], references: [id])
+  name     String
+
+  cities City[]
+
+  @@index([regionId])
+  @@map("prefectures")
+}
+
+model City {
+  id           String      @id @default(uuid())
+  countryId    String
+  country      Country     @relation(fields: [countryId], references: [id])
+  prefectureId String?
+  prefecture   Prefecture? @relation(fields: [prefectureId], references: [id])
+  name         String
+
+  locations          Location[]
+  customerProfiles   CustomerProfile[]
+  driverProfiles     DriverProfile[]
+  tripsAsOrigin      Trip[]            @relation("TripOriginCity")
+  tripsAsDestination Trip[]            @relation("TripDestinationCity")
+
+  @@index([countryId])
+  @@map("cities")
+}
+
+// Modèle hybride GPS + texte libre — décision Partie VII 7.2 : toute adresse
+// doit pouvoir être enregistrée même sans géocodage fiable (ex. "Gare
+// routière de Labé"). geoPoint est peuplé/consulté via SQL brut uniquement.
+model Location {
+  id               String                                @id @default(uuid())
+  label            String // saisie libre, ex "Gare routière de Labé"
+  formattedAddress String?
+  latitude         Float?
+  longitude        Float?
+  geoPoint         Unsupported("geography(Point,4326)")?
+  geocodeTrust     GeocodeTrust                           @default(MANUAL)
+  cityId           String?
+  city             City?                                 @relation(fields: [cityId], references: [id])
+
+  tripStops            TripStop[]
+  tripsAsOrigin        Trip[]     @relation("TripOriginLocation")
+  tripsAsDestination   Trip[]     @relation("TripDestinationLocation")
+  shipmentsAsSender    Shipment[] @relation("ShipmentSenderLocation")
+  shipmentsAsRecipient Shipment[] @relation("ShipmentRecipientLocation")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([cityId])
+  @@map("locations")
+}
+
+// =============================================================================
+// TRAJETS — Partie III
+// =============================================================================
+
+model Trip {
+  id        String        @id @default(uuid())
+  driverId  String
+  driver    DriverProfile @relation(fields: [driverId], references: [id])
+  vehicleId String
+  vehicle   Vehicle       @relation(fields: [vehicleId], references: [id])
+
+  // Ville dénormalisée sur le trajet pour accélérer la recherche
+  // (évite une jointure via Location à chaque recherche) — Partie VII 7.2 pt.12.
+  originCityId     String
+  originCity       City     @relation("TripOriginCity", fields: [originCityId], references: [id])
+  originLocationId String
+  originLocation   Location @relation("TripOriginLocation", fields: [originLocationId], references: [id])
+
+  destinationCityId     String
+  destinationCity       City     @relation("TripDestinationCity", fields: [destinationCityId], references: [id])
+  destinationLocationId String
+  destinationLocation   Location @relation("TripDestinationLocation", fields: [destinationLocationId], references: [id])
+
+  departureAt DateTime
+  status      TripStatus @default(DRAFT)
+
+  // Capacité modélisée en deux compteurs indépendants — passagers et
+  // envois — décrémentés séparément (règle fondamentale, Partie I/VII).
+  totalSeats     Int
+  availableSeats Int
+
+  allowsLuggage             Boolean @default(true)
+  allowsShipments           Boolean @default(true)
+  maxShipmentWeightKg       Float?
+  availableShipmentWeightKg Float?
+
+  pricePerSeat BigInt
+  currencyId   String
+  currency     Currency @relation(fields: [currencyId], references: [id])
+
+  notes String?
+
+  stops      TripStop[]
+  bookings   Booking[]
+  shipments  Shipment[]
+  passengers TripPassenger[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([originCityId, destinationCityId, departureAt])
+  @@index([status])
+  @@map("trips")
+}
+
+model TripStop {
+  id                 String    @id @default(uuid())
+  tripId             String
+  trip               Trip      @relation(fields: [tripId], references: [id])
+  locationId         String
+  location           Location  @relation(fields: [locationId], references: [id])
+  sequence           Int
+  estimatedArrivalAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([tripId, sequence])
+  @@map("trip_stops")
+}
+
+// Réservation faite par un client (paiement, cycle de vie). Peut couvrir
+// plusieurs sièges — voir TripPassenger pour la réservation de groupe.
+model Booking {
+  id         String          @id @default(uuid())
+  tripId     String
+  trip       Trip            @relation(fields: [tripId], references: [id])
+  customerId String
+  customer   CustomerProfile @relation(fields: [customerId], references: [id])
+
+  seatsCount   Int
+  pricePerSeat BigInt
+  platformFee  BigInt
+  totalAmount  BigInt
+  currencyId   String
+  currency     Currency @relation(fields: [currencyId], references: [id])
+
+  status BookingStatus @default(PENDING_PAYMENT)
+
+  cancelledAt        DateTime?
+  cancelledBy        CancellationInitiator?
+  cancellationReason String?
+
+  passengers         TripPassenger[]
+  payment            Payment?
+  otpCodes           OtpCode[]
+  disputes           Dispute[]
+  conversations      Conversation[]
+  ratings            Rating[]
+  walletTransactions WalletTransaction[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([tripId])
+  @@index([customerId])
+  @@index([status])
+  @@map("bookings")
+}
+
+// Chaque siège réservé, avec son propre suivi OTP départ/arrivée — permet
+// à un client de réserver pour plusieurs passagers nommés en un seul Booking.
+model TripPassenger {
+  id           String    @id @default(uuid())
+  tripId       String
+  trip         Trip      @relation(fields: [tripId], references: [id])
+  bookingId    String
+  booking      Booking   @relation(fields: [bookingId], references: [id])
+  fullName     String
+  phone        String?
+  seatNumber   Int?
+  pickedUpAt   DateTime?
+  droppedOffAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+  @@map("trip_passengers")
+}
+
+// =============================================================================
+// ENVOIS — Partie IV
+// =============================================================================
+
+model ShipmentCategory {
+  id               String    @id @default(uuid())
+  name             String
+  description      String?
+  isAllowed        Boolean   @default(true)
+  countryId        String? // null = règle globale, sinon règle spécifique au pays
+  country          Country?  @relation(fields: [countryId], references: [id])
+  maxDeclaredValue BigInt?
+  currencyId       String?
+  currency         Currency? @relation(fields: [currencyId], references: [id])
+  // Facteur de prix par catégorie (section 40) — 1.0 = tarif standard ;
+  // ex. 1.5 pour une catégorie fragile/encombrante facturée 50% plus cher.
+  priceMultiplier  Float     @default(1.0)
+
+  shipments Shipment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, countryId])
+  @@map("shipment_categories")
+}
+
+model Shipment {
+  id         String           @id @default(uuid())
+  tripId     String? // nul tant que SEARCHING_DRIVER
+  trip       Trip?            @relation(fields: [tripId], references: [id])
+  customerId String
+  customer   CustomerProfile  @relation(fields: [customerId], references: [id])
+  categoryId String
+  category   ShipmentCategory @relation(fields: [categoryId], references: [id])
+
+  senderName       String
+  senderPhone      String
+  senderLocationId String
+  senderLocation   Location @relation("ShipmentSenderLocation", fields: [senderLocationId], references: [id])
+
+  recipientName       String
+  recipientPhone      String
+  recipientLocationId String
+  recipientLocation   Location @relation("ShipmentRecipientLocation", fields: [recipientLocationId], references: [id])
+
+  description   String?
+  weightKg      Float
+  lengthCm      Float?
+  widthCm       Float?
+  heightCm      Float?
+  quantity      Int     @default(1)
+  declaredValue BigInt?
+  instructions  String?
+  // Urgence (section 40, facteur de tarification) — applique une
+  // majoration configurable via PlatformSetting "shipment.urgent_surcharge".
+  isUrgent      Boolean @default(false)
+
+  status ShipmentStatus @default(CREATED)
+
+  price       BigInt
+  platformFee BigInt
+  totalAmount BigInt
+  currencyId  String
+  currency    Currency @relation(fields: [currencyId], references: [id])
+
+  cancelledAt        DateTime?
+  cancelledBy        CancellationInitiator?
+  cancellationReason String?
+
+  items              ShipmentItem[]
+  tracking           ShipmentTracking[]
+  payment            Payment?
+  otpCodes           OtpCode[]
+  disputes           Dispute[]
+  conversations      Conversation[]
+  ratings            Rating[]
+  walletTransactions WalletTransaction[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([tripId])
+  @@map("shipments")
+}
+
+model ShipmentItem {
+  id         String   @id @default(uuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id])
+  label      String
+  weightKg   Float?
+  photoUrl   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([shipmentId])
+  @@map("shipment_items")
+}
+
+// Historique de statut + position — sert de preuve en cas de litige
+// (photos avant/après récupération : section 62, référencées via Document).
+model ShipmentTracking {
+  id         String         @id @default(uuid())
+  shipmentId String
+  shipment   Shipment       @relation(fields: [shipmentId], references: [id])
+  status     ShipmentStatus
+  latitude   Float?
+  longitude  Float?
+  note       String?
+
+  recordedAt DateTime @default(now())
+
+  @@index([shipmentId, recordedAt])
+  @@map("shipment_tracking")
+}
+
+// =============================================================================
+// PAIEMENT, PORTEFEUILLE, LEDGER — Partie V
+// =============================================================================
+
+model PaymentProvider {
+  id        String              @id @default(uuid())
+  type      PaymentProviderType
+  name      String
+  countryId String?
+  country   Country?            @relation(fields: [countryId], references: [id])
+  isActive  Boolean             @default(true)
+  // Identifiants publics uniquement (endpoint, merchant id) — jamais de secret.
+  config    Json?
+
+  transactions PaymentTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payment_providers")
+}
+
+model Payment {
+  id         String    @id @default(uuid())
+  bookingId  String?   @unique
+  booking    Booking?  @relation(fields: [bookingId], references: [id])
+  shipmentId String?   @unique
+  shipment   Shipment? @relation(fields: [shipmentId], references: [id])
+
+  amount     BigInt
+  currencyId String
+  currency   Currency      @relation(fields: [currencyId], references: [id])
+  status     PaymentStatus @default(PENDING)
+
+  transactions PaymentTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@map("payments")
+}
+
+// La confirmation de paiement ne vient jamais du mobile : webhookReceivedAt
+// n'est renseigné que par un appel serveur authentifié du prestataire
+// (règle d'or, section 13).
+model PaymentTransaction {
+  id         String          @id @default(uuid())
+  paymentId  String
+  payment    Payment         @relation(fields: [paymentId], references: [id])
+  providerId String
+  provider   PaymentProvider @relation(fields: [providerId], references: [id])
+
+  externalReference String?
+  webhookReceivedAt DateTime?
+  amount            BigInt
+  currencyId        String
+  currency          Currency      @relation(fields: [currencyId], references: [id])
+  status            PaymentStatus
+  rawPayload        Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([externalReference])
+  @@map("payment_transactions")
+}
+
+// balance/pendingBalance ne sont jamais modifiés par UPDATE direct : toute
+// écriture passe par une WalletTransaction + incrément de version
+// (verrou optimiste) dans la même transaction SQL — Partie VII 7.2 pt.4.
+model Wallet {
+  id             String        @id @default(uuid())
+  driverId       String        @unique
+  driver         DriverProfile @relation(fields: [driverId], references: [id])
+  balance        BigInt        @default(0)
+  pendingBalance BigInt        @default(0)
+  currencyId     String
+  currency       Currency      @relation(fields: [currencyId], references: [id])
+  version        Int           @default(0)
+
+  transactions WalletTransaction[]
+  payouts      Payout[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("wallets")
+}
+
+// Ledger immuable : chaque ligne est un mouvement, jamais une mise à jour
+// de solde. Montant signé (positif = crédit, négatif = débit) — Partie V.4.
+model WalletTransaction {
+  id         String                  @id @default(uuid())
+  walletId   String
+  wallet     Wallet                  @relation(fields: [walletId], references: [id])
+  type       WalletTransactionType
+  status     WalletTransactionStatus @default(COMPLETED)
+  amount     BigInt
+  currencyId String
+  currency   Currency                @relation(fields: [currencyId], references: [id])
+
+  bookingId  String?
+  booking    Booking?  @relation(fields: [bookingId], references: [id])
+  shipmentId String?
+  shipment   Shipment? @relation(fields: [shipmentId], references: [id])
+  payoutId   String?
+  payout     Payout?   @relation(fields: [payoutId], references: [id])
+
+  externalReference String?
+  paymentReference  String?
+  metadata          Json?
+  triggeredByUserId String?
+  triggeredByUser   User?    @relation(fields: [triggeredByUserId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([walletId, createdAt])
+  @@map("wallet_transactions")
+}
+
+model Payout {
+  id             String       @id @default(uuid())
+  walletId       String
+  wallet         Wallet       @relation(fields: [walletId], references: [id])
+  amount         BigInt
+  currencyId     String
+  currency       Currency     @relation(fields: [currencyId], references: [id])
+  status         PayoutStatus @default(REQUESTED)
+  method         String? // ex: orange_money, bank_transfer
+  destinationRef String? // numéro mobile money / IBAN masqué
+
+  transactions WalletTransaction[]
+
+  requestedAt DateTime  @default(now())
+  processedAt DateTime?
+
+  @@map("payouts")
+}
+
+// Configurable par le SuperAdmin, différent par pays / type de prestation
+// (section 39).
+model CommissionRule {
+  id          String      @id @default(uuid())
+  serviceType ServiceType
+  countryId   String?
+  country     Country?    @relation(fields: [countryId], references: [id])
+  percentage  Float?
+  fixedAmount BigInt?
+  minAmount   BigInt?
+  maxAmount   BigInt?
+  currencyId  String?
+  currency    Currency?   @relation(fields: [currencyId], references: [id])
+  isActive    Boolean     @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([serviceType, countryId])
+  @@map("commission_rules")
+}
+
+// Règles de remboursement configurables (sections 26 et 63).
+model CancellationPolicy {
+  id                   String      @id @default(uuid())
+  serviceType          ServiceType
+  countryId            String?
+  country              Country?    @relation(fields: [countryId], references: [id])
+  hoursBeforeDeparture Int
+  refundPercentage     Float
+  cancellationFee      BigInt?
+  currencyId           String?
+  currency             Currency?   @relation(fields: [currencyId], references: [id])
+  isActive             Boolean     @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([serviceType, countryId])
+  @@map("cancellation_policies")
+}
+
+// =============================================================================
+// CONFIANCE & SÉCURITÉ DE LA PRESTATION — Partie VI
+// =============================================================================
+
+// Le code est généré et transmis côté serveur uniquement — le chauffeur ne
+// peut jamais générer lui-même la validation finale (règle d'or, section 18).
+// `code` stocke un hash, jamais la valeur en clair.
+model OtpCode {
+  id      String     @id @default(uuid())
+  code    String // hash, jamais la valeur en clair
+  purpose OtpPurpose
+  status  OtpStatus  @default(PENDING)
+
+  bookingId  String?
+  booking    Booking?  @relation(fields: [bookingId], references: [id])
+  shipmentId String?
+  shipment   Shipment? @relation(fields: [shipmentId], references: [id])
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id])
+
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  expiresAt   DateTime
+  verifiedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+  @@index([shipmentId])
+  @@map("otp_codes")
+}
+
+model Verification {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation("VerificationSubject", fields: [userId], references: [id])
+
+  driverId String?
+  driver   DriverProfile? @relation(fields: [driverId], references: [id])
+
+  type   VerificationType
+  status VerificationStatus @default(PENDING)
+
+  documentId String?
+  document   Document? @relation(fields: [documentId], references: [id])
+
+  reviewedById    String?
+  reviewedBy      User?     @relation("VerificationReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("verifications")
+}
+
+model Rating {
+  id         String     @id @default(uuid())
+  role       RatingRole
+  fromUserId String
+  fromUser   User       @relation("RatingFrom", fields: [fromUserId], references: [id])
+  toUserId   String
+  toUser     User       @relation("RatingTo", fields: [toUserId], references: [id])
+
+  bookingId  String?
+  booking    Booking?  @relation(fields: [bookingId], references: [id])
+  shipmentId String?
+  shipment   Shipment? @relation(fields: [shipmentId], references: [id])
+
+  score  Int // 1 à 5
+  review Review?
+
+  createdAt DateTime @default(now())
+
+  @@index([toUserId])
+  @@map("ratings")
+}
+
+model Review {
+  id               String  @id @default(uuid())
+  ratingId         String  @unique
+  rating           Rating  @relation(fields: [ratingId], references: [id])
+  comment          String?
+  punctuality      Int?
+  respect          Int?
+  communication    Int?
+  reliability      Int?
+  vehicleCondition Int?
+
+  createdAt DateTime @default(now())
+
+  @@map("reviews")
+}
+
+// =============================================================================
+// LITIGES — Partie VI
+// =============================================================================
+
+model Dispute {
+  id          String      @id @default(uuid())
+  subjectType ServiceType
+
+  bookingId  String?
+  booking    Booking?  @relation(fields: [bookingId], references: [id])
+  shipmentId String?
+  shipment   Shipment? @relation(fields: [shipmentId], references: [id])
+
+  openedById  String
+  openedBy    User            @relation("DisputeOpener", fields: [openedById], references: [id])
+  reason      String
+  description String?
+  status      DisputeStatus   @default(OPENED)
+  priority    DisputePriority @default(MEDIUM)
+
+  assignedAgentId String?
+  assignedAgent   User?   @relation("DisputeAgent", fields: [assignedAgentId], references: [id])
+
+  messages   DisputeMessage[]
+  evidence   DisputeEvidence[]
+  resolution DisputeResolution?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, priority])
+  @@map("disputes")
+}
+
+model DisputeMessage {
+  id        String  @id @default(uuid())
+  disputeId String
+  dispute   Dispute @relation(fields: [disputeId], references: [id])
+  authorId  String
+  author    User    @relation(fields: [authorId], references: [id])
+  message   String
+
+  createdAt DateTime @default(now())
+
+  @@index([disputeId])
+  @@map("dispute_messages")
+}
+
+model DisputeEvidence {
+  id         String   @id @default(uuid())
+  disputeId  String
+  dispute    Dispute  @relation(fields: [disputeId], references: [id])
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+  note       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([disputeId])
+  @@map("dispute_evidence")
+}
+
+model DisputeResolution {
+  id           String                @id @default(uuid())
+  disputeId    String                @unique
+  dispute      Dispute               @relation(fields: [disputeId], references: [id])
+  type         DisputeResolutionType
+  refundAmount BigInt?
+  currencyId   String?
+  currency     Currency?             @relation(fields: [currencyId], references: [id])
+  decidedById  String
+  decidedBy    User                  @relation(fields: [decidedById], references: [id])
+  notes        String?
+
+  createdAt DateTime @default(now())
+
+  @@map("dispute_resolutions")
+}
+
+// =============================================================================
+// COMMUNICATION — Partie VI / XII
+// =============================================================================
+
+model NotificationTemplate {
+  id       String              @id @default(uuid())
+  type     NotificationType
+  channel  NotificationChannel
+  locale   String              @default("fr")
+  subject  String?
+  body     String
+  isActive Boolean             @default(true)
+
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, channel, locale])
+  @@map("notification_templates")
+}
+
+model Notification {
+  id           String                @id @default(uuid())
+  userId       String
+  user         User                  @relation(fields: [userId], references: [id])
+  templateId   String?
+  template     NotificationTemplate? @relation(fields: [templateId], references: [id])
+  type         NotificationType
+  channel      NotificationChannel
+  payload      Json?
+  readAt       DateTime?
+  sentAt       DateTime?
+  failedReason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+// Conversation toujours entre un client et un chauffeur ; le support peut
+// intervenir sans être "participant" — ses messages sont marqués
+// isSupportIntervention (section 23).
+model Conversation {
+  id         String          @id @default(uuid())
+  bookingId  String?
+  booking    Booking?        @relation(fields: [bookingId], references: [id])
+  shipmentId String?
+  shipment   Shipment?       @relation(fields: [shipmentId], references: [id])
+  customerId String
+  customer   CustomerProfile @relation(fields: [customerId], references: [id])
+  driverId   String
+  driver     DriverProfile   @relation(fields: [driverId], references: [id])
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+
+  @@index([customerId])
+  @@index([driverId])
+  @@map("conversations")
+}
+
+model Message {
+  id                    String       @id @default(uuid())
+  conversationId        String
+  conversation          Conversation @relation(fields: [conversationId], references: [id])
+  senderId              String
+  sender                User         @relation(fields: [senderId], references: [id])
+  content               String
+  isSupportIntervention Boolean      @default(false)
+  readAt                DateTime?
+
+  sentAt DateTime @default(now())
+
+  @@index([conversationId, sentAt])
+  @@map("messages")
+}
+
+// =============================================================================
+// GOUVERNANCE — Partie VII / XIII
+// =============================================================================
+
+// Log générique : une seule table pour toutes les actions administratives
+// sensibles, y compris celles du SuperAdmin (section 49) — Partie VII 7.2 pt.10.
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  entityType String
+  entityId   String
+  action     String
+  diff       Json?
+  ipAddress  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+// Table clé/valeur générique pour tout paramètre configurable dynamiquement
+// (rayon de recherche, seuils KYC, textes...) plutôt que codé en dur —
+// Partie VII 7.2 pt.9.
+model PlatformSetting {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  value       Json
+  description String?
+  updatedById String?
+  updatedBy   User?   @relation(fields: [updatedById], references: [id])
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("platform_settings")
+}
+
+// Table de traduction générique — évite des colonnes name_fr/name_en codées
+// en dur sur chaque table (Partie VII 7.2 pt.11, utile dès la Phase 2 langues).
+model Translation {
+  id         String @id @default(uuid())
+  entityType String
+  entityId   String
+  locale     String
+  field      String
+  value      String
+
+  @@unique([entityType, entityId, locale, field])
+  @@index([entityType, entityId, locale])
+  @@map("translations")
+}

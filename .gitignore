@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Env — NE JAMAIS COMMIT (secrets, DB credentials)
+.env
+.env.local
+.env.*.local
+**/.env
+
+# Build output
+dist/
+build/
+.next/
+**/dist/
+
+# Expo / React Native
+.expo/
+**/.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Logs
+npm-debug.log*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
