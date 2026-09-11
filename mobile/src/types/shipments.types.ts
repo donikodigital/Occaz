@@ -112,3 +112,14 @@ export interface CreateShipmentPayload {
 export interface CancelShipmentPayload {
   reason: string;
 }
+
+export interface SearchAvailableShipmentsParams {
+  originCityId?: string;
+  destinationCityId?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface AssignShipmentPayload {
+  tripId: string;
+}

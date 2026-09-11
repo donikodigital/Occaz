@@ -50,7 +50,7 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <ScreenContainer style={styles.container}>
+    <ScreenContainer style={styles.container} maxWidth="form">
       <View style={styles.hero}>
         <View style={styles.heroIcon}>
           <IconRoute size={34} color={colors.primaryLight} />

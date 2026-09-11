@@ -2,7 +2,8 @@
 import { create } from 'zustand';
 import type { TripLocation } from '@/types/trips.types';
 
-export type LocationField = 'sender' | 'recipient';
+/** Chaîne libre — voir la même note dans citySelectionStore.ts. */
+export type LocationField = string;
 
 interface LocationSelectionState {
   pendingField: LocationField | null;

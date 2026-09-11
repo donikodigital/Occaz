@@ -320,17 +320,49 @@ cp .env.example .env   # puis renseigner DATABASE_URL et les secrets
 
 npm run prisma:migrate     # crée les tables
 npm run seed:rbac          # crée les rôles/permissions par défaut
+npm run seed:accounts      # crée les comptes SuperAdmin/Support demandés (voir plus bas)
 npm run start:dev          # démarre l'API sur http://localhost:3000/api/v1
 ```
 
 Documentation interactive (Swagger) : `http://localhost:3000/api/docs`.
+
+## Comptes provisionnés (`npm run seed:accounts`)
+
+Script à exécuter une fois par environnement, après `seed:rbac`
+(réexécutable sans risque — upsert par email). Comptes demandés
+explicitement par le client, pas des comptes de démonstration :
+
+| Email | Rôle | Téléphone |
+|---|---|---|
+| thiernodoniko@gmail.com | SuperAdmin | +3766736226 |
+| thierno.diallo99@sfr.fr | Agent clientèle | +33751244722 |
+| jallowdoniko@gmail.com | Superviseur clientèle | +33621158829 |
+| donikojallow@gmail.com | Responsable financier | +33611435397 |
+
+Mot de passe commun : `Lcd123456!`. Deux modes de connexion pour ces
+quatre comptes :
+- **Téléphone + OTP** (prioritaire, comme demandé) — fonctionne
+  immédiatement pour les quatre, `verifyOtpAndLogin` ne fait aucune
+  distinction de type de compte (voir `auth.service.ts`).
+- **Email + mot de passe** — fonctionne immédiatement pour les 3
+  comptes Support. Pour le SuperAdmin, la 2FA est obligatoire
+  (section 3.1) : ce mode restera bloqué tant qu'il n'aura pas été
+  configuré via `POST /auth/2fa/setup`, mais la connexion par téléphone
+  reste disponible en attendant.
+
+**À vérifier** : le premier numéro fourni par le client
+(`003766736226`) a un chiffre de moins que les trois autres, tous au
+format `+33...`. Traité tel quel (`+3766736226`) plutôt que corrigé
+sans confirmation — à ajuster dans `src/seed/accounts.seed.ts` si
+c'était une erreur de saisie.
 
 ## Vérification effectuée avant livraison
 
 - `schema.prisma` validé avec le moteur Prisma officiel (hors-ligne, via
   `@prisma/prisma-schema-wasm`) : 48 modèles, 26 enums, zéro erreur de
   relation, zéro doublon de table.
-- Code des 9 lots (222 fichiers `.ts`, l'intégralité du backend) compilé
+- Code des 9 lots plus le seed des comptes (225 fichiers `.ts`,
+  l'intégralité du backend) compilé
   avec `tsc --noEmit` en mode strict, contre un
   stub TypeScript généré directement depuis le DMMF du schéma (donc
   fidèle aux vrais noms de champs/relations), en l'absence d'accès

@@ -2,7 +2,11 @@
 import { Stack } from 'expo-router';
 import { colors } from '@/theme';
 
-/** Simple Stack pour ce Lot — voir la même note dans (customer)/_layout.tsx. */
+/**
+ * Stack racine de l'espace chauffeur : héberge le groupe (tabs)
+ * (Accueil, Trajets, Profil) ainsi que les écrans qui se superposent
+ * aux onglets (création de véhicule/trajet, détail d'un trajet).
+ */
 export default function DriverLayout() {
   return (
     <Stack
@@ -11,7 +15,17 @@ export default function DriverLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      <Stack.Screen name="home" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="complete-profile" />
+      <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="select-city" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="select-location" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="vehicle-new" />
+      <Stack.Screen name="trip-new" />
+      <Stack.Screen name="trip/[id]" />
+      <Stack.Screen name="shipment-available" />
+      <Stack.Screen name="shipment/[id]" />
+      <Stack.Screen name="payout-new" />
     </Stack>
   );
 }

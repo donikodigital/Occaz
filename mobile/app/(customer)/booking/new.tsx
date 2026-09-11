@@ -23,7 +23,7 @@ export default function NewBookingScreen() {
 
   if (isLoading || !trip) {
     return (
-      <ScreenContainer style={styles.center}>
+      <ScreenContainer style={styles.center} maxWidth="detail">
         <ActivityIndicator color={colors.primary} />
       </ScreenContainer>
     );
@@ -75,7 +75,7 @@ export default function NewBookingScreen() {
   }
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll maxWidth="detail">
       <View style={styles.header}>
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}

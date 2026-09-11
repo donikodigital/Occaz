@@ -99,3 +99,30 @@ export interface SearchTripsParams {
   page?: number;
   limit?: number;
 }
+
+export interface TripStopInput {
+  locationId: string;
+  sequence: number;
+  estimatedArrivalAt?: string;
+}
+
+export interface CreateTripPayload {
+  vehicleId: string;
+  originCityId: string;
+  originLocationId: string;
+  destinationCityId: string;
+  destinationLocationId: string;
+  departureAt: string;
+  totalSeats: number;
+  pricePerSeat: string;
+  currencyId: string;
+  allowsLuggage?: boolean;
+  allowsShipments?: boolean;
+  maxShipmentWeightKg?: number;
+  notes?: string;
+  stops?: TripStopInput[];
+}
+
+export interface CancelTripPayload {
+  reason: string;
+}

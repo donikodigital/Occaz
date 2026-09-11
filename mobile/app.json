@@ -20,6 +20,10 @@
         "backgroundColor": "#FAFAF9"
       }
     },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
     "plugins": ["expo-router", "expo-font", "expo-secure-store"],
     "extra": {
       "apiUrl": "https://api.transport-partage.example.com/api/v1"

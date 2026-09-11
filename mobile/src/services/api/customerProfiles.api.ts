@@ -7,4 +7,7 @@ export const customerProfilesApi = {
 
   createMine: (payload: CreateCustomerProfilePayload) =>
     api.post<CustomerProfile>('/customer-profiles/me', payload),
+
+  updateMine: (payload: Partial<CreateCustomerProfilePayload>) =>
+    api.patch<CustomerProfile>('/customer-profiles/me', payload),
 };

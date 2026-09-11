@@ -1,5 +1,5 @@
 // backend/src/rbac/roles.service.ts
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -28,20 +28,31 @@ export class RolesService {
     return role;
   }
 
+  private async resolvePermissionIds(permissionKeys: string[]): Promise<string[]> {
+    const permissions = await this.prisma.permission.findMany({
+      where: { key: { in: permissionKeys } },
+    });
+    const found = new Set(permissions.map((p) => p.key));
+    const missing = permissionKeys.filter((key) => !found.has(key));
+    if (missing.length > 0) {
+      throw new NotFoundException(`Permission(s) introuvable(s) : ${missing.join(', ')}`);
+    }
+    return permissions.map((p) => p.id);
+  }
+
   async create(dto: CreateRoleDto, actorId: string) {
-    const existing = await this.prisma.role.findUnique({ where: { key: dto.key } });
-    if (existing) throw new ConflictException(`Le rôle "${dto.key}" existe déjà.`);
+    const permissionIds = dto.permissionKeys?.length
+      ? await this.resolvePermissionIds(dto.permissionKeys)
+      : [];
 
     const role = await this.prisma.role.create({
       data: {
         key: dto.key,
         name: dto.name,
         description: dto.description,
-        permissions: dto.permissionKeys
-          ? {
-              create: await this.resolvePermissionLinks(dto.permissionKeys),
-            }
-          : undefined,
+        permissions: {
+          create: permissionIds.map((permissionId) => ({ permissionId })),
+        },
       },
       include: { permissions: { include: { permission: true } } },
     });
@@ -59,18 +70,26 @@ export class RolesService {
   async update(id: string, dto: UpdateRoleDto, actorId: string) {
     await this.findOne(id);
 
+    // Si des permissionKeys sont fournies, on resynchronise entièrement la
+    // relation (delete + recreate) plutôt que de calculer un diff — plus
+    // simple et sûr pour une liste de taille modeste comme les permissions
+    // d'un rôle.
     if (dto.permissionKeys) {
-      await this.prisma.rolePermission.deleteMany({ where: { roleId: id } });
+      const permissionIds = await this.resolvePermissionIds(dto.permissionKeys);
+      await this.prisma.$transaction([
+        this.prisma.rolePermission.deleteMany({ where: { roleId: id } }),
+        this.prisma.rolePermission.createMany({
+          data: permissionIds.map((permissionId) => ({ roleId: id, permissionId })),
+        }),
+      ]);
     }
 
     const role = await this.prisma.role.update({
       where: { id },
       data: {
+        key: dto.key,
         name: dto.name,
         description: dto.description,
-        permissions: dto.permissionKeys
-          ? { create: await this.resolvePermissionLinks(dto.permissionKeys) }
-          : undefined,
       },
       include: { permissions: { include: { permission: true } } },
     });
@@ -83,19 +102,5 @@ export class RolesService {
       diff: { ...dto },
     });
     return role;
-  }
-
-  private async resolvePermissionLinks(permissionKeys: string[]) {
-    const permissions = await this.prisma.permission.findMany({
-      where: { key: { in: permissionKeys } },
-    });
-    const foundKeys = new Set(permissions.map((p) => p.key));
-    const missing = permissionKeys.filter((k) => !foundKeys.has(k));
-    if (missing.length > 0) {
-      throw new NotFoundException(
-        `Permission(s) inconnue(s) : ${missing.join(', ')}.`,
-      );
-    }
-    return permissions.map((p) => ({ permissionId: p.id }));
   }
 }

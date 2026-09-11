@@ -6,6 +6,7 @@ import { IconArrowLeft, IconCheck } from '@tabler/icons-react-native';
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useBooking, useCancelBooking } from '@/hooks/useBookings';
+import { useBookingRatings } from '@/hooks/useRatings';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import type { BookingStatus } from '@/types/bookings.types';
@@ -26,10 +27,11 @@ export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: booking, isLoading, isError } = useBooking(id);
   const cancelBooking = useCancelBooking(id ?? '');
+  const { data: existingRatings } = useBookingRatings(id);
 
   if (isLoading || !booking) {
     return (
-      <ScreenContainer style={styles.center}>
+      <ScreenContainer style={styles.center} maxWidth="detail">
         {isError ? (
           <AppText variant="sm" color="danger">
             Impossible de charger cette réservation.
@@ -43,6 +45,7 @@ export default function BookingDetailScreen() {
 
   const trip = booking.trip;
   const canCancel = CANCELLABLE_STATUSES.includes(booking.status);
+  const hasRated = (existingRatings?.length ?? 0) > 0;
 
   function handleCancel() {
     Alert.alert('Annuler la réservation ?', 'Cette action ne peut pas être annulée.', [
@@ -62,7 +65,7 @@ export default function BookingDetailScreen() {
   }
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll maxWidth="detail">
       <View style={styles.header}>
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
@@ -139,7 +142,16 @@ export default function BookingDetailScreen() {
       {booking.status === 'PENDING_PAYMENT' ? (
         <Button
           label="Payer maintenant"
-          onPress={() => Alert.alert('Bientôt disponible', 'Le paiement en ligne arrive dans une prochaine mise à jour.')}
+          onPress={() => router.push({ pathname: '/(customer)/payment', params: { bookingId: booking.id } })}
+          style={styles.actionButton}
+        />
+      ) : null}
+
+      {booking.status === 'COMPLETED' && !hasRated ? (
+        <Button
+          label="Noter ce trajet"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/(customer)/rate', params: { type: 'booking', id: booking.id } })}
           style={styles.actionButton}
         />
       ) : null}

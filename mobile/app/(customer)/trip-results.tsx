@@ -1,6 +1,6 @@
 // mobile/app/(customer)/trip-results.tsx
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   IconArrowLeft,
@@ -10,7 +10,7 @@ import {
   IconStarFilled,
   IconUsers,
 } from '@tabler/icons-react-native';
-import { AppText, Avatar, Card, IconButton, ScreenContainer } from '@/components/ui';
+import { AppText, Avatar, Card, IconButton, ResponsiveList, ScreenContainer } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useTripSearch } from '@/hooks/useTripSearch';
 import { formatMoney } from '@/utils/money';
@@ -111,7 +111,7 @@ export default function TripResultsScreen() {
   );
 
   return (
-    <ScreenContainer padded={false}>
+    <ScreenContainer padded={false} maxWidth="wide">
       <View style={styles.header}>
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
@@ -151,7 +151,7 @@ export default function TripResultsScreen() {
         </AppText>
       ) : null}
 
-      <FlatList
+      <ResponsiveList
         data={data?.data ?? []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}

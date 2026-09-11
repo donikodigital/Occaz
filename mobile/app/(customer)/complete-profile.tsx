@@ -37,7 +37,7 @@ export default function CompleteProfileScreen() {
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer maxWidth="form">
       <View style={styles.body}>
         <AppText variant="xxl" weight="semibold" style={styles.title}>
           Complétez votre profil

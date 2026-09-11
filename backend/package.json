@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "seed:rbac": "ts-node src/rbac/seed.ts"
+    "seed:rbac": "ts-node src/rbac/seed.ts",
+    "seed:accounts": "ts-node src/seed/run-accounts-seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.22",

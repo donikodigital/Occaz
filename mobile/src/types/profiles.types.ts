@@ -16,3 +16,33 @@ export interface CreateCustomerProfilePayload {
   countryId?: string;
   cityId?: string;
 }
+
+export type DriverAccountStatus = 'PENDING' | 'VALIDATED' | 'SUSPENDED' | 'REJECTED';
+
+export interface DriverProfile {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  photoUrl: string | null;
+  countryId: string;
+  cityId: string;
+  dateOfBirth: string | null;
+  status: DriverAccountStatus;
+  isVerifiedBadge: boolean;
+  mobileMoneyNumber: string | null;
+  cancellationCount: number;
+  completedTripsCount: number;
+  completedShipmentsCount: number;
+  averageRating: number | null;
+  ratingsCount: number;
+}
+
+export interface CreateDriverProfilePayload {
+  firstName: string;
+  lastName: string;
+  countryId: string;
+  cityId: string;
+  dateOfBirth?: string;
+  mobileMoneyNumber?: string;
+}

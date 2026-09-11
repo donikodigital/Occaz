@@ -1,9 +1,11 @@
 // mobile/app/(customer)/(tabs)/_layout.tsx
 import React from 'react';
-import { Tabs, Redirect } from 'expo-router';
+import { Redirect } from 'expo-router';
+import { Tabs } from 'expo-router/tabs';
 import { IconHome, IconRoute, IconUser } from '@tabler/icons-react-native';
-import { colors, fontFamily } from '@/theme';
+import { colors } from '@/theme';
 import { useCustomerProfile, isProfileMissingError } from '@/hooks/useCustomerProfile';
+import { ResponsiveTabBar } from '@/components/navigation/ResponsiveTabBar';
 
 /**
  * Onglet "Messages" (section 56) volontairement absent tant que le
@@ -22,22 +24,8 @@ export default function CustomerTabsLayout() {
 
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          height: 58,
-          paddingTop: 6,
-          paddingBottom: 8,
-        },
-        tabBarLabelStyle: {
-          fontFamily: fontFamily.medium,
-          fontSize: 11,
-        },
-      }}
+      tabBar={(props) => <ResponsiveTabBar {...props} accentColor={colors.primary} brandLabel="Espace client" />}
+      screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen
         name="home"

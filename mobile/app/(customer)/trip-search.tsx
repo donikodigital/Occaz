@@ -62,7 +62,7 @@ export default function TripSearchScreen() {
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer maxWidth="detail">
       <View style={styles.header}>
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}

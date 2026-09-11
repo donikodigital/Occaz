@@ -36,7 +36,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer maxWidth="form">
       <View style={styles.header}>
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}

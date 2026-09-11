@@ -103,7 +103,7 @@ export default function NewShipmentScreen() {
   }
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll maxWidth="detail">
       <View style={styles.header}>
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}

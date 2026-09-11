@@ -1,7 +1,6 @@
 // mobile/app/(customer)/trip/[id].tsx
 import React from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   IconArrowLeft,
@@ -12,7 +11,7 @@ import {
   IconRosetteDiscountCheck,
   IconStarFilled,
 } from '@tabler/icons-react-native';
-import { AppText, Avatar, Badge, Button, Card, Divider, IconButton } from '@/components/ui';
+import { AppText, Avatar, Badge, Button, Card, Divider, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useTrip } from '@/hooks/useTripSearch';
 import { formatMoney } from '@/utils/money';
@@ -24,7 +23,7 @@ export default function TripDetailScreen() {
 
   if (isLoading || !trip) {
     return (
-      <SafeAreaView style={[styles.safeArea, styles.center]}>
+      <ScreenContainer maxWidth="detail" style={styles.center}>
         {isError ? (
           <AppText variant="sm" color="danger">
             Impossible de charger ce trajet.
@@ -32,14 +31,32 @@ export default function TripDetailScreen() {
         ) : (
           <ActivityIndicator color={colors.primary} />
         )}
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   const initials = `${trip.driver.firstName[0] ?? ''}${trip.driver.lastName[0] ?? ''}`;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <ScreenContainer
+      scroll
+      maxWidth="detail"
+      footer={
+        <View style={styles.footer}>
+          <Badge
+            label={`${trip.availableSeats} place${trip.availableSeats > 1 ? 's' : ''} disponible${trip.availableSeats > 1 ? 's' : ''}`}
+            tone="primary"
+          />
+          <Button
+            label="Réserver"
+            onPress={() => router.push({ pathname: '/(customer)/booking/new', params: { tripId: trip.id } })}
+            disabled={trip.availableSeats === 0}
+            fullWidth={false}
+            style={styles.reserveButton}
+          />
+        </View>
+      }
+    >
       <View style={styles.header}>
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
@@ -48,7 +65,7 @@ export default function TripDetailScreen() {
         />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.content}>
         <Card style={styles.driverCard}>
           <View style={styles.driverRow}>
             <Avatar initials={initials} imageUri={trip.driver.photoUrl} size={52} />
@@ -158,41 +175,20 @@ export default function TripDetailScreen() {
             {formatMoney(trip.pricePerSeat)}
           </AppText>
         </View>
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <Badge
-          label={`${trip.availableSeats} place${trip.availableSeats > 1 ? 's' : ''} disponible${trip.availableSeats > 1 ? 's' : ''}`}
-          tone="primary"
-        />
-        <Button
-          label="Réserver"
-          onPress={() => router.push({ pathname: '/(customer)/booking/new', params: { tripId: trip.id } })}
-          disabled={trip.availableSeats === 0}
-          fullWidth={false}
-          style={styles.reserveButton}
-        />
       </View>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   center: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
     marginBottom: spacing.sm,
   },
   content: {
-    paddingHorizontal: spacing.lg,
     gap: spacing.md,
   },
   driverCard: {
@@ -249,10 +245,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    width: '100%',
   },
   reserveButton: {
     minWidth: 140,

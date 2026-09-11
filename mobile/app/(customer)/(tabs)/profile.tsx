@@ -2,7 +2,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconCheck, IconLogout, IconPhone, IconUserCircle } from '@tabler/icons-react-native';
+import { IconCheck, IconEdit, IconLogout, IconPhone, IconUserCircle } from '@tabler/icons-react-native';
 import { AppText, Avatar, Badge, Card, Divider, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
@@ -32,6 +32,11 @@ export default function CustomerProfileScreen() {
             Compte client
           </AppText>
         </View>
+        <IconButton
+          icon={<IconEdit size={18} color={colors.textPrimary} />}
+          accessibilityLabel="Modifier le profil"
+          onPress={() => router.push('/(customer)/edit-profile')}
+        />
         <IconButton
           icon={<IconLogout size={18} color={colors.danger} />}
           accessibilityLabel="Se déconnecter"
@@ -75,7 +80,7 @@ export default function CustomerProfileScreen() {
       </Card>
 
       <AppText variant="sm" color="textMuted" align="center" style={styles.footnote}>
-        Modification du profil, litiges et messagerie arrivent avec les prochains lots.
+        Litiges et messagerie arrivent avec les prochains lots.
       </AppText>
     </ScreenContainer>
   );

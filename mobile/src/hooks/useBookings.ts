@@ -38,3 +38,43 @@ export function useCancelBooking(id: string) {
     },
   });
 }
+
+// --- Côté chauffeur : validation OTP de prise en charge / dépose ---
+
+export function useRequestPickupOtp(bookingId: string, tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => bookingsApi.requestPickupOtp(bookingId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trips', tripId, 'bookings'] }),
+  });
+}
+
+export function useVerifyPickupOtp(bookingId: string, tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => bookingsApi.verifyPickupOtp(bookingId, code),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trips', tripId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['trips', tripId] });
+    },
+  });
+}
+
+export function useRequestDropoffOtp(bookingId: string, tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => bookingsApi.requestDropoffOtp(bookingId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trips', tripId, 'bookings'] }),
+  });
+}
+
+export function useVerifyDropoffOtp(bookingId: string, tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => bookingsApi.verifyDropoffOtp(bookingId, code),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trips', tripId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['trips', tripId] });
+    },
+  });
+}

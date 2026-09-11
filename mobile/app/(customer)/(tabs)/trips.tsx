@@ -1,9 +1,9 @@
 // mobile/app/(customer)/(tabs)/trips.tsx
 import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconPackage, IconRoute } from '@tabler/icons-react-native';
-import { AppText, Badge, Card, ScreenContainer } from '@/components/ui';
+import { AppText, Badge, Card, ResponsiveList, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useMyBookings } from '@/hooks/useBookings';
 import { useMyShipments } from '@/hooks/useShipments';
@@ -121,7 +121,7 @@ export default function ActivityScreen() {
   const isLoading = segment === 'trips' ? bookingsQuery.isLoading : shipmentsQuery.isLoading;
 
   return (
-    <ScreenContainer padded={false}>
+    <ScreenContainer padded={false} maxWidth="wide">
       <AppText variant="xxl" weight="semibold" style={styles.title}>
         Mon activité
       </AppText>
@@ -150,7 +150,7 @@ export default function ActivityScreen() {
       </View>
 
       {segment === 'trips' ? (
-        <FlatList
+        <ResponsiveList
           data={bookingsQuery.data?.data ?? []}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
@@ -167,7 +167,7 @@ export default function ActivityScreen() {
           renderItem={({ item }) => <BookingRow booking={item} />}
         />
       ) : (
-        <FlatList
+        <ResponsiveList
           data={shipmentsQuery.data?.data ?? []}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}

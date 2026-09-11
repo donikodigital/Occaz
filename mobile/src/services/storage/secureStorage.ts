@@ -3,14 +3,19 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 /**
- * Sur natif (iOS/Android), les jetons ne transitent jamais par AsyncStorage
- * en clair — toujours expo-secure-store (Keychain iOS / Keystore Android).
- * `expo-secure-store` n'a pas d'implémentation web (c'est un wrapper natif :
- * `getValueWithKeyAsync` n'existe simplement pas dans le bundle web), donc
- * sur le web on retombe sur `localStorage`. C'est un choix de confort pour
- * le développement/preview web — ce n'est PAS un stockage chiffré côté
- * navigateur, à garder en tête si la cible web est un jour utilisée en
- * production avec des données sensibles.
+ * Les jetons ne transitent jamais par AsyncStorage (non chiffré) —
+ * toujours expo-secure-store (Keychain iOS / Keystore Android) sur
+ * mobile natif. Un seul point d'accès pour que ce choix ne se
+ * re-décide pas ailleurs par erreur.
+ *
+ * Sur web, expo-secure-store n'a AUCUNE implémentation fonctionnelle
+ * (module natif vide côté web — vérifié dans node_modules, pas supposé)
+ * : chaque appel y échouerait silencieusement. Seul recours pour un
+ * navigateur : `localStorage`, moins sûr (accessible à tout script de
+ * la page, donc vulnérable en cas de faille XSS) mais c'est le
+ * compromis standard des apps Expo qui supportent aussi le web — jamais
+ * un vrai coffre-fort côté navigateur de toute façon. À garder en tête
+ * si une vraie surface d'attaque XSS existe côté web un jour.
  */
 const KEYS = {
   accessToken: 'auth.accessToken',
@@ -20,15 +25,13 @@ const KEYS = {
 const isWeb = Platform.OS === 'web';
 
 async function getItem(key: string): Promise<string | null> {
-  if (isWeb) {
-    return typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-  }
+  if (isWeb) return window.localStorage.getItem(key);
   return SecureStore.getItemAsync(key);
 }
 
 async function setItem(key: string, value: string): Promise<void> {
   if (isWeb) {
-    if (typeof window !== 'undefined') window.localStorage.setItem(key, value);
+    window.localStorage.setItem(key, value);
     return;
   }
   await SecureStore.setItemAsync(key, value);
@@ -36,7 +39,7 @@ async function setItem(key: string, value: string): Promise<void> {
 
 async function deleteItem(key: string): Promise<void> {
   if (isWeb) {
-    if (typeof window !== 'undefined') window.localStorage.removeItem(key);
+    window.localStorage.removeItem(key);
     return;
   }
   await SecureStore.deleteItemAsync(key);
@@ -50,15 +53,9 @@ export const secureStorage = {
     return getItem(KEYS.refreshToken);
   },
   async setTokens(accessToken: string, refreshToken: string): Promise<void> {
-    await Promise.all([
-      setItem(KEYS.accessToken, accessToken),
-      setItem(KEYS.refreshToken, refreshToken),
-    ]);
+    await Promise.all([setItem(KEYS.accessToken, accessToken), setItem(KEYS.refreshToken, refreshToken)]);
   },
   async clearTokens(): Promise<void> {
-    await Promise.all([
-      deleteItem(KEYS.accessToken),
-      deleteItem(KEYS.refreshToken),
-    ]);
+    await Promise.all([deleteItem(KEYS.accessToken), deleteItem(KEYS.refreshToken)]);
   },
 };

@@ -6,6 +6,7 @@ import { IconArrowLeft, IconMapPin, IconPackage } from '@tabler/icons-react-nati
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useCancelShipment, useShipment } from '@/hooks/useShipments';
+import { useShipmentRatings } from '@/hooks/useRatings';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import type { ShipmentStatus } from '@/types/shipments.types';
@@ -31,10 +32,11 @@ export default function ShipmentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: shipment, isLoading, isError } = useShipment(id);
   const cancelShipment = useCancelShipment(id ?? '');
+  const { data: existingRatings } = useShipmentRatings(id);
 
   if (isLoading || !shipment) {
     return (
-      <ScreenContainer style={styles.center}>
+      <ScreenContainer style={styles.center} maxWidth="detail">
         {isError ? (
           <AppText variant="sm" color="danger">
             Impossible de charger cet envoi.
@@ -48,6 +50,7 @@ export default function ShipmentDetailScreen() {
 
   const canCancel = CANCELLABLE_STATUSES.includes(shipment.status);
   const tracking = shipment.tracking ?? [];
+  const hasRated = (existingRatings?.length ?? 0) > 0;
 
   function handleCancel() {
     Alert.alert('Annuler cet envoi ?', 'Cette action ne peut pas être annulée.', [
@@ -65,7 +68,7 @@ export default function ShipmentDetailScreen() {
   }
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll maxWidth="detail">
       <View style={styles.header}>
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
@@ -177,8 +180,17 @@ export default function ShipmentDetailScreen() {
       {shipment.status === 'CREATED' ? (
         <Button
           label="Payer maintenant"
+          onPress={() => router.push({ pathname: '/(customer)/payment', params: { shipmentId: shipment.id } })}
+          style={styles.actionButton}
+        />
+      ) : null}
+
+      {shipment.status === 'COMPLETED' && !hasRated ? (
+        <Button
+          label="Noter cet envoi"
+          variant="secondary"
           onPress={() =>
-            Alert.alert('Bientôt disponible', 'Le paiement en ligne arrive dans une prochaine mise à jour.')
+            router.push({ pathname: '/(customer)/rate', params: { type: 'shipment', id: shipment.id } })
           }
           style={styles.actionButton}
         />

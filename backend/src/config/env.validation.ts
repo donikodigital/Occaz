@@ -20,12 +20,6 @@ enum NodeEnv {
  * Toute variable d'environnement manquante ou mal typée fait échouer le
  * démarrage immédiatement, plutôt que de laisser une valeur `undefined`
  * se propager silencieusement jusqu'en production (ex: un JWT_SECRET vide).
- *
- * Les propriétés sans valeur par défaut utilisent l'assertion `!` : elles
- * sont bien remplies au runtime par `plainToInstance` + `validateSync`
- * (voir `validate()` ci-dessous), mais TypeScript ne peut pas le savoir
- * statiquement puisque `strictPropertyInitialization` exige soit un
- * initialiseur, soit une valeur assignée dans le constructeur.
  */
 class EnvironmentVariables {
   @IsEnum(NodeEnv)
@@ -37,13 +31,13 @@ class EnvironmentVariables {
   PORT: number = 3000;
 
   @IsUrl({ require_tld: false, protocols: ['postgresql', 'postgres'] })
-  DATABASE_URL!: string;
+  DATABASE_URL: string;
 
   @IsString()
-  JWT_ACCESS_SECRET!: string;
+  JWT_ACCESS_SECRET: string;
 
   @IsString()
-  JWT_REFRESH_SECRET!: string;
+  JWT_REFRESH_SECRET: string;
 
   @IsString()
   JWT_ACCESS_EXPIRES_IN: string = '15m';
@@ -52,7 +46,7 @@ class EnvironmentVariables {
   JWT_REFRESH_EXPIRES_IN: string = '30d';
 
   @IsString()
-  OTP_HASH_PEPPER!: string;
+  OTP_HASH_PEPPER: string;
 }
 
 export function validate(config: Record<string, unknown>): EnvironmentVariables {

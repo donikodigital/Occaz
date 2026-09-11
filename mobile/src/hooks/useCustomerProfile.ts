@@ -28,6 +28,16 @@ export function useCreateCustomerProfile() {
   });
 }
 
+export function useUpdateCustomerProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<CreateCustomerProfilePayload>) => customerProfilesApi.updateMine(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-profile', 'mine'] });
+    },
+  });
+}
+
 export function isProfileMissingError(error: unknown): boolean {
   return error instanceof ApiError && error.statusCode === 404;
 }

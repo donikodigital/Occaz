@@ -1,3 +1,4 @@
+// backend/prisma/schema.prisma
 // =============================================================================
 // schema.prisma — Plateforme régionale de transport partagé (Trajets + Envois)
 // Version : v1.0.0
