@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "esnext",
-    "lib": ["dom", "esnext"],
+    "lib": [
+      "dom",
+      "esnext"
+    ],
     "module": "esnext",
     "moduleResolution": "bundler",
     "jsx": "react-native",
@@ -14,12 +17,24 @@
     "noEmit": true,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
-    "types": ["react-native", "react"]
+    "types": [
+      "react-native",
+      "react"
+    ]
   },
-  "include": ["app", "src", "*.d.ts", "app.config.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "app",
+    "src",
+    "*.d.ts",
+    "app.config.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ],
+  "extends": "expo/tsconfig.base"
 }
