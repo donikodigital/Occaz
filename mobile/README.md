@@ -196,6 +196,71 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
   client au solde disponible avant même l'appel serveur, numéro Mobile
   Money pré-rempli depuis le profil chauffeur s'il existe déjà.
 
+## Lot 7 (livré) — Messagerie et Notifications (les deux rôles)
+
+- **Deux vraies limites du backend actuel, contournées côté design plutôt
+  que corrigées** (le client a demandé de ne plus toucher au backend
+  pour l'instant) :
+  - `GET /conversations/mine` ne renvoie ni le nom du correspondant ni
+    de compteur de non-lus — seulement les références booking/shipment.
+    La liste reste donc volontairement sobre (type + date) ; le contexte
+    riche (qui écrit quoi) n'apparaît qu'une fois dans le fil, où
+    chaque message porte son expéditeur.
+  - `Notification` ne persiste jamais le texte réellement envoyé (le
+    corps est rendu à la volée côté backend puis jeté — seuls `type` et
+    `payload` bruts restent). Les libellés affichés sont donc générés
+    côté client à partir du `type` (`notificationLabels.ts`), même
+    principe que les statuts de trajet/réservation/envoi ailleurs dans
+    l'app.
+- **Messagerie** : nouvel onglet "Messages" dans les deux espaces (4ᵉ
+  onglet client, 5ᵉ onglet chauffeur), fil de discussion avec bulles
+  alignées selon l'expéditeur, distinction visuelle des interventions du
+  support (`isSupportIntervention`). Interrogation périodique (10s)
+  plutôt que temps réel — le backend n'expose aucun canal websocket pour
+  ça. Boutons "Contacter" ajoutés sur le détail d'une réservation/d'un
+  envoi (client) et sur chaque réservation/l'envoi lui-même (chauffeur),
+  conditionnés à l'existence d'un chauffeur assigné quand c'est pertinent
+  (`getOrCreateForShipment` du backend l'exige).
+- **Notifications** : icône cloche (déjà en place côté client depuis le
+  Lot 2, ajoutée pour la première fois côté chauffeur) menant à une boîte
+  de réception avec icône par type, distinction lu/non-lu, "tout marquer
+  comme lu". Les notifications push réelles ne sont volontairement pas
+  câblées dans ce lot — le fournisseur backend n'est lui-même qu'un
+  simulateur qui journalise en console (Lot 8 backend), construire
+  l'enregistrement de jeton push maintenant n'aurait rien à recevoir.
+
+## Lot 8 (livré) — Litiges (les deux rôles)
+
+**Dernier lot mobile — le back-office web (Lot 9) est le seul restant.**
+
+- Contrats vérifiés dans le code source du backend avant d'écrire quoi
+  que ce soit (comme tous les lots précédents). Une vraie erreur de
+  typage évitée au passage : `POST /disputes/:id/messages` renvoie le
+  `DisputeMessage` créé, pas le litige entier — un détail qui aurait
+  cassé silencieusement l'invalidation du cache si copié depuis le
+  pattern de la messagerie du Lot 7 sans vérifier.
+- **Ouverture toujours contextuelle, jamais dans le vide** : le bouton
+  "Signaler un problème" vit sur le détail d'une réservation ou d'un
+  envoi (les deux côtés), jamais comme un flux autonome qui obligerait
+  à re-choisir quoi que ce soit — le contexte est déjà là. Côté
+  chauffeur, un trajet ayant plusieurs réservations, le lien est posé
+  sur chaque réservation individuellement, pas sur le trajet entier.
+- **Liste des litiges** volontairement en lecture seule (statut,
+  priorité, date) — la création se fait ailleurs, comme décrit ci-dessus.
+  Accessible depuis l'onglet Profil des deux espaces.
+- **Fil de discussion** avec les mêmes bulles que la messagerie du
+  Lot 7, plus une distinction visuelle des réponses de l'agent assigné.
+  Résolution affichée en tête du fil quand elle existe (type, montant
+  remboursé le cas échéant, notes).
+- **Un vrai bug d'ordre des messages trouvé à la relecture, pas par le
+  compilateur** : les messages étaient inversés (donc triés du plus
+  récent au plus ancien) sans que la liste soit configurée en mode
+  `inverted` — résultat, le message le plus récent se serait affiché
+  en haut de l'écran plutôt qu'en bas. Corrigé en ajoutant la prop
+  manquante plutôt qu'en annulant l'inversion, pour garder le
+  comportement "dernier message visible sans avoir à faire défiler",
+  cohérent avec la messagerie du Lot 7.
+
 ## Mise à jour transversale — Responsive mobile + desktop
 
 Appliquée après le Lot 5, avant le Lot 6, à la demande explicite du
@@ -248,12 +313,10 @@ nativement.
   transitive — déclaré explicitement pour ne pas dépendre d'une
   résolution accidentelle).
 
-## Lots à venir
+## Lot à venir
 
 | Lot | Contenu |
 |---|---|
-| 7 | Messagerie et Notifications (les deux rôles) |
-| 8 | Litiges (les deux rôles) |
 | 9 | Back-office web (Next.js) — SuperAdmin / Support, projet séparé |
 
 ## Démarrage

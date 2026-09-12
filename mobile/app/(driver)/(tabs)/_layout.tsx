@@ -2,12 +2,11 @@
 import React from 'react';
 import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/tabs';
-import { IconHome, IconRoute, IconUser, IconWallet } from '@tabler/icons-react-native';
+import { IconHome, IconMessageCircle, IconRoute, IconUser, IconWallet } from '@tabler/icons-react-native';
 import { colors } from '@/theme';
 import { useDriverProfile, isDriverProfileMissingError } from '@/hooks/useDriverProfile';
 import { ResponsiveTabBar } from '@/components/navigation/ResponsiveTabBar';
 
-/** Même principe que le groupe (customer) — voir sa note pour le pourquoi de l'absence d'onglet Messages. */
 export default function DriverTabsLayout() {
   const profileQuery = useDriverProfile();
 
@@ -39,6 +38,13 @@ export default function DriverTabsLayout() {
         options={{
           title: 'Portefeuille',
           tabBarIcon: ({ color, size }) => <IconWallet size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarIcon: ({ color, size }) => <IconMessageCircle size={size} color={color} />,
         }}
       />
       <Tabs.Screen

@@ -2,16 +2,11 @@
 import React from 'react';
 import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/tabs';
-import { IconHome, IconRoute, IconUser } from '@tabler/icons-react-native';
+import { IconHome, IconMessageCircle, IconRoute, IconUser } from '@tabler/icons-react-native';
 import { colors } from '@/theme';
 import { useCustomerProfile, isProfileMissingError } from '@/hooks/useCustomerProfile';
 import { ResponsiveTabBar } from '@/components/navigation/ResponsiveTabBar';
 
-/**
- * Onglet "Messages" (section 56) volontairement absent tant que le
- * module Messagerie du frontend n'existe pas (Lot 7) — mieux vaut trois
- * onglets pleinement fonctionnels qu'un quatrième qui ne mène nulle part.
- */
 export default function CustomerTabsLayout() {
   const profileQuery = useCustomerProfile();
 
@@ -39,6 +34,13 @@ export default function CustomerTabsLayout() {
         options={{
           title: 'Trajets',
           tabBarIcon: ({ color, size }) => <IconRoute size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarIcon: ({ color, size }) => <IconMessageCircle size={size} color={color} />,
         }}
       />
       <Tabs.Screen

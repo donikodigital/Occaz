@@ -1,0 +1,114 @@
+// web-admin/src/app/(app)/dashboard/page.tsx
+'use client';
+
+import React from 'react';
+import {
+  IconAlertTriangle,
+  IconCash,
+  IconPackage,
+  IconRoute,
+  IconUserCheck,
+  IconUsers,
+} from '@tabler/icons-react';
+import { StatCard } from '@/components/layout/StatCard';
+import { useAdminDashboard } from '@/hooks/useAdminDashboard';
+import { formatMoney, formatNumber } from '@/utils/money';
+
+export default function DashboardPage() {
+  const { data, isLoading, isError } = useAdminDashboard();
+
+  if (isError) {
+    return (
+      <p className="text-sm text-danger">
+        Impossible de charger le tableau de bord — vérifiez que votre compte a la permission requise
+        (DASHBOARD_ADMIN_READ).
+      </p>
+    );
+  }
+
+  if (isLoading || !data) {
+    return <p className="text-sm text-text-secondary">Chargement…</p>;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold text-text-primary">Tableau de bord</h1>
+        <p className="text-sm text-text-secondary">
+          Actifs sur les {data.active.windowDays} derniers jours.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          label="Utilisateurs"
+          value={formatNumber(data.users.total)}
+          icon={IconUsers}
+          sublabel={`${formatNumber(data.users.drivers)} chauffeurs · ${formatNumber(data.users.customers)} clients`}
+        />
+        <StatCard
+          label="Chauffeurs vérifiés"
+          value={formatNumber(data.users.verifiedDrivers)}
+          icon={IconUserCheck}
+          tone="success"
+          sublabel={`sur ${formatNumber(data.users.drivers)} au total`}
+        />
+        <StatCard
+          label="Utilisateurs actifs"
+          value={formatNumber(data.active.drivers + data.active.customers)}
+          icon={IconUsers}
+          tone="accent"
+          sublabel={`${formatNumber(data.active.drivers)} chauffeurs · ${formatNumber(data.active.customers)} clients`}
+        />
+        <StatCard
+          label="Trajets"
+          value={formatNumber(data.trips.total)}
+          icon={IconRoute}
+          sublabel={`${formatNumber(data.trips.bookings)} réservations · ${formatNumber(data.trips.completedBookings)} terminées`}
+        />
+        <StatCard
+          label="Envois"
+          value={formatNumber(data.shipments.total)}
+          icon={IconPackage}
+          sublabel={`${formatNumber(data.shipments.completed)} terminés`}
+        />
+        <StatCard
+          label="Litiges ouverts"
+          value={formatNumber(data.disputes.open)}
+          icon={IconAlertTriangle}
+          tone="danger"
+          sublabel={
+            data.disputes.resolutionRatePercent !== null
+              ? `${data.disputes.resolutionRatePercent}% de résolution`
+              : `${formatNumber(data.disputes.total)} au total`
+          }
+        />
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-lg font-semibold text-text-primary">Finances</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <StatCard
+            label="Revenu brut trajets"
+            value={formatMoney(data.finance.grossBookingRevenue)}
+            icon={IconCash}
+            sublabel={`Commission : ${formatMoney(data.finance.bookingCommission)}`}
+          />
+          <StatCard
+            label="Revenu brut envois"
+            value={formatMoney(data.finance.grossShipmentRevenue)}
+            icon={IconCash}
+            sublabel={`Commission : ${formatMoney(data.finance.shipmentCommission)}`}
+          />
+          <StatCard
+            label="Remboursé"
+            value={formatMoney(data.finance.refundedAmount)}
+            icon={IconCash}
+            tone="danger"
+            sublabel={`${formatNumber(data.finance.refundedCount)} remboursement(s)`}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   IconAlertTriangle,
+  IconBell,
   IconCar,
   IconLogout,
   IconPackage,
@@ -45,6 +46,11 @@ export default function DriverHomeScreen() {
             {profile?.firstName ?? '…'}
           </AppText>
         </View>
+        <IconButton
+          icon={<IconBell size={18} color={colors.textPrimary} />}
+          accessibilityLabel="Notifications"
+          onPress={() => router.push('/(driver)/notifications')}
+        />
         <IconButton
           icon={<IconLogout size={18} color={colors.danger} />}
           accessibilityLabel="Se déconnecter"

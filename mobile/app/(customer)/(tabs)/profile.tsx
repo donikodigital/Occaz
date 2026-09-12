@@ -2,7 +2,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconCheck, IconEdit, IconLogout, IconPhone, IconUserCircle } from '@tabler/icons-react-native';
+import { IconAlertTriangle, IconCheck, IconChevronRight, IconEdit, IconLogout, IconPhone, IconUserCircle } from '@tabler/icons-react-native';
 import { AppText, Avatar, Badge, Card, Divider, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
@@ -79,9 +79,15 @@ export default function CustomerProfileScreen() {
         </View>
       </Card>
 
-      <AppText variant="sm" color="textMuted" align="center" style={styles.footnote}>
-        Litiges et messagerie arrivent avec les prochains lots.
-      </AppText>
+      <Card onPress={() => router.push('/(customer)/disputes')} style={styles.row}>
+        <View style={styles.rowIcon}>
+          <IconAlertTriangle size={18} color={colors.primary} />
+        </View>
+        <AppText variant="md" weight="medium" style={styles.rowText}>
+          Mes litiges
+        </AppText>
+        <IconChevronRight size={16} color={colors.textMuted} />
+      </Card>
     </ScreenContainer>
   );
 }

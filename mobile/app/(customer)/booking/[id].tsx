@@ -2,11 +2,12 @@
 import React from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconCheck } from '@tabler/icons-react-native';
+import { IconArrowLeft, IconCheck, IconMessageCircle } from '@tabler/icons-react-native';
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useBooking, useCancelBooking } from '@/hooks/useBookings';
 import { useBookingRatings } from '@/hooks/useRatings';
+import { useGetOrCreateConversationForBooking } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import type { BookingStatus } from '@/types/bookings.types';
@@ -28,6 +29,7 @@ export default function BookingDetailScreen() {
   const { data: booking, isLoading, isError } = useBooking(id);
   const cancelBooking = useCancelBooking(id ?? '');
   const { data: existingRatings } = useBookingRatings(id);
+  const getOrCreateConversation = useGetOrCreateConversationForBooking();
 
   if (isLoading || !booking) {
     return (
@@ -75,7 +77,15 @@ export default function BookingDetailScreen() {
         <AppText variant="lg" weight="semibold">
           Réservation
         </AppText>
-        <View style={{ width: 38 }} />
+        <IconButton
+          icon={<IconMessageCircle size={18} color={colors.textPrimary} />}
+          accessibilityLabel="Contacter le chauffeur"
+          onPress={() =>
+            getOrCreateConversation.mutate(booking.id, {
+              onSuccess: (conversation) => router.push(`/(customer)/conversation/${conversation.id}`),
+            })
+          }
+        />
       </View>
 
       <View style={styles.statusBlock}>
@@ -165,6 +175,18 @@ export default function BookingDetailScreen() {
           style={styles.actionButton}
         />
       ) : null}
+
+      <Button
+        label="Signaler un problème"
+        variant="ghost"
+        onPress={() =>
+          router.push({
+            pathname: '/(customer)/dispute-new',
+            params: { subjectType: 'TRIP', bookingId: booking.id },
+          })
+        }
+        style={styles.actionButton}
+      />
     </ScreenContainer>
   );
 }

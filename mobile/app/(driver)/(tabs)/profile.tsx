@@ -2,8 +2,17 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconCar, IconCheck, IconEdit, IconLogout, IconPhone, IconPlus } from '@tabler/icons-react-native';
-import { AppText, Avatar, Badge, Card, Divider, IconButton, ScreenContainer } from '@/components/ui';
+import {
+  IconAlertTriangle,
+  IconCar,
+  IconCheck,
+  IconChevronRight,
+  IconEdit,
+  IconLogout,
+  IconPhone,
+  IconPlus,
+} from '@tabler/icons-react-native';
+import { AppText, Avatar, Badge, Card, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
@@ -108,11 +117,15 @@ export default function DriverProfileScreen() {
         ) : null}
       </View>
 
-      <Divider />
-
-      <AppText variant="sm" color="textMuted" align="center" style={styles.footnote}>
-        Envois, portefeuille, litiges et messagerie arrivent avec les prochains lots.
-      </AppText>
+      <Card onPress={() => router.push('/(driver)/disputes')} style={styles.row}>
+        <View style={styles.rowIcon}>
+          <IconAlertTriangle size={18} color={colors.success} />
+        </View>
+        <AppText variant="md" weight="medium" style={styles.rowText}>
+          Mes litiges
+        </AppText>
+        <IconChevronRight size={16} color={colors.textMuted} />
+      </Card>
     </ScreenContainer>
   );
 }

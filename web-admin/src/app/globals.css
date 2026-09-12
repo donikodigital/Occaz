@@ -1,0 +1,45 @@
+/* web-admin/src/app/globals.css */
+@import "tailwindcss";
+
+/*
+ * Mêmes jetons que l'app mobile (voir mobile/src/theme/colors.ts) —
+ * indigo pour la marque, émeraude pour l'argent/la confirmation, ambre
+ * pour l'énergie/les alertes. Fond blanc cassé chaud, jamais de noir ni
+ * de fond sombre. Cohérence de marque entre l'app et ce back-office,
+ * pas un thème générique de tableau de bord.
+ */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary: #4f46e5;
+  --color-primary-dark: #3730a3;
+  --color-primary-light: #eeedfe;
+  --color-on-primary: #ffffff;
+
+  --color-success: #10b981;
+  --color-success-dark: #047857;
+  --color-success-light: #e1f5ee;
+
+  --color-accent: #f59e0b;
+  --color-accent-dark: #92400e;
+  --color-accent-light: #fdf1dc;
+
+  --color-danger: #dc2626;
+  --color-danger-dark: #7f1d1d;
+  --color-danger-light: #fcebeb;
+
+  --color-background: #fafaf9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4f3f0;
+  --color-border: #e5e3de;
+  --color-border-strong: #d3d1c7;
+
+  --color-text-primary: #1c1b1a;
+  --color-text-secondary: #6b6862;
+  --color-text-muted: #9c9a93;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-text-primary);
+}

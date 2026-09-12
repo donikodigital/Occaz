@@ -1,6 +1,6 @@
 // mobile/app/(customer)/(tabs)/home.tsx
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import {
   IconArrowUpRight,
@@ -61,7 +61,7 @@ export default function CustomerHomeScreen() {
         <IconButton
           icon={<IconBell size={18} color={colors.textPrimary} />}
           accessibilityLabel="Notifications"
-          onPress={() => Alert.alert('Bientôt disponible', 'Les notifications arrivent prochainement.')}
+          onPress={() => router.push('/(customer)/notifications')}
         />
       </View>
 

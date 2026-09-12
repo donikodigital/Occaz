@@ -29,6 +29,11 @@ export default function CustomerLayout() {
       <Stack.Screen name="shipment/[id]" />
       <Stack.Screen name="payment" />
       <Stack.Screen name="rate" />
+      <Stack.Screen name="conversation/[id]" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="disputes" />
+      <Stack.Screen name="dispute-new" />
+      <Stack.Screen name="dispute/[id]" />
     </Stack>
   );
 }

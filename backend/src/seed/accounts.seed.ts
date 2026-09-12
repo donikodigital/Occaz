@@ -18,7 +18,7 @@ const SEED_PASSWORD = 'Lcd123456!';
 
 interface SeedAccount {
   email: string;
-  /** Format international — voir la note sur le premier numéro dans run(). */
+  /** Format international. */
   phone: string;
   accountType: AccountType;
   /** Doit correspondre à une clé de rôle déjà créée par `npm run seed:rbac`. */
@@ -28,7 +28,7 @@ interface SeedAccount {
 const ACCOUNTS: SeedAccount[] = [
   {
     email: 'thiernodoniko@gmail.com',
-    phone: '+3766736226',
+    phone: '+33766736226',
     accountType: AccountType.SUPERADMIN,
     roleKey: 'superadmin',
   },
@@ -59,11 +59,6 @@ export class AccountsSeedService {
   constructor(private readonly prisma: PrismaService) {}
 
   async run(): Promise<void> {
-    this.logger.warn(
-      'Le premier numéro fourni ("003766736226") a un chiffre de moins que les trois autres ' +
-        '(tous au format +33...). Traité tel quel en +3766736226 — à corriger si c\'était une erreur de saisie.',
-    );
-
     const passwordHash = await bcrypt.hash(SEED_PASSWORD, 12);
 
     for (const account of ACCOUNTS) {

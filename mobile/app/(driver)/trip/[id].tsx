@@ -1,8 +1,8 @@
 // mobile/app/(driver)/trip/[id].tsx
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconCar, IconUsers } from '@tabler/icons-react-native';
+import { IconArrowLeft, IconCar, IconMessageCircle, IconUsers } from '@tabler/icons-react-native';
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useTrip } from '@/hooks/useTripSearch';
@@ -21,6 +21,7 @@ import {
   useVerifyDropoffOtp,
   useVerifyPickupOtp,
 } from '@/hooks/useBookings';
+import { useGetOrCreateConversationForBooking } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { DRIVER_BOOKING_STATUS_LABELS, TRIP_STATUS_LABELS, TRIP_STATUS_TONE } from '@/utils/tripStatusLabels';
@@ -37,6 +38,7 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
   const verifyPickup = useVerifyPickupOtp(booking.id, tripId);
   const requestDropoff = useRequestDropoffOtp(booking.id, tripId);
   const verifyDropoff = useVerifyDropoffOtp(booking.id, tripId);
+  const getOrCreateConversation = useGetOrCreateConversationForBooking();
 
   const passengerNames = booking.passengers?.map((p) => p.fullName).join(', ') || `${booking.seatsCount} place(s)`;
 
@@ -79,6 +81,15 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
           </AppText>
         </View>
         <Badge label={DRIVER_BOOKING_STATUS_LABELS[booking.status]} tone={booking.status === 'CONFIRMED' ? 'success' : 'neutral'} />
+        <IconButton
+          icon={<IconMessageCircle size={15} color={colors.textPrimary} />}
+          accessibilityLabel="Contacter le passager"
+          onPress={() =>
+            getOrCreateConversation.mutate(booking.id, {
+              onSuccess: (conversation) => router.push(`/(driver)/conversation/${conversation.id}`),
+            })
+          }
+        />
       </View>
 
       {phase !== 'none' ? (
@@ -113,6 +124,18 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
           )}
         </View>
       ) : null}
+      <Pressable
+        onPress={() =>
+          router.push({
+            pathname: '/(driver)/dispute-new',
+            params: { subjectType: 'TRIP', bookingId: booking.id },
+          })
+        }
+      >
+        <AppText variant="xs" color="textMuted" style={styles.reportLink}>
+          Signaler un problème
+        </AppText>
+      </Pressable>
     </Card>
   );
 }
@@ -321,6 +344,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
+  },
+  reportLink: {
+    marginTop: spacing.xs,
+    textDecorationLine: 'underline',
   },
   codeRow: {
     flexDirection: 'row',

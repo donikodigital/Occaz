@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconMapPin, IconPhone } from '@tabler/icons-react-native';
+import { IconArrowLeft, IconMapPin, IconMessageCircle, IconPhone } from '@tabler/icons-react-native';
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useShipment, useCancelShipment } from '@/hooks/useShipments';
@@ -19,6 +19,7 @@ import {
 } from '@/hooks/useShipmentOtp';
 import { formatMoney } from '@/utils/money';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_TONE } from '@/utils/tripStatusLabels';
+import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { ApiError } from '@/services/api/ApiError';
 
 function OtpSection({
@@ -83,6 +84,7 @@ export default function DriverShipmentDetailScreen() {
 
   const assignShipment = useAssignShipment(id ?? '');
   const cancelShipment = useCancelShipment(id ?? '');
+  const getOrCreateConversation = useGetOrCreateConversationForShipment();
   const markPickupPending = useMarkShipmentPickupPending(id ?? '');
   const markInTransit = useMarkShipmentInTransit(id ?? '');
   const markDeliveryPending = useMarkShipmentDeliveryPending(id ?? '');
@@ -140,6 +142,17 @@ export default function DriverShipmentDetailScreen() {
           accessibilityLabel="Retour"
           onPress={() => router.back()}
         />
+        {shipment.tripId ? (
+          <IconButton
+            icon={<IconMessageCircle size={18} color={colors.textPrimary} />}
+            accessibilityLabel="Contacter le client"
+            onPress={() =>
+              getOrCreateConversation.mutate(shipment.id, {
+                onSuccess: (conversation) => router.push(`/(driver)/conversation/${conversation.id}`),
+              })
+            }
+          />
+        ) : null}
         <Badge label={SHIPMENT_STATUS_LABELS[shipment.status]} tone={SHIPMENT_STATUS_TONE[shipment.status]} />
       </View>
 
@@ -299,6 +312,18 @@ export default function DriverShipmentDetailScreen() {
           style={styles.actionButton}
         />
       ) : null}
+
+      <Button
+        label="Signaler un problème"
+        variant="ghost"
+        onPress={() =>
+          router.push({
+            pathname: '/(driver)/dispute-new',
+            params: { subjectType: 'SHIPMENT', shipmentId: shipment.id },
+          })
+        }
+        style={styles.actionButton}
+      />
     </ScreenContainer>
   );
 }

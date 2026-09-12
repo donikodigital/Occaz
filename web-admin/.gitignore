@@ -1,0 +1,8 @@
+# web-admin/.gitignore
+node_modules/
+.next/
+out/
+*.log
+.env
+.env.*.local
+.DS_Store

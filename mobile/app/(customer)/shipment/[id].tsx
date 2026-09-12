@@ -2,11 +2,12 @@
 import React from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconMapPin, IconPackage } from '@tabler/icons-react-native';
+import { IconArrowLeft, IconMapPin, IconMessageCircle, IconPackage } from '@tabler/icons-react-native';
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useCancelShipment, useShipment } from '@/hooks/useShipments';
 import { useShipmentRatings } from '@/hooks/useRatings';
+import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import type { ShipmentStatus } from '@/types/shipments.types';
@@ -32,6 +33,7 @@ export default function ShipmentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: shipment, isLoading, isError } = useShipment(id);
   const cancelShipment = useCancelShipment(id ?? '');
+  const getOrCreateConversation = useGetOrCreateConversationForShipment();
   const { data: existingRatings } = useShipmentRatings(id);
 
   if (isLoading || !shipment) {
@@ -78,7 +80,19 @@ export default function ShipmentDetailScreen() {
         <AppText variant="lg" weight="semibold">
           Suivi de l'envoi
         </AppText>
-        <View style={{ width: 38 }} />
+        {shipment.tripId ? (
+          <IconButton
+            icon={<IconMessageCircle size={18} color={colors.textPrimary} />}
+            accessibilityLabel="Contacter le chauffeur"
+            onPress={() =>
+              getOrCreateConversation.mutate(shipment.id, {
+                onSuccess: (conversation) => router.push(`/(customer)/conversation/${conversation.id}`),
+              })
+            }
+          />
+        ) : (
+          <View style={{ width: 38 }} />
+        )}
       </View>
 
       <View style={styles.statusBlock}>
@@ -205,6 +219,18 @@ export default function ShipmentDetailScreen() {
           style={styles.actionButton}
         />
       ) : null}
+
+      <Button
+        label="Signaler un problème"
+        variant="ghost"
+        onPress={() =>
+          router.push({
+            pathname: '/(customer)/dispute-new',
+            params: { subjectType: 'SHIPMENT', shipmentId: shipment.id },
+          })
+        }
+        style={styles.actionButton}
+      />
     </ScreenContainer>
   );
 }

@@ -22,7 +22,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "static"
     },
     "plugins": ["expo-router", "expo-font", "expo-secure-store"],
     "extra": {
