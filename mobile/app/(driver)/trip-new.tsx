@@ -1,19 +1,17 @@
-// mobile/app/(driver)/trip-new.tsx
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconArrowLeft, IconMapPin } from '@tabler/icons-react-native';
-import { AppText, Button, Card, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, Button, CalendarPicker, Card, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { useCreateTrip } from '@/hooks/useDriverTrips';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
-import { upcomingDays, formatDateShort } from '@/utils/date';
+import { upcomingDays } from '@/utils/date';
 import { ApiError } from '@/services/api/ApiError';
 import type { TripLocation } from '@/types/trips.types';
 
-const DAYS_AHEAD = 21;
 const MINUTE_STEPS = [0, 15, 30, 45];
 
 export default function NewTripScreen() {
@@ -159,22 +157,9 @@ export default function NewTripScreen() {
       </Card>
 
       <SectionTitle label="Date de départ" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayStrip}>
-        {upcomingDays(DAYS_AHEAD).map((day) => {
-          const isActive = day.toDateString() === selectedDay.toDateString();
-          return (
-            <Pressable
-              key={day.toISOString()}
-              onPress={() => setSelectedDay(day)}
-              style={[styles.dayPill, isActive && styles.dayPillActive]}
-            >
-              <AppText variant="sm" weight="medium" color={isActive ? colors.onPrimary : 'textPrimary'}>
-                {formatDateShort(day.toISOString())}
-              </AppText>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.dateField}>
+        <CalendarPicker label="" selectedDate={selectedDay} onSelectDate={(date) => setSelectedDay(date ?? selectedDay)} />
+      </View>
 
       <SectionTitle label="Heure de départ" />
       <View style={styles.timeRow}>
@@ -331,21 +316,8 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  dayStrip: {
+  dateField: {
     marginBottom: spacing.lg,
-  },
-  dayPill: {
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.sm + 2,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    marginRight: spacing.xs,
-  },
-  dayPillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   timeRow: {
     gap: spacing.xs,

@@ -1,16 +1,13 @@
-// mobile/app/(customer)/trip-search.tsx
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconArrowLeft, IconArrowsUpDown, IconMapPin, IconMinus, IconPlus } from '@tabler/icons-react-native';
-import { AppText, Button, Card, IconButton, ScreenContainer } from '@/components/ui';
+import { AppText, Button, CalendarPicker, Card, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { recentSearchesStorage } from '@/services/storage/recentSearches';
-import { formatDateShort, toDateOnly, upcomingDays } from '@/utils/date';
+import { toDateOnly } from '@/utils/date';
 import type { City } from '@/types/geography.types';
-
-const DAYS_AHEAD = 14;
 
 export default function TripSearchScreen() {
   const [origin, setOrigin] = useState<City | null>(null);
@@ -29,7 +26,6 @@ export default function TripSearchScreen() {
     consumeSelection();
   }, [selection, consumeSelection]);
 
-  const days = upcomingDays(DAYS_AHEAD);
   const canSearch = Boolean(origin && destination);
 
   async function handleSearch() {
@@ -114,30 +110,14 @@ export default function TripSearchScreen() {
       <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
         Date
       </AppText>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateStrip}>
-        <Pressable
-          onPress={() => setSelectedDate(null)}
-          style={[styles.dayPill, !selectedDate && styles.dayPillActive]}
-        >
-          <AppText variant="sm" weight="medium" color={!selectedDate ? colors.onPrimary : 'textPrimary'}>
-            Flexible
-          </AppText>
-        </Pressable>
-        {days.map((day) => {
-          const isActive = selectedDate?.toDateString() === day.toDateString();
-          return (
-            <Pressable
-              key={day.toISOString()}
-              onPress={() => setSelectedDate(day)}
-              style={[styles.dayPill, isActive && styles.dayPillActive]}
-            >
-              <AppText variant="sm" weight="medium" color={isActive ? colors.onPrimary : 'textPrimary'}>
-                {formatDateShort(day.toISOString())}
-              </AppText>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.dateField}>
+        <CalendarPicker
+          label=""
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          flexibleLabel="Dates flexibles"
+        />
+      </View>
 
       <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
         Passagers
@@ -207,21 +187,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginBottom: spacing.sm,
   },
-  dateStrip: {
+  dateField: {
     marginBottom: spacing.lg,
-  },
-  dayPill: {
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.sm + 2,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    marginRight: spacing.xs,
-  },
-  dayPillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   stepper: {
     flexDirection: 'row',
