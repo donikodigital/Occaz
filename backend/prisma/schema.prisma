@@ -706,6 +706,17 @@ model Trip {
 
   notes String?
 
+  // Position en direct du chauffeur pendant IN_PROGRESS — seule la
+  // dernière position est conservée (pas d'historique de trajet complet,
+  // hors scope MVP ; voir TripsService.updatePosition). Mise à jour par
+  // polling REST côté app chauffeur, pas de WebSocket dans cette V1 —
+  // largement suffisant pour une fréquence de quelques secondes, plus
+  // simple à opérer qu'un canal temps réel tant que le besoin de latence
+  // sub-seconde ne se fait pas sentir.
+  currentLatitude          Float?
+  currentLongitude         Float?
+  currentPositionUpdatedAt DateTime?
+
   stops      TripStop[]
   bookings   Booking[]
   shipments  Shipment[]

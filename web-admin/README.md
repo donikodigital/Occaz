@@ -135,12 +135,32 @@ sans cesse.
   groupes (Opérations, Finance, Configuration, Système) plutôt que
   listée à plat — devenait illisible sinon.
 
+## Mise à jour — Revue des pièces justificatives
+
+Ferme le trou signalé au Lot 2 (`GET /documents` n'acceptait pas de
+filtre par propriétaire) — comblé côté backend, exploité ici.
+
+- **`DocumentsPanel`** (nouveau, réutilisable) : liste les documents
+  d'un chauffeur ou d'un véhicule, avec aperçu via URL signée
+  temporaire (jamais d'accès direct au fichier), validation/rejet avec
+  motif obligatoire.
+- Ajouté à la fiche chauffeur (Lot 2) : une carte "Pièces d'identité"
+  au niveau du chauffeur, et un panneau dépliable par véhicule.
+
 ## État du projet
 
 Les 5 lots prévus sont livrés. D'éventuelles extensions (ex: écrans
 dédiés pour les preuves/évidences de litige, un vrai visualiseur de
 documents une fois le trou `GET /documents` du Lot 2 comblé côté
 backend) resteraient à la demande plutôt que planifiées d'avance.
+
+## Déploiement
+
+Pensé pour Vercel (zéro configuration nécessaire pour un projet
+Next.js standard) — il suffit de renseigner `NEXT_PUBLIC_API_URL` vers
+le backend déployé dans les variables d'environnement du projet
+Vercel. `.github/workflows/ci.yml` vérifie les types et le build à
+chaque push/PR touchant `web-admin/`.
 
 ## Démarrage
 

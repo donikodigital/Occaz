@@ -10,6 +10,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../audit/audit.service';
 import { DocumentsService } from '../../documents/documents.service';
 import { CreateDocumentDto } from '../../documents/dto/create-document.dto';
+import { StorageService } from '../../storage/storage.service';
+import { RequestUploadUrlDto, extensionForContentType } from '../../storage/dto/request-upload-url.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../../common/dto/pagination-response.dto';
 import { CreateDriverProfileDto } from './dto/create-driver-profile.dto';
@@ -21,6 +23,7 @@ export class DriverProfilesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly documentsService: DocumentsService,
+    private readonly storageService: StorageService,
   ) {}
 
   async findByUserId(userId: string) {
@@ -236,6 +239,20 @@ export class DriverProfilesService {
   // -----------------------------------------------------------------------
   // Documents du chauffeur (pièce d'identité, permis...) — section 5.
   // -----------------------------------------------------------------------
+
+  /**
+   * Étape 1/2 de l'envoi d'un document : génère une clé + une URL
+   * d'upload signée, sans encore créer de ligne Document (voir la note
+   * de StorageService). Le client fait ensuite le PUT direct vers le
+   * stockage, puis confirme via uploadDocumentForUser avec cette même
+   * storageKey.
+   */
+  async requestDocumentUploadUrlForUser(userId: string, dto: RequestUploadUrlDto) {
+    const driverId = await this.getProfileIdForUser(userId);
+    const storageKey = this.storageService.buildKey('driver', driverId, extensionForContentType(dto.contentType));
+    const { uploadUrl, expiresInSeconds } = await this.storageService.createUploadUrl(storageKey, dto.contentType);
+    return { storageKey, uploadUrl, expiresInSeconds };
+  }
 
   async uploadDocumentForUser(userId: string, dto: CreateDocumentDto) {
     const driverId = await this.getProfileIdForUser(userId);

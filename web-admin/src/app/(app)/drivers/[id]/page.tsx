@@ -4,8 +4,9 @@
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { IconArrowLeft, IconCar, IconRosetteDiscountCheck, IconStarFilled } from '@tabler/icons-react';
+import { IconArrowLeft, IconCar, IconChevronDown, IconRosetteDiscountCheck, IconStarFilled } from '@tabler/icons-react';
 import { Badge, Button, Card, TextArea } from '@/components/ui';
+import { DocumentsPanel } from '@/components/layout/DocumentsPanel';
 import { useDriver, useReactivateDriver, useSuspendDriver, useVerifyDriver } from '@/hooks/useDrivers';
 import { useRejectVehicle, useVerifyVehicle } from '@/hooks/useVehicles';
 import { DRIVER_STATUS_LABELS, DRIVER_STATUS_TONE, VEHICLE_TYPE_LABELS } from '@/utils/driverLabels';
@@ -15,48 +16,64 @@ import type { Vehicle } from '@/types/drivers.types';
 function VehicleRow({ vehicle, driverId }: { vehicle: Vehicle; driverId: string }) {
   const verifyVehicle = useVerifyVehicle(driverId);
   const rejectVehicle = useRejectVehicle(driverId);
+  const [showDocuments, setShowDocuments] = useState(false);
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-light text-primary-dark">
-          <IconCar size={17} />
+    <div className="rounded-lg border border-border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-light text-primary-dark">
+            <IconCar size={17} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-text-primary">
+              {vehicle.brand} {vehicle.model}
+            </p>
+            <p className="text-xs text-text-secondary">
+              {VEHICLE_TYPE_LABELS[vehicle.type]} · {vehicle.plateNumber} · {vehicle.totalSeats} places
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-medium text-text-primary">
-            {vehicle.brand} {vehicle.model}
-          </p>
-          <p className="text-xs text-text-secondary">
-            {VEHICLE_TYPE_LABELS[vehicle.type]} · {vehicle.plateNumber} · {vehicle.totalSeats} places
-          </p>
+        <div className="flex items-center gap-2">
+          <Badge
+            label={vehicle.verificationStatus === 'VERIFIED' ? 'Vérifié' : vehicle.verificationStatus === 'REJECTED' ? 'Rejeté' : 'En attente'}
+            tone={vehicle.verificationStatus === 'VERIFIED' ? 'success' : vehicle.verificationStatus === 'REJECTED' ? 'danger' : 'accent'}
+          />
+          {vehicle.verificationStatus === 'PENDING' ? (
+            <>
+              <Button
+                variant="success"
+                className="px-2.5 py-1.5 text-xs"
+                onClick={() => verifyVehicle.mutate(vehicle.id)}
+                loading={verifyVehicle.isPending}
+              >
+                Valider
+              </Button>
+              <Button
+                variant="outline"
+                className="px-2.5 py-1.5 text-xs"
+                onClick={() => rejectVehicle.mutate(vehicle.id)}
+                loading={rejectVehicle.isPending}
+              >
+                Rejeter
+              </Button>
+            </>
+          ) : null}
+          <button
+            onClick={() => setShowDocuments((v) => !v)}
+            className="text-text-muted transition-transform hover:text-text-secondary"
+            style={{ transform: showDocuments ? 'rotate(180deg)' : undefined }}
+            aria-label="Voir les documents du véhicule"
+          >
+            <IconChevronDown size={16} />
+          </button>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Badge
-          label={vehicle.verificationStatus === 'VERIFIED' ? 'Vérifié' : vehicle.verificationStatus === 'REJECTED' ? 'Rejeté' : 'En attente'}
-          tone={vehicle.verificationStatus === 'VERIFIED' ? 'success' : vehicle.verificationStatus === 'REJECTED' ? 'danger' : 'accent'}
-        />
-        {vehicle.verificationStatus === 'PENDING' ? (
-          <>
-            <Button
-              variant="success"
-              className="px-2.5 py-1.5 text-xs"
-              onClick={() => verifyVehicle.mutate(vehicle.id)}
-              loading={verifyVehicle.isPending}
-            >
-              Valider
-            </Button>
-            <Button
-              variant="outline"
-              className="px-2.5 py-1.5 text-xs"
-              onClick={() => rejectVehicle.mutate(vehicle.id)}
-              loading={rejectVehicle.isPending}
-            >
-              Rejeter
-            </Button>
-          </>
-        ) : null}
-      </div>
+      {showDocuments ? (
+        <div className="mt-3 border-t border-border pt-3">
+          <DocumentsPanel ownerType="VEHICLE" ownerId={vehicle.id} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -129,6 +146,11 @@ export default function DriverDetailPage() {
             {driver.averageRating ? `${driver.averageRating.toFixed(1)} (${driver.ratingsCount} avis)` : 'Aucun avis'}
           </p>
         </div>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="text-lg font-semibold text-text-primary">Pièces d&apos;identité</h2>
+        <DocumentsPanel ownerType="DRIVER" ownerId={driver.id} />
       </Card>
 
       <Card className="space-y-3">

@@ -3,6 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DocumentOwnerType, DocumentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { StorageService } from '../storage/storage.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
@@ -20,7 +21,15 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly storageService: StorageService,
   ) {}
+
+  /** URL temporaire pour visualiser une pièce depuis le back-office — jamais d'accès direct au storageKey brut. */
+  async createDownloadUrl(id: string): Promise<{ url: string; expiresInSeconds: number }> {
+    const document = await this.findOne(id);
+    const url = await this.storageService.createDownloadUrl(document.storageKey);
+    return { url, expiresInSeconds: 300 };
+  }
 
   create(ownerType: DocumentOwnerType, ownerId: string, dto: CreateDocumentDto) {
     return this.prisma.document.create({
@@ -50,9 +59,9 @@ export class DocumentsService {
 
   async findAll(
     query: PaginationQueryDto,
-    filters: { ownerType?: DocumentOwnerType; status?: DocumentStatus } = {},
+    filters: { ownerType?: DocumentOwnerType; ownerId?: string; status?: DocumentStatus } = {},
   ): Promise<PaginatedResult<unknown>> {
-    const where = { ownerType: filters.ownerType, status: filters.status };
+    const where = { ownerType: filters.ownerType, ownerId: filters.ownerId, status: filters.status };
     const [data, total] = await Promise.all([
       this.prisma.document.findMany({
         where,

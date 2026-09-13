@@ -16,6 +16,7 @@ import {
 import { queryClient } from '@/services/queryClient';
 import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/theme';
+import '@/tasks/tripLocationTask';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 

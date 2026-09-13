@@ -19,17 +19,6 @@ export class PaymentProvidersService {
     private readonly audit: AuditService,
   ) {}
 
-  /**
-   * `config` est saisi côté DTO en `Record<string, unknown>` (validation
-   * class-validator @IsObject). On le sérialise en JSON avant de l'envoyer
-   * à Prisma pour garantir la compatibilité avec `Prisma.InputJsonValue`
-   * (élimine les `undefined` imbriqués et types non JSON-sérialisables).
-   */
-  private toJsonValue(config: Record<string, unknown> | undefined): Prisma.InputJsonValue | undefined {
-    if (config === undefined) return undefined;
-    return JSON.parse(JSON.stringify(config)) as Prisma.InputJsonValue;
-  }
-
   findAllActiveForCountry(countryId?: string, type?: PaymentProviderType) {
     return this.prisma.paymentProvider.findMany({
       where: {
@@ -57,7 +46,11 @@ export class PaymentProvidersService {
         type: dto.type,
         name: dto.name,
         countryId: dto.countryId,
-        config: this.toJsonValue(dto.config),
+        // `config` est un JSON libre côté schéma (Prisma.JsonValue) — TypeScript
+        // ne peut pas vérifier statiquement qu'un Record<string, unknown>
+        // arbitraire est sérialisable en JSON ; le cast est le contournement
+        // standard et sûr ici (voir aussi diff ci-dessous, même raison).
+        config: dto.config as Prisma.InputJsonValue | undefined,
       },
     });
     await this.audit.log({
@@ -65,7 +58,7 @@ export class PaymentProvidersService {
       entityType: 'PaymentProvider',
       entityId: provider.id,
       action: 'CREATE',
-      diff: { ...dto },
+      diff: { ...dto } as Prisma.InputJsonValue,
     });
     return provider;
   }
@@ -78,7 +71,7 @@ export class PaymentProvidersService {
         type: dto.type,
         name: dto.name,
         countryId: dto.countryId,
-        config: this.toJsonValue(dto.config),
+        config: dto.config as Prisma.InputJsonValue | undefined,
       },
     });
     await this.audit.log({
@@ -86,7 +79,7 @@ export class PaymentProvidersService {
       entityType: 'PaymentProvider',
       entityId: id,
       action: 'UPDATE',
-      diff: { ...dto },
+      diff: { ...dto } as Prisma.InputJsonValue,
     });
     return provider;
   }

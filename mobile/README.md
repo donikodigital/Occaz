@@ -261,6 +261,125 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
   comportement "dernier message visible sans avoir à faire défiler",
   cohérent avec la messagerie du Lot 7.
 
+## Mise à jour transversale — Publication sur les stores
+
+Dernier chantier du plan initial. `app.json` n'avait **jamais eu
+d'icône du tout** jusqu'ici (`icon`, `adaptive-icon`, `splash` non
+référencés) — aurait bloqué toute soumission.
+
+- **Icônes générées** (`assets/images/`) : un repère de localisation
+  simple et lisible à petite taille, sur fond indigo — cohérent avec la
+  charte déjà posée pour le web-admin. `icon.png` (1024×1024),
+  `adaptive-icon.png` (Android, contenu dans la zone sûre centrale pour
+  survivre au masquage en cercle/squircle), `splash-icon.png`,
+  `favicon.png` (web).
+- **`app.json` complété** : icônes référencées, `ios.buildNumber` et
+  `android.versionCode` ajoutés (obligatoires pour toute soumission),
+  plugin `expo-splash-screen` enfin configuré — le code appelait déjà
+  `SplashScreen.preventAutoHideAsync()`/`hideAsync()` sans qu'aucune
+  image ne soit jamais réellement configurée.
+- **`eas.json`** : profils `development` / `preview` / `production`.
+- **`store-assets/`** : fiche store complète en français
+  (`listing-fr.md`), brouillon de politique de confidentialité
+  reflétant fidèlement les données réellement collectées par l'app
+  (`privacy-policy-fr.md` — **pas un document juridique validé**, à
+  faire relire), et une checklist de soumission couvrant les
+  déclarations obligatoires des deux stores (`SUBMISSION_CHECKLIST.md`).
+- **Ce qui reste hors de ce lot** : captures d'écran réelles (besoin de
+  l'app buildée), comptes de test pour les équipes de revue, et
+  remplacer les `[À COMPLÉTER]` du brouillon de politique de
+  confidentialité après relecture juridique.
+
+## Mise à jour transversale — Suivi de position en direct (premier plan + arrière-plan)
+
+- **Côté chauffeur** (`useTripPositionBroadcast`) : demande d'abord la
+  permission "Utilisation de l'app" (obligatoire), puis tente la
+  permission **"Toujours"** — demandée de façon contextuelle, seulement
+  quand un trajet démarre réellement, jamais au premier lancement (ce
+  qu'Apple exige pour ne pas rejeter l'app en revue).
+  - **Accordée** → suivi en arrière-plan réel via
+    `expo-task-manager` + `expo-location`
+    (`src/tasks/tripLocationTask.ts`), continue même app fermée. Une
+    notification persistante s'affiche côté Android tant que le suivi
+    tourne — obligatoire dès qu'un service tourne en fond, pas un choix.
+  - **Refusée** → repli automatique en premier plan uniquement (l'ancien
+    comportement), plutôt que de bloquer le chauffeur qui refuse ce
+    niveau d'accès.
+  - La tâche de fond n'a accès à aucun état React — elle relit le
+    trajet actif depuis `activeTripStorage` (AsyncStorage) à chaque
+    déclenchement, pour fonctionner même après un redémarrage de l'app
+    par le système suite à un événement de localisation.
+  - Aucun risque côté données si le signal d'arrêt est manqué (app tuée
+    brutalement, etc.) : le backend rejette déjà toute mise à jour de
+    position sur un trajet qui n'est plus `IN_PROGRESS` (voir
+    `TripsService.updatePosition`) — au pire, quelques appels perdus,
+    jamais une position stockée à tort.
+- **Côté client** (`useTripPosition` + `DriverPositionCard`) : inchangé,
+  toujours du polling REST — voir plus bas.
+- `app.json` : `isIosBackgroundLocationEnabled` /
+  `isAndroidBackgroundLocationEnabled` activés sur le plugin
+  `expo-location` (ajoute automatiquement `UIBackgroundModes: ["location"]`
+  côté iOS et les permissions Android nécessaires,
+  `ACCESS_BACKGROUND_LOCATION` + service de premier plan).
+- **À prévoir avant soumission** : Apple demande une justification
+  explicite de l'usage "Always" en revue App Store — reprendre le texte
+  du plugin (déjà rédigé en français) et l'exemple d'usage réel
+  (partage de position pendant un trajet actif) dans le formulaire de
+  review (voir `store-assets/SUBMISSION_CHECKLIST.md`).
+
+- **À prévoir avant soumission** : Apple demande une justification
+  explicite de l'usage "Always" en revue App Store — reprendre le texte
+  du plugin (déjà rédigé en français) et l'exemple d'usage réel
+  (partage de position pendant un trajet actif) dans le formulaire de
+  review (voir `store-assets/SUBMISSION_CHECKLIST.md`).
+- **Erreurs de version corrigées en cours de route** (lots précédents) :
+  `expo-image-picker` avait été installé en `17.0.11` puis `57.0.17` ;
+  `expo-task-manager` installé directement à `57.0.17`, la version
+  alignée avec ce SDK Expo 57.
+
+## Mise à jour transversale — Géocodage réel
+
+Remplace la saisie 100% manuelle des adresses (`LocationPickerScreen`
+notait déjà explicitement cette limite) par une vraie recherche
+d'adresse — Mapbox, via un proxy backend (jamais de clé exposée côté
+client).
+
+- **`useAddressSearch`** : debounce manuel (350ms), pas de nouvelle
+  dépendance pour ça.
+- **`LocationSearchField`** : champ de recherche + suggestions en
+  ligne. Sélectionner un résultat crée directement la Location
+  (`geocodeTrust: 'EXACT'`) et referme l'écran.
+- La saisie manuelle (ville + texte libre, `geocodeTrust: 'MANUAL'`)
+  reste disponible en repli explicite ("Adresse introuvable ?") — utile
+  dans les zones rurales moins bien couvertes par les données
+  cartographiques.
+- **Un vrai bug pré-existant corrigé** : `GeocodeTrust` utilisait
+  `'GPS' | 'APPROXIMATE'`, des valeurs qui n'existent pas côté backend
+  (`EXACT | APPROX | MANUAL`) — resté invisible tant que seul
+  `'MANUAL'` était utilisé en pratique.
+
+## Mise à jour transversale — Envoi de documents (upload réel)
+
+Complète l'infrastructure de stockage ajoutée côté backend
+(`StorageService`, Cloudflare R2) — jusque-là aucune vraie pièce
+justificative ne pouvait être envoyée.
+
+- **`useDocumentUpload`** : hook générique en 3 étapes (demande d'URL
+  signée → PUT direct vers R2 → confirmation auprès du backend), jamais
+  de fichier qui transite par le serveur NestJS. Réutilisé pour les
+  documents chauffeur et véhicule sans dupliquer la logique.
+- **`DocumentUploadField`** : composant UI (galerie ou appareil photo,
+  badge de statut, motif affiché si rejeté).
+- **Chauffeur** : `complete-profile.tsx` gagne une seconde étape après
+  la création du profil — CNI et permis de conduire, avant d'atteindre
+  l'accueil.
+- **Véhicule** : `vehicle-new.tsx` gagne la même seconde étape — carte
+  grise et assurance, juste après la création du véhicule.
+- `expo-image-picker` ajouté (galerie + appareil photo), avec ses
+  chaînes de permission en français dans `app.json`. Micro
+  explicitement désactivé (`microphonePermission: false`) — inutile
+  pour de simples photos de documents.
+
 ## Mise à jour transversale — Responsive mobile + desktop
 
 Appliquée après le Lot 5, avant le Lot 6, à la demande explicite du

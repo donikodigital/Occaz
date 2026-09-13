@@ -32,3 +32,12 @@ export function upcomingDays(count: number): Date[] {
     return day;
   });
 }
+
+/** "à l'instant" / "il y a Ns" / "il y a Nmin" — suffisant ici, le composant appelant se rafraîchit déjà toutes les 10s (voir useTripPosition). */
+export function formatRelativeTime(iso: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 10) return "à l'instant";
+  if (seconds < 60) return `il y a ${seconds} s`;
+  const minutes = Math.floor(seconds / 60);
+  return `il y a ${minutes} min`;
+}

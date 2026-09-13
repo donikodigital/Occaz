@@ -12,6 +12,7 @@ import { CreateDriverProfileDto } from './dto/create-driver-profile.dto';
 import { UpdateDriverProfileDto } from './dto/update-driver-profile.dto';
 import { SuspendDriverDto } from './dto/suspend-driver.dto';
 import { CreateDocumentDto } from '../../documents/dto/create-document.dto';
+import { RequestUploadUrlDto } from '../../storage/dto/request-upload-url.dto';
 
 @ApiTags('Profils — Chauffeurs')
 @ApiBearerAuth()
@@ -32,6 +33,11 @@ export class DriverProfilesController {
   @Patch('me')
   updateMine(@Body() dto: UpdateDriverProfileDto, @CurrentUser() user: AuthenticatedUser) {
     return this.driverProfilesService.updateForUser(user.id, dto);
+  }
+
+  @Post('me/documents/upload-url')
+  requestDocumentUploadUrl(@Body() dto: RequestUploadUrlDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.driverProfilesService.requestDocumentUploadUrlForUser(user.id, dto);
   }
 
   @Post('me/documents')

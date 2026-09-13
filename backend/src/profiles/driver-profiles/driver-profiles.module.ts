@@ -3,9 +3,10 @@ import { Module } from '@nestjs/common';
 import { DriverProfilesController } from './driver-profiles.controller';
 import { DriverProfilesService } from './driver-profiles.service';
 import { DocumentsModule } from '../../documents/documents.module';
+import { StorageModule } from '../../storage/storage.module';
 
 @Module({
-  imports: [DocumentsModule],
+  imports: [DocumentsModule, StorageModule],
   controllers: [DriverProfilesController],
   providers: [DriverProfilesService],
   exports: [DriverProfilesService],

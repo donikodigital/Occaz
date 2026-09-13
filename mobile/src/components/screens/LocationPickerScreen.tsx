@@ -4,24 +4,28 @@ import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconMapPin, IconX } from '@tabler/icons-react-native';
 import { AppText, Button, Card, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { LocationSearchField } from './LocationSearchField';
 import { colors, spacing } from '@/theme';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { locationsApi } from '@/services/api/locations.api';
 import { ApiError } from '@/services/api/ApiError';
 import type { City } from '@/types/geography.types';
+import type { GeocodingSuggestion } from '@/types/geocoding.types';
 
 const CITY_PICKER_FIELD = 'shipment-address-city';
 
 /**
- * Adresse hybride (section 58, "Location hybride GPS + texte libre") :
- * sans intégration cartographique dans ce lot, l'adresse précise reste
- * une description en texte libre rattachée à une ville — cohérent avec
- * le repli MANUAL prévu côté backend (geocodeTrust), pas une
- * simplification qui trahit le modèle.
+ * Recherche d'adresse réelle (Mapbox, via le backend) en mode
+ * principal — remplace la saisie 100% manuelle qui était le seul repli
+ * disponible jusqu'ici (section 58, "Location hybride GPS + texte
+ * libre"). La saisie manuelle reste accessible en repli explicite,
+ * pour les adresses que la recherche ne couvre pas bien (zones rurales
+ * moins bien cartographiées).
  */
 export function LocationPickerScreen() {
   const { title } = useLocalSearchParams<{ title?: string }>();
+  const [showManualEntry, setShowManualEntry] = useState(false);
   const [city, setCity] = useState<City | null>(null);
   const [addressLabel, setAddressLabel] = useState('');
   const [isSubmitting, setSubmitting] = useState(false);
@@ -39,7 +43,26 @@ export function LocationPickerScreen() {
     }
   }, [citySelection, consumeCitySelection]);
 
-  async function handleSubmit() {
+  async function handleSearchSelect(suggestion: GeocodingSuggestion) {
+    setErrorMessage(undefined);
+    setSubmitting(true);
+    try {
+      const location = await locationsApi.create({
+        label: suggestion.label,
+        formattedAddress: suggestion.formattedAddress,
+        latitude: suggestion.latitude,
+        longitude: suggestion.longitude,
+        geocodeTrust: 'EXACT',
+      });
+      selectLocation(location);
+      router.back();
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+      setSubmitting(false);
+    }
+  }
+
+  async function handleManualSubmit() {
     setErrorMessage(undefined);
     if (!city) {
       setErrorMessage('Choisissez une ville.');
@@ -67,7 +90,7 @@ export function LocationPickerScreen() {
   }
 
   return (
-    <ScreenContainer edges={['top', 'bottom']} maxWidth="form">
+    <ScreenContainer scroll edges={['top', 'bottom']} maxWidth="form">
       <View style={styles.header}>
         <AppText variant="lg" weight="semibold">
           {title ?? 'Adresse'}
@@ -80,41 +103,62 @@ export function LocationPickerScreen() {
       </View>
 
       <View style={styles.body}>
-        <AppText variant="sm" weight="medium" color="textSecondary" style={styles.label}>
-          Ville
-        </AppText>
-        <Card
-          onPress={() => {
-            openCityPicker(CITY_PICKER_FIELD);
-            router.push('/(customer)/select-city');
-          }}
-          style={styles.cityCard}
-        >
-          <View style={styles.cityRow}>
-            <IconMapPin size={16} color={colors.textSecondary} />
-            <AppText variant="base" color={city ? 'textPrimary' : 'textSecondary'}>
-              {city?.name ?? 'Choisir une ville'}
-            </AppText>
-          </View>
-        </Card>
-
-        <TextField
-          label="Adresse précise"
-          value={addressLabel}
-          onChangeText={setAddressLabel}
-          placeholder="Ex : Marché de Madina, près de l'arrêt taxi"
-          multiline
-          style={styles.addressField}
-        />
+        <LocationSearchField onSelect={handleSearchSelect} placeholder="Ex : Marché de Madina, Conakry" />
 
         {errorMessage ? (
           <AppText variant="sm" color="danger" style={styles.error}>
             {errorMessage}
           </AppText>
         ) : null}
-      </View>
 
-      <Button label="Valider l'adresse" onPress={handleSubmit} loading={isSubmitting} style={styles.submit} />
+        {!showManualEntry ? (
+          <AppText
+            variant="sm"
+            color="primary"
+            style={styles.manualToggle}
+            onPress={() => setShowManualEntry(true)}
+            suppressHighlighting
+          >
+            Adresse introuvable ? Saisir manuellement
+          </AppText>
+        ) : (
+          <View style={styles.manualSection}>
+            <AppText variant="sm" weight="medium" color="textSecondary" style={styles.label}>
+              Ville
+            </AppText>
+            <Card
+              onPress={() => {
+                openCityPicker(CITY_PICKER_FIELD);
+                router.push('/(customer)/select-city');
+              }}
+              style={styles.cityCard}
+            >
+              <View style={styles.cityRow}>
+                <IconMapPin size={16} color={colors.textSecondary} />
+                <AppText variant="base" color={city ? 'textPrimary' : 'textSecondary'}>
+                  {city?.name ?? 'Choisir une ville'}
+                </AppText>
+              </View>
+            </Card>
+
+            <TextField
+              label="Adresse précise"
+              value={addressLabel}
+              onChangeText={setAddressLabel}
+              placeholder="Ex : Marché de Madina, près de l'arrêt taxi"
+              multiline
+              style={styles.addressField}
+            />
+
+            <Button
+              label="Valider l'adresse"
+              onPress={handleManualSubmit}
+              loading={isSubmitting}
+              style={styles.submit}
+            />
+          </View>
+        )}
+      </View>
     </ScreenContainer>
   );
 }
@@ -132,6 +176,16 @@ const styles = StyleSheet.create({
   },
   label: {
     marginBottom: spacing.xxs,
+  },
+  manualToggle: {
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+  manualSection: {
+    marginTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: spacing.lg,
   },
   cityCard: {
     marginBottom: spacing.md,

@@ -1,0 +1,20 @@
+# backend/docker-compose.yml
+# backend/docker-compose.yml
+#
+# Pour tester l'image de production en local avant de déployer sur
+# Render — pas de service Postgres ici, ce projet utilise Neon
+# (voir README, section Neon/scale-to-zero) : DATABASE_URL dans .env
+# doit déjà pointer vers votre base Neon, locale ou de test.
+#
+# Usage : docker compose up --build
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    restart: unless-stopped

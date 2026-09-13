@@ -7,26 +7,63 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "backgroundColor": "#FAFAF9"
-    },
+    "icon": "./assets/images/icon.png",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.transportpartage.app"
+      "bundleIdentifier": "com.transportpartage.app",
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.transportpartage.app",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#FAFAF9"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#4F46E5"
       }
     },
     "web": {
       "bundler": "metro",
-      "output": "static"
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
     },
-    "plugins": ["expo-router", "expo-font", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FAFAF9"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Autorisez l'accès à vos photos pour envoyer vos documents (pièce d'identité, permis, carte grise...).",
+          "cameraPermission": "Autorisez l'accès à l'appareil photo pour prendre une photo de vos documents.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Autorisez la localisation pour partager votre position avec le passager pendant un trajet en cours.",
+          "locationAlwaysAndWhenInUsePermission": "Autorisez la localisation en arrière-plan pour continuer à partager votre position avec le passager même si vous quittez l'application pendant un trajet en cours.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      "expo-image"
+    ],
     "extra": {
-      "apiUrl": "https://api.transport-partage.example.com/api/v1"
-    }
+      "apiUrl": "https://api.transport-partage.example.com/api/v1",
+      "eas": {
+        "projectId": "REMPLACER_PAR_VOTRE_PROJECT_ID_EAS"
+      }
+    },
+    "owner": "REMPLACER_PAR_VOTRE_COMPTE_EXPO"
   }
 }

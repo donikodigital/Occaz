@@ -27,9 +27,10 @@ export class DocumentsController {
   findAll(
     @Query() query: PaginationQueryDto,
     @Query('ownerType') ownerType?: DocumentOwnerType,
+    @Query('ownerId') ownerId?: string,
     @Query('status') status?: DocumentStatus,
   ) {
-    return this.documentsService.findAll(query, { ownerType, status });
+    return this.documentsService.findAll(query, { ownerType, ownerId, status });
   }
 
   @Get('expiring-soon')
@@ -40,6 +41,11 @@ export class DocumentsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.documentsService.findOne(id);
+  }
+
+  @Get(':id/download-url')
+  getDownloadUrl(@Param('id') id: string) {
+    return this.documentsService.createDownloadUrl(id);
   }
 
   @Permissions(PERMISSIONS.DOCUMENT_VERIFY)

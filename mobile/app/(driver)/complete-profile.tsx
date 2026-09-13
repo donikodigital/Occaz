@@ -3,15 +3,55 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconMapPin } from '@tabler/icons-react-native';
-import { AppText, Button, Card, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, Button, Card, DocumentUploadField, ScreenContainer, TextField } from '@/components/ui';
 import { CountrySelectField } from '@/components/screens/CountrySelectField';
 import { colors, spacing } from '@/theme';
 import { useCreateDriverProfile } from '@/hooks/useDriverProfile';
+import { useDriverDocumentUpload, useMyDriverDocuments } from '@/hooks/useDriverDocuments';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { City, Country } from '@/types/geography.types';
 
 const CITY_FIELD = 'driver-profile-city';
+
+/** Deuxième étape affichée juste après la création du profil — mêmes principes que VehicleDocumentsStep dans vehicle-new.tsx. */
+function IdentityDocumentsStep() {
+  const { data: documents } = useMyDriverDocuments();
+  const upload = useDriverDocumentUpload();
+
+  const nationalIdDoc = documents?.find((d) => d.type === 'national_id');
+  const licenseDoc = documents?.find((d) => d.type === 'driver_license');
+
+  return (
+    <ScreenContainer scroll maxWidth="form">
+      <AppText variant="xxl" weight="semibold" style={styles.title}>
+        Vos pièces d&apos;identité
+      </AppText>
+      <AppText variant="base" color="textSecondary" style={styles.subtitle}>
+        Envoyez votre CNI et votre permis de conduire pour que votre compte soit validé.
+      </AppText>
+
+      <View style={styles.fields}>
+        <DocumentUploadField
+          label="Carte nationale d'identité"
+          document={nationalIdDoc}
+          isUploading={upload.isUploading}
+          onPickLibrary={() => upload.pickFromLibrary('national_id')}
+          onPickCamera={() => upload.pickFromCamera('national_id')}
+        />
+        <DocumentUploadField
+          label="Permis de conduire"
+          document={licenseDoc}
+          isUploading={upload.isUploading}
+          onPickLibrary={() => upload.pickFromLibrary('driver_license')}
+          onPickCamera={() => upload.pickFromCamera('driver_license')}
+        />
+      </View>
+
+      <Button label="Continuer" onPress={() => router.replace('/(driver)/(tabs)/home')} style={styles.submit} />
+    </ScreenContainer>
+  );
+}
 
 /**
  * Contrairement au profil client, countryId et cityId sont obligatoires
@@ -25,6 +65,7 @@ export default function DriverCompleteProfileScreen() {
   const [city, setCity] = useState<City | null>(null);
   const [mobileMoneyNumber, setMobileMoneyNumber] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [isProfileCreated, setProfileCreated] = useState(false);
   const createProfile = useCreateDriverProfile();
 
   const citySelection = useCitySelectionStore((state) => state.selection);
@@ -37,6 +78,10 @@ export default function DriverCompleteProfileScreen() {
       consumeCitySelection();
     }
   }, [citySelection, consumeCitySelection]);
+
+  if (isProfileCreated) {
+    return <IdentityDocumentsStep />;
+  }
 
   function handleSubmit() {
     setErrorMessage(undefined);
@@ -58,7 +103,7 @@ export default function DriverCompleteProfileScreen() {
         mobileMoneyNumber: mobileMoneyNumber.trim() || undefined,
       },
       {
-        onSuccess: () => router.replace('/(driver)/(tabs)/home'),
+        onSuccess: () => setProfileCreated(true),
         onError: (error) => {
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },

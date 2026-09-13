@@ -3,7 +3,7 @@ import React from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconArrowLeft, IconCheck, IconMessageCircle } from '@tabler/icons-react-native';
-import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer } from '@/components/ui';
+import { AppText, Badge, Button, Card, Divider, DriverPositionCard, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useBooking, useCancelBooking } from '@/hooks/useBookings';
 import { useBookingRatings } from '@/hooks/useRatings';
@@ -97,6 +97,10 @@ export default function BookingDetailScreen() {
           tone={booking.status === 'CANCELLED' ? 'danger' : booking.status === 'CONFIRMED' ? 'success' : 'primary'}
         />
       </View>
+
+      {trip ? (
+        <DriverPositionCard tripId={trip.id} isActive={trip.status === 'IN_PROGRESS'} />
+      ) : null}
 
       {trip ? (
         <Card style={styles.card}>

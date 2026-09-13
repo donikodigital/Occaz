@@ -247,6 +247,69 @@ export class TripsService {
   }
 
   /**
+   * Appelé par polling depuis l'app chauffeur pendant IN_PROGRESS (toutes
+   * les quelques secondes) — pas de canal temps réel dans cette V1, voir
+   * la note du schéma sur Trip.currentLatitude/currentLongitude.
+   */
+  async updatePosition(id: string, driverId: string, latitude: number, longitude: number) {
+    const trip = await this.assertOwnership(id, driverId);
+    if (trip.status !== TripStatus.IN_PROGRESS) {
+      throw new BadRequestException('Le suivi de position n\'est disponible que pendant un trajet en cours (IN_PROGRESS).');
+    }
+    return this.prisma.trip.update({
+      where: { id },
+      data: {
+        currentLatitude: latitude,
+        currentLongitude: longitude,
+        currentPositionUpdatedAt: new Date(),
+      },
+      select: { id: true, currentLatitude: true, currentLongitude: true, currentPositionUpdatedAt: true },
+    });
+  }
+
+  /**
+   * Accessible au chauffeur du trajet (confirme que ses propres mises à
+   * jour arrivent bien) ou à un client ayant une réservation active dessus
+   * — jamais à un tiers, même authentifié. La visibilité Support/
+   * SuperAdmin (utile pour l'instruction d'un litige) n'est volontairement
+   * pas couverte ici ; à ajouter côté back-office si le besoin se
+   * confirme, via une permission dédiée plutôt qu'un accès systématique.
+   */
+  async getPosition(
+    id: string,
+    requester: { driverProfileId?: string; customerProfileId?: string },
+  ): Promise<{ latitude: number; longitude: number; updatedAt: Date } | null> {
+    const trip = await this.prisma.trip.findUnique({ where: { id } });
+    if (!trip) throw new NotFoundException('Trajet introuvable.');
+
+    const isOwnTrip = Boolean(requester.driverProfileId) && trip.driverId === requester.driverProfileId;
+    const hasActiveBooking =
+      Boolean(requester.customerProfileId) &&
+      Boolean(
+        await this.prisma.booking.findFirst({
+          where: {
+            tripId: id,
+            customerId: requester.customerProfileId,
+            status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] },
+          },
+        }),
+      );
+
+    if (!isOwnTrip && !hasActiveBooking) {
+      throw new ForbiddenException("Vous n'avez pas accès à la position de ce trajet.");
+    }
+
+    if (trip.currentLatitude === null || trip.currentLongitude === null || !trip.currentPositionUpdatedAt) {
+      return null;
+    }
+    return {
+      latitude: trip.currentLatitude,
+      longitude: trip.currentLongitude,
+      updatedAt: trip.currentPositionUpdatedAt,
+    };
+  }
+
+  /**
    * Clôture le trajet — exige que toutes les réservations actives aient
    * déjà été closes individuellement (dépose OTP vérifiée pour chacune,
    * voir TripOtpService.verifyDropoffOtp). Incrémente le compteur de

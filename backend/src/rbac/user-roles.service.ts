@@ -32,26 +32,18 @@ export class UserRolesService {
     if (!user) throw new NotFoundException('Utilisateur introuvable.');
     if (!role) throw new NotFoundException('Rôle introuvable.');
 
-    // On évite `upsert` sur la clé composite @@unique([userId, roleId, countryId]) :
-    // Prisma type strictement `countryId` en `string` (non-nullable) dans les clés
-    // composites, ce qui rend impossible un lookup direct avec `countryId: null`.
-    // Un `findFirst` + `create` explicite contourne cette limitation proprement.
+    // Même limitation que dans accounts.seed.ts : la clé composite
+    // @@unique([userId, roleId, countryId]) type `countryId` en `string`
+    // non-nullable côté client Prisma réel, incompatible avec un lookup
+    // `countryId: null` — on passe donc par un findFirst + create explicite
+    // plutôt qu'un upsert.
     const existing = await this.prisma.userRole.findFirst({
-      where: {
-        userId: dto.userId,
-        roleId: dto.roleId,
-        countryId: dto.countryId ?? null,
-      },
+      where: { userId: dto.userId, roleId: dto.roleId, countryId: dto.countryId ?? null },
     });
-
     const userRole =
       existing ??
       (await this.prisma.userRole.create({
-        data: {
-          userId: dto.userId,
-          roleId: dto.roleId,
-          countryId: dto.countryId,
-        },
+        data: { userId: dto.userId, roleId: dto.roleId, countryId: dto.countryId },
       }));
 
     await this.audit.log({

@@ -1,0 +1,38 @@
+# web-admin/.github/workflows/ci.yml
+# web-admin/.github/workflows/ci.yml
+name: Web Admin CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web-admin/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web-admin/**'
+
+defaults:
+  run:
+    working-directory: web-admin
+
+jobs:
+  typecheck-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web-admin/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Vérifier les types (tsc --noEmit)
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Compiler (next build)
+        run: npm run build

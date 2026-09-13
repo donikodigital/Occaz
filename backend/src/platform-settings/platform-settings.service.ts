@@ -18,15 +18,6 @@ export class PlatformSettingsService {
     private readonly audit: AuditService,
   ) {}
 
-  /**
-   * `value` est saisi en `unknown` côté DTO (n'importe quelle valeur JSON
-   * valide). On le sérialise en JSON avant de l'envoyer à Prisma plutôt que
-   * de faire un cast `as never`, pour garantir un vrai objet JSON-safe.
-   */
-  private toJsonValue(value: unknown): Prisma.InputJsonValue {
-    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-  }
-
   findAll() {
     return this.prisma.platformSetting.findMany({ orderBy: { key: 'asc' } });
   }
@@ -38,13 +29,12 @@ export class PlatformSettingsService {
   }
 
   async upsert(dto: UpsertPlatformSettingDto, actorId: string) {
-    const jsonValue = this.toJsonValue(dto.value);
     const setting = await this.prisma.platformSetting.upsert({
       where: { key: dto.key },
-      update: { value: jsonValue, description: dto.description, updatedById: actorId },
+      update: { value: dto.value as never, description: dto.description, updatedById: actorId },
       create: {
         key: dto.key,
-        value: jsonValue,
+        value: dto.value as never,
         description: dto.description,
         updatedById: actorId,
       },
@@ -54,7 +44,7 @@ export class PlatformSettingsService {
       entityType: 'PlatformSetting',
       entityId: setting.id,
       action: 'UPSERT',
-      diff: { key: dto.key, value: dto.value },
+      diff: { key: dto.key, value: dto.value } as Prisma.InputJsonValue,
     });
     return setting;
   }

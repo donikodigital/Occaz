@@ -12,6 +12,8 @@ import { AuditModule } from './audit/audit.module';
 import { GeographyModule } from './geography/geography.module';
 import { RbacModule } from './rbac/rbac.module';
 import { SeedModule } from './seed/seed.module';
+import { HealthModule } from './health/health.module';
+import { GeocodingModule } from './geocoding/geocoding.module';
 import { UsersModule } from './users/users.module';
 import { DevicesModule } from './devices/devices.module';
 import { AuthModule } from './auth/auth.module';
@@ -63,6 +65,8 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     GeographyModule,
     RbacModule,
     SeedModule,
+    HealthModule,
+    GeocodingModule,
     UsersModule,
     DevicesModule,
     AuthModule,

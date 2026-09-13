@@ -1,6 +1,7 @@
 // mobile/src/services/api/driverProfiles.api.ts
 import { api } from './client';
 import type { CreateDriverProfilePayload, DriverProfile } from '@/types/profiles.types';
+import type { AppDocument, CreateDocumentPayload, RequestUploadUrlPayload, UploadUrlResult } from '@/types/documents.types';
 
 export const driverProfilesApi = {
   getMine: () => api.get<DriverProfile>('/driver-profiles/me'),
@@ -10,4 +11,12 @@ export const driverProfilesApi = {
 
   updateMine: (payload: Partial<CreateDriverProfilePayload>) =>
     api.patch<DriverProfile>('/driver-profiles/me', payload),
+
+  requestDocumentUploadUrl: (payload: RequestUploadUrlPayload) =>
+    api.post<UploadUrlResult>('/driver-profiles/me/documents/upload-url', payload),
+
+  confirmDocument: (payload: CreateDocumentPayload) =>
+    api.post<AppDocument>('/driver-profiles/me/documents', payload),
+
+  listMyDocuments: () => api.get<AppDocument[]>('/driver-profiles/me/documents'),
 };

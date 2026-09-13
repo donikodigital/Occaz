@@ -1,7 +1,7 @@
 // backend/src/trips/trips.controller.ts
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { TripStatus } from '@prisma/client';
+import { AccountType, TripStatus } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
@@ -15,6 +15,8 @@ import { SearchTripsDto } from './dto/search-trips.dto';
 import { CancelTripDto } from './dto/cancel-trip.dto';
 import { TripStopInputDto } from './dto/trip-stop-input.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
+import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
+import { UpdateTripPositionDto } from './dto/update-trip-position.dto';
 
 @ApiTags('Trajets')
 @ApiBearerAuth()
@@ -24,6 +26,7 @@ export class TripsController {
     private readonly tripsService: TripsService,
     private readonly bookingsService: BookingsService,
     private readonly driverProfilesService: DriverProfilesService,
+    private readonly customerProfilesService: CustomerProfilesService,
   ) {}
 
   @Get('search')
@@ -90,6 +93,29 @@ export class TripsController {
   async markArrived(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
     return this.tripsService.markArrived(id, driverId);
+  }
+
+  @Patch(':id/position')
+  async updatePosition(
+    @Param('id') id: string,
+    @Body() dto: UpdateTripPositionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    return this.tripsService.updatePosition(id, driverId, dto.latitude, dto.longitude);
+  }
+
+  @Get(':id/position')
+  async getPosition(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    if (user.accountType === AccountType.DRIVER) {
+      const driverProfileId = await this.driverProfilesService.getProfileIdForUser(user.id);
+      return this.tripsService.getPosition(id, { driverProfileId });
+    }
+    if (user.accountType === AccountType.CUSTOMER) {
+      const customerProfile = await this.customerProfilesService.findByUserId(user.id);
+      return this.tripsService.getPosition(id, { customerProfileId: customerProfile.id });
+    }
+    throw new ForbiddenException("Vous n'avez pas accès à la position de ce trajet.");
   }
 
   @Post(':id/complete')

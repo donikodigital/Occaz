@@ -11,6 +11,7 @@ import { VehiclesService } from './vehicles.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { CreateDocumentDto } from '../documents/dto/create-document.dto';
+import { RequestUploadUrlDto } from '../storage/dto/request-upload-url.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 
 @ApiTags('Véhicules')
@@ -53,6 +54,16 @@ export class VehiclesController {
   async remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
     return this.vehiclesService.remove(id, driverId);
+  }
+
+  @Post(':id/documents/upload-url')
+  async requestDocumentUploadUrl(
+    @Param('id') id: string,
+    @Body() dto: RequestUploadUrlDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    return this.vehiclesService.requestDocumentUploadUrl(id, driverId, dto);
   }
 
   @Post(':id/documents')

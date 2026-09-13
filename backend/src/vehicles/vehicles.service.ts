@@ -13,6 +13,8 @@ import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { CreateDocumentDto } from '../documents/dto/create-document.dto';
+import { StorageService } from '../storage/storage.service';
+import { RequestUploadUrlDto, extensionForContentType } from '../storage/dto/request-upload-url.dto';
 
 @Injectable()
 export class VehiclesService {
@@ -20,6 +22,7 @@ export class VehiclesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly documentsService: DocumentsService,
+    private readonly storageService: StorageService,
   ) {}
 
   findAllForDriver(driverId: string) {
@@ -134,6 +137,13 @@ export class VehiclesService {
   // Documents du véhicule (carte grise, assurance...) — délègue au service
   // générique après vérification de propriété.
   // -----------------------------------------------------------------------
+
+  async requestDocumentUploadUrl(vehicleId: string, driverId: string, dto: RequestUploadUrlDto) {
+    await this.assertOwnership(vehicleId, driverId);
+    const storageKey = this.storageService.buildKey('vehicle', vehicleId, extensionForContentType(dto.contentType));
+    const { uploadUrl, expiresInSeconds } = await this.storageService.createUploadUrl(storageKey, dto.contentType);
+    return { storageKey, uploadUrl, expiresInSeconds };
+  }
 
   async uploadDocument(vehicleId: string, driverId: string, dto: CreateDocumentDto) {
     await this.assertOwnership(vehicleId, driverId);

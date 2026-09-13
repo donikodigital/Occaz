@@ -309,6 +309,129 @@ Prochaines étapes naturelles, hors périmètre de ce backend :
   sont concentrés sur la couverture fonctionnelle complète.
 - Le frontend (mobile + back-office web).
 
+## Déploiement (Docker, CI, health checks)
+
+- **`Dockerfile`** : build en 4 étapes — dépendances + génération
+  Prisma, compilation, dépendances de production seules, image finale
+  avec utilisateur non-root. Le CLI `prisma` est une devDependency :
+  l'étape de dépendances de production ne le réinstalle pas, elle
+  récupère directement le client déjà généré à l'étape précédente.
+  **Non testé par un vrai build Docker** dans cet environnement (pas
+  d'accès à Docker Hub ici) — à vérifier une fois sur ta machine ou en
+  CI, où le job `docker-build` le fait à chaque push.
+- **`docker-compose.yml`** : pour tester l'image en local avant Render
+  (`docker compose up --build`) — aucun service Postgres inclus, ce
+  projet utilise Neon.
+- **`/health`** (liveness, jamais de dépendance externe) et
+  **`/health/ready`** (readiness, vérifie la base) — distinction
+  standard pour un load balancer. Si Neon est en pause (scale-to-zero,
+  voir plus haut), `/health` reste "ok" pendant que `/health/ready`
+  passe à 503 le temps que la base se réveille, plutôt qu'un
+  redémarrage en boucle inutile de l'instance.
+- **CORS restreint** : `CORS_ALLOWED_ORIGINS` (liste séparée par des
+  virgules) — vide en dev (tout autorisé), à renseigner en production
+  avec les vrais domaines du mobile/web-admin.
+- **CI** (`.github/workflows/ci.yml`) : à chaque push/PR touchant
+  `backend/`, vérifie les types, compile, et construit l'image Docker.
+  Aucun secret requis (Prisma génère son client à partir du seul
+  schéma, sans connexion réelle à une base).
+
+## Suivi de position (temps réel)
+
+- **Nouveaux champs sur `Trip`** : `currentLatitude`, `currentLongitude`,
+  `currentPositionUpdatedAt` — seule la dernière position est conservée
+  (pas d'historique complet du trajet, hors scope MVP). **Nécessite une
+  migration** (`npm run prisma:migrate`) avant de fonctionner.
+- **Polling REST, pas de WebSocket** — `PATCH /trips/:id/position`
+  (chauffeur, uniquement pendant `IN_PROGRESS`) et
+  `GET /trips/:id/position` (le chauffeur du trajet, ou un client avec
+  une réservation `PAID`/`CONFIRMED` dessus — jamais un tiers). Un choix
+  d'architecture assumé : suffisant pour une fréquence de quelques
+  secondes, beaucoup plus simple à opérer qu'un canal temps réel tant
+  que le besoin de latence sub-seconde ne se fait pas sentir.
+- **7 tests unitaires** sur `getPosition` — c'est la vérification
+  d'autorisation la plus sensible de ce lot (qui peut voir la position
+  d'un chauffeur), testée explicitement : propriétaire autorisé, autre
+  chauffeur rejeté, client avec/sans réservation active, aucun
+  identifiant fourni.
+- Visibilité Support/SuperAdmin (utile pour l'instruction d'un litige)
+  volontairement pas couverte — à ajouter via une permission dédiée si
+  le besoin se confirme, pas un accès systématique.
+
+## Géocodage
+
+- **Mapbox** choisi pour son offre gratuite généreuse (100 000
+  requêtes/mois) — voir `src/integrations/geocoding/` pour l'adapter,
+  même principe que `SmsProvider` : remplaçable sans toucher au reste
+  de l'app.
+- `GET /geocoding/search?query=...&countryCode=gn` et
+  `GET /geocoding/reverse?latitude=...&longitude=...` — toujours
+  authentifiés, pour protéger le quota d'un usage comme proxy ouvert.
+- Géocodage "temporaire" (comportement par défaut de l'API, jamais
+  `permanent=true`) — conforme aux conditions d'utilisation Mapbox :
+  seul le résultat choisi par l'utilisateur est persisté, via la route
+  `POST /locations` déjà existante (le champ `geocodeTrust` du schéma
+  l'anticipait déjà : `EXACT` pour un résultat géocodé, `MANUAL` pour
+  la saisie libre).
+- **Un vrai bug pré-existant trouvé en construisant ce lot** : le type
+  `GeocodeTrust` côté mobile utilisait `'GPS' | 'APPROXIMATE'`, des
+  valeurs qui n'existent pas dans l'enum réel du backend
+  (`EXACT | APPROX | MANUAL`). Resté invisible jusqu'ici car seul
+  `'MANUAL'` avait été utilisé en pratique — corrigé avant que
+  l'intégration du géocodage ne le fasse échouer pour de vrai.
+
+## Tests automatisés
+
+**47 tests unitaires, réellement exécutés et vérifiés dans cet
+environnement** (`npm test`) — pas une promesse, la commande a
+effectivement tourné :
+- `src/common/utils/otp.util.spec.ts` — hachage/vérification OTP (jamais le code en clair dans le hash, rejet strict).
+- `src/common/utils/money.util.spec.ts` — conversion BigInt (rejette décimales/négatifs), formatage, sommes.
+- `src/common/utils/duration.util.spec.ts` — parsing "15m"/"30d"/etc.
+- `src/pricing/pricing.service.spec.ts` — `computeCommission` : pourcentage, montant fixe, plancher/plafond, priorité pays > global. La logique la plus directement liée à l'argent facturé.
+- `src/trips/bookings.service.spec.ts` — pourcentage de remboursement selon le délai avant départ (avant/après/pile au seuil/départ déjà passé).
+- `src/trips/trips.service.getPosition.spec.ts` — autorisation d'accès à la position d'un trajet (voir section "Suivi de position").
+
+**Fondation e2e posée, non vérifiable dans cet environnement** —
+honnêteté complète sur ce point précis : `test/health.e2e-spec.ts`
+existe et suit un schéma standard NestJS/Supertest, mais tenter de le
+lancer ici échoue dès le chargement des modules (`@nestjs/swagger` qui
+inspecte un enum Prisma sur `create-vehicle.dto.ts`) — **pas** à cause
+d'une base de données injoignable comme prévu, mais parce que
+`@prisma/client` dans cet environnement est mon stub hors-ligne
+(jamais eu d'accès réseau pour un vrai `prisma generate`, voir plus
+haut dans ce README), qui ne fournit pas de vrais objets enum à cet
+endroit précis. Un vrai client généré (ton environnement, une fois
+`prisma generate` exécuté normalement) ne devrait pas rencontrer ce
+problème. Il faudra malgré tout une base de test dédiée (ex: une
+branche Neon séparée) pour que `/health/ready` et tout test e2e futur
+touchant la base fonctionnent réellement — voir le commentaire en tête
+du fichier.
+
+```bash
+npm test              # tests unitaires
+npm run test:cov      # avec couverture
+npm run test:e2e      # nécessite une DATABASE_URL joignable
+```
+
+## Corrections récentes (config + typage réel Prisma)
+
+- **`tsconfig.build.json` créé** — n'avait jamais existé (projet
+  construit fichier par fichier, pas via `nest new` qui le génère
+  d'habitude). Sans lui, `nest start --watch`/`nest build` compilait
+  aussi les fichiers `*.spec.ts` et `test/`, provoquant des centaines
+  d'erreurs "Cannot find name describe/it/expect" sans rapport avec le
+  code lui-même.
+- **3 champs JSON mal typés, visibles seulement avec un vrai client
+  Prisma généré** (jamais avec mon stub hors-ligne) : `config` et
+  `diff` dans `payment-providers.service.ts`, `diff` dans
+  `platform-settings.service.ts` — corrigés avec un cast explicite
+  `as Prisma.InputJsonValue`.
+- **`user-roles.service.ts`** : même limitation que celle déjà
+  rencontrée dans `accounts.seed.ts` (upsert sur une clé composite
+  incluant un `countryId` nullable, rejeté par le vrai client) —
+  remplacé par le même contournement `findFirst` + `create`.
+
 ## Démarrage
 
 ```bash
@@ -334,7 +457,7 @@ explicitement par le client, pas des comptes de démonstration :
 
 | Email | Rôle | Téléphone |
 |---|---|---|
-| thiernodoniko@gmail.com | SuperAdmin | +3766736226 |
+| thiernodoniko@gmail.com | SuperAdmin | +33766736226 |
 | thierno.diallo99@sfr.fr | Agent clientèle | +33751244722 |
 | jallowdoniko@gmail.com | Superviseur clientèle | +33621158829 |
 | donikojallow@gmail.com | Responsable financier | +33611435397 |
@@ -349,12 +472,6 @@ quatre comptes :
   (section 3.1) : ce mode restera bloqué tant qu'il n'aura pas été
   configuré via `POST /auth/2fa/setup`, mais la connexion par téléphone
   reste disponible en attendant.
-
-**À vérifier** : le premier numéro fourni par le client
-(`003766736226`) a un chiffre de moins que les trois autres, tous au
-format `+33...`. Traité tel quel (`+3766736226`) plutôt que corrigé
-sans confirmation — à ajuster dans `src/seed/accounts.seed.ts` si
-c'était une erreur de saisie.
 
 ## Vérification effectuée avant livraison
 

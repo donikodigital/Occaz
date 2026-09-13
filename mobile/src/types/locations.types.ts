@@ -1,5 +1,5 @@
 // mobile/src/types/locations.types.ts
-export type GeocodeTrust = 'GPS' | 'MANUAL' | 'APPROXIMATE';
+export type GeocodeTrust = 'EXACT' | 'APPROX' | 'MANUAL';
 
 export interface CreateLocationPayload {
   label: string;

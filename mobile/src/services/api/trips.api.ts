@@ -2,7 +2,7 @@
 import { api } from './client';
 import type { Paginated } from './types';
 import type { Booking } from '@/types/bookings.types';
-import type { CancelTripPayload, CreateTripPayload, SearchTripsParams, Trip } from '@/types/trips.types';
+import type { CancelTripPayload, CreateTripPayload, SearchTripsParams, Trip, TripPosition } from '@/types/trips.types';
 
 export const tripsApi = {
   search: (params: SearchTripsParams) =>
@@ -32,4 +32,9 @@ export const tripsApi = {
   complete: (id: string) => api.post<Trip>(`/trips/${id}/complete`),
 
   findBookings: (id: string) => api.get<Booking[]>(`/trips/${id}/bookings`),
+
+  updatePosition: (id: string, latitude: number, longitude: number) =>
+    api.patch<TripPosition>(`/trips/${id}/position`, { latitude, longitude }),
+
+  getPosition: (id: string) => api.get<TripPosition | null>(`/trips/${id}/position`),
 };

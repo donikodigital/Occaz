@@ -21,8 +21,12 @@ async function bootstrap() {
 
   app.use(helmet());
   app.use(compression());
+  // CORS_ALLOWED_ORIGINS="https://admin.example.com,https://app.example.com"
+  // Vide/non défini → tout est autorisé (pratique en dev ; JAMAIS souhaitable
+  // en production avec `credentials: true`, d'où cette liste explicite).
+  const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS;
   app.enableCors({
-    origin: true, // à restreindre à la liste des origines connues en production
+    origin: allowedOrigins ? allowedOrigins.split(',').map((origin) => origin.trim()) : true,
     credentials: true,
   });
 

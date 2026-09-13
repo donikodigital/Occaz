@@ -6,6 +6,7 @@ import { IconArrowLeft, IconCar, IconMessageCircle, IconUsers } from '@tabler/ic
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useTrip } from '@/hooks/useTripSearch';
+import { useTripPositionBroadcast } from '@/hooks/useTripPositionBroadcast';
 import {
   useCancelTrip,
   useCompleteTrip,
@@ -151,6 +152,7 @@ export default function DriverTripDetailScreen() {
   const markArrived = useMarkTripArrived(id ?? '');
   const completeTrip = useCompleteTrip(id ?? '');
   const cancelTrip = useCancelTrip(id ?? '');
+  const { error: positionError, mode: positionMode } = useTripPositionBroadcast(id ?? '', trip?.status === 'IN_PROGRESS');
 
   if (isLoading || !trip) {
     return (
@@ -204,6 +206,15 @@ export default function DriverTripDetailScreen() {
         />
         <Badge label={TRIP_STATUS_LABELS[trip.status]} tone={TRIP_STATUS_TONE[trip.status]} />
       </View>
+
+      {trip.status === 'IN_PROGRESS' ? (
+        <AppText variant="xs" color={positionError ? 'danger' : 'success'} style={styles.positionNote}>
+          {positionError ??
+            (positionMode === 'background'
+              ? 'Votre position est partagée avec le passager, même en arrière-plan.'
+              : 'Votre position est partagée avec le passager tant que l\'application reste ouverte.')}
+        </AppText>
+      ) : null}
 
       <Card style={styles.card}>
         <AppText variant="sm" color="textSecondary">
@@ -296,6 +307,9 @@ const styles = StyleSheet.create({
   center: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  positionNote: {
+    marginBottom: spacing.md,
   },
   header: {
     flexDirection: 'row',

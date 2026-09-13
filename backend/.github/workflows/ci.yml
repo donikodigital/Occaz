@@ -1,0 +1,59 @@
+# backend/.github/workflows/ci.yml
+# backend/.github/workflows/ci.yml
+#
+# Vérification minimale mais réelle avant tout merge : le client Prisma
+# se génère à partir du seul schema.prisma (aucune connexion à une
+# vraie base requise), donc ce workflow tourne sans le moindre secret.
+# Étendre avec de vrais tests une fois qu'ils existeront (voir la note
+# "tests automatisés" du README).
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  typecheck-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Générer le client Prisma
+        run: npx prisma generate
+
+      - name: Vérifier les types (tsc --noEmit)
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Tests unitaires
+        run: npm test
+
+      - name: Compiler (nest build)
+        run: npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construire l'image Docker (vérification uniquement, pas de publication)
+        working-directory: backend
+        run: docker build -t backend:ci-check .

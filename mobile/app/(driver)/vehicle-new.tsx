@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconArrowLeft, IconMinus, IconPlus } from '@tabler/icons-react-native';
-import { AppText, Button, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, Button, DocumentUploadField, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useCreateVehicle } from '@/hooks/useVehicles';
+import { useVehicleDocumentUpload, useVehicleDocuments } from '@/hooks/useVehicleDocuments';
 import { ApiError } from '@/services/api/ApiError';
 import type { VehicleType } from '@/types/vehicles.types';
 
@@ -18,6 +19,50 @@ const VEHICLE_TYPES: { value: VehicleType; label: string }[] = [
   { value: 'MOTORCYCLE', label: 'Moto' },
 ];
 
+/** Deuxième étape affichée juste après la création — le véhicule existe déjà en base, seuls ses documents manquent avant validation. */
+function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
+  const { data: documents } = useVehicleDocuments(vehicleId);
+  const upload = useVehicleDocumentUpload(vehicleId);
+
+  const registrationDoc = documents?.find((d) => d.type === 'vehicle_registration');
+  const insuranceDoc = documents?.find((d) => d.type === 'vehicle_insurance');
+
+  return (
+    <ScreenContainer scroll maxWidth="form">
+      <View style={styles.header}>
+        <View style={{ width: 38 }} />
+        <AppText variant="lg" weight="semibold">
+          Documents du véhicule
+        </AppText>
+        <View style={{ width: 38 }} />
+      </View>
+
+      <AppText variant="sm" color="textSecondary" style={styles.intro}>
+        Véhicule ajouté. Envoyez sa carte grise et son assurance pour qu&apos;il soit validé par notre équipe.
+      </AppText>
+
+      <View style={styles.fields}>
+        <DocumentUploadField
+          label="Carte grise"
+          document={registrationDoc}
+          isUploading={upload.isUploading}
+          onPickLibrary={() => upload.pickFromLibrary('vehicle_registration')}
+          onPickCamera={() => upload.pickFromCamera('vehicle_registration')}
+        />
+        <DocumentUploadField
+          label="Assurance"
+          document={insuranceDoc}
+          isUploading={upload.isUploading}
+          onPickLibrary={() => upload.pickFromLibrary('vehicle_insurance')}
+          onPickCamera={() => upload.pickFromCamera('vehicle_insurance')}
+        />
+      </View>
+
+      <Button label="Terminer" onPress={() => router.back()} style={styles.submit} />
+    </ScreenContainer>
+  );
+}
+
 export default function NewVehicleScreen() {
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
@@ -26,7 +71,12 @@ export default function NewVehicleScreen() {
   const [type, setType] = useState<VehicleType>('SEDAN');
   const [totalSeats, setTotalSeats] = useState(4);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [createdVehicleId, setCreatedVehicleId] = useState<string | null>(null);
   const createVehicle = useCreateVehicle();
+
+  if (createdVehicleId) {
+    return <VehicleDocumentsStep vehicleId={createdVehicleId} />;
+  }
 
   function handleSubmit() {
     setErrorMessage(undefined);
@@ -49,7 +99,7 @@ export default function NewVehicleScreen() {
         totalSeats,
       },
       {
-        onSuccess: () => router.back(),
+        onSuccess: (vehicle) => setCreatedVehicleId(vehicle.id),
         onError: (error) => {
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },
@@ -144,6 +194,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  intro: {
     marginBottom: spacing.lg,
   },
   typeRow: {

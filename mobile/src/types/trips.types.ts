@@ -126,3 +126,9 @@ export interface CreateTripPayload {
 export interface CancelTripPayload {
   reason: string;
 }
+
+export interface TripPosition {
+  latitude: number;
+  longitude: number;
+  updatedAt: string;
+}

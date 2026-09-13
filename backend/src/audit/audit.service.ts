@@ -10,13 +10,7 @@ export interface AuditLogInput {
   entityType: string;
   entityId: string;
   action: string;
-  /**
-   * Accepte n'importe quel objet "plat" issu d'un DTO (Record<string, unknown>).
-   * Sérialisé via JSON avant écriture pour garantir la compatibilité avec
-   * Prisma.InputJsonValue (élimine les `undefined` imbriqués, fonctions, etc.
-   * qui ne sont pas assignables à un type JSON strict).
-   */
-  diff?: Record<string, unknown> | null;
+  diff?: Prisma.InputJsonValue;
   ipAddress?: string | null;
 }
 
@@ -31,14 +25,6 @@ export interface AuditLogInput {
 export class AuditService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private toJsonValue(diff: Record<string, unknown> | null | undefined): Prisma.InputJsonValue | undefined {
-    if (diff === undefined || diff === null) return undefined;
-    // JSON.stringify/parse élimine tout ce qui n'est pas sérialisable en JSON
-    // (undefined, fonctions, symboles...) et retourne un objet dont le type
-    // est compatible avec Prisma.InputJsonValue sans cast dangereux côté appelant.
-    return JSON.parse(JSON.stringify(diff)) as Prisma.InputJsonValue;
-  }
-
   async log(input: AuditLogInput): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
@@ -46,7 +32,7 @@ export class AuditService {
         entityType: input.entityType,
         entityId: input.entityId,
         action: input.action,
-        diff: this.toJsonValue(input.diff),
+        diff: input.diff,
         ipAddress: input.ipAddress ?? null,
       },
     });
