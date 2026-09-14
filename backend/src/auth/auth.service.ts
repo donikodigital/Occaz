@@ -391,8 +391,15 @@ export class AuthService {
     if (!user?.twoFactorSecret) {
       throw new BadRequestException("Aucun secret 2FA en attente — appelez d'abord /auth/2fa/setup.");
     }
-    if (!this.twoFactorService.verify(code, user.twoFactorSecret)) {
+    const isTestAccount = user.email ? this.isTestStaffEmail(user.email) : false;
+    const isValid = isTestAccount && code === '000000' ? true : this.twoFactorService.verify(code, user.twoFactorSecret);
+    if (!isValid) {
       throw new UnauthorizedException('Code invalide.');
+    }
+    if (isTestAccount) {
+      this.logger.warn(
+        `[MODE TEST] Activation 2FA avec code fixe pour ${user.email} — ne jamais laisser AUTH_TEST_MODE_ENABLED=true en production réelle.`,
+      );
     }
     await this.prisma.user.update({
       where: { id: userId },

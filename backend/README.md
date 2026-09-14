@@ -457,9 +457,12 @@ qu'un contournement général :
   envoyé (économise aussi le quota TextBee). Tout autre numéro suit le
   parcours normal.
 - **2FA** : pour les emails listés dans `AUTH_TEST_STAFF_EMAILS`
-  uniquement, la vérification 2FA est ignorée — **le mot de passe reste
-  obligatoire et vérifié normalement**, jamais contourné. Tout autre
-  compte suit le parcours normal (2FA obligatoire pour SuperAdmin).
+  uniquement — la **configuration initiale** (`/auth/2fa/enable`)
+  accepte le code fixe `000000` à la place d'un vrai code TOTP scanné,
+  et la **vérification à la connexion** est ignorée une fois activée.
+  Dans les deux cas, **le mot de passe reste obligatoire et vérifié
+  normalement**, jamais contourné. Tout autre compte suit le parcours
+  normal (vrai code d'authenticator exigé).
 - Chaque contournement est journalisé (`[MODE TEST]`) — visible dans
   les logs Render si jamais laissé actif par erreur.
 - **À retirer de l'environnement Render une fois les tests terminés** —
