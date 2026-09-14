@@ -309,6 +309,18 @@ Prochaines étapes naturelles, hors périmètre de ce backend :
   sont concentrés sur la couverture fonctionnelle complète.
 - Le frontend (mobile + back-office web).
 
+- **Bug réel trouvé au premier déploiement Render, corrigé** : le
+  moteur Prisma (variante musl, utilisée par les images Alpine) a
+  besoin d'OpenSSL, absent par défaut de `node:22-alpine` — sans lui,
+  échec au démarrage avec `Error loading shared library libssl.so`.
+  Corrigé avec `RUN apk add --no-cache openssl` dans les étapes `deps`
+  et `runner` du Dockerfile, et `binaryTargets` complété dans
+  `schema.prisma` (`debian-openssl-3.0.x`, `linux-musl-openssl-3.0.x`,
+  `linux-musl`) pour que Prisma génère le bon moteur pour cette
+  plateforme. Jamais reproduit dans cet environnement de vérification
+  (pas d'accès Docker ici) — trouvé et corrigé directement en
+  production par Doniko.
+
 ## Déploiement (Docker, CI, health checks)
 
 - **`Dockerfile`** : build en 4 étapes — dépendances + génération
@@ -431,6 +443,28 @@ npm run test:e2e      # nécessite une DATABASE_URL joignable
   rencontrée dans `accounts.seed.ts` (upsert sur une clé composite
   incluant un `countryId` nullable, rejeté par le vrai client) —
   remplacé par le même contournement `findFirst` + `create`.
+
+## Mode test (contournement OTP/2FA — réversible, jamais en vrai prod)
+
+Demandé explicitement pour fluidifier les tests sur `occaz.sarl` en
+attendant la fin des vérifications — volontairement **étroit** plutôt
+qu'un contournement général :
+
+- **Désactivé par défaut** (`AUTH_TEST_MODE_ENABLED` absent ou `false`)
+  — aucun changement de comportement tant que non activé.
+- **OTP** : pour les numéros listés dans `AUTH_TEST_PHONE_NUMBERS`
+  (séparés par des virgules) uniquement, code fixe `000000`, aucun SMS
+  envoyé (économise aussi le quota TextBee). Tout autre numéro suit le
+  parcours normal.
+- **2FA** : pour les emails listés dans `AUTH_TEST_STAFF_EMAILS`
+  uniquement, la vérification 2FA est ignorée — **le mot de passe reste
+  obligatoire et vérifié normalement**, jamais contourné. Tout autre
+  compte suit le parcours normal (2FA obligatoire pour SuperAdmin).
+- Chaque contournement est journalisé (`[MODE TEST]`) — visible dans
+  les logs Render si jamais laissé actif par erreur.
+- **À retirer de l'environnement Render une fois les tests terminés** —
+  ces trois variables n'ont aucune raison d'exister une fois de vrais
+  utilisateurs sur la plateforme.
 
 ## SMS réel (TextBee)
 

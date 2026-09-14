@@ -1,4 +1,5 @@
 # backend/Dockerfile
+# backend/Dockerfile
 #
 # Build multi-étapes : l'étape "builder" contient tout ce qu'il faut
 # pour compiler (devDependencies incluses), l'image finale ne garde
@@ -8,6 +9,8 @@
 # --- Étape 1 : dépendances + génération du client Prisma ---
 FROM node:22-alpine AS deps
 WORKDIR /app
+# Le moteur Prisma (musl) a besoin d'OpenSSL, absent par défaut d'Alpine —
+# sans ça, échec au démarrage ("Error loading shared library libssl.so").
 RUN apk add --no-cache openssl
 COPY package.json package-lock.json ./
 RUN npm ci

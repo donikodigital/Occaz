@@ -55,6 +55,25 @@ export class AuthService {
     @Inject(EMAIL_PROVIDER) private readonly emailProvider: EmailProvider,
   ) {}
 
+  /**
+   * Mode test — désactivé par défaut, à n'activer QUE le temps de tes
+   * propres tests (jamais avec de vrais utilisateurs sur le site
+   * public). Ne concerne que les numéros/emails explicitement listés
+   * dans AUTH_TEST_PHONE_NUMBERS / AUTH_TEST_STAFF_EMAILS — n'importe
+   * quel autre compte suit le parcours normal, sans exception.
+   */
+  private isTestPhone(phone: string): boolean {
+    if (process.env.AUTH_TEST_MODE_ENABLED !== 'true') return false;
+    const testPhones = (process.env.AUTH_TEST_PHONE_NUMBERS ?? '').split(',').map((p) => p.trim());
+    return testPhones.includes(phone);
+  }
+
+  private isTestStaffEmail(email: string): boolean {
+    if (process.env.AUTH_TEST_MODE_ENABLED !== 'true') return false;
+    const testEmails = (process.env.AUTH_TEST_STAFF_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase());
+    return testEmails.includes(email.toLowerCase());
+  }
+
   // ---------------------------------------------------------------------
   // OTP par téléphone — parcours principal Client / Chauffeur (section 36)
   // ---------------------------------------------------------------------
@@ -81,7 +100,8 @@ export class AuthService {
 
     const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
     const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;
-    const code = generateOtpCode();
+    const isTestPhone = this.isTestPhone(dto.phone);
+    const code = isTestPhone ? '000000' : generateOtpCode();
 
     await this.prisma.otpCode.create({
       data: {
@@ -94,10 +114,16 @@ export class AuthService {
       },
     });
 
-    await this.smsProvider.send(
-      dto.phone,
-      `Votre code de connexion est ${code}. Il expire dans ${Math.round(expirySeconds / 60)} minutes.`,
-    );
+    if (isTestPhone) {
+      this.logger.warn(
+        `[MODE TEST] Code fixe pour ${dto.phone} : 000000 — aucun SMS envoyé. Ne jamais laisser AUTH_TEST_MODE_ENABLED=true en production réelle.`,
+      );
+    } else {
+      await this.smsProvider.send(
+        dto.phone,
+        `Votre code de connexion est ${code}. Il expire dans ${Math.round(expirySeconds / 60)} minutes.`,
+      );
+    }
 
     return { expiresInSeconds: expirySeconds };
   }
@@ -191,7 +217,14 @@ export class AuthService {
       throw new UnauthorizedException('Identifiants invalides.');
     }
 
-    if (user.isTwoFactorEnabled) {
+    const skipTwoFactor = this.isTestStaffEmail(dto.email);
+
+    if (skipTwoFactor) {
+      // Rien à vérifier — le mot de passe seul suffit pour ce compte de test.
+      this.logger.warn(
+        `[MODE TEST] 2FA ignorée pour ${dto.email} — ne jamais laisser AUTH_TEST_MODE_ENABLED=true en production réelle.`,
+      );
+    } else if (user.isTwoFactorEnabled) {
       if (!dto.twoFactorCode) {
         throw new UnauthorizedException('Code 2FA requis.');
       }
