@@ -247,6 +247,7 @@ export class DisputesService {
         this.notifications.notify({
           userId,
           type: NotificationType.SUPPORT_MESSAGE,
+          channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
           fallbackTitle: 'Nouveau message — litige',
           fallbackBody: `Nouveau message sur le litige "${dispute.reason}".`,
         }),
@@ -545,7 +546,7 @@ export class DisputesService {
         this.notifications.notify({
           userId,
           type: NotificationType.DISPUTE,
-          channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+          channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],
           fallbackTitle: 'Litige résolu',
           fallbackBody: `Le litige "${dispute.reason}" a été résolu (${resolutionType}).`,
         }),

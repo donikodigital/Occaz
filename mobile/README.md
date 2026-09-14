@@ -290,6 +290,27 @@ référencés) — aurait bloqué toute soumission.
   remplacer les `[À COMPLÉTER]` du brouillon de politique de
   confidentialité après relecture juridique.
 
+## Mise à jour transversale — Photo de profil chauffeur
+
+- **`ProfilePhotoField`** (nouveau) : avatar rond, recadrage carré imposé
+  à la sélection (`allowsEditing` + `aspect: [1,1]`) — contrairement aux
+  documents d'identité, jamais recadrés.
+- **`useDriverPhotoUpload`** (nouveau) : même flux en 3 étapes que
+  `useDocumentUpload`, mais un contrat simplifié (une seule photo, pas de
+  notion de "type") — hook dédié plutôt que de forcer la généralisation
+  du hook documents.
+- Intégré à l'inscription (juste à côté de la CNI et du permis, avec un
+  rappel visuel "obligatoire avant validation" tant qu'aucune photo n'est
+  envoyée) et à la modification de profil, pour la changer plus tard.
+
+## Mise à jour transversale — Email optionnel à l'inscription
+
+`complete-profile.tsx` (client et chauffeur) gagne un champ email
+optionnel — validation basique côté client, backend gère le conflit
+d'unicité proprement. Permet de recevoir aussi les notifications par
+email (bienvenue, paiement confirmé, litige...), en plus du push —
+voir le README backend, section "Notifications réelles".
+
 ## Mise à jour transversale — Suivi de position en direct (premier plan + arrière-plan)
 
 - **Côté chauffeur** (`useTripPositionBroadcast`) : demande d'abord la

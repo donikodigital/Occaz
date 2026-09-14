@@ -10,5 +10,4 @@ dist
 coverage
 test
 *.spec.ts
-Dockerfile
 .dockerignore

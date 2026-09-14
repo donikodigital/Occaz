@@ -2,8 +2,10 @@
 import { Module } from '@nestjs/common';
 import { CustomerProfilesController } from './customer-profiles.controller';
 import { CustomerProfilesService } from './customer-profiles.service';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 @Module({
+  imports: [NotificationsModule],
   controllers: [CustomerProfilesController],
   providers: [CustomerProfilesService],
   exports: [CustomerProfilesService],

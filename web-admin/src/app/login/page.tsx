@@ -3,14 +3,14 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconArrowLeft, IconLock, IconMail, IconPhone, IconRoute2 } from '@tabler/icons-react';
+import { IconArrowLeft, IconKey, IconLock, IconMail, IconPhone, IconRoute2 } from '@tabler/icons-react';
 import { Button, PasswordField, TextField } from '@/components/ui';
 import { authApi } from '@/services/api/auth.api';
 import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { AuthResult } from '@/types/auth.types';
 
-type Mode = 'password' | 'phone-request' | 'phone-verify';
+type Mode = 'password' | 'phone-request' | 'phone-verify' | 'reset-request' | 'reset-confirm';
 
 /**
  * Motif de marque : un tracé de trajet reliant quelques repères, sur
@@ -62,6 +62,10 @@ export default function LoginPage() {
   const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
   const [phone, setPhone] = useState('+224');
   const [otpCode, setOtpCode] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [resetMessage, setResetMessage] = useState<string | undefined>();
   const [isSubmitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
@@ -123,6 +127,38 @@ export default function LoginPage() {
     }
   }
 
+  async function handleRequestReset(event: React.FormEvent) {
+    event.preventDefault();
+    setErrorMessage(undefined);
+    setSubmitting(true);
+    try {
+      const { message } = await authApi.requestPasswordReset(resetEmail);
+      setResetMessage(message);
+      setMode('reset-confirm');
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleConfirmReset(event: React.FormEvent) {
+    event.preventDefault();
+    setErrorMessage(undefined);
+    setSubmitting(true);
+    try {
+      await authApi.confirmPasswordReset({ email: resetEmail, code: resetCode, newPassword });
+      setMode('password');
+      setPassword('');
+      setResetMessage(undefined);
+      setErrorMessage(undefined);
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Panneau de marque — masqué sur mobile, où la place est trop restreinte pour être autre chose que du remplissage. */}
@@ -161,14 +197,26 @@ export default function LoginPage() {
 
           <div className="mb-8">
             <h1 className="text-2xl font-semibold text-text-primary">
-              {mode === 'password' ? 'Connexion' : mode === 'phone-request' ? 'Connexion par téléphone' : 'Vérification'}
+              {mode === 'password'
+                ? 'Connexion'
+                : mode === 'phone-request'
+                  ? 'Connexion par téléphone'
+                  : mode === 'phone-verify'
+                    ? 'Vérification'
+                    : mode === 'reset-request'
+                      ? 'Mot de passe oublié'
+                      : 'Nouveau mot de passe'}
             </h1>
             <p className="mt-1 text-sm text-text-secondary">
               {mode === 'password'
                 ? 'Accédez à votre espace Support ou Administration.'
                 : mode === 'phone-request'
                   ? 'Un code de vérification vous sera envoyé par SMS.'
-                  : `Entrez le code reçu au ${phone}.`}
+                  : mode === 'phone-verify'
+                    ? `Entrez le code reçu au ${phone}.`
+                    : mode === 'reset-request'
+                      ? 'Recevez un code par email pour réinitialiser votre mot de passe.'
+                      : (resetMessage ?? `Entrez le code reçu à ${resetEmail} et votre nouveau mot de passe.`)}
             </p>
           </div>
 
@@ -189,6 +237,19 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              {!needsTwoFactor ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(email);
+                    setMode('reset-request');
+                    setErrorMessage(undefined);
+                  }}
+                  className="-mt-3 text-sm text-text-secondary transition-colors hover:text-primary"
+                >
+                  Mot de passe oublié ?
+                </button>
+              ) : null}
               {needsTwoFactor ? (
                 <TextField
                   label="Code de double authentification"
@@ -272,6 +333,71 @@ export default function LoginPage() {
               >
                 <IconArrowLeft size={14} />
                 Changer de numéro
+              </button>
+            </form>
+          ) : null}
+
+          {mode === 'reset-request' ? (
+            <form onSubmit={handleRequestReset} className="space-y-5">
+              <TextField
+                label="Email"
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="vous@exemple.com"
+                autoFocus
+                required
+              />
+              {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
+              <Button type="submit" loading={isSubmitting} className="w-full py-3">
+                <IconKey size={16} />
+                Recevoir un code
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('password');
+                  setErrorMessage(undefined);
+                }}
+                className="flex w-full items-center justify-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-primary"
+              >
+                <IconArrowLeft size={14} />
+                Retour à la connexion
+              </button>
+            </form>
+          ) : null}
+
+          {mode === 'reset-confirm' ? (
+            <form onSubmit={handleConfirmReset} className="space-y-5">
+              <TextField
+                label="Code reçu par email"
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="123456"
+                maxLength={6}
+                autoFocus
+                required
+              />
+              <PasswordField
+                label="Nouveau mot de passe"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+              {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
+              <Button type="submit" loading={isSubmitting} className="w-full py-3">
+                Réinitialiser le mot de passe
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('reset-request');
+                  setErrorMessage(undefined);
+                }}
+                className="flex w-full items-center justify-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-primary"
+              >
+                <IconArrowLeft size={14} />
+                Redemander un code
               </button>
             </form>
           ) : null}

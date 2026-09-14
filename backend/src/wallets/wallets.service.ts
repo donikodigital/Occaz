@@ -1,6 +1,7 @@
 // backend/src/wallets/wallets.service.ts
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  NotificationChannel,
   NotificationType,
   Prisma,
   WalletTransactionStatus,
@@ -205,6 +206,7 @@ export class WalletsService {
       await this.notifications.notify({
         userId: driver.userId,
         type: NotificationType.DRIVER_PAYMENT,
+        channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: 'Paiement reçu',
         fallbackBody: `${formatMoney(netAmount)} ont été ajoutés à votre solde disponible.`,
       });

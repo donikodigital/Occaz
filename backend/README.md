@@ -432,6 +432,80 @@ npm run test:e2e      # nécessite une DATABASE_URL joignable
   incluant un `countryId` nullable, rejeté par le vrai client) —
   remplacé par le même contournement `findFirst` + `create`.
 
+## Mot de passe oublié (Support / SuperAdmin)
+
+Manquait jusqu'ici — seul le repli par téléphone + OTP permettait de
+recontourner un mot de passe/2FA perdu, sans readonner un vrai accès
+par mot de passe.
+
+- Réutilise l'infrastructure OTP existante (`OtpCode`, hachage, limite
+  de tentatives) plutôt qu'un mécanisme séparé — nouvelle valeur
+  d'enum `OtpPurpose.PASSWORD_RESET` (**migration nécessaire**).
+- `POST /auth/password-reset/request` (email) → `POST
+  /auth/password-reset/confirm` (email + code + nouveau mot de passe).
+- **Ne révèle jamais si l'email existe** — même réponse générique dans
+  tous les cas, seul un compte SUPPORT/SUPERADMIN valide reçoit
+  réellement un code.
+- Toutes les sessions actives sont révoquées après une réinitialisation
+  réussie — traité comme un signal de compromission potentielle.
+- Envoi par email (Resend) — voir la section notifications plus haut,
+  fonctionne dès que `RESEND_API_KEY`/`RESEND_FROM_EMAIL` sont
+  renseignées.
+
+## Photo de profil chauffeur (obligatoire avant validation)
+
+- `photoUrl` reste optionnel dans `CreateDriverProfileDto` (aucune photo
+  ne peut exister avant l'upload), mais **`DriverProfilesService.verify()`
+  refuse désormais de valider un chauffeur sans photo** — c'est le vrai
+  point d'obligation, pas une contrainte de formulaire à la création.
+- Même flux en 2 temps que les documents d'identité
+  (`POST /driver-profiles/me/photo/upload-url` puis
+  `POST /driver-profiles/me/photo`), mais une clé de stockage distincte
+  (`driver-avatar/...` plutôt que `driver/...`) — une photo de profil est
+  vue en permanence dans l'app (par les clients aussi, pas seulement le
+  SuperAdmin), contrairement à une pièce d'identité.
+- **Recommandé** : configurer un accès public en lecture sur ce seul
+  préfixe dans le bucket R2 et renseigner `STORAGE_PUBLIC_BASE_URL` —
+  sans ça, l'URL stockée est une URL signée qui expirera après quelques
+  minutes, ce qui casserait l'affichage de l'avatar avec le temps.
+
+## Notifications réelles (push + email)
+
+Toute la plomberie de routage existait déjà (`NotificationsService` — un
+seul point d'entrée `.notify()`, choix du modèle actif, traçabilité
+`sentAt`/`failedReason`) ; seuls les fournisseurs `push` et `email`
+étaient encore des simulations console. Les deux sont maintenant réels.
+
+- **Push (Expo)** — `ExpoPushProvider`, gratuit, aucun compte à créer.
+  Devenu le choix par défaut de `push.module.ts` immédiatement (rien à
+  configurer). Filtre les tokens mal formés, découpe en lots de 100 (limite
+  Expo), journalise les échecs par destinataire sans jamais bloquer le
+  reste du lot.
+- **Email (Resend)** — `ResendEmailProvider`, choix par défaut de
+  `email.module.ts` dès maintenant aussi, mais nécessite `RESEND_API_KEY`
+  et `RESEND_FROM_EMAIL` (compte à créer, domaine d'expédition à
+  vérifier côté Resend) — tant qu'absentes, le backend démarre
+  normalement, seul l'envoi réel échoue proprement (`failedReason`
+  enregistré, jamais de crash).
+- **Canal email ajouté à 8 notifications déjà existantes** : paiement
+  confirmé (trajet + colis), remboursement (x2), paiement chauffeur
+  reçu, colis livré, chauffeur trouvé, litige résolu/nouveau message.
+- **Deux vrais trous comblés au passage**, pas seulement l'ajout du
+  canal email :
+  - La validation/le rejet d'un chauffeur ou d'un véhicule
+    (`DriverProfilesService.verify`, `VehiclesService.verify`/`reject`)
+    **ne notifiait rien du tout** avant — corrigé (push + email,
+    `NotificationType.STATUS_CHANGE`).
+  - **Aucun message de bienvenue à la création d'un compte** —
+    ajouté pour client et chauffeur.
+- **Champ email désormais collectable** : `CreateCustomerProfileDto`/
+  `CreateDriverProfileDto` acceptent un `email` optionnel, qui écrit sur
+  `User.email` (conflit d'unicité géré proprement — `ConflictException`
+  plutôt qu'une erreur Prisma brute qui remonterait telle quelle). Le
+  point d'architecture ci-dessus est donc résolu : les emails de
+  bienvenue et autres notifications email ont maintenant un vrai
+  destinataire pour les clients/chauffeurs qui en renseignent une.
+
 ## Démarrage
 
 ```bash

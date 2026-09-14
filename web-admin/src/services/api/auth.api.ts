@@ -21,4 +21,10 @@ export const authApi = {
   setupTwoFactor: () => api.post<SetupTwoFactorResult>('/auth/2fa/setup'),
 
   enableTwoFactor: (code: string) => api.post<void>('/auth/2fa/enable', { code }),
+
+  requestPasswordReset: (email: string) =>
+    api.post<{ message: string }>('/auth/password-reset/request', { email }, { auth: false }),
+
+  confirmPasswordReset: (payload: { email: string; code: string; newPassword: string }) =>
+    api.post<{ message: string }>('/auth/password-reset/confirm', payload, { auth: false }),
 };

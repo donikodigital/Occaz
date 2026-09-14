@@ -45,6 +45,7 @@ generator client {
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
   extensions = [postgis]
 }
 
@@ -188,6 +189,7 @@ enum OtpPurpose {
   SHIPMENT_DELIVERY
   LOGIN
   PHONE_VERIFICATION
+  PASSWORD_RESET
 }
 
 enum OtpStatus {

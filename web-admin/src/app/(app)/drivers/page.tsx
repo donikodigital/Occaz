@@ -62,7 +62,16 @@ export default function DriversPage() {
             {(data?.data ?? []).map((driver) => (
               <TableRow key={driver.id} className="hover:bg-surface-muted/50">
                 <TableCell>
-                  <Link href={`/drivers/${driver.id}`} className="flex items-center gap-1.5 font-medium text-primary hover:underline">
+                  <Link href={`/drivers/${driver.id}`} className="flex items-center gap-2 font-medium text-primary hover:underline">
+                    {driver.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={driver.photoUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                    ) : (
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-light text-xs font-semibold text-primary-dark">
+                        {driver.firstName.charAt(0)}
+                        {driver.lastName.charAt(0)}
+                      </span>
+                    )}
                     {driver.firstName} {driver.lastName}
                     {driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={15} className="text-success-dark" /> : null}
                   </Link>

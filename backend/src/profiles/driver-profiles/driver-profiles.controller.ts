@@ -13,6 +13,7 @@ import { UpdateDriverProfileDto } from './dto/update-driver-profile.dto';
 import { SuspendDriverDto } from './dto/suspend-driver.dto';
 import { CreateDocumentDto } from '../../documents/dto/create-document.dto';
 import { RequestUploadUrlDto } from '../../storage/dto/request-upload-url.dto';
+import { ConfirmPhotoDto } from './dto/confirm-photo.dto';
 
 @ApiTags('Profils — Chauffeurs')
 @ApiBearerAuth()
@@ -48,6 +49,16 @@ export class DriverProfilesController {
   @Get('me/documents')
   findMyDocuments(@CurrentUser() user: AuthenticatedUser) {
     return this.driverProfilesService.findDocumentsForUser(user.id);
+  }
+
+  @Post('me/photo/upload-url')
+  requestPhotoUploadUrl(@Body() dto: RequestUploadUrlDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.driverProfilesService.requestPhotoUploadUrlForUser(user.id, dto);
+  }
+
+  @Post('me/photo')
+  confirmPhoto(@Body() dto: ConfirmPhotoDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.driverProfilesService.confirmPhotoForUser(user.id, dto);
   }
 
   @Permissions(PERMISSIONS.DRIVER_READ)

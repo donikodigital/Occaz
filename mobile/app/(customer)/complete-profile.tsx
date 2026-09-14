@@ -16,6 +16,7 @@ import { ApiError } from '@/services/api/ApiError';
 export default function CompleteProfileScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const createProfile = useCreateCustomerProfile();
 
@@ -25,8 +26,13 @@ export default function CompleteProfileScreen() {
       setErrorMessage('Renseignez votre prénom et votre nom.');
       return;
     }
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setErrorMessage('Adresse email invalide.');
+      return;
+    }
     createProfile.mutate(
-      { firstName: firstName.trim(), lastName: lastName.trim() },
+      { firstName: firstName.trim(), lastName: lastName.trim(), email: trimmedEmail || undefined },
       {
         onSuccess: () => router.replace('/(customer)/(tabs)/home'),
         onError: (error) => {
@@ -55,6 +61,17 @@ export default function CompleteProfileScreen() {
             autoFocus
           />
           <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Diallo" />
+          <TextField
+            label="Email (optionnel)"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="vous@exemple.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <AppText variant="xs" color="textMuted">
+            Pour recevoir aussi vos notifications par email.
+          </AppText>
         </View>
 
         {errorMessage ? (

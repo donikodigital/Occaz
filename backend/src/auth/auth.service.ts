@@ -18,12 +18,15 @@ import { DevicesService } from '../devices/devices.service';
 import { SessionsService } from './sessions.service';
 import { TwoFactorService } from './two-factor.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
+import { EMAIL_PROVIDER, EmailProvider } from '../integrations/email/email-provider.interface';
 import { generateOtpCode, hashOtpCode, verifyOtpCode } from '../common/utils/otp.util';
 import { addDuration } from '../common/utils/duration.util';
 import { JwtAccessPayload, JwtRefreshPayload } from '../common/types/jwt-payload.interface';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginPasswordDto } from './dto/login-password.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 
 export interface AuthTokens {
   accessToken: string;
@@ -49,6 +52,7 @@ export class AuthService {
     private readonly twoFactorService: TwoFactorService,
     private readonly audit: AuditService,
     @Inject(SMS_PROVIDER) private readonly smsProvider: SmsProvider,
+    @Inject(EMAIL_PROVIDER) private readonly emailProvider: EmailProvider,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -220,6 +224,113 @@ export class AuthService {
     });
 
     return result;
+  }
+
+  // ---------------------------------------------------------------------
+  // Mot de passe oublié — réservé aux comptes SUPPORT / SUPERADMIN
+  // (les seuls à s'authentifier par mot de passe). Le repli existant
+  // (connexion par téléphone + OTP, toujours disponible pour tous les
+  // comptes) évitait un blocage total, mais imposait de systématiquement
+  // repasser par le téléphone plutôt que de pouvoir réellement récupérer
+  // l'accès par mot de passe.
+  // ---------------------------------------------------------------------
+
+  /**
+   * Ne révèle jamais si l'email existe ou non — même réponse générique
+   * dans tous les cas (compte introuvable, pas de mot de passe, mauvais
+   * type de compte), pour ne pas permettre à quelqu'un de sonder quels
+   * emails sont enregistrés comme personnel. Seul un compte valide
+   * reçoit réellement un code.
+   */
+  async requestPasswordReset(dto: RequestPasswordResetDto): Promise<{ message: string }> {
+    const genericResponse = {
+      message: 'Si un compte existe avec cet email, un code de réinitialisation a été envoyé.',
+    };
+
+    const user = await this.usersService.findByEmail(dto.email);
+    const isEligible =
+      user &&
+      user.passwordHash &&
+      (user.accountType === AccountType.SUPPORT || user.accountType === AccountType.SUPERADMIN) &&
+      !user.isSuspended;
+
+    if (!isEligible) {
+      return genericResponse;
+    }
+
+    const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
+    const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;
+    const code = generateOtpCode();
+
+    await this.prisma.otpCode.create({
+      data: {
+        userId: user!.id,
+        code: hashOtpCode(code),
+        purpose: OtpPurpose.PASSWORD_RESET,
+        status: OtpStatus.PENDING,
+        maxAttempts,
+        expiresAt: addDuration(`${expirySeconds}s`),
+      },
+    });
+
+    await this.emailProvider.send(
+      dto.email,
+      'Réinitialisation de votre mot de passe',
+      `Votre code de réinitialisation est ${code}. Il expire dans ${Math.round(expirySeconds / 60)} minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
+    );
+
+    return genericResponse;
+  }
+
+  async confirmPasswordReset(dto: ConfirmPasswordResetDto): Promise<{ message: string }> {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user) {
+      throw new UnauthorizedException('Code invalide.');
+    }
+
+    const otp = await this.prisma.otpCode.findFirst({
+      where: { userId: user.id, purpose: OtpPurpose.PASSWORD_RESET, status: OtpStatus.PENDING },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otp || otp.expiresAt < new Date()) {
+      throw new UnauthorizedException('Code expiré ou introuvable, veuillez en redemander un.');
+    }
+    if (otp.attempts >= otp.maxAttempts) {
+      await this.prisma.otpCode.update({ where: { id: otp.id }, data: { status: OtpStatus.FAILED } });
+      throw new UnauthorizedException('Trop de tentatives, veuillez redemander un code.');
+    }
+    if (!verifyOtpCode(dto.code, otp.code)) {
+      await this.prisma.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
+      throw new UnauthorizedException('Code invalide.');
+    }
+
+    const newPasswordHash = await bcrypt.hash(dto.newPassword, 12);
+
+    await this.prisma.$transaction([
+      this.prisma.otpCode.update({
+        where: { id: otp.id },
+        data: { status: OtpStatus.VERIFIED, verifiedAt: new Date() },
+      }),
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: newPasswordHash },
+      }),
+    ]);
+
+    // Un changement de mot de passe est aussi traité comme un signal de
+    // compromission potentielle — toutes les sessions actives sont
+    // révoquées, un éventuel accès non autorisé est coupé net.
+    await this.sessionsService.revokeAllForUser(user.id);
+
+    await this.audit.log({
+      actorId: user.id,
+      entityType: 'User',
+      entityId: user.id,
+      action: 'PASSWORD_RESET',
+    });
+
+    return { message: 'Mot de passe mis à jour. Connectez-vous avec votre nouveau mot de passe.' };
   }
 
   // ---------------------------------------------------------------------

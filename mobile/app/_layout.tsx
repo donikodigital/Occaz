@@ -16,6 +16,7 @@ import {
 import { queryClient } from '@/services/queryClient';
 import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/theme';
+import { usePushNotificationRegistration } from '@/hooks/usePushNotifications';
 import '@/tasks/tripLocationTask';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -29,6 +30,8 @@ export default function RootLayout() {
   });
   const hydrate = useAuthStore((state) => state.hydrate);
   const isHydrating = useAuthStore((state) => state.isHydrating);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  usePushNotificationRegistration(isAuthenticated);
 
   useEffect(() => {
     hydrate();

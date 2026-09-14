@@ -19,4 +19,10 @@ export const driverProfilesApi = {
     api.post<AppDocument>('/driver-profiles/me/documents', payload),
 
   listMyDocuments: () => api.get<AppDocument[]>('/driver-profiles/me/documents'),
+
+  requestPhotoUploadUrl: (payload: RequestUploadUrlPayload) =>
+    api.post<UploadUrlResult>('/driver-profiles/me/photo/upload-url', payload),
+
+  confirmPhoto: (storageKey: string) =>
+    api.post<DriverProfile>('/driver-profiles/me/photo', { storageKey }),
 };

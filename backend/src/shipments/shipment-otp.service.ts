@@ -1,6 +1,6 @@
 // backend/src/shipments/shipment-otp.service.ts
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationType, OtpPurpose, ShipmentStatus } from '@prisma/client';
+import { NotificationChannel, NotificationType, OtpPurpose, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OtpService } from '../otp/otp.service';
 import { WalletsService } from '../wallets/wallets.service';
@@ -170,6 +170,7 @@ export class ShipmentOtpService {
       await this.notifications.notify({
         userId: customer.userId,
         type: NotificationType.DELIVERY,
+        channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: 'Colis livré',
         fallbackBody: 'Votre envoi a été livré avec succès.',
       });

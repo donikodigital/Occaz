@@ -4,9 +4,10 @@ import { DriverProfilesController } from './driver-profiles.controller';
 import { DriverProfilesService } from './driver-profiles.service';
 import { DocumentsModule } from '../../documents/documents.module';
 import { StorageModule } from '../../storage/storage.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 @Module({
-  imports: [DocumentsModule, StorageModule],
+  imports: [DocumentsModule, StorageModule, NotificationsModule],
   controllers: [DriverProfilesController],
   providers: [DriverProfilesService],
   exports: [DriverProfilesService],

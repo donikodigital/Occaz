@@ -4,9 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AccountType } from '@prisma/client';
+import { AccountType, NotificationChannel, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../audit/audit.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../../common/dto/pagination-response.dto';
 import { CreateCustomerProfileDto } from './dto/create-customer-profile.dto';
@@ -17,6 +18,7 @@ export class CustomerProfilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findByUserId(userId: string) {
@@ -61,17 +63,40 @@ export class CustomerProfilesService {
       throw new ConflictException('Un profil client existe déjà pour ce compte.');
     }
 
-    return this.prisma.customerProfile.create({
-      data: {
-        userId,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        photoUrl: dto.photoUrl,
-        countryId: dto.countryId,
-        cityId: dto.cityId,
-        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
-      },
+    const profile = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      if (dto.email) {
+        try {
+          await tx.user.update({ where: { id: userId }, data: { email: dto.email } });
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            throw new ConflictException('Cette adresse email est déjà utilisée par un autre compte.');
+          }
+          throw error;
+        }
+      }
+
+      return tx.customerProfile.create({
+        data: {
+          userId,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          photoUrl: dto.photoUrl,
+          countryId: dto.countryId,
+          cityId: dto.cityId,
+          dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+        },
+      });
     });
+
+    await this.notifications.notify({
+      userId,
+      type: NotificationType.STATUS_CHANGE,
+      channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+      fallbackTitle: 'Bienvenue chez Transport Partagé',
+      fallbackBody: `Bienvenue ${dto.firstName} ! Votre compte est prêt.`,
+    });
+
+    return profile;
   }
 
   async updateForUser(userId: string, dto: UpdateCustomerProfileDto) {

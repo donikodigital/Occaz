@@ -1,4 +1,4 @@
-//mobile/src/components/ui/CalendarPicker.tsx
+// mobile/src/components/ui/CalendarPicker.tsx
 import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { IconCalendar, IconChevronLeft, IconChevronRight, IconX } from '@tabler/icons-react-native';

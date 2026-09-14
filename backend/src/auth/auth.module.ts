@@ -12,6 +12,7 @@ import { UsersModule } from '../users/users.module';
 import { DevicesModule } from '../devices/devices.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { SmsModule } from '../integrations/sms/sms.module';
+import { EmailModule } from '../integrations/email/email.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { SmsModule } from '../integrations/sms/sms.module';
     DevicesModule,
     RbacModule,
     SmsModule,
+    EmailModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

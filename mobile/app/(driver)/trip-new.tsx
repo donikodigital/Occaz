@@ -1,3 +1,4 @@
+// mobile/app/(driver)/trip-new.tsx
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';

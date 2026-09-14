@@ -3,11 +3,12 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconMapPin } from '@tabler/icons-react-native';
-import { AppText, Button, Card, DocumentUploadField, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, Button, Card, DocumentUploadField, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { CountrySelectField } from '@/components/screens/CountrySelectField';
 import { colors, spacing } from '@/theme';
 import { useCreateDriverProfile } from '@/hooks/useDriverProfile';
 import { useDriverDocumentUpload, useMyDriverDocuments } from '@/hooks/useDriverDocuments';
+import { useDriverPhotoUpload } from '@/hooks/useDriverPhotoUpload';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { City, Country } from '@/types/geography.types';
@@ -15,12 +16,15 @@ import type { City, Country } from '@/types/geography.types';
 const CITY_FIELD = 'driver-profile-city';
 
 /** Deuxième étape affichée juste après la création du profil — mêmes principes que VehicleDocumentsStep dans vehicle-new.tsx. */
-function IdentityDocumentsStep() {
+function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; lastName: string }) {
   const { data: documents } = useMyDriverDocuments();
   const upload = useDriverDocumentUpload();
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const photoUpload = useDriverPhotoUpload((profile) => setPhotoUrl(profile.photoUrl));
 
   const nationalIdDoc = documents?.find((d) => d.type === 'national_id');
   const licenseDoc = documents?.find((d) => d.type === 'driver_license');
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`;
 
   return (
     <ScreenContainer scroll maxWidth="form">
@@ -28,8 +32,17 @@ function IdentityDocumentsStep() {
         Vos pièces d&apos;identité
       </AppText>
       <AppText variant="base" color="textSecondary" style={styles.subtitle}>
-        Envoyez votre CNI et votre permis de conduire pour que votre compte soit validé.
+        Envoyez votre photo de profil, votre CNI et votre permis de conduire pour que votre compte soit validé.
       </AppText>
+
+      <ProfilePhotoField
+        photoUrl={photoUrl}
+        initials={initials}
+        isUploading={photoUpload.isUploading}
+        onPickLibrary={photoUpload.pickFromLibrary}
+        onPickCamera={photoUpload.pickFromCamera}
+        isRequired
+      />
 
       <View style={styles.fields}>
         <DocumentUploadField
@@ -61,6 +74,7 @@ function IdentityDocumentsStep() {
 export default function DriverCompleteProfileScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [country, setCountry] = useState<Country | null>(null);
   const [city, setCity] = useState<City | null>(null);
   const [mobileMoneyNumber, setMobileMoneyNumber] = useState('');
@@ -80,7 +94,7 @@ export default function DriverCompleteProfileScreen() {
   }, [citySelection, consumeCitySelection]);
 
   if (isProfileCreated) {
-    return <IdentityDocumentsStep />;
+    return <IdentityDocumentsStep firstName={firstName} lastName={lastName} />;
   }
 
   function handleSubmit() {
@@ -93,11 +107,17 @@ export default function DriverCompleteProfileScreen() {
       setErrorMessage('Choisissez votre pays et votre ville.');
       return;
     }
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setErrorMessage('Adresse email invalide.');
+      return;
+    }
 
     createProfile.mutate(
       {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        email: trimmedEmail || undefined,
         countryId: country.id,
         cityId: city.id,
         mobileMoneyNumber: mobileMoneyNumber.trim() || undefined,
@@ -123,6 +143,17 @@ export default function DriverCompleteProfileScreen() {
       <View style={styles.fields}>
         <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Mamadou" autoFocus />
         <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Barry" />
+        <TextField
+          label="Email (optionnel)"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="vous@exemple.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <AppText variant="xs" color="textMuted">
+          Pour recevoir aussi vos notifications par email.
+        </AppText>
 
         <CountrySelectField label="Pays" value={country} onSelect={setCountry} />
 

@@ -135,6 +135,20 @@ sans cesse.
   groupes (Opérations, Finance, Configuration, Système) plutôt que
   listée à plat — devenait illisible sinon.
 
+## Mise à jour — Mot de passe oublié
+
+Lien "Mot de passe oublié ?" sur l'écran de connexion — deux nouveaux
+modes dans le même composant (`reset-request`, `reset-confirm`), même
+principe que le flux téléphone/OTP déjà en place. Voir le README
+backend pour le détail du mécanisme (réutilise l'infrastructure OTP
+existante, jamais de nouveau système).
+
+## Mise à jour — Photo de profil chauffeur
+
+Affichée (ou initiales à défaut) sur la fiche détail et dans la liste
+des chauffeurs — `driver.photoUrl`, alimenté par le nouveau flux
+d'upload mobile.
+
 ## Mise à jour — Revue des pièces justificatives
 
 Ferme le trou signalé au Lot 2 (`GET /documents` n'acceptait pas de

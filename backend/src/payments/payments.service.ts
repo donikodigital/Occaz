@@ -245,6 +245,7 @@ export class PaymentsService {
       await this.notifications.notify({
         userId: booking.customer.userId,
         type: NotificationType.PAYMENT,
+        channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: 'Paiement confirmé',
         fallbackBody: 'Votre paiement a été confirmé — votre réservation est validée.',
       });
@@ -270,6 +271,7 @@ export class PaymentsService {
       await this.notifications.notify({
         userId: shipment.customer.userId,
         type: NotificationType.PAYMENT,
+        channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: 'Paiement confirmé',
         fallbackBody: 'Votre paiement a été confirmé — nous recherchons un chauffeur pour votre envoi.',
       });
@@ -337,7 +339,7 @@ export class PaymentsService {
     await this.notifications.notify({
       userId: booking.customer.userId,
       type: NotificationType.REFUND,
-      channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+      channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],
       fallbackTitle: 'Remboursement effectué',
       fallbackBody: `Votre remboursement (${refundPercentage}%) a été traité.`,
     });
@@ -358,7 +360,7 @@ export class PaymentsService {
     await this.notifications.notify({
       userId: shipment.customer.userId,
       type: NotificationType.REFUND,
-      channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+      channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],
       fallbackTitle: 'Remboursement effectué',
       fallbackBody: `Votre remboursement (${refundPercentage}%) a été traité.`,
     });

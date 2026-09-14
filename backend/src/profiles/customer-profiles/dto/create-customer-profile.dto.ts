@@ -1,6 +1,6 @@
 // backend/src/profiles/customer-profiles/dto/create-customer-profile.dto.ts
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsDateString, IsEmail, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class CreateCustomerProfileDto {
   @ApiProperty({ example: 'Fatoumata' })
@@ -10,6 +10,11 @@ export class CreateCustomerProfileDto {
   @ApiProperty({ example: 'Diallo' })
   @IsString()
   lastName: string;
+
+  @ApiPropertyOptional({ description: 'Optionnel — permet de recevoir aussi les notifications par email, en plus du push.' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

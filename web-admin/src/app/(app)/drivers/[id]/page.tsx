@@ -111,6 +111,15 @@ export default function DriverDetailPage() {
         <Link href="/drivers" className="text-text-secondary hover:text-text-primary">
           <IconArrowLeft size={20} />
         </Link>
+        {driver.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={driver.photoUrl} alt="" className="h-11 w-11 rounded-full object-cover" />
+        ) : (
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-light text-sm font-semibold text-primary-dark">
+            {driver.firstName.charAt(0)}
+            {driver.lastName.charAt(0)}
+          </div>
+        )}
         <h1 className="flex items-center gap-2 text-2xl font-semibold text-text-primary">
           {driver.firstName} {driver.lastName}
           {driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={20} className="text-success-dark" /> : null}

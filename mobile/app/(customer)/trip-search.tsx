@@ -1,3 +1,4 @@
+// mobile/app/(customer)/trip-search.tsx
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';

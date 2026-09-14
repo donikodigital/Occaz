@@ -5,13 +5,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AccountType, DocumentOwnerType, DriverAccountStatus, Prisma } from '@prisma/client';
+import { AccountType, DocumentOwnerType, DriverAccountStatus, NotificationChannel, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../audit/audit.service';
 import { DocumentsService } from '../../documents/documents.service';
 import { CreateDocumentDto } from '../../documents/dto/create-document.dto';
 import { StorageService } from '../../storage/storage.service';
 import { RequestUploadUrlDto, extensionForContentType } from '../../storage/dto/request-upload-url.dto';
+import { ConfirmPhotoDto } from './dto/confirm-photo.dto';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../../common/dto/pagination-response.dto';
 import { CreateDriverProfileDto } from './dto/create-driver-profile.dto';
@@ -24,6 +26,7 @@ export class DriverProfilesService {
     private readonly audit: AuditService,
     private readonly documentsService: DocumentsService,
     private readonly storageService: StorageService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findByUserId(userId: string) {
@@ -94,8 +97,19 @@ export class DriverProfilesService {
       );
     }
 
-    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const profile = await tx.driverProfile.create({
+    const profile = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      if (dto.email) {
+        try {
+          await tx.user.update({ where: { id: userId }, data: { email: dto.email } });
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            throw new ConflictException('Cette adresse email est déjà utilisée par un autre compte.');
+          }
+          throw error;
+        }
+      }
+
+      const created = await tx.driverProfile.create({
         data: {
           userId,
           firstName: dto.firstName,
@@ -111,15 +125,28 @@ export class DriverProfilesService {
 
       await tx.wallet.create({
         data: {
-          driverId: profile.id,
+          driverId: created.id,
           currencyId: country.defaultCurrencyId!,
           balance: 0n,
           pendingBalance: 0n,
         },
       });
 
-      return profile;
+      return created;
     });
+
+    // En dehors de la transaction : un envoi externe (push/email) ne doit
+    // jamais faire échouer ni retarder l'écriture en base, et un envoi
+    // manqué ici n'a pas besoin d'annuler la création du profil.
+    await this.notifications.notify({
+      userId,
+      type: NotificationType.STATUS_CHANGE,
+      channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+      fallbackTitle: 'Bienvenue chez Transport Partagé',
+      fallbackBody: `Bienvenue ${dto.firstName} ! Votre profil chauffeur est en cours de vérification.`,
+    });
+
+    return profile;
   }
 
   async updateForUser(userId: string, dto: UpdateDriverProfileDto) {
@@ -164,7 +191,12 @@ export class DriverProfilesService {
 
   /** Validation d'un chauffeur — attribue le badge "Conducteur vérifié" (section 25). */
   async verify(id: string, actorId: string) {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
+    if (!existing.photoUrl) {
+      throw new BadRequestException(
+        'Ce chauffeur doit avoir une photo de profil avant de pouvoir être validé.',
+      );
+    }
     const profile = await this.prisma.driverProfile.update({
       where: { id },
       data: { status: DriverAccountStatus.VALIDATED, isVerifiedBadge: true },
@@ -174,6 +206,13 @@ export class DriverProfilesService {
       entityType: 'DriverProfile',
       entityId: id,
       action: 'VERIFY',
+    });
+    await this.notifications.notify({
+      userId: profile.userId,
+      type: NotificationType.STATUS_CHANGE,
+      channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+      fallbackTitle: 'Compte validé',
+      fallbackBody: 'Votre profil chauffeur a été vérifié — vous pouvez maintenant proposer des trajets.',
     });
     return profile;
   }
@@ -252,6 +291,32 @@ export class DriverProfilesService {
     const storageKey = this.storageService.buildKey('driver', driverId, extensionForContentType(dto.contentType));
     const { uploadUrl, expiresInSeconds } = await this.storageService.createUploadUrl(storageKey, dto.contentType);
     return { storageKey, uploadUrl, expiresInSeconds };
+  }
+
+  /**
+   * Même flux en 2 étapes que les documents d'identité, mais une clé
+   * distincte (`driver-avatar` plutôt que `driver`) — une photo de
+   * profil est destinée à être vue en permanence dans l'app (par les
+   * clients, pas seulement le SuperAdmin), contrairement à une pièce
+   * d'identité. Recommandé : configurer un accès public en lecture sur
+   * ce seul préfixe dans le bucket R2 (voir STORAGE_PUBLIC_BASE_URL,
+   * .env.example) pour une URL stable ; sans ça, createDownloadUrl
+   * retombe sur une URL signée qui expirera après quelques minutes.
+   */
+  async requestPhotoUploadUrlForUser(userId: string, dto: RequestUploadUrlDto) {
+    const driverId = await this.getProfileIdForUser(userId);
+    const storageKey = this.storageService.buildKey('driver-avatar', driverId, extensionForContentType(dto.contentType));
+    const { uploadUrl, expiresInSeconds } = await this.storageService.createUploadUrl(storageKey, dto.contentType);
+    return { storageKey, uploadUrl, expiresInSeconds };
+  }
+
+  async confirmPhotoForUser(userId: string, dto: ConfirmPhotoDto) {
+    const driverId = await this.getProfileIdForUser(userId);
+    const photoUrl = await this.storageService.createDownloadUrl(dto.storageKey);
+    return this.prisma.driverProfile.update({
+      where: { id: driverId },
+      data: { photoUrl },
+    });
   }
 
   async uploadDocumentForUser(userId: string, dto: CreateDocumentDto) {

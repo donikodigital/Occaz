@@ -13,6 +13,7 @@ export interface CustomerProfile {
 export interface CreateCustomerProfilePayload {
   firstName: string;
   lastName: string;
+  email?: string;
   countryId?: string;
   cityId?: string;
 }
@@ -41,6 +42,7 @@ export interface DriverProfile {
 export interface CreateDriverProfilePayload {
   firstName: string;
   lastName: string;
+  email?: string;
   countryId: string;
   cityId: string;
   dateOfBirth?: string;

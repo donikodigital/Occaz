@@ -1,6 +1,6 @@
 // backend/src/profiles/driver-profiles/dto/create-driver-profile.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsDateString, IsEmail, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class CreateDriverProfileDto {
   @ApiProperty({ example: 'Mamadou' })
@@ -11,6 +11,16 @@ export class CreateDriverProfileDto {
   @IsString()
   lastName: string;
 
+  @ApiPropertyOptional({ description: 'Optionnel — permet de recevoir aussi les notifications par email, en plus du push.' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  /** Toujours vide à cette étape en pratique — aucune photo ne peut encore
+   * exister avant la création du profil (le storageKey n'existe pas tant
+   * qu'aucun upload n'a eu lieu). La vraie photo arrive via le flux en 2
+   * temps POST me/photo/upload-url puis POST me/photo, obligatoire avant
+   * que verify() n'accepte de valider ce chauffeur. */
   @ApiPropertyOptional()
   @IsOptional()
   @IsUrl()

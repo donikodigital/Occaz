@@ -10,6 +10,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   CancellationInitiator,
   DocumentOwnerType,
+  NotificationChannel,
   NotificationType,
   Prisma,
   ServiceType,
@@ -286,6 +287,7 @@ export class ShipmentsService {
       await this.notifications.notify({
         userId: customer.userId,
         type: NotificationType.DRIVER_ACCEPTED,
+        channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: 'Chauffeur trouvé',
         fallbackBody: 'Un chauffeur a accepté de transporter votre envoi.',
       });

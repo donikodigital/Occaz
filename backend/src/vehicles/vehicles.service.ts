@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DocumentOwnerType, DocumentStatus } from '@prisma/client';
+import { DocumentOwnerType, DocumentStatus, NotificationChannel, NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DocumentsService } from '../documents/documents.service';
@@ -15,6 +15,7 @@ import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { CreateDocumentDto } from '../documents/dto/create-document.dto';
 import { StorageService } from '../storage/storage.service';
 import { RequestUploadUrlDto, extensionForContentType } from '../storage/dto/request-upload-url.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class VehiclesService {
@@ -23,6 +24,7 @@ export class VehiclesService {
     private readonly audit: AuditService,
     private readonly documentsService: DocumentsService,
     private readonly storageService: StorageService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   findAllForDriver(driverId: string) {
@@ -108,12 +110,20 @@ export class VehiclesService {
     const vehicle = await this.prisma.vehicle.update({
       where: { id },
       data: { verificationStatus: DocumentStatus.VERIFIED },
+      include: { driver: true },
     });
     await this.audit.log({
       actorId,
       entityType: 'Vehicle',
       entityId: id,
       action: 'VERIFY',
+    });
+    await this.notifications.notify({
+      userId: vehicle.driver.userId,
+      type: NotificationType.STATUS_CHANGE,
+      channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+      fallbackTitle: 'Véhicule validé',
+      fallbackBody: `Votre véhicule ${vehicle.brand} ${vehicle.model} a été vérifié.`,
     });
     return vehicle;
   }
@@ -123,12 +133,20 @@ export class VehiclesService {
     const vehicle = await this.prisma.vehicle.update({
       where: { id },
       data: { verificationStatus: DocumentStatus.REJECTED },
+      include: { driver: true },
     });
     await this.audit.log({
       actorId,
       entityType: 'Vehicle',
       entityId: id,
       action: 'REJECT',
+    });
+    await this.notifications.notify({
+      userId: vehicle.driver.userId,
+      type: NotificationType.STATUS_CHANGE,
+      channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+      fallbackTitle: 'Véhicule refusé',
+      fallbackBody: `Votre véhicule ${vehicle.brand} ${vehicle.model} n'a pas été validé — vérifiez vos documents.`,
     });
     return vehicle;
   }

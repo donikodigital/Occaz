@@ -56,6 +56,12 @@
           "isAndroidBackgroundLocationEnabled": true
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "color": "#4F46E5"
+        }
+      ],
       "expo-image"
     ],
     "extra": {

@@ -9,6 +9,8 @@ import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LoginPasswordDto } from './dto/login-password.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { EnableTwoFactorDto } from './dto/enable-two-factor.dto';
 
 @ApiTags('Authentification')
@@ -43,6 +45,20 @@ export class AuthController {
     @Headers('user-agent') userAgent?: string,
   ) {
     return this.authService.loginWithPassword(dto, { ipAddress: ip, userAgent });
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('password-reset/request')
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('password-reset/confirm')
+  confirmPasswordReset(@Body() dto: ConfirmPasswordResetDto) {
+    return this.authService.confirmPasswordReset(dto);
   }
 
   @Public()

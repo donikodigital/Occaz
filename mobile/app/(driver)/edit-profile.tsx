@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconArrowLeft } from '@tabler/icons-react-native';
-import { AppText, Button, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, Button, IconButton, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useDriverProfile, useUpdateDriverProfile } from '@/hooks/useDriverProfile';
+import { useDriverPhotoUpload } from '@/hooks/useDriverPhotoUpload';
 import { ApiError } from '@/services/api/ApiError';
 
 export default function DriverEditProfileScreen() {
@@ -13,8 +14,10 @@ export default function DriverEditProfileScreen() {
   const [firstName, setFirstName] = useState(profile?.firstName ?? '');
   const [lastName, setLastName] = useState(profile?.lastName ?? '');
   const [mobileMoneyNumber, setMobileMoneyNumber] = useState(profile?.mobileMoneyNumber ?? '');
+  const [photoUrl, setPhotoUrl] = useState(profile?.photoUrl ?? null);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const updateProfile = useUpdateDriverProfile();
+  const photoUpload = useDriverPhotoUpload((updated) => setPhotoUrl(updated.photoUrl));
 
   function handleSubmit() {
     setErrorMessage(undefined);
@@ -51,6 +54,16 @@ export default function DriverEditProfileScreen() {
         </AppText>
         <View style={{ width: 38 }} />
       </View>
+
+      <ProfilePhotoField
+        photoUrl={photoUrl}
+        initials={`${firstName.charAt(0)}${lastName.charAt(0)}`}
+        isUploading={photoUpload.isUploading}
+        onPickLibrary={photoUpload.pickFromLibrary}
+        onPickCamera={photoUpload.pickFromCamera}
+        isRequired={!profile?.isVerifiedBadge}
+      />
+      <View style={{ height: spacing.lg }} />
 
       <View style={styles.fields}>
         <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Mamadou" />
