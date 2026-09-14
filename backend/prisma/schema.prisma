@@ -40,7 +40,6 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
-  binaryTargets   = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x", "linux-musl"]
 }
 
 datasource db {
@@ -49,6 +48,7 @@ datasource db {
   directUrl  = env("DIRECT_URL")
   extensions = [postgis]
 }
+
 // =============================================================================
 // ENUMS
 // =============================================================================

@@ -1,4 +1,5 @@
 # backend/Dockerfile
+# backend/Dockerfile
 #
 # Build multi-étapes : l'étape "builder" contient tout ce qu'il faut
 # pour compiler (devDependencies incluses), l'image finale ne garde
@@ -8,7 +9,6 @@
 # --- Étape 1 : dépendances + génération du client Prisma ---
 FROM node:22-alpine AS deps
 WORKDIR /app
-RUN apk add --no-cache openssl
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY prisma ./prisma
@@ -37,7 +37,6 @@ COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apk add --no-cache openssl
 
 # Utilisateur non-root — bonne pratique standard, évite qu'un
 # éventuel accès au conteneur donne directement les droits root.

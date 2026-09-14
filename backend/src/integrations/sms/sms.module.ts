@@ -1,17 +1,19 @@
 // backend/src/integrations/sms/sms.module.ts
 import { Module } from '@nestjs/common';
-import { ConsoleSmsProvider } from './console-sms.provider';
+import { TextBeeSmsProvider } from './textbee-sms.provider';
 import { SMS_PROVIDER } from './sms-provider.interface';
 
 /**
- * Le choix du provider effectif se fait ici, au point de composition —
- * aucun autre module n'a besoin de savoir quelle implémentation est active.
+ * Basculé sur TextBee dès maintenant plutôt que de laisser
+ * ConsoleSmsProvider par défaut — même raisonnement que EmailModule
+ * pour Resend : tant que TEXTBEE_API_KEY n'est pas renseignée, chaque
+ * tentative d'envoi échoue proprement, jamais de crash.
  */
 @Module({
   providers: [
     {
       provide: SMS_PROVIDER,
-      useClass: ConsoleSmsProvider,
+      useClass: TextBeeSmsProvider,
     },
   ],
   exports: [SMS_PROVIDER],

@@ -432,6 +432,17 @@ npm run test:e2e      # nécessite une DATABASE_URL joignable
   incluant un `countryId` nullable, rejeté par le vrai client) —
   remplacé par le même contournement `findFirst` + `create`.
 
+## SMS réel (TextBee)
+
+- `TextBeeSmsProvider` — même principe d'initialisation différée que
+  les autres fournisseurs (Storage, Mapbox, Resend) : démarre
+  normalement sans `TEXTBEE_API_KEY`, échoue proprement à l'usage
+  réel tant qu'elle est absente.
+- Un seul appareil lié (offre gratuite) : pas besoin de préciser de
+  `deviceId`, TextBee utilise l'appareil actif par défaut.
+- Devenu le choix par défaut de `sms.module.ts` (comme Resend/Push) —
+  remplace `ConsoleSmsProvider`.
+
 ## Mot de passe oublié (Support / SuperAdmin)
 
 Manquait jusqu'ici — seul le repli par téléphone + OTP permettait de
