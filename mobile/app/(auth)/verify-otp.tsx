@@ -32,8 +32,20 @@ export default function VerifyOtpScreen() {
   }, [cooldown]);
 
   const verifyOtp = useMutation({
-    mutationFn: () =>
-      authApi.verifyOtp({ phone, code, device: { platform: Platform.OS as 'ios' | 'android' } }),
+    // Le code à vérifier est un paramètre de la mutation, jamais lu depuis
+    // le state `code` du composant : setCode() est asynchrone, donc au
+    // moment où mutate() s'exécute juste après un setCode(), le closure de
+    // mutationFn peut encore pointer sur le rendu précédent — un code d'un
+    // caractère plus court que celui qui vient d'être saisi (bug corrigé
+    // le 15/09/2026 : provoquait "code must be longer than or equal to 6
+    // characters" côté backend alors que l'utilisateur avait bien tapé 6
+    // chiffres).
+    mutationFn: (codeToVerify: string) =>
+      authApi.verifyOtp({
+        phone,
+        code: codeToVerify,
+        device: { platform: Platform.OS as 'ios' | 'android' },
+      }),
     onSuccess: async (result) => {
       await setSession(result);
       router.replace(result.user.accountType === 'DRIVER' ? '/(driver)/home' : '/(customer)/(tabs)/home');
@@ -54,7 +66,7 @@ export default function VerifyOtpScreen() {
     setCode(digitsOnly);
     setErrorMessage(undefined);
     if (digitsOnly.length === CODE_LENGTH) {
-      verifyOtp.mutate();
+      verifyOtp.mutate(digitsOnly);
     }
   }
 
@@ -132,7 +144,7 @@ export default function VerifyOtpScreen() {
 
       <Button
         label="Vérifier"
-        onPress={() => verifyOtp.mutate()}
+        onPress={() => verifyOtp.mutate(code)}
         loading={verifyOtp.isPending}
         disabled={code.length !== CODE_LENGTH}
         style={styles.submit}
