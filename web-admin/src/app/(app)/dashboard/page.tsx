@@ -39,7 +39,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
         <StatCard
           label="Utilisateurs"
           value={formatNumber(data.users.total)}
@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
       <div>
         <h2 className="mb-3 text-lg font-semibold text-text-primary">Finances</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
           <StatCard
             label="Revenu brut trajets"
             value={formatMoney(data.finance.grossBookingRevenue)}

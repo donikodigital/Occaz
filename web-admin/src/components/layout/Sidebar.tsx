@@ -17,6 +17,10 @@ interface SidebarProps {
  * Fixe en desktop (≥ lg). En dessous de lg, devient un tiroir hors-écran
  * piloté par isOpen/onClose (déclenché depuis MobileTopBar) — même liste
  * de navigation des deux côtés, seule la présentation change.
+ *
+ * h-dvh (et non h-screen) : sur mobile, 100vh dépasse souvent la zone
+ * réellement visible quand la barre d'adresse du navigateur est affichée,
+ * ce qui poussait le pied (mail + déconnexion) hors écran.
  */
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
@@ -56,7 +60,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-72 shrink-0 flex-col border-r border-border bg-surface transition-transform duration-200 ease-out lg:static lg:w-64 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-72 shrink-0 flex-col border-r border-border bg-surface transition-transform duration-200 ease-out lg:static lg:h-screen lg:w-64 lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -102,7 +106,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        <div className="border-t border-border px-4 py-4">
+        <div className="shrink-0 border-t border-border px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <p className="truncate text-sm font-medium text-text-primary">{user?.email ?? user?.phone}</p>
           <button
             onClick={handleLogout}
