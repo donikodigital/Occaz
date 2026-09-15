@@ -33,13 +33,13 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Tableau de bord</h1>
+        <h1 className="text-xl font-semibold text-text-primary sm:text-2xl">Tableau de bord</h1>
         <p className="text-sm text-text-secondary">
           Actifs sur les {data.active.windowDays} derniers jours.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
         <StatCard
           label="Utilisateurs"
           value={formatNumber(data.users.total)}
@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
       <div>
         <h2 className="mb-3 text-lg font-semibold text-text-primary">Finances</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           <StatCard
             label="Revenu brut trajets"
             value={formatMoney(data.finance.grossBookingRevenue)}
