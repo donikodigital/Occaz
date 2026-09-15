@@ -29,8 +29,9 @@ export interface NavSection {
 }
 
 /**
- * Source unique de la navigation, partagée par la Sidebar (desktop) et la
- * MobileTopBar (mobile), pour ne jamais avoir deux listes qui divergent.
+ * Source unique de la navigation, partagée par la Sidebar (desktop), la
+ * MobileTopBar et la BottomNavBar (mobile), pour ne jamais avoir des
+ * listes qui divergent.
  */
 export const NAV_SECTIONS: NavSection[] = [
   {
@@ -77,4 +78,15 @@ export function getActiveNavItem(pathname: string): NavItem | undefined {
     if (match) return match;
   }
   return undefined;
+}
+
+// Les 4 liens les plus utilisés au quotidien, affichés dans la barre du
+// bas sur mobile. Le reste de la navigation passe par le menu burger.
+const QUICK_LINK_HREFS = ['/dashboard', '/users', '/drivers', '/disputes'];
+
+export function getQuickLinks(): NavItem[] {
+  const allItems = NAV_SECTIONS.flatMap((section) => section.items);
+  return QUICK_LINK_HREFS.map((href) => allItems.find((item) => item.href === href)).filter(
+    (item): item is NavItem => Boolean(item)
+  );
 }

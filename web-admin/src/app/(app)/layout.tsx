@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileTopBar } from '@/components/layout/MobileTopBar';
+import { BottomNavBar } from '@/components/layout/BottomNavBar';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -23,14 +24,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar isOpen={isMobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-      {/* min-w-0 : empêche ce conteneur flex de s'élargir au-delà du viewport
-          quand le contenu (tableaux, cartes) est large — c'est ça qui causait
-          le scroll horizontal sur mobile. */}
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileTopBar onOpenMenu={() => setMobileNavOpen(true)} />
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+        {/* pb-24 : laisse la place à la BottomNavBar fixe sur mobile, pas
+            nécessaire sur desktop où elle est masquée (lg:hidden). */}
+        <main className="flex-1 overflow-y-auto px-4 py-6 pb-24 sm:px-6 lg:px-10 lg:py-10 lg:pb-10">
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
+        <BottomNavBar />
       </div>
     </div>
   );

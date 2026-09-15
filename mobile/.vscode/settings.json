@@ -1,0 +1,9 @@
+{
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.expo/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true
+  }
+}
