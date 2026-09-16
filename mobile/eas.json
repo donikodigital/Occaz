@@ -18,7 +18,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api-staging.transport-partage.example.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.occaz.sarl/api/v1"
       }
     },
     "production": {
@@ -28,7 +28,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.transport-partage.example.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.occaz.sarl/api/v1"
       }
     }
   },
