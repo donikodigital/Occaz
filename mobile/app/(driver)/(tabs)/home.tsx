@@ -1,4 +1,11 @@
 // mobile/app/(driver)/(tabs)/home.tsx
+//
+// v2 — "Prochain trajet" et les cartes de stats passent en HoverCard
+// (échelle + ombre au survol sur desktop/web, aucun effet sur mobile
+// tactile). Ajout d'une 3e carte de stat "Véhicules" (réutilise
+// useMyVehicles, déjà chargé dans ce fichier pour la tuile de config) —
+// complète naturellement la ligne à 3 cartes sans nouvel appel réseau.
+
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
@@ -13,6 +20,7 @@ import {
   IconStarFilled,
 } from '@tabler/icons-react-native';
 import { AppText, Badge, Card, IconButton, ScreenContainer } from '@/components/ui';
+import { HoverCard } from '@/components/ui/HoverCard';
 import { colors, radius, spacing } from '@/theme';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useMyVehicles } from '@/hooks/useVehicles';
@@ -106,7 +114,7 @@ export default function DriverHomeScreen() {
           <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
             Prochain trajet
           </AppText>
-          <Card onPress={() => router.push(`/(driver)/trip/${nextTrip.id}`)} style={styles.tripCard}>
+          <HoverCard onPress={() => router.push(`/(driver)/trip/${nextTrip.id}`)} style={styles.tripCard}>
             <AppText variant="sm" color="textSecondary">
               {nextTrip.originCity.name} → {nextTrip.destinationCity.name}
             </AppText>
@@ -116,7 +124,7 @@ export default function DriverHomeScreen() {
             <View style={styles.tripMeta}>
               <Badge label={`${nextTrip.availableSeats}/${nextTrip.totalSeats} places`} tone="primary" />
             </View>
-          </Card>
+          </HoverCard>
         </>
       ) : null}
 
@@ -124,7 +132,7 @@ export default function DriverHomeScreen() {
         Statistiques
       </AppText>
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
+        <HoverCard style={styles.statCard}>
           <IconStarFilled size={16} color={colors.accent} />
           <AppText variant="lg" weight="semibold">
             {profile?.averageRating ? profile.averageRating.toFixed(1) : '—'}
@@ -132,8 +140,8 @@ export default function DriverHomeScreen() {
           <AppText variant="xs" color="textSecondary">
             Note ({profile?.ratingsCount ?? 0})
           </AppText>
-        </View>
-        <View style={styles.statCard}>
+        </HoverCard>
+        <HoverCard onPress={() => router.push('/(driver)/(tabs)/trips')} style={styles.statCard}>
           <IconShieldCheck size={16} color={colors.successDark} />
           <AppText variant="lg" weight="semibold">
             {profile?.completedTripsCount ?? 0}
@@ -141,7 +149,16 @@ export default function DriverHomeScreen() {
           <AppText variant="xs" color="textSecondary">
             Trajets terminés
           </AppText>
-        </View>
+        </HoverCard>
+        <HoverCard onPress={() => router.push('/(driver)/(tabs)/profile')} style={styles.statCard}>
+          <IconCar size={16} color={colors.primary} />
+          <AppText variant="lg" weight="semibold">
+            {vehicles?.length ?? 0}
+          </AppText>
+          <AppText variant="xs" color="textSecondary">
+            Véhicule{(vehicles?.length ?? 0) > 1 ? 's' : ''}
+          </AppText>
+        </HoverCard>
       </View>
     </ScreenContainer>
   );
@@ -204,10 +221,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
   },
 });
