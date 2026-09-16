@@ -1,6 +1,7 @@
 // web-admin/src/hooks/useGeography.ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { geographyApi } from '@/services/api/geography.api';
+import type { UpdateCountryPayload } from '@/services/api/geography.api';
 import type {
   CreateCityPayload,
   CreateCountryPayload,
@@ -17,6 +18,18 @@ export function useCreateCountry() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CreateCountryPayload) => geographyApi.createCountry(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['countries'] }),
+  });
+}
+
+// Ajouté : permet de relier un pays existant à sa devise par défaut —
+// jusqu'ici impossible depuis cette page, ce qui bloquait silencieusement
+// la création du portefeuille chauffeur (voir CountryRow dans page.tsx).
+export function useUpdateCountry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: { id: string } & UpdateCountryPayload) =>
+      geographyApi.updateCountry(id, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['countries'] }),
   });
 }

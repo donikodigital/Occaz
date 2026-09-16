@@ -37,9 +37,7 @@ export default function VerifyOtpScreen() {
     // moment où mutate() s'exécute juste après un setCode(), le closure de
     // mutationFn peut encore pointer sur le rendu précédent — un code d'un
     // caractère plus court que celui qui vient d'être saisi (bug corrigé
-    // le 15/09/2026 : provoquait "code must be longer than or equal to 6
-    // characters" côté backend alors que l'utilisateur avait bien tapé 6
-    // chiffres).
+    // le 15/09/2026).
     mutationFn: (codeToVerify: string) =>
       authApi.verifyOtp({
         phone,
@@ -48,7 +46,11 @@ export default function VerifyOtpScreen() {
       }),
     onSuccess: async (result) => {
       await setSession(result);
-      router.replace(result.user.accountType === 'DRIVER' ? '/(driver)/home' : '/(customer)/(tabs)/home');
+      // Correction : le chauffeur doit aller dans le groupe (tabs) comme le
+      // client, sinon il atterrit sur (driver)/home.tsx — un fichier hors
+      // (tabs), orphelin depuis le commit initial, sans barre d'onglets et
+      // sans aucun des écrans construits depuis (bug identifié le 16/09/2026).
+      router.replace(result.user.accountType === 'DRIVER' ? '/(driver)/(tabs)/home' : '/(customer)/(tabs)/home');
     },
     onError: (error) => {
       setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');

@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   IconAlertTriangle,
+  IconArrowLeft,
   IconCar,
   IconCheck,
   IconChevronRight,
@@ -33,6 +34,26 @@ export default function DriverProfileScreen() {
 
   return (
     <ScreenContainer scroll>
+      <View style={styles.topBar}>
+        <IconButton
+          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
+          accessibilityLabel="Retour au tableau de bord"
+          onPress={() => router.push('/(driver)/(tabs)/home')}
+        />
+        <View style={styles.topBarActions}>
+          <IconButton
+            icon={<IconEdit size={18} color={colors.textPrimary} />}
+            accessibilityLabel="Modifier le profil"
+            onPress={() => router.push('/(driver)/edit-profile')}
+          />
+          <IconButton
+            icon={<IconLogout size={18} color={colors.danger} />}
+            accessibilityLabel="Se déconnecter"
+            onPress={handleLogout}
+          />
+        </View>
+      </View>
+
       <View style={styles.header}>
         <Avatar initials={initials} imageUri={profile?.photoUrl} size={56} backgroundColor={colors.success} />
         <View style={{ flex: 1 }}>
@@ -48,16 +69,6 @@ export default function DriverProfileScreen() {
             Compte chauffeur
           </AppText>
         </View>
-        <IconButton
-          icon={<IconEdit size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Modifier le profil"
-          onPress={() => router.push('/(driver)/edit-profile')}
-        />
-        <IconButton
-          icon={<IconLogout size={18} color={colors.danger} />}
-          accessibilityLabel="Se déconnecter"
-          onPress={handleLogout}
-        />
       </View>
 
       <Card style={styles.card}>
@@ -131,11 +142,21 @@ export default function DriverProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm + 2,
-    paddingTop: spacing.sm,
     marginBottom: spacing.xl,
   },
   nameRow: {

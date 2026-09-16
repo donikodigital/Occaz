@@ -2,19 +2,16 @@
 //
 // Écran de secours strictement pour le développement : rejoue le flux
 // OTP (requestOtp + verifyOtp) avec un numéro de test connu, sans passer
-// par la saisie manuelle de l'écran verify-otp. Sert à 1) débloquer une
-// session de travail tant que le bug réseau sur /otp/verify n'est pas
-// identifié, et 2) isoler si le problème vient de la saisie (otp boxes /
-// hidden input) ou d'un souci plus profond — ici c'est le même appel
-// réseau, déclenché sans passer par le clavier.
+// par la saisie manuelle de l'écran verify-otp.
 //
-// Fichier isolé, ne touche à rien d'existant. Accessible uniquement en
-// __DEV__. Route : /(auth)/dev-login
-//   - En web (Expo web) : ouvre juste http://localhost:8081/(auth)/dev-login
-//   - Sur device/simulateur : depuis le menu dev / debugger distant,
-//     exécute `require('expo-router').router.push('/(auth)/dev-login')`
-//     — ou ajoute temporairement un `router.push('/(auth)/dev-login')`
-//     dans login.tsx le temps du test, à retirer ensuite.
+// Accessible uniquement en __DEV__. Route : /(auth)/dev-login
+//
+// Corrections :
+//  - ApiError expose `.statusCode`, pas `.status`.
+//  - La redirection chauffeur pointe vers (driver)/(tabs)/home, pas
+//    (driver)/home — ce dernier est un fichier orphelin hors du groupe
+//    (tabs), sans barre d'onglets, jamais mis à jour depuis le commit
+//    initial (bug identifié le 16/09/2026).
 
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
@@ -55,11 +52,11 @@ export default function DevLoginScreen() {
       });
       setStatus('Connecté.');
       await setSession(result);
-      router.replace(result.user.accountType === 'DRIVER' ? '/(driver)/home' : '/(customer)/(tabs)/home');
+      router.replace(result.user.accountType === 'DRIVER' ? '/(driver)/(tabs)/home' : '/(customer)/(tabs)/home');
     } catch (error) {
       setStatus(
         error instanceof ApiError
-          ? `Échec (${error.status ?? '?'}) : ${error.message}`
+          ? `Échec (${error.statusCode ?? '?'}) : ${error.message}`
           : `Échec inattendu : ${String(error)}`,
       );
     } finally {
