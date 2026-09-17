@@ -24,6 +24,7 @@ function TripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
     <Card onPress={onPress} style={styles.card}>
       <View style={styles.cardTop}>
         <Avatar initials={initials} imageUri={trip.driver.photoUrl} />
+        
         <View style={styles.driverInfo}>
           <View style={styles.nameRow}>
             <AppText variant="base" weight="semibold" numberOfLines={1}>

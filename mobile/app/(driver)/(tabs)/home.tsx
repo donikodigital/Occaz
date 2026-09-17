@@ -1,10 +1,10 @@
 // mobile/app/(driver)/(tabs)/home.tsx
 //
-// v3 — refonte visuelle : tuiles pleine couleur avec icône large (en
-// attendant de vraies illustrations — voir note plus bas), cartes stats
-// façon badge (anneau de progression sur "trajets terminés"), et carte
-// raccourci "Itinéraire" avec un vrai tracé Conakry → Dakar en dur
-// (RouteMap, origine/destination fixes — pas de recherche dynamique ici).
+// v4 — badge de notifications non lues sur la cloche (calculé à partir
+// de useMyNotifications, pas d'endpoint compteur dédié — voir note dans
+// le composant), et anneau "trajets terminés" basé sur de vrais paliers
+// (voir utils/milestones.ts) avec pourcentage affiché, au lieu de la
+// valeur décorative fixe de la v3.
 
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -24,8 +24,10 @@ import { colors, radius, spacing } from '@/theme';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useMyTrips } from '@/hooks/useDriverTrips';
+import { useMyNotifications } from '@/hooks/useNotifications';
 import { useAuthStore } from '@/stores/authStore';
 import { formatDateShort, formatTime } from '@/utils/date';
+import { getTripMilestoneProgress } from '@/utils/milestones';
 
 const UPCOMING_STATUSES = new Set(['PUBLISHED', 'DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS']);
 
@@ -39,9 +41,15 @@ export default function DriverHomeScreen() {
   const { data: profile } = useDriverProfile();
   const { data: vehicles } = useMyVehicles();
   const { data: tripsPage } = useMyTrips();
+  // Pas d'endpoint compteur dédié — approximation à partir de la première
+  // page de notifications (30 les plus récentes). Sous-compte si plus de
+  // 30 non lues d'un coup, cas limite acceptable pour un badge d'accueil.
+  const { data: notificationsPage } = useMyNotifications(1);
   const logout = useAuthStore((state) => state.logout);
 
   const nextTrip = tripsPage?.data.find((trip) => UPCOMING_STATUSES.has(trip.status));
+  const unreadCount = notificationsPage?.data.filter((n) => !n.readAt).length ?? 0;
+  const tripMilestone = getTripMilestoneProgress(profile?.completedTripsCount ?? 0);
 
   async function handleLogout() {
     await logout();
@@ -59,11 +67,20 @@ export default function DriverHomeScreen() {
             {profile?.firstName ?? '…'}
           </AppText>
         </View>
-        <IconButton
-          icon={<IconBell size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Notifications"
-          onPress={() => router.push('/(driver)/notifications')}
-        />
+        <View style={styles.bellWrapper}>
+          <IconButton
+            icon={<IconBell size={18} color={colors.textPrimary} />}
+            accessibilityLabel="Notifications"
+            onPress={() => router.push('/(driver)/notifications')}
+          />
+          {unreadCount > 0 ? (
+            <View style={styles.notificationBadge}>
+              <AppText variant="xs" weight="semibold" color="#fff" style={styles.notificationBadgeText}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </AppText>
+            </View>
+          ) : null}
+        </View>
         <IconButton
           icon={<IconLogout size={18} color={colors.danger} />}
           accessibilityLabel="Se déconnecter"
@@ -154,9 +171,12 @@ export default function DriverHomeScreen() {
         </Card>
 
         <Card style={styles.statCard}>
-          <ProgressRing progress={0.75} size={48} strokeWidth={4}>
-            <AppText variant="base" weight="semibold">
+          <ProgressRing progress={tripMilestone.progress} size={48} strokeWidth={4}>
+            <AppText variant="xs" weight="semibold">
               {profile?.completedTripsCount ?? 0}
+            </AppText>
+            <AppText variant="xs" color="textSecondary" style={styles.ringPercent}>
+              {Math.round(tripMilestone.progress * 100)}%
             </AppText>
           </ProgressRing>
           <AppText variant="xs" color="textSecondary" align="center" style={{ marginTop: spacing.xxs }}>
@@ -195,6 +215,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: spacing.sm,
     marginBottom: spacing.lg,
+  },
+  bellWrapper: {
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.background,
+  },
+  notificationBadgeText: {
+    fontSize: 10,
+    lineHeight: 12,
   },
   statusBanner: {
     flexDirection: 'row',
@@ -253,6 +294,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingVertical: spacing.md,
+  },
+  ringPercent: {
+    fontSize: 9,
   },
   routeSectionHeader: {
     flexDirection: 'row',

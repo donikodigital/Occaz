@@ -17,9 +17,20 @@ export function formatTime(iso: string): string {
   return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 
-/** Date au format YYYY-MM-DD attendu par SearchTripsDto.departureDate côté backend. */
+/**
+ * Date au format YYYY-MM-DD attendu par SearchTripsDto.departureDate
+ * côté backend. Lit les composants année/mois/jour en heure LOCALE
+ * (getFullYear/getMonth/getDate), jamais via toISOString() : cette
+ * dernière convertit d'abord en UTC, ce qui décale la date d'un jour
+ * pour tout fuseau en avance sur UTC (ex : minuit le 19 en France,
+ * UTC+2, devient 22h le 18 en UTC — le calendrier renvoyait alors
+ * "2026-09-18" pour une sélection du 19).
+ */
 export function toDateOnly(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /** Prochains `count` jours à partir d'aujourd'hui — alimente le sélecteur de date en bandeau horizontal. */
