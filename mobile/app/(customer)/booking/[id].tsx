@@ -1,9 +1,28 @@
 // mobile/app/(customer)/booking/[id].tsx
-import React from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+//
+// v2 — Alert.alert() ne s'affiche pas sur le web (react-native-web ne
+// l'implémente pas) : le bouton "Annuler la réservation" semblait ne
+// rien faire. Remplacé par ConfirmDialog (nouveau composant, même
+// famille que CalendarPicker/TimePicker) pour la confirmation, et par
+// un message d'erreur en ligne pour l'échec d'annulation — même souci
+// sur le second Alert.alert (celui d'erreur), corrigé par la même
+// occasion plutôt que de laisser un piège identique juste après.
+
+import React, { useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconArrowLeft, IconCheck, IconMessageCircle } from '@tabler/icons-react-native';
-import { AppText, Badge, Button, Card, Divider, DriverPositionCard, IconButton, ScreenContainer } from '@/components/ui';
+import {
+  AppText,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  Divider,
+  DriverPositionCard,
+  IconButton,
+  ScreenContainer,
+} from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useBooking, useCancelBooking } from '@/hooks/useBookings';
 import { useBookingRatings } from '@/hooks/useRatings';
@@ -31,6 +50,9 @@ export default function BookingDetailScreen() {
   const { data: existingRatings } = useBookingRatings(id);
   const getOrCreateConversation = useGetOrCreateConversationForBooking();
 
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [cancelErrorMessage, setCancelErrorMessage] = useState<string | undefined>();
+
   if (isLoading || !booking) {
     return (
       <ScreenContainer style={styles.center} maxWidth="detail">
@@ -49,21 +71,15 @@ export default function BookingDetailScreen() {
   const canCancel = CANCELLABLE_STATUSES.includes(booking.status);
   const hasRated = (existingRatings?.length ?? 0) > 0;
 
-  function handleCancel() {
-    Alert.alert('Annuler la réservation ?', 'Cette action ne peut pas être annulée.', [
-      { text: 'Retour', style: 'cancel' },
+  function handleConfirmCancel() {
+    setCancelErrorMessage(undefined);
+    cancelBooking.mutate(
+      { reason: "Annulée depuis l'application" },
       {
-        text: 'Annuler la réservation',
-        style: 'destructive',
-        onPress: () =>
-          cancelBooking.mutate(
-            { reason: "Annulée depuis l'application" },
-            {
-              onError: () => Alert.alert('Erreur', "L'annulation a échoué — réessayez."),
-            },
-          ),
+        onSuccess: () => setConfirmCancelOpen(false),
+        onError: () => setCancelErrorMessage("L'annulation a échoué — réessayez."),
       },
-    ]);
+    );
   }
 
   return (
@@ -171,13 +187,22 @@ export default function BookingDetailScreen() {
       ) : null}
 
       {canCancel ? (
-        <Button
-          label="Annuler la réservation"
-          variant="outline"
-          onPress={handleCancel}
-          loading={cancelBooking.isPending}
-          style={styles.actionButton}
-        />
+        <>
+          {cancelErrorMessage ? (
+            <AppText variant="sm" color="danger" style={styles.cancelError}>
+              {cancelErrorMessage}
+            </AppText>
+          ) : null}
+          <Button
+            label="Annuler la réservation"
+            variant="outline"
+            onPress={() => {
+              setCancelErrorMessage(undefined);
+              setConfirmCancelOpen(true);
+            }}
+            style={styles.actionButton}
+          />
+        </>
       ) : null}
 
       <Button
@@ -190,6 +215,17 @@ export default function BookingDetailScreen() {
           })
         }
         style={styles.actionButton}
+      />
+
+      <ConfirmDialog
+        visible={confirmCancelOpen}
+        title="Annuler la réservation ?"
+        message="Cette action ne peut pas être annulée."
+        confirmLabel="Annuler la réservation"
+        destructive
+        loading={cancelBooking.isPending}
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setConfirmCancelOpen(false)}
       />
     </ScreenContainer>
   );
@@ -235,5 +271,8 @@ const styles = StyleSheet.create({
   actionButton: {
     marginTop: spacing.xs,
     marginBottom: spacing.md,
+  },
+  cancelError: {
+    marginBottom: spacing.xs,
   },
 });

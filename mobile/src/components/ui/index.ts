@@ -28,6 +28,8 @@ export { CalendarPicker } from './CalendarPicker';
 export type { CalendarPickerProps } from './CalendarPicker';
 export { TimePicker } from './TimePicker';
 export type { TimePickerProps, TimeValue } from './TimePicker';
+export { ConfirmDialog } from './ConfirmDialog';
+export type { ConfirmDialogProps } from './ConfirmDialog';
 export { RouteMap } from './RouteMap';
 export type { RouteMapProps, RouteMapPoint, RouteInfo } from './RouteMap';
 export { ProfilePhotoField } from './ProfilePhotoField';
