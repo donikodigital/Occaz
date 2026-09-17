@@ -1,4 +1,11 @@
 // mobile/src/types/profiles.types.ts
+//
+// v3 — CreateCustomerProfilePayload : ajoute dateOfBirth et photoUrl
+// (déjà acceptés par le backend via CreateCustomerProfileDto, jamais
+// exposés côté type frontend jusqu'ici).
+
+import type { City, Country } from '@/types/geography.types';
+
 export interface CustomerProfile {
   id: string;
   userId: string;
@@ -6,19 +13,32 @@ export interface CustomerProfile {
   lastName: string;
   photoUrl: string | null;
   countryId: string | null;
+  country: Country | null;
   cityId: string | null;
+  city: City | null;
   dateOfBirth: string | null;
+  address: string | null;
+  createdAt: string;
 }
 
 export interface CreateCustomerProfilePayload {
   firstName: string;
   lastName: string;
   email?: string;
+  photoUrl?: string;
   countryId?: string;
   cityId?: string;
+  dateOfBirth?: string;
+  address?: string;
 }
 
-export type DriverAccountStatus = 'PENDING' | 'VALIDATED' | 'SUSPENDED' | 'REJECTED';
+export type DriverAccountStatus =
+  | 'PENDING'
+  | 'IN_VERIFICATION'
+  | 'VALIDATED'
+  | 'SUSPENDED'
+  | 'BLOCKED'
+  | 'DEACTIVATED';
 
 export interface DriverProfile {
   id: string;

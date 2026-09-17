@@ -438,6 +438,7 @@ model CustomerProfile {
   cityId      String?
   city        City?     @relation(fields: [cityId], references: [id])
   dateOfBirth DateTime? @db.Date
+  address     String?
 
   bookings      Booking[]
   shipments     Shipment[]
@@ -628,6 +629,8 @@ model City {
   prefectureId String?
   prefecture   Prefecture? @relation(fields: [prefectureId], references: [id])
   name         String
+  latitude     Float?
+  longitude    Float?
 
   locations          Location[]
   customerProfiles   CustomerProfile[]
@@ -637,6 +640,7 @@ model City {
 
   @@index([countryId])
   @@map("cities")
+  
 }
 
 // Modèle hybride GPS + texte libre — décision Partie VII 7.2 : toute adresse

@@ -1,19 +1,63 @@
 // mobile/app/(driver)/trip-new.tsx
+//
+// v2 — Refonte visuelle : chaque section passe dans un panneau Card avec
+// icône + titre (même principe que la page /geography du back-office),
+// le nombre de places devient un stepper +/- (repris de vehicle-new.tsx)
+// plutôt qu'un champ texte brut, et une carte récapitulative apparaît une
+// fois le trajet complet, juste avant validation. Logique métier
+// inchangée — seule la présentation évolue.
+//
+// NOTE : ne corrige pas encore l'erreur "adresses doivent être rattachées
+// à une ville" — cause identifiée en amont (LocationPickerScreen ne
+// renseigne jamais cityId sur le chemin recherche), correction à part.
+
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowLeft, IconMapPin } from '@tabler/icons-react-native';
+import {
+  IconArrowLeft,
+  IconCalendarEvent,
+  IconCar,
+  IconMapPin,
+  IconMinus,
+  IconPlus,
+  IconRoute,
+  IconUsers,
+} from '@tabler/icons-react-native';
 import { AppText, Button, CalendarPicker, Card, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { useCreateTrip } from '@/hooks/useDriverTrips';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
-import { upcomingDays } from '@/utils/date';
+import { upcomingDays, formatDateShort, formatTime } from '@/utils/date';
+import { formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
 import type { TripLocation } from '@/types/trips.types';
 
 const MINUTE_STEPS = [0, 15, 30, 45];
+
+function SectionCard({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card style={styles.sectionCard}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionIcon}>{icon}</View>
+        <AppText variant="base" weight="semibold">
+          {title}
+        </AppText>
+      </View>
+      {children}
+    </Card>
+  );
+}
 
 export default function NewTripScreen() {
   const [vehicleId, setVehicleId] = useState<string | null>(null);
@@ -53,6 +97,11 @@ export default function NewTripScreen() {
     router.push({ pathname: '/(driver)/select-location', params: { title } });
   }
 
+  const priceNumber = Number(pricePerSeat.replace(',', '.'));
+  const hasValidPrice = Number.isFinite(priceNumber) && priceNumber > 0;
+  const showRecap = Boolean(origin && destination && vehicleId && hasValidPrice);
+  const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
+
   function handleSubmit() {
     setErrorMessage(undefined);
     if (!vehicleId) {
@@ -67,8 +116,7 @@ export default function NewTripScreen() {
       setErrorMessage('Les adresses doivent être rattachées à une ville.');
       return;
     }
-    const price = Number(pricePerSeat.replace(',', '.'));
-    if (!Number.isFinite(price) || price <= 0) {
+    if (!hasValidPrice) {
       setErrorMessage('Indiquez le prix par place.');
       return;
     }
@@ -89,7 +137,7 @@ export default function NewTripScreen() {
         destinationLocationId: destination.id,
         departureAt: departure.toISOString(),
         totalSeats,
-        pricePerSeat: String(Math.round(price)),
+        pricePerSeat: String(Math.round(priceNumber)),
         currencyId,
         allowsShipments,
         notes: notes.trim() || undefined,
@@ -117,136 +165,180 @@ export default function NewTripScreen() {
         <View style={{ width: 38 }} />
       </View>
 
-      <SectionTitle label="Véhicule" />
-      <View style={styles.chipRow}>
-        {(vehicles ?? []).map((vehicle) => {
-          const isActive = vehicle.id === vehicleId;
-          return (
-            <Pressable
-              key={vehicle.id}
-              onPress={() => setVehicleId(vehicle.id)}
-              style={[styles.chip, isActive && styles.chipActive]}
-            >
-              <AppText variant="sm" weight="medium" color={isActive ? colors.onPrimary : 'textPrimary'}>
-                {vehicle.brand} {vehicle.model}
-              </AppText>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <SectionTitle label="Itinéraire" />
-      <Card style={styles.locationsCard} padded={false}>
-        <Pressable onPress={() => openLocation('trip-origin', 'Point de départ')} style={styles.locationRow}>
-          <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-          <AppText variant="base" color={origin ? 'textPrimary' : 'textSecondary'} numberOfLines={1} style={{ flex: 1 }}>
-            {origin?.label ?? 'Point de départ'}
-          </AppText>
-        </Pressable>
-        <View style={styles.locationDivider} />
-        <Pressable onPress={() => openLocation('trip-destination', 'Destination')} style={styles.locationRow}>
-          <IconMapPin size={14} color={colors.accentDark} />
-          <AppText
-            variant="base"
-            color={destination ? 'textPrimary' : 'textSecondary'}
-            numberOfLines={1}
-            style={{ flex: 1 }}
-          >
-            {destination?.label ?? 'Destination'}
-          </AppText>
-        </Pressable>
-      </Card>
-
-      <SectionTitle label="Date de départ" />
-      <View style={styles.dateField}>
-        <CalendarPicker label="" selectedDate={selectedDay} onSelectDate={(date) => setSelectedDay(date ?? selectedDay)} />
-      </View>
-
-      <SectionTitle label="Heure de départ" />
-      <View style={styles.timeRow}>
-        <View style={styles.timeGroup}>
-          {[6, 8, 10, 12, 14, 16, 18, 20].map((h) => (
-            <Pressable
-              key={h}
-              onPress={() => setHour(h)}
-              style={[styles.timeChip, hour === h && styles.chipActive]}
-            >
-              <AppText variant="sm" weight="medium" color={hour === h ? colors.onPrimary : 'textPrimary'}>
-                {String(h).padStart(2, '0')}h
-              </AppText>
-            </Pressable>
-          ))}
+      <SectionCard icon={<IconCar size={18} color={colors.primary} />} title="Véhicule">
+        <View style={styles.chipRow}>
+          {(vehicles ?? []).map((vehicle) => {
+            const isActive = vehicle.id === vehicleId;
+            return (
+              <Pressable
+                key={vehicle.id}
+                onPress={() => setVehicleId(vehicle.id)}
+                style={[styles.chip, isActive && styles.chipActive]}
+              >
+                <AppText variant="sm" weight="medium" color={isActive ? colors.onPrimary : 'textPrimary'}>
+                  {vehicle.brand} {vehicle.model}
+                </AppText>
+              </Pressable>
+            );
+          })}
         </View>
-        <View style={styles.timeGroup}>
-          {MINUTE_STEPS.map((m) => (
-            <Pressable
-              key={m}
-              onPress={() => setMinute(m)}
-              style={[styles.timeChip, minute === m && styles.chipActive]}
+      </SectionCard>
+
+      <SectionCard icon={<IconRoute size={18} color={colors.primary} />} title="Itinéraire">
+        <Card style={styles.locationsCard} padded={false}>
+          <Pressable onPress={() => openLocation('trip-origin', 'Point de départ')} style={styles.locationRow}>
+            <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+            <AppText
+              variant="base"
+              color={origin ? 'textPrimary' : 'textSecondary'}
+              numberOfLines={1}
+              style={{ flex: 1 }}
             >
-              <AppText variant="sm" weight="medium" color={minute === m ? colors.onPrimary : 'textPrimary'}>
-                {String(m).padStart(2, '0')}
-              </AppText>
-            </Pressable>
-          ))}
+              {origin?.label ?? 'Point de départ'}
+            </AppText>
+          </Pressable>
+          <View style={styles.locationDivider} />
+          <Pressable onPress={() => openLocation('trip-destination', 'Destination')} style={styles.locationRow}>
+            <IconMapPin size={14} color={colors.accentDark} />
+            <AppText
+              variant="base"
+              color={destination ? 'textPrimary' : 'textSecondary'}
+              numberOfLines={1}
+              style={{ flex: 1 }}
+            >
+              {destination?.label ?? 'Destination'}
+            </AppText>
+          </Pressable>
+        </Card>
+      </SectionCard>
+
+      <SectionCard icon={<IconCalendarEvent size={18} color={colors.primary} />} title="Date et heure">
+        <View style={styles.dateField}>
+          <CalendarPicker label="" selectedDate={selectedDay} onSelectDate={(date) => setSelectedDay(date ?? selectedDay)} />
         </View>
-      </View>
 
-      <SectionTitle label="Places et tarif" />
-      <View style={styles.fields}>
-        <TextField
-          label="Nombre de places proposées"
-          value={String(totalSeats)}
-          onChangeText={(t) => setTotalSeats(Math.max(1, Number(t.replace(/\D/g, '')) || 1))}
-          keyboardType="number-pad"
-        />
-        <TextField
-          label="Prix par place"
-          value={pricePerSeat}
-          onChangeText={setPricePerSeat}
-          keyboardType="numeric"
-          placeholder="Ex : 50000"
-        />
-
-        {currencies && currencies.length > 1 ? (
-          <View style={styles.chipRow}>
-            {currencies.map((currency) => {
-              const isActive = currency.id === currencyId;
-              return (
-                <Pressable
-                  key={currency.id}
-                  onPress={() => setCurrencyId(currency.id)}
-                  style={[styles.chip, isActive && styles.chipActive]}
-                >
-                  <AppText variant="sm" weight="medium" color={isActive ? colors.onPrimary : 'textPrimary'}>
-                    {currency.isoCode}
-                  </AppText>
-                </Pressable>
-              );
-            })}
+        <View style={styles.timeRow}>
+          <View style={styles.timeGroup}>
+            {[6, 8, 10, 12, 14, 16, 18, 20].map((h) => (
+              <Pressable
+                key={h}
+                onPress={() => setHour(h)}
+                style={[styles.timeChip, hour === h && styles.chipActive]}
+              >
+                <AppText variant="sm" weight="medium" color={hour === h ? colors.onPrimary : 'textPrimary'}>
+                  {String(h).padStart(2, '0')}h
+                </AppText>
+              </Pressable>
+            ))}
           </View>
-        ) : null}
+          <View style={styles.timeGroup}>
+            {MINUTE_STEPS.map((m) => (
+              <Pressable
+                key={m}
+                onPress={() => setMinute(m)}
+                style={[styles.timeChip, minute === m && styles.chipActive]}
+              >
+                <AppText variant="sm" weight="medium" color={minute === m ? colors.onPrimary : 'textPrimary'}>
+                  {String(m).padStart(2, '0')}
+                </AppText>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </SectionCard>
 
-        <Pressable onPress={() => setAllowsShipments((v) => !v)} style={styles.switchRow}>
-          <AppText variant="sm" style={{ flex: 1 }}>
-            Accepter les colis sur ce trajet
-          </AppText>
-          <Switch
-            value={allowsShipments}
-            onValueChange={setAllowsShipments}
-            trackColor={{ true: colors.success, false: colors.border }}
+      <SectionCard icon={<IconUsers size={18} color={colors.primary} />} title="Places et tarif">
+        <View style={styles.fields}>
+          <View>
+            <AppText variant="sm" weight="medium" color="textSecondary" style={styles.stepperLabel}>
+              Nombre de places proposées
+            </AppText>
+            <View style={styles.stepper}>
+              <IconButton
+                icon={<IconMinus size={16} color={colors.textPrimary} />}
+                accessibilityLabel="Retirer une place"
+                onPress={() => setTotalSeats((s) => Math.max(1, s - 1))}
+              />
+              <AppText variant="lg" weight="semibold" style={styles.stepperValue}>
+                {totalSeats}
+              </AppText>
+              <IconButton
+                icon={<IconPlus size={16} color={colors.textPrimary} />}
+                accessibilityLabel="Ajouter une place"
+                onPress={() => setTotalSeats((s) => Math.min(12, s + 1))}
+              />
+            </View>
+          </View>
+
+          <TextField
+            label="Prix par place"
+            value={pricePerSeat}
+            onChangeText={setPricePerSeat}
+            keyboardType="numeric"
+            placeholder="Ex : 50000"
           />
-        </Pressable>
 
-        <TextField
-          label="Notes (optionnel)"
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Informations complémentaires pour les passagers"
-          multiline
-          style={styles.notesField}
-        />
-      </View>
+          {currencies && currencies.length > 1 ? (
+            <View style={styles.chipRow}>
+              {currencies.map((currency) => {
+                const isActive = currency.id === currencyId;
+                return (
+                  <Pressable
+                    key={currency.id}
+                    onPress={() => setCurrencyId(currency.id)}
+                    style={[styles.chip, isActive && styles.chipActive]}
+                  >
+                    <AppText variant="sm" weight="medium" color={isActive ? colors.onPrimary : 'textPrimary'}>
+                      {currency.isoCode}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+
+          <Pressable onPress={() => setAllowsShipments((v) => !v)} style={styles.switchRow}>
+            <AppText variant="sm" style={{ flex: 1 }}>
+              Accepter les colis sur ce trajet
+            </AppText>
+            <Switch
+              value={allowsShipments}
+              onValueChange={setAllowsShipments}
+              trackColor={{ true: colors.success, false: colors.border }}
+            />
+          </Pressable>
+
+          <TextField
+            label="Notes (optionnel)"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Informations complémentaires pour les passagers"
+            multiline
+            style={styles.notesField}
+          />
+        </View>
+      </SectionCard>
+
+      {showRecap ? (
+        <Card style={styles.recapCard}>
+          <AppText variant="xs" weight="semibold" color="textMuted" style={styles.recapEyebrow}>
+            RÉCAPITULATIF
+          </AppText>
+          <AppText variant="base" weight="semibold" numberOfLines={1}>
+            {origin!.label} → {destination!.label}
+          </AppText>
+          <AppText variant="sm" color="textSecondary">
+            {formatDateShort(
+              new Date(new Date(selectedDay).setHours(hour, minute, 0, 0)).toISOString(),
+            )}{' '}
+            à {formatTime(new Date(new Date(selectedDay).setHours(hour, minute, 0, 0)).toISOString())}
+            {selectedVehicle ? ` · ${selectedVehicle.brand} ${selectedVehicle.model}` : ''}
+          </AppText>
+          <AppText variant="sm" color="textSecondary">
+            {totalSeats} place{totalSeats > 1 ? 's' : ''} · {formatMoney(Math.round(priceNumber))} / place
+          </AppText>
+        </Card>
+      ) : null}
 
       {errorMessage ? (
         <AppText variant="sm" color="danger" style={styles.error}>
@@ -259,14 +351,6 @@ export default function NewTripScreen() {
   );
 }
 
-function SectionTitle({ label }: { label: string }) {
-  return (
-    <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
-      {label}
-    </AppText>
-  );
-}
-
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
@@ -275,15 +359,27 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     marginBottom: spacing.lg,
   },
-  sectionTitle: {
-    marginBottom: spacing.sm,
-    marginTop: spacing.xs,
+  sectionCard: {
+    marginBottom: spacing.md,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  sectionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm + 2,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-    marginBottom: spacing.lg,
   },
   chip: {
     paddingVertical: spacing.xs,
@@ -298,7 +394,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   locationsCard: {
-    marginBottom: spacing.lg,
+    borderColor: colors.border,
   },
   locationRow: {
     flexDirection: 'row',
@@ -318,11 +414,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   dateField: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   timeRow: {
     gap: spacing.xs,
-    marginBottom: spacing.lg,
   },
   timeGroup: {
     flexDirection: 'row',
@@ -340,7 +435,18 @@ const styles = StyleSheet.create({
   },
   fields: {
     gap: spacing.md,
-    marginBottom: spacing.lg,
+  },
+  stepperLabel: {
+    marginBottom: spacing.xxs,
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  stepperValue: {
+    minWidth: 24,
+    textAlign: 'center',
   },
   switchRow: {
     flexDirection: 'row',
@@ -349,6 +455,16 @@ const styles = StyleSheet.create({
   notesField: {
     minHeight: 70,
     textAlignVertical: 'top',
+  },
+  recapCard: {
+    gap: 4,
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primaryLight,
+    marginBottom: spacing.lg,
+  },
+  recapEyebrow: {
+    letterSpacing: 0.5,
+    marginBottom: spacing.xxs,
   },
   error: {
     marginBottom: spacing.sm,

@@ -1,4 +1,11 @@
 // backend/src/profiles/customer-profiles/customer-profiles.service.ts
+//
+// v2 — Ajout du champ address (texte libre, même esprit que Location.label)
+// sur CustomerProfile. Seul createForUser change : il liste ses champs
+// explicitement. updateForUser fait déjà `data: { ...dto }`, donc il
+// prend automatiquement en compte address dès qu'il est dans le DTO —
+// aucun changement nécessaire là.
+
 import {
   ConflictException,
   Injectable,
@@ -83,6 +90,7 @@ export class CustomerProfilesService {
           photoUrl: dto.photoUrl,
           countryId: dto.countryId,
           cityId: dto.cityId,
+          address: dto.address,
           dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
         },
       });

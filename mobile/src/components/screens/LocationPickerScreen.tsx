@@ -1,4 +1,24 @@
 // mobile/src/components/screens/LocationPickerScreen.tsx
+//
+// v2 — Corrige deux bugs :
+//  1. Une adresse choisie via la recherche Mapbox n'avait jamais de ville
+//     rattachée (GeocodingSuggestion ne porte que label/adresse/lat/lng —
+//     aucune info de ville, et City n'a pas de frontière géographique
+//     stockée pour une résolution automatique). Après sélection, on
+//     demande maintenant de confirmer la ville avant de créer la Location,
+//     au lieu de la créer immédiatement sans cityId.
+//  2. Le sélecteur de ville naviguait en dur vers /(customer)/select-city,
+//     y compris quand cet écran est ouvert depuis le contexte chauffeur
+//     (trip-new.tsx → /(driver)/select-location) — jamais remarqué côté
+//     client, mais aurait cassé la navigation chauffeur. Paramétré via
+//     `basePath`, même principe que ConversationsListScreen.tsx.
+//
+// IMPORTANT : les fichiers route qui montent cet écran
+// (probablement mobile/app/(customer)/select-location.tsx et
+// mobile/app/(driver)/select-location.tsx) doivent maintenant lui passer
+// basePath="/(customer)" ou basePath="/(driver)" respectivement — envoie-
+// les-moi si tu veux que je les corrige aussi, je ne les ai pas vus.
+
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -15,19 +35,21 @@ import type { GeocodingSuggestion } from '@/types/geocoding.types';
 
 const CITY_PICKER_FIELD = 'shipment-address-city';
 
-/**
- * Recherche d'adresse réelle (Mapbox, via le backend) en mode
- * principal — remplace la saisie 100% manuelle qui était le seul repli
- * disponible jusqu'ici (section 58, "Location hybride GPS + texte
- * libre"). La saisie manuelle reste accessible en repli explicite,
- * pour les adresses que la recherche ne couvre pas bien (zones rurales
- * moins bien cartographiées).
- */
-export function LocationPickerScreen() {
+export interface LocationPickerScreenProps {
+  /** Racine de navigation du groupe appelant — (customer) et (driver) sont deux Stacks Expo Router isolés. */
+  basePath: '/(customer)' | '/(driver)';
+}
+
+export function LocationPickerScreen({ basePath }: LocationPickerScreenProps) {
   const { title } = useLocalSearchParams<{ title?: string }>();
-  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [showCityStep, setShowCityStep] = useState(false);
   const [city, setCity] = useState<City | null>(null);
   const [addressLabel, setAddressLabel] = useState('');
+  const [geocoded, setGeocoded] = useState<{
+    formattedAddress?: string;
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
@@ -43,29 +65,21 @@ export function LocationPickerScreen() {
     }
   }, [citySelection, consumeCitySelection]);
 
-  async function handleSearchSelect(suggestion: GeocodingSuggestion) {
+  function handleSearchSelect(suggestion: GeocodingSuggestion) {
     setErrorMessage(undefined);
-    setSubmitting(true);
-    try {
-      const location = await locationsApi.create({
-        label: suggestion.label,
-        formattedAddress: suggestion.formattedAddress,
-        latitude: suggestion.latitude,
-        longitude: suggestion.longitude,
-        geocodeTrust: 'EXACT',
-      });
-      selectLocation(location);
-      router.back();
-    } catch (error) {
-      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
-      setSubmitting(false);
-    }
+    setAddressLabel(suggestion.label);
+    setGeocoded({
+      formattedAddress: suggestion.formattedAddress,
+      latitude: suggestion.latitude,
+      longitude: suggestion.longitude,
+    });
+    setShowCityStep(true);
   }
 
-  async function handleManualSubmit() {
+  async function handleConfirm() {
     setErrorMessage(undefined);
     if (!city) {
-      setErrorMessage('Choisissez une ville.');
+      setErrorMessage('Choisissez une ville pour confirmer cette adresse.');
       return;
     }
     if (addressLabel.trim().length < 3) {
@@ -78,7 +92,14 @@ export function LocationPickerScreen() {
       const location = await locationsApi.create({
         label: addressLabel.trim(),
         cityId: city.id,
-        geocodeTrust: 'MANUAL',
+        ...(geocoded
+          ? {
+              formattedAddress: geocoded.formattedAddress,
+              latitude: geocoded.latitude,
+              longitude: geocoded.longitude,
+              geocodeTrust: 'EXACT' as const,
+            }
+          : { geocodeTrust: 'MANUAL' as const }),
       });
       selectLocation(location);
       router.back();
@@ -105,31 +126,37 @@ export function LocationPickerScreen() {
       <View style={styles.body}>
         <LocationSearchField onSelect={handleSearchSelect} placeholder="Ex : Marché de Madina, Conakry" />
 
-        {errorMessage ? (
+        {errorMessage && !showCityStep ? (
           <AppText variant="sm" color="danger" style={styles.error}>
             {errorMessage}
           </AppText>
         ) : null}
 
-        {!showManualEntry ? (
+        {!showCityStep ? (
           <AppText
             variant="sm"
             color="primary"
             style={styles.manualToggle}
-            onPress={() => setShowManualEntry(true)}
+            onPress={() => setShowCityStep(true)}
             suppressHighlighting
           >
             Adresse introuvable ? Saisir manuellement
           </AppText>
         ) : (
           <View style={styles.manualSection}>
+            {geocoded ? (
+              <AppText variant="xs" color="textSecondary" style={styles.geocodedHint}>
+                Confirmez la ville pour : {addressLabel}
+              </AppText>
+            ) : null}
+
             <AppText variant="sm" weight="medium" color="textSecondary" style={styles.label}>
               Ville
             </AppText>
             <Card
               onPress={() => {
                 openCityPicker(CITY_PICKER_FIELD);
-                router.push('/(customer)/select-city');
+                router.push(`${basePath}/select-city`);
               }}
               style={styles.cityCard}
             >
@@ -150,12 +177,34 @@ export function LocationPickerScreen() {
               style={styles.addressField}
             />
 
+            {errorMessage ? (
+              <AppText variant="sm" color="danger" style={styles.error}>
+                {errorMessage}
+              </AppText>
+            ) : null}
+
             <Button
               label="Valider l'adresse"
-              onPress={handleManualSubmit}
+              onPress={handleConfirm}
               loading={isSubmitting}
               style={styles.submit}
             />
+
+            {geocoded ? (
+              <AppText
+                variant="sm"
+                color="textMuted"
+                style={styles.manualToggle}
+                onPress={() => {
+                  setShowCityStep(false);
+                  setGeocoded(null);
+                  setAddressLabel('');
+                }}
+                suppressHighlighting
+              >
+                ← Refaire une recherche
+              </AppText>
+            ) : null}
           </View>
         )}
       </View>
@@ -180,6 +229,9 @@ const styles = StyleSheet.create({
   manualToggle: {
     marginTop: spacing.md,
     textAlign: 'center',
+  },
+  geocodedHint: {
+    marginBottom: spacing.sm,
   },
   manualSection: {
     marginTop: spacing.lg,

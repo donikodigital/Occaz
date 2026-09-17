@@ -35,4 +35,9 @@ export class CreateCustomerProfileDto {
   @IsOptional()
   @IsDateString()
   dateOfBirth?: string;
+
+  @ApiPropertyOptional({ example: 'Quartier Almamya, non loin de la mosquée Fayçal' })
+  @IsOptional()
+  @IsString()
+  address?: string;
 }
