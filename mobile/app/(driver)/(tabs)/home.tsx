@@ -1,10 +1,10 @@
 // mobile/app/(driver)/(tabs)/home.tsx
 //
-// v2 — "Prochain trajet" et les cartes de stats passent en HoverCard
-// (échelle + ombre au survol sur desktop/web, aucun effet sur mobile
-// tactile). Ajout d'une 3e carte de stat "Véhicules" (réutilise
-// useMyVehicles, déjà chargé dans ce fichier pour la tuile de config) —
-// complète naturellement la ligne à 3 cartes sans nouvel appel réseau.
+// v3 — refonte visuelle : tuiles pleine couleur avec icône large (en
+// attendant de vraies illustrations — voir note plus bas), cartes stats
+// façon badge (anneau de progression sur "trajets terminés"), et carte
+// raccourci "Itinéraire" avec un vrai tracé Conakry → Dakar en dur
+// (RouteMap, origine/destination fixes — pas de recherche dynamique ici).
 
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -16,11 +16,10 @@ import {
   IconLogout,
   IconPackage,
   IconPlus,
-  IconShieldCheck,
+  IconRoute,
   IconStarFilled,
 } from '@tabler/icons-react-native';
-import { AppText, Badge, Card, IconButton, ScreenContainer } from '@/components/ui';
-import { HoverCard } from '@/components/ui/HoverCard';
+import { AppText, Badge, Card, IconButton, ProgressRing, RouteMap, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useMyVehicles } from '@/hooks/useVehicles';
@@ -29,6 +28,12 @@ import { useAuthStore } from '@/stores/authStore';
 import { formatDateShort, formatTime } from '@/utils/date';
 
 const UPCOMING_STATUSES = new Set(['PUBLISHED', 'DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS']);
+
+// Coordonnées fixes — raccourci décoratif, pas une recherche de trajet
+// réelle. Mêmes valeurs que CONAKRY_CENTER dans RouteMap.web.tsx pour
+// l'origine.
+const CONAKRY = { latitude: 9.6412, longitude: -13.6773, label: 'Conakry' };
+const DAKAR = { latitude: 14.7167, longitude: -17.4677, label: 'Dakar' };
 
 export default function DriverHomeScreen() {
   const { data: profile } = useDriverProfile();
@@ -92,18 +97,24 @@ export default function DriverHomeScreen() {
             onPress={() => router.push('/(driver)/trip-new')}
             style={[styles.tile, { backgroundColor: colors.primary }]}
           >
-            <IconPlus size={22} color={colors.onPrimary} />
-            <AppText variant="base" weight="semibold" color={colors.onPrimary} style={styles.tileLabel}>
-              Créer{'\n'}un trajet
+            <IconCar size={36} color={colors.onPrimary} style={styles.tileIcon} />
+            <AppText variant="base" weight="semibold" color={colors.onPrimary}>
+              Créer un trajet
+            </AppText>
+            <AppText variant="xs" color={colors.onPrimary} style={styles.tileSubtitle}>
+              Partager votre route
             </AppText>
           </Pressable>
           <Pressable
             onPress={() => router.push('/(driver)/shipment-available')}
             style={[styles.tile, { backgroundColor: colors.accent }]}
           >
-            <IconPackage size={22} color={colors.onAccent} />
-            <AppText variant="base" weight="semibold" color={colors.onAccent} style={styles.tileLabel}>
-              Envois{'\n'}disponibles
+            <IconPackage size={36} color={colors.onAccent} style={styles.tileIcon} />
+            <AppText variant="base" weight="semibold" color={colors.onAccent}>
+              Envois disponibles
+            </AppText>
+            <AppText variant="xs" color={colors.onAccent} style={styles.tileSubtitle}>
+              Livrer des colis
             </AppText>
           </Pressable>
         </View>
@@ -114,7 +125,7 @@ export default function DriverHomeScreen() {
           <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
             Prochain trajet
           </AppText>
-          <HoverCard onPress={() => router.push(`/(driver)/trip/${nextTrip.id}`)} style={styles.tripCard}>
+          <Card onPress={() => router.push(`/(driver)/trip/${nextTrip.id}`)} style={styles.tripCard}>
             <AppText variant="sm" color="textSecondary">
               {nextTrip.originCity.name} → {nextTrip.destinationCity.name}
             </AppText>
@@ -124,42 +135,55 @@ export default function DriverHomeScreen() {
             <View style={styles.tripMeta}>
               <Badge label={`${nextTrip.availableSeats}/${nextTrip.totalSeats} places`} tone="primary" />
             </View>
-          </HoverCard>
+          </Card>
         </>
       ) : null}
 
       <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
-        Statistiques
+        Vos statistiques
       </AppText>
       <View style={styles.statsRow}>
-        <HoverCard style={styles.statCard}>
-          <IconStarFilled size={16} color={colors.accent} />
+        <Card style={styles.statCard}>
+          <IconStarFilled size={18} color={colors.accent} />
           <AppText variant="lg" weight="semibold">
             {profile?.averageRating ? profile.averageRating.toFixed(1) : '—'}
           </AppText>
-          <AppText variant="xs" color="textSecondary">
-            Note ({profile?.ratingsCount ?? 0})
+          <AppText variant="xs" color="textSecondary" align="center">
+            Note globale{'\n'}sur {profile?.ratingsCount ?? 0} trajets
           </AppText>
-        </HoverCard>
-        <HoverCard onPress={() => router.push('/(driver)/(tabs)/trips')} style={styles.statCard}>
-          <IconShieldCheck size={16} color={colors.successDark} />
-          <AppText variant="lg" weight="semibold">
-            {profile?.completedTripsCount ?? 0}
+        </Card>
+
+        <Card style={styles.statCard}>
+          <ProgressRing progress={0.75} size={48} strokeWidth={4}>
+            <AppText variant="base" weight="semibold">
+              {profile?.completedTripsCount ?? 0}
+            </AppText>
+          </ProgressRing>
+          <AppText variant="xs" color="textSecondary" align="center" style={{ marginTop: spacing.xxs }}>
+            Trajets terminés{'\n'}depuis votre inscription
           </AppText>
-          <AppText variant="xs" color="textSecondary">
-            Trajets terminés
-          </AppText>
-        </HoverCard>
-        <HoverCard onPress={() => router.push('/(driver)/(tabs)/profile')} style={styles.statCard}>
-          <IconCar size={16} color={colors.primary} />
+        </Card>
+
+        <Card style={styles.statCard}>
+          <IconCar size={18} color={colors.primary} />
           <AppText variant="lg" weight="semibold">
             {vehicles?.length ?? 0}
           </AppText>
-          <AppText variant="xs" color="textSecondary">
-            Véhicule{(vehicles?.length ?? 0) > 1 ? 's' : ''}
+          <AppText variant="xs" color="textSecondary" align="center">
+            Véhicule{(vehicles?.length ?? 0) > 1 ? 's' : ''}{'\n'}enregistré{(vehicles?.length ?? 0) > 1 ? 's' : ''}
           </AppText>
-        </HoverCard>
+        </Card>
       </View>
+
+      <View style={styles.routeSectionHeader}>
+        <IconRoute size={16} color={colors.textSecondary} />
+        <AppText variant="base" weight="semibold">
+          Itinéraire Conakry → Dakar
+        </AppText>
+      </View>
+      <Card style={styles.routeCard}>
+        <RouteMap origin={CONAKRY} destination={DAKAR} height={180} />
+      </Card>
     </ScreenContainer>
   );
 }
@@ -198,9 +222,15 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: radius.lg,
     padding: spacing.md,
+    minHeight: 140,
+    justifyContent: 'flex-end',
   },
-  tileLabel: {
-    marginTop: spacing.sm,
+  tileIcon: {
+    marginBottom: spacing.md,
+  },
+  tileSubtitle: {
+    opacity: 0.85,
+    marginTop: 2,
   },
   sectionTitle: {
     marginBottom: spacing.sm,
@@ -216,10 +246,23 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   statCard: {
     flex: 1,
     alignItems: 'center',
     gap: 4,
+    paddingVertical: spacing.md,
+  },
+  routeSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  routeCard: {
+    padding: 0,
+    overflow: 'hidden',
+    marginBottom: spacing.lg,
   },
 });
