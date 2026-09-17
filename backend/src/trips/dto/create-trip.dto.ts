@@ -18,43 +18,43 @@ import { TripStopInputDto } from './trip-stop-input.dto';
 export class CreateTripDto {
   @ApiProperty()
   @IsString()
-  vehicleId: string;
+  vehicleId!: string;
 
   @ApiProperty()
   @IsString()
-  originCityId: string;
+  originCityId!: string;
 
   @ApiProperty({ description: 'Localisation précise du point de départ (voir POST /locations)' })
   @IsString()
-  originLocationId: string;
+  originLocationId!: string;
 
   @ApiProperty()
   @IsString()
-  destinationCityId: string;
+  destinationCityId!: string;
 
   @ApiProperty({ description: "Localisation précise du point d'arrivée (voir POST /locations)" })
   @IsString()
-  destinationLocationId: string;
+  destinationLocationId!: string;
 
   @ApiProperty({ example: '2026-09-20T08:00:00+00:00' })
   @IsDateString()
-  departureAt: string;
+  departureAt!: string;
 
   @ApiProperty({ example: 3 })
   @IsInt()
   @Min(1)
-  totalSeats: number;
+  totalSeats!: number;
 
   @ApiProperty({
     example: '50000',
     description: 'Prix par place, en plus petite unité de la devise (chaîne pour éviter toute perte de précision)',
   })
   @IsString()
-  pricePerSeat: string;
+  pricePerSeat!: string;
 
   @ApiProperty()
   @IsString()
-  currencyId: string;
+  currencyId!: string;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()

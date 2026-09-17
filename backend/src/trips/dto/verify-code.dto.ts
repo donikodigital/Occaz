@@ -6,5 +6,5 @@ export class VerifyCodeDto {
   @ApiProperty({ example: '123456' })
   @IsString()
   @Length(6, 6)
-  code: string;
+  code!: string;
 }

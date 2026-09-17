@@ -6,5 +6,5 @@ export class CancelTripDto {
   @ApiProperty()
   @IsString()
   @MinLength(3)
-  reason: string;
+  reason!: string;
 }

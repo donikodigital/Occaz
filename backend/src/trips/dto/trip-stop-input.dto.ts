@@ -5,12 +5,12 @@ import { IsDateString, IsInt, IsOptional, IsString, Min } from 'class-validator'
 export class TripStopInputDto {
   @ApiProperty()
   @IsString()
-  locationId: string;
+  locationId!: string;
 
   @ApiProperty({ description: 'Ordre de passage (1, 2, 3...)' })
   @IsInt()
   @Min(1)
-  sequence: number;
+  sequence!: number;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -5,7 +5,7 @@ import { IsOptional, IsString } from 'class-validator';
 export class PassengerInputDto {
   @ApiProperty({ example: 'Aïssatou Bah' })
   @IsString()
-  fullName: string;
+  fullName!: string;
 
   @ApiPropertyOptional()
   @IsOptional()

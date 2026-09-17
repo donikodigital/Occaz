@@ -5,9 +5,9 @@ import { IsLatitude, IsLongitude } from 'class-validator';
 export class UpdateTripPositionDto {
   @ApiProperty()
   @IsLatitude()
-  latitude: number;
+  latitude!: number;
 
   @ApiProperty()
   @IsLongitude()
-  longitude: number;
+  longitude!: number;
 }

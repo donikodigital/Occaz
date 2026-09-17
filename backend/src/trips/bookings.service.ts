@@ -15,6 +15,22 @@ import { BookingCancelledEvent, DOMAIN_EVENTS } from '../common/events/domain-ev
 import { CreateBookingDto } from './dto/create-booking.dto';
 
 /**
+ * Relations de Trip attendues côté mobile pour toute réponse contenant
+ * booking.trip (voir mobile/src/types/trips.types.ts — Booking.trip est
+ * typé comme un Trip complet, pas seulement ses colonnes scalaires).
+ * `include: { trip: true }` seul ne charge PAS ces relations imbriquées
+ * — c'était la cause de "trip.originCity is undefined" côté client.
+ * Centralisé ici pour que ce bug ne puisse pas resurgir ailleurs dans ce
+ * fichier faute d'avoir pensé à dupliquer le bon include partout.
+ */
+const TRIP_INCLUDE_FOR_BOOKING = {
+  originCity: true,
+  destinationCity: true,
+  driver: true,
+  vehicle: true,
+} as const;
+
+/**
  * Volontairement indépendant de TripsService (pas d'injection croisée) —
  * TripsService dépend déjà de BookingsService pour la cascade
  * d'annulation ; une dépendance dans l'autre sens créerait un cycle.
@@ -33,7 +49,7 @@ export class BookingsService {
   async findOne(id: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
-      include: { trip: true, passengers: true },
+      include: { trip: { include: TRIP_INCLUDE_FOR_BOOKING }, passengers: true },
     });
     if (!booking) throw new NotFoundException('Réservation introuvable.');
     return booking;
@@ -115,7 +131,7 @@ export class BookingsService {
 
       return tx.booking.findUnique({
         where: { id: booking.id },
-        include: { passengers: true, trip: true },
+        include: { passengers: true, trip: { include: TRIP_INCLUDE_FOR_BOOKING } },
       });
     });
   }
@@ -249,7 +265,7 @@ export class BookingsService {
         skip: query.skip,
         take: query.take,
         orderBy: { createdAt: 'desc' },
-        include: { trip: true, passengers: true },
+        include: { trip: { include: TRIP_INCLUDE_FOR_BOOKING }, passengers: true },
       }),
       this.prisma.booking.count({ where }),
     ]);
@@ -275,7 +291,7 @@ export class BookingsService {
         skip: query.skip,
         take: query.take,
         orderBy: { createdAt: 'desc' },
-        include: { trip: true },
+        include: { trip: { include: TRIP_INCLUDE_FOR_BOOKING } },
       }),
       this.prisma.booking.count({ where }),
     ]);

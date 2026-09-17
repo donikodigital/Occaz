@@ -7,12 +7,12 @@ import { PassengerInputDto } from './passenger-input.dto';
 export class CreateBookingDto {
   @ApiProperty()
   @IsString()
-  tripId: string;
+  tripId!: string;
 
   @ApiProperty({ example: 1 })
   @IsInt()
   @Min(1)
-  seatsCount: number;
+  seatsCount!: number;
 
   @ApiPropertyOptional({
     type: [PassengerInputDto],

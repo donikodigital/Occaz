@@ -6,5 +6,5 @@ export class CancelBookingDto {
   @ApiProperty()
   @IsString()
   @MinLength(3)
-  reason: string;
+  reason!: string;
 }
