@@ -6,15 +6,15 @@ export class CreateCountryDto {
   @ApiProperty({ example: 'GN', description: 'Code ISO 3166-1 alpha-2' })
   @IsString()
   @Length(2, 2)
-  isoCode: string;
+  isoCode!: string;
 
   @ApiProperty({ example: 'Guinée' })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ example: '+224' })
   @IsString()
-  phoneCode: string;
+  phoneCode!: string;
 
   @ApiPropertyOptional()
   @IsOptional()

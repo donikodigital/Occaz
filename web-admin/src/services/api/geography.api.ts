@@ -11,15 +11,18 @@ import type {
   Currency,
   Prefecture,
   Region,
+  UpdateCityPayload,
+  UpdateCurrencyPayload,
+  UpdatePrefecturePayload,
+  UpdateRegionPayload,
 } from '@/types/geography.types';
 
-// Ajouté : aucune route de mise à jour générale n'existait pour un pays
-// (seulement /deactivate) — nécessaire pour relier un pays à sa devise
-// par défaut après coup. À CONFIRMER côté backend : si PATCH /countries/:id
-// n'existe pas encore, cet appel échouera avec une 404/405 jusqu'à ce
-// qu'il soit ajouté.
 export interface UpdateCountryPayload {
+  isoCode?: string;
+  name?: string;
+  phoneCode?: string;
   defaultCurrencyId?: string | null;
+  isCrossBorderEnabled?: boolean;
 }
 
 export const geographyApi = {
@@ -30,14 +33,22 @@ export const geographyApi = {
 
   listCurrencies: () => api.get<Currency[]>('/currencies', { auth: false }),
   createCurrency: (payload: CreateCurrencyPayload) => api.post<Currency>('/currencies', payload),
+  updateCurrency: (id: string, payload: UpdateCurrencyPayload) => api.patch<Currency>(`/currencies/${id}`, payload),
+  deleteCurrency: (id: string) => api.delete<void>(`/currencies/${id}`),
 
   listRegions: (countryId: string) => api.get<Region[]>('/regions', { query: { countryId }, auth: false }),
   createRegion: (payload: CreateRegionPayload) => api.post<Region>('/regions', payload),
+  updateRegion: (id: string, payload: UpdateRegionPayload) => api.patch<Region>(`/regions/${id}`, payload),
+  deleteRegion: (id: string) => api.delete<void>(`/regions/${id}`),
 
   listPrefectures: (regionId: string) => api.get<Prefecture[]>('/prefectures', { query: { regionId }, auth: false }),
   createPrefecture: (payload: CreatePrefecturePayload) => api.post<Prefecture>('/prefectures', payload),
+  updatePrefecture: (id: string, payload: UpdatePrefecturePayload) => api.patch<Prefecture>(`/prefectures/${id}`, payload),
+  deletePrefecture: (id: string) => api.delete<void>(`/prefectures/${id}`),
 
   listCities: (countryId?: string) =>
     api.get<{ data: City[] }>('/cities', { query: { countryId, limit: 100 }, auth: false }).then((r) => r.data),
   createCity: (payload: CreateCityPayload) => api.post<City>('/cities', payload),
+  updateCity: (id: string, payload: UpdateCityPayload) => api.patch<City>(`/cities/${id}`, payload),
+  deleteCity: (id: string) => api.delete<void>(`/cities/${id}`),
 };

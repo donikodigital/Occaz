@@ -34,6 +34,7 @@ export interface City {
   countryId: string;
   prefectureId: string | null;
   name: string;
+  address: string | null;
 }
 
 export interface CreateCountryPayload {
@@ -50,19 +51,24 @@ export interface CreateCurrencyPayload {
   symbol?: string;
   decimalDigits?: number;
 }
+export type UpdateCurrencyPayload = Partial<CreateCurrencyPayload>;
 
 export interface CreateRegionPayload {
   countryId: string;
   name: string;
 }
+export type UpdateRegionPayload = Partial<CreateRegionPayload>;
 
 export interface CreatePrefecturePayload {
   regionId: string;
   name: string;
 }
+export type UpdatePrefecturePayload = Partial<CreatePrefecturePayload>;
 
 export interface CreateCityPayload {
   countryId: string;
   prefectureId?: string;
   name: string;
+  address?: string;
 }
+export type UpdateCityPayload = Partial<CreateCityPayload>;

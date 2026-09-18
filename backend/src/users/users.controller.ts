@@ -9,6 +9,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 
 @ApiTags('Utilisateurs')
 @ApiBearerAuth()
@@ -55,5 +56,27 @@ export class UsersController {
   @Patch(':id/unsuspend')
   unsuspend(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.usersService.unsuspend(id, user.id);
+  }
+
+  @Permissions(PERMISSIONS.USER_UPDATE)
+  @Patch(':id')
+  adminUpdate(
+    @Param('id') id: string,
+    @Body() dto: AdminUpdateUserDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.usersService.adminUpdate(id, dto, user.id);
+  }
+
+  @Permissions(PERMISSIONS.USER_DELETE)
+  @Patch(':id/deactivate')
+  deactivate(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.deactivate(id, user.id);
+  }
+
+  @Permissions(PERMISSIONS.USER_DELETE)
+  @Patch(':id/activate')
+  activate(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.activate(id, user.id);
   }
 }

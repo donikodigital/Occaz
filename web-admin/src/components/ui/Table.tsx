@@ -18,12 +18,20 @@ export function TableBody({ children }: { children: React.ReactNode }) {
   return <tbody className="divide-y divide-border">{children}</tbody>;
 }
 
-export function TableRow({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <tr className={className}>{children}</tr>;
+export function TableRow({
+  children,
+  className = '',
+  ...rest
+}: React.HTMLAttributes<HTMLTableRowElement> & { children: React.ReactNode }) {
+  return (
+    <tr className={className} {...rest}>
+      {children}
+    </tr>
+  );
 }
 
-export function TableHeaderCell({ children }: { children?: React.ReactNode }) {
-  return <th className="px-4 py-3 text-xs font-semibold text-text-muted">{children}</th>;
+export function TableHeaderCell({ children, className = '' }: { children?: React.ReactNode; className?: string }) {
+  return <th className={`px-4 py-3 text-xs font-semibold text-text-muted ${className}`}>{children}</th>;
 }
 
 export function TableCell({ children, className = '' }: { children: React.ReactNode; className?: string }) {

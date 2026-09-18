@@ -1,14 +1,13 @@
 // backend/src/documents/documents.controller.ts
 import { Controller, Get, Param, Patch, Body, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { DocumentOwnerType, DocumentStatus } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { DocumentsService } from './documents.service';
 import { RejectDocumentDto } from './dto/reject-document.dto';
+import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 
 /**
  * Vue d'ensemble admin, tous types de propriétaires confondus. L'upload
@@ -24,13 +23,12 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Get()
-  findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('ownerType') ownerType?: DocumentOwnerType,
-    @Query('ownerId') ownerId?: string,
-    @Query('status') status?: DocumentStatus,
-  ) {
-    return this.documentsService.findAll(query, { ownerType, ownerId, status });
+  findAll(@Query() query: ListDocumentsQueryDto) {
+    return this.documentsService.findAll(query, {
+      ownerType: query.ownerType,
+      ownerId: query.ownerId,
+      status: query.status,
+    });
   }
 
   @Get('expiring-soon')

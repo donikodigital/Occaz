@@ -15,6 +15,9 @@ export interface SafeUser {
   isTwoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Dénormalisés depuis CustomerProfile/DriverProfile — null pour Support/SuperAdmin (pas de profil). */
+  firstName: string | null;
+  lastName: string | null;
 }
 
 export interface LoginPasswordPayload {

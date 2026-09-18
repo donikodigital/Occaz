@@ -1,12 +1,13 @@
 // backend/src/geography/cities.controller.ts
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CitiesService } from './cities.service';
 import { CreateCityDto } from './dto/create-city.dto';
+import { UpdateCityDto } from './dto/update-city.dto';
+import { ListCitiesQueryDto } from './dto/list-cities-query.dto';
 
 @ApiTags('Géographie — Villes')
 @ApiBearerAuth()
@@ -16,8 +17,8 @@ export class CitiesController {
 
   @Public()
   @Get()
-  findAll(@Query() query: PaginationQueryDto, @Query('countryId') countryId?: string) {
-    return this.citiesService.findAll(query, countryId);
+  findAll(@Query() query: ListCitiesQueryDto) {
+    return this.citiesService.findAll(query, query.countryId);
   }
 
   @Public()
@@ -30,5 +31,17 @@ export class CitiesController {
   @Post()
   create(@Body() dto: CreateCityDto) {
     return this.citiesService.create(dto);
+  }
+
+  @Permissions(PERMISSIONS.GEOGRAPHY_MANAGE)
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateCityDto) {
+    return this.citiesService.update(id, dto);
+  }
+
+  @Permissions(PERMISSIONS.GEOGRAPHY_MANAGE)
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.citiesService.remove(id);
   }
 }

@@ -16,3 +16,7 @@ export type { SelectProps } from './Select';
 export { Switch } from './Switch';
 export type { SwitchProps } from './Switch';
 export { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from './Table';
+export { Modal } from './Modal';
+export type { ModalProps } from './Modal';
+export { Disclosure } from './Disclosure';
+export type { DisclosureProps } from './Disclosure';

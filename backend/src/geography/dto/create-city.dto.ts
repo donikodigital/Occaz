@@ -5,7 +5,7 @@ import { IsOptional, IsString } from 'class-validator';
 export class CreateCityDto {
   @ApiProperty()
   @IsString()
-  countryId: string;
+  countryId!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -14,5 +14,10 @@ export class CreateCityDto {
 
   @ApiProperty({ example: 'Labé' })
   @IsString()
-  name: string;
+  name!: string;
+
+  @ApiPropertyOptional({ example: 'Quartier Almamya, en face du marché', description: 'Adresse libre, optionnelle' })
+  @IsOptional()
+  @IsString()
+  address?: string;
 }

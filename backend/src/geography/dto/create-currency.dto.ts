@@ -6,11 +6,11 @@ export class CreateCurrencyDto {
   @ApiProperty({ example: 'GNF' })
   @IsString()
   @Length(3, 3)
-  isoCode: string;
+  isoCode!: string;
 
   @ApiProperty({ example: 'Franc guinéen' })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({ example: 'FG' })
   @IsOptional()

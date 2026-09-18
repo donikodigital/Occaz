@@ -8,6 +8,7 @@
 export const PERMISSIONS = {
   // Utilisateurs & RBAC
   USER_READ: 'user.read',
+  USER_UPDATE: 'user.update',
   USER_SUSPEND: 'user.suspend',
   USER_DELETE: 'user.delete',
   ROLE_MANAGE: 'role.manage',

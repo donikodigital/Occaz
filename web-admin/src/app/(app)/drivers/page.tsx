@@ -2,12 +2,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
-import { IconRosetteDiscountCheck, IconSearch } from '@tabler/icons-react';
+import { IconChevronRight, IconRosetteDiscountCheck, IconSearch } from '@tabler/icons-react';
 import { Badge, Select, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TextField } from '@/components/ui';
 import { useDriversList } from '@/hooks/useDrivers';
 import { DRIVER_STATUS_LABELS, DRIVER_STATUS_TONE } from '@/utils/driverLabels';
 import type { DriverAccountStatus } from '@/types/drivers.types';
+import { DriverDetailModal } from '@/components/drivers/DriverDetailModal';
 
 const STATUS_OPTIONS = Object.keys(DRIVER_STATUS_LABELS) as DriverAccountStatus[];
 
@@ -15,6 +15,8 @@ export default function DriversPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<DriverAccountStatus | ''>('');
   const { data, isLoading, isError } = useDriversList({ search: search || undefined, status: status || undefined });
+
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
@@ -47,22 +49,29 @@ export default function DriversPage() {
         <p className="text-sm text-danger">Impossible de charger les chauffeurs.</p>
       ) : isLoading ? (
         <p className="text-sm text-text-secondary">Chargement…</p>
+      ) : (data?.data.length ?? 0) === 0 ? (
+        <p className="py-10 text-center text-sm text-text-muted">Aucun chauffeur ne correspond à cette recherche.</p>
       ) : (
         <Table>
           <TableHead>
             <TableRow>
               <TableHeaderCell>Nom</TableHeaderCell>
-              <TableHeaderCell>Ville</TableHeaderCell>
-              <TableHeaderCell>Trajets terminés</TableHeaderCell>
-              <TableHeaderCell>Note</TableHeaderCell>
+              <TableHeaderCell className="hidden sm:table-cell">Ville</TableHeaderCell>
+              <TableHeaderCell className="hidden sm:table-cell">Trajets terminés</TableHeaderCell>
+              <TableHeaderCell className="hidden sm:table-cell">Note</TableHeaderCell>
               <TableHeaderCell>Statut</TableHeaderCell>
+              <TableHeaderCell className="w-8" />
             </TableRow>
           </TableHead>
           <TableBody>
             {(data?.data ?? []).map((driver) => (
-              <TableRow key={driver.id} className="hover:bg-surface-muted/50">
+              <TableRow
+                key={driver.id}
+                className="cursor-pointer transition-colors hover:bg-surface-muted/50"
+                onClick={() => setSelectedDriverId(driver.id)}
+              >
                 <TableCell>
-                  <Link href={`/drivers/${driver.id}`} className="flex items-center gap-2 font-medium text-primary hover:underline">
+                  <div className="flex items-center gap-2 font-medium text-text-primary">
                     {driver.photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={driver.photoUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
@@ -74,21 +83,26 @@ export default function DriversPage() {
                     )}
                     {driver.firstName} {driver.lastName}
                     {driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={15} className="text-success-dark" /> : null}
-                  </Link>
+                  </div>
                 </TableCell>
-                <TableCell className="text-text-secondary">{driver.city?.name ?? '—'}</TableCell>
-                <TableCell className="text-text-secondary">{driver.completedTripsCount}</TableCell>
-                <TableCell className="text-text-secondary">
+                <TableCell className="hidden text-text-secondary sm:table-cell">{driver.city?.name ?? '—'}</TableCell>
+                <TableCell className="hidden text-text-secondary sm:table-cell">{driver.completedTripsCount}</TableCell>
+                <TableCell className="hidden text-text-secondary sm:table-cell">
                   {driver.averageRating ? `${driver.averageRating.toFixed(1)} (${driver.ratingsCount})` : '—'}
                 </TableCell>
                 <TableCell>
                   <Badge label={DRIVER_STATUS_LABELS[driver.status]} tone={DRIVER_STATUS_TONE[driver.status]} />
+                </TableCell>
+                <TableCell className="w-8">
+                  <IconChevronRight size={16} className="text-text-muted" />
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
+
+      <DriverDetailModal open={selectedDriverId !== null} onClose={() => setSelectedDriverId(null)} driverId={selectedDriverId} />
     </div>
   );
 }

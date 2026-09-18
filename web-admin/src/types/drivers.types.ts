@@ -1,6 +1,6 @@
 // web-admin/src/types/drivers.types.ts
-export type DriverAccountStatus = 'PENDING' | 'VALIDATED' | 'SUSPENDED' | 'REJECTED';
-export type VehicleType = 'SEDAN' | 'SUV' | 'VAN' | 'MINIBUS' | 'PICKUP' | 'MOTORCYCLE';
+export type DriverAccountStatus = 'PENDING' | 'IN_VERIFICATION' | 'VALIDATED' | 'SUSPENDED' | 'BLOCKED' | 'DEACTIVATED';
+export type VehicleType = 'SEDAN' | 'SUV' | 'MINIVAN' | 'MINIBUS' | 'PICKUP' | 'MOTORCYCLE' | 'TRUCK' | 'OTHER';
 export type DocumentStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
 export interface Vehicle {

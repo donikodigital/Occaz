@@ -5,9 +5,9 @@ import { IsString } from 'class-validator';
 export class CreateRegionDto {
   @ApiProperty()
   @IsString()
-  countryId: string;
+  countryId!: string;
 
   @ApiProperty({ example: 'Région de Labé' })
   @IsString()
-  name: string;
+  name!: string;
 }

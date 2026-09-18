@@ -622,6 +622,7 @@ model Prefecture {
   @@map("prefectures")
 }
 
+
 model City {
   id           String      @id @default(uuid())
   countryId    String
@@ -629,6 +630,7 @@ model City {
   prefectureId String?
   prefecture   Prefecture? @relation(fields: [prefectureId], references: [id])
   name         String
+  address      String?
   latitude     Float?
   longitude    Float?
 
@@ -640,7 +642,6 @@ model City {
 
   @@index([countryId])
   @@map("cities")
-  
 }
 
 // Modèle hybride GPS + texte libre — décision Partie VII 7.2 : toute adresse
