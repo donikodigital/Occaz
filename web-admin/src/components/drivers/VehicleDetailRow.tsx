@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { IconCar, IconChevronDown } from '@tabler/icons-react';
-import { Badge, Button } from '@/components/ui';
+import { IconCar, IconCheck, IconChevronDown, IconChevronUp, IconX } from '@tabler/icons-react';
+import { Badge, IconActionButton } from '@/components/ui';
 import { DocumentsPanel } from '@/components/layout/DocumentsPanel';
 import { useRejectVehicle, useVerifyVehicle } from '@/hooks/useVehicles';
 import { VEHICLE_TYPE_LABELS } from '@/utils/driverLabels';
@@ -28,51 +28,45 @@ export function VehicleDetailRow({ vehicle, driverId }: { vehicle: Vehicle; driv
 
   return (
     <div className="rounded-lg border border-border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-light text-primary-dark">
             <IconCar size={17} />
           </div>
-          <div>
-            <p className="text-sm font-medium text-text-primary">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-text-primary">
               {vehicle.brand} {vehicle.model} {vehicle.year ? `(${vehicle.year})` : ''}
             </p>
-            <p className="text-xs text-text-secondary">
+            <p className="truncate text-xs text-text-secondary">
               {VEHICLE_TYPE_LABELS[vehicle.type]} · {vehicle.color ?? 'Couleur non précisée'} · {vehicle.plateNumber} · {vehicle.totalSeats} places
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <Badge label={STATUS_LABEL[vehicle.verificationStatus]} tone={STATUS_TONE[vehicle.verificationStatus]} />
           {vehicle.verificationStatus === 'PENDING' ? (
             <>
-              <Button
-                variant="success"
-                className="px-2.5 py-1.5 text-xs"
+              <IconActionButton
+                icon={IconCheck}
+                label="Valider le véhicule"
+                tone="success"
                 onClick={() => verifyVehicle.mutate(vehicle.id)}
                 loading={verifyVehicle.isPending}
-              >
-                Valider
-              </Button>
-              <Button
-                variant="outline"
-                className="px-2.5 py-1.5 text-xs"
+              />
+              <IconActionButton
+                icon={IconX}
+                label="Rejeter le véhicule"
+                tone="danger"
                 onClick={() => rejectVehicle.mutate(vehicle.id)}
                 loading={rejectVehicle.isPending}
-              >
-                Rejeter
-              </Button>
+              />
             </>
           ) : null}
-          <button
-            type="button"
+          <IconActionButton
+            icon={showDocuments ? IconChevronUp : IconChevronDown}
+            label={showDocuments ? 'Masquer les documents du véhicule' : 'Voir les documents du véhicule'}
             onClick={() => setShowDocuments((v) => !v)}
-            className="text-text-muted transition-transform hover:text-text-secondary"
-            style={{ transform: showDocuments ? 'rotate(180deg)' : undefined }}
-            aria-label="Voir les documents du véhicule"
-          >
-            <IconChevronDown size={16} />
-          </button>
+          />
         </div>
       </div>
       {showDocuments ? (

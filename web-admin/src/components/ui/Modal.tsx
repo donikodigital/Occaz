@@ -24,10 +24,12 @@ const SIZE_CLASSES: Record<NonNullable<ModalProps['size']>, string> = {
 
 /**
  * Modal générique pour tout le back-office — centré sur tous les écrans.
- * Le calque extérieur est lui-même scrollable (overflow-y-auto) en secours :
- * si le contenu dépasse la hauteur de l'écran (clavier mobile ouvert, très
- * petit viewport), on peut toujours faire défiler jusqu'au bouton du pied de
- * page plutôt qu'il ne soit inatteignable. Pas d'ombre (cohérence avec Card).
+ * Le calque extérieur est lui-même scrollable (overflow-y-auto) en secours,
+ * et le corps bloque tout débordement horizontal (overflow-x-hidden) pour
+ * qu'un contenu interne mal contenu (rangée de boutons sans flex-wrap, par
+ * exemple) ne pousse jamais le modal à défiler latéralement — il doit
+ * passer à la ligne à l'intérieur, jamais déborder. Pas d'ombre (cohérence
+ * avec Card).
  */
 export function Modal({ open, onClose, title, description, children, footer, size = 'md', zIndex = 50 }: ModalProps) {
   useEffect(() => {
@@ -67,7 +69,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
               <IconX size={18} />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 py-4">{children}</div>
           {footer ? (
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-4">{footer}</div>
           ) : null}

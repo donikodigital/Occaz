@@ -2,13 +2,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { IconRosetteDiscountCheck, IconStarFilled } from '@tabler/icons-react';
-import { Badge, Button, Modal, TextArea } from '@/components/ui';
+import { useRouter } from 'next/navigation';
+import { IconEye, IconPlayerPause, IconPlayerPlay, IconRosetteDiscountCheck, IconShieldCheck } from '@tabler/icons-react';
+import { Button, DetailField, DetailSection, EntityAvatar, Modal, TextArea, TintedIconButton } from '@/components/ui';
 import { DocumentsPanel } from '@/components/layout/DocumentsPanel';
 import { VehicleDetailRow } from './VehicleDetailRow';
 import { useDriver, useReactivateDriver, useSuspendDriver, useVerifyDriver } from '@/hooks/useDrivers';
-import { DRIVER_STATUS_LABELS, DRIVER_STATUS_TONE } from '@/utils/driverLabels';
+import { DRIVER_STATUS_LABELS } from '@/utils/driverLabels';
 import { ApiError } from '@/services/api/ApiError';
 
 export interface DriverDetailModalProps {
@@ -22,14 +22,8 @@ function formatDate(value: string | null): string {
   return new Date(value).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 }
 
-/**
- * Fiche chauffeur complète en modal : infos, documents d'identité, véhicules
- * avec leurs propres documents, et actions Valider/Suspendre/Réactiver.
- * Charge toujours le détail via useDriver(driverId) plutôt que de recevoir
- * l'objet de la liste, car GET /driver-profiles (liste) n'inclut pas les
- * véhicules — seul GET /driver-profiles/:id (findOne) le fait.
- */
 export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModalProps) {
+  const router = useRouter();
   const { data: driver, isLoading, isError } = useDriver(driverId ?? undefined);
   const verifyDriver = useVerifyDriver(driverId ?? '');
   const suspendDriver = useSuspendDriver(driverId ?? '');
@@ -66,7 +60,7 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
       open={open}
       onClose={onClose}
       title={driver ? `${driver.firstName} ${driver.lastName}` : 'Chauffeur'}
-      description={driver ? `${driver.city?.name ?? '—'} · ${driver.country?.name ?? '—'}` : undefined}
+      description={driver ? DRIVER_STATUS_LABELS[driver.status] : undefined}
       size="lg"
     >
       {isError ? (
@@ -75,51 +69,88 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
         <p className="text-sm text-text-secondary">Chargement…</p>
       ) : (
         <div className="space-y-5">
-          <div className="flex items-center gap-3">
-            {driver.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={driver.photoUrl} alt="" className="h-14 w-14 rounded-full object-cover" />
-            ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-light text-base font-semibold text-primary-dark">
-                {driver.firstName.charAt(0)}
-                {driver.lastName.charAt(0)}
-              </div>
-            )}
-            <div>
-              <p className="flex items-center gap-1.5 font-semibold text-text-primary">
+          <div className="flex items-start gap-4">
+            <EntityAvatar
+              initials={`${driver.firstName.charAt(0)}${driver.lastName.charAt(0)}`}
+              imageUrl={driver.photoUrl}
+              size="lg"
+              tone={driver.status === 'VALIDATED' ? 'success' : 'primary'}
+            />
+            <div className="min-w-0 pt-1">
+              <p className="flex items-center gap-1.5 truncate font-serif text-xl text-text-primary">
                 {driver.firstName} {driver.lastName}
-                {driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={16} className="text-success-dark" /> : null}
+                {driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={17} className="shrink-0 text-success-dark" /> : null}
               </p>
-              <Badge label={DRIVER_STATUS_LABELS[driver.status]} tone={DRIVER_STATUS_TONE[driver.status]} />
+              <p className="mt-1 text-xs text-text-muted">
+                {driver.city?.name ?? '—'} · {driver.country?.name ?? '—'}
+              </p>
+              <p className="text-xs text-text-muted">Membre depuis le {formatDate(driver.createdAt)}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-border p-3 text-sm">
-            <span className="text-text-secondary">Date de naissance</span>
-            <span className="text-right text-text-primary">{formatDate(driver.dateOfBirth)}</span>
-            <span className="text-text-secondary">Mobile money</span>
-            <span className="text-right text-text-primary">{driver.mobileMoneyNumber ?? '—'}</span>
-            <span className="text-text-secondary">Trajets terminés</span>
-            <span className="text-right text-text-primary">{driver.completedTripsCount}</span>
-            <span className="text-text-secondary">Envois terminés</span>
-            <span className="text-right text-text-primary">{driver.completedShipmentsCount}</span>
-            <span className="text-text-secondary">Annulations</span>
-            <span className="text-right text-text-primary">{driver.cancellationCount}</span>
-            <span className="flex items-center gap-1 text-text-secondary">
-              <IconStarFilled size={12} className="text-accent" /> Note moyenne
-            </span>
-            <span className="text-right text-text-primary">
-              {driver.averageRating ? `${driver.averageRating.toFixed(1)} (${driver.ratingsCount} avis)` : 'Aucun avis'}
-            </span>
+          <div className="flex flex-wrap gap-2.5">
+            {driver.status === 'PENDING' || driver.status === 'IN_VERIFICATION' ? (
+              <TintedIconButton
+                icon={IconShieldCheck}
+                label="Valider le chauffeur"
+                tone="success"
+                onClick={() => verifyDriver.mutate()}
+                loading={verifyDriver.isPending}
+              />
+            ) : null}
+            <TintedIconButton icon={IconEye} label="Voir la fiche complète" tone="neutral" onClick={() => router.push(`/drivers/${driver.id}`)} />
+            {driver.status === 'SUSPENDED' ? (
+              <TintedIconButton
+                icon={IconPlayerPlay}
+                label="Réactiver"
+                tone="success"
+                onClick={() => reactivateDriver.mutate()}
+                loading={reactivateDriver.isPending}
+              />
+            ) : (
+              <TintedIconButton icon={IconPlayerPause} label="Suspendre" tone="danger" onClick={() => setShowSuspendForm(true)} />
+            )}
           </div>
 
+          {showSuspendForm ? (
+            <div className="space-y-2 rounded-lg bg-danger-light/40 p-3">
+              <TextArea
+                label="Motif de la suspension"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                placeholder="Expliquez la raison…"
+                autoFocus
+              />
+              {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setShowSuspendForm(false)}>
+                  Annuler
+                </Button>
+                <Button variant="danger" loading={suspendDriver.isPending} onClick={handleSuspend}>
+                  Confirmer
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <DetailSection title="Activité">
+            <DetailField label="Trajets terminés" value={driver.completedTripsCount} />
+            <DetailField label="Envois terminés" value={driver.completedShipmentsCount} />
+            <DetailField label="Annulations" value={driver.cancellationCount} />
+            <DetailField
+              label="Note moyenne"
+              value={driver.averageRating ? `${driver.averageRating.toFixed(1)} (${driver.ratingsCount} avis)` : 'Aucun avis'}
+            />
+          </DetailSection>
+
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-text-primary">Pièces d&apos;identité</h3>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-primary">Pièces d&apos;identité</h4>
             <DocumentsPanel ownerType="DRIVER" ownerId={driver.id} />
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-text-primary">Véhicules</h3>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-primary">Véhicules</h4>
             {driver.vehicles && driver.vehicles.length > 0 ? (
               <div className="space-y-2">
                 {driver.vehicles.map((vehicle) => (
@@ -128,50 +159,6 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
               </div>
             ) : (
               <p className="text-sm text-text-muted">Aucun véhicule enregistré.</p>
-            )}
-          </div>
-
-          <div className="space-y-3 border-t border-border pt-4">
-            {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
-            {showSuspendForm ? (
-              <div className="space-y-2 rounded-lg bg-danger-light/40 p-3">
-                <TextArea
-                  label="Motif de la suspension"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={2}
-                  placeholder="Expliquez la raison…"
-                  autoFocus
-                />
-                <div className="flex justify-end gap-2">
-                  <Button variant="ghost" onClick={() => setShowSuspendForm(false)}>
-                    Annuler
-                  </Button>
-                  <Button variant="danger" loading={suspendDriver.isPending} onClick={handleSuspend}>
-                    Confirmer
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                {driver.status === 'PENDING' || driver.status === 'IN_VERIFICATION' ? (
-                  <Button variant="success" onClick={() => verifyDriver.mutate()} loading={verifyDriver.isPending}>
-                    Valider le chauffeur
-                  </Button>
-                ) : null}
-                {driver.status === 'SUSPENDED' ? (
-                  <Button variant="success" onClick={() => reactivateDriver.mutate()} loading={reactivateDriver.isPending}>
-                    Réactiver le compte
-                  </Button>
-                ) : (
-                  <Button variant="danger" onClick={() => setShowSuspendForm(true)}>
-                    Suspendre
-                  </Button>
-                )}
-                <Link href={`/drivers/${driver.id}`} className="ml-auto text-sm text-primary hover:underline">
-                  Voir la fiche complète →
-                </Link>
-              </div>
             )}
           </div>
         </div>

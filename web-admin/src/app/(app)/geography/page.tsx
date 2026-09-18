@@ -17,15 +17,11 @@ import {
   Button,
   Card,
   Disclosure,
+  EntityAvatar,
+  EntityListCard,
   Modal,
   Select,
   Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
   TextField,
 } from '@/components/ui';
 import {
@@ -1049,30 +1045,23 @@ function LocationsPanel({ countries }: { countries: Country[] }) {
           ) : rows.length === 0 ? (
             <p className="py-6 text-center text-sm text-text-muted">Aucune ville enregistrée pour ce pays.</p>
           ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell>Région</TableHeaderCell>
-                  <TableHeaderCell>Préfecture</TableHeaderCell>
-                  <TableHeaderCell>Ville</TableHeaderCell>
-                  <TableHeaderCell>Adresse</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map(({ city, regionName, prefectureName }) => (
-                  <TableRow
-                    key={city.id}
-                    className="cursor-pointer hover:bg-surface-muted/40"
-                    onClick={() => setCityModalState({ mode: 'edit', city })}
-                  >
-                    <TableCell>{regionName}</TableCell>
-                    <TableCell>{prefectureName}</TableCell>
-                    <TableCell className="font-medium text-text-primary">{city.name}</TableCell>
-                    <TableCell className="text-text-secondary">{city.address ?? '—'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {rows.map(({ city, regionName, prefectureName }) => (
+                <EntityListCard
+                  key={city.id}
+                  avatar={<EntityAvatar initials={city.name.slice(0, 2).toUpperCase()} tone="accent" />}
+                  title={city.name}
+                  subtitle={city.address ?? undefined}
+                  badges={
+                    <>
+                      {regionName !== '—' ? <Badge label={regionName} tone="primary" /> : null}
+                      {prefectureName !== '—' ? <Badge label={prefectureName} tone="neutral" /> : null}
+                    </>
+                  }
+                  onClick={() => setCityModalState({ mode: 'edit', city })}
+                />
+              ))}
+            </div>
           )}
         </>
       )}

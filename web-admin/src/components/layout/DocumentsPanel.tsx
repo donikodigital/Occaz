@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { IconEye, IconFileText } from '@tabler/icons-react';
-import { Badge, Button, TextArea } from '@/components/ui';
+import { IconCheck, IconEye, IconFileText, IconX } from '@tabler/icons-react';
+import { Badge, Button, IconActionButton, TextArea } from '@/components/ui';
 import { useDocumentsForOwner, useRejectDocument, useVerifyDocument } from '@/hooks/useDocuments';
 import { documentsApi } from '@/services/api/documents.api';
 import type { AppDocument, DocumentOwnerType } from '@/types/documents.types';
@@ -38,41 +38,31 @@ function DocumentRow({ document, ownerType, ownerId }: { document: AppDocument; 
 
   return (
     <div className="rounded-lg border border-border p-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-muted">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
             <IconFileText size={15} className="text-text-secondary" />
           </div>
-          <div>
-            <p className="text-sm font-medium text-text-primary">{document.type}</p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-text-primary">{document.type}</p>
             <p className="text-xs text-text-muted">
               {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(document.createdAt))}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <Badge label={STATUS_LABEL[document.status]} tone={STATUS_TONE[document.status]} />
-          <Button variant="secondary" className="px-2.5 py-1.5 text-xs" onClick={handleView} loading={isViewing}>
-            <IconEye size={14} />
-            Voir
-          </Button>
+          <IconActionButton icon={IconEye} label="Voir le document" onClick={handleView} loading={isViewing} />
           {document.status === 'PENDING' ? (
             <>
-              <Button
-                variant="success"
-                className="px-2.5 py-1.5 text-xs"
+              <IconActionButton
+                icon={IconCheck}
+                label="Valider le document"
+                tone="success"
                 onClick={() => verify.mutate(document.id)}
                 loading={verify.isPending}
-              >
-                Valider
-              </Button>
-              <Button
-                variant="outline"
-                className="px-2.5 py-1.5 text-xs"
-                onClick={() => setShowRejectForm((v) => !v)}
-              >
-                Rejeter
-              </Button>
+              />
+              <IconActionButton icon={IconX} label="Rejeter le document" tone="danger" onClick={() => setShowRejectForm((v) => !v)} />
             </>
           ) : null}
         </div>
