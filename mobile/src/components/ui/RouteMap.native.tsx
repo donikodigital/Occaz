@@ -1,9 +1,12 @@
 // mobile/src/components/ui/RouteMap.native.tsx
 //
-// Implémentation native — miroir de RouteMap.web.tsx mais avec le SDK
-// natif @rnmapbox/maps plutôt que mapbox-gl (qui ne tourne qu'en DOM/web).
-// Même interface (RouteMapProps) que la version web, pour que les deux
-// fichiers restent interchangeables pour tout appelant.
+// v3 — Garde défensive ajoutée : sans token, on affiche un message
+// plutôt que de monter <MapView> — @rnmapbox/maps plante nativement
+// (crash silencieux, écran noir, aucune trace JS récupérable) si
+// Mapbox.setAccessToken() n'a jamais été appelé avant le montage d'une
+// MapView. C'est exactement ce qui s'est produit en build preview :
+// EXPO_PUBLIC_MAPBOX_TOKEN n'était pas listé dans eas.json (corrigé par
+// ailleurs), donc token valait undefined à l'exécution.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -94,6 +97,18 @@ export function RouteMap({ origin, destination, onRouteInfo, height = 320 }: Rou
     };
   }, [origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude]);
 
+  // Ne JAMAIS monter <MapView> sans token — c'est ce qui provoquait le
+  // crash natif silencieux (écran noir) plutôt qu'une simple carte vide.
+  if (!token) {
+    return (
+      <View style={[styles.container, styles.fallback, { height }]}>
+        <AppText variant="xs" color="textSecondary" align="center" style={styles.fallbackText}>
+          {errorMessage}
+        </AppText>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { height }]}>
       <MapView style={styles.mapSurface} scaleBarEnabled={false} logoEnabled={false}>
@@ -144,6 +159,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     overflow: 'hidden',
     backgroundColor: colors.surfaceMuted,
+  },
+  fallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fallbackText: {
+    paddingHorizontal: 16,
   },
   mapSurface: {
     flex: 1,
