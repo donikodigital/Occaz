@@ -9,7 +9,9 @@ import { AdminDashboardService } from './admin-dashboard.service';
 import { DriverDashboardService } from './driver-dashboard.service';
 import { CustomerDashboardService } from './customer-dashboard.service';
 import { SupportDashboardService } from './support-dashboard.service';
+import { CommissionSummaryService } from './commission-summary.service';
 import { RevenueTimeSeriesDto } from './dto/revenue-time-series.dto';
+import { CommissionSummaryQueryDto } from './dto/commission-summary-query.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 
@@ -22,6 +24,7 @@ export class DashboardsController {
     private readonly driverDashboard: DriverDashboardService,
     private readonly customerDashboard: CustomerDashboardService,
     private readonly supportDashboard: SupportDashboardService,
+    private readonly commissionSummary: CommissionSummaryService,
     private readonly driverProfilesService: DriverProfilesService,
     private readonly customerProfilesService: CustomerProfilesService,
   ) {}
@@ -52,6 +55,13 @@ export class DashboardsController {
       new Date(query.from),
       new Date(query.to),
     );
+  }
+
+  /** Commissions filtrées par période préréglée (semaine/mois/trimestre/année), avec comparaison à la période précédente. */
+  @Permissions(PERMISSIONS.DASHBOARD_ADMIN_READ)
+  @Get('admin/commission-summary')
+  getCommissionSummary(@Query() query: CommissionSummaryQueryDto) {
+    return this.commissionSummary.getSummary(query.period ?? 'month');
   }
 
   @Get('driver/mine')

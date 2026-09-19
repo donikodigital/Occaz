@@ -16,3 +16,28 @@ export interface AdminDashboardOverview {
     refundedCount: number;
   };
 }
+
+export type CommissionSummaryPeriod = 'week' | 'month' | 'quarter' | 'year';
+
+export interface CommissionFigures {
+  from: string;
+  to: string;
+  bookingCommission: Money;
+  shipmentCommission: Money;
+  totalCommission: Money;
+}
+
+export interface CommissionSummary {
+  period: CommissionSummaryPeriod;
+  current: CommissionFigures;
+  previous: CommissionFigures;
+}
+
+/** Granularité acceptée par GET /dashboards/admin/revenue-time-series (voir RevenueTimeSeriesDto côté backend). */
+export type RevenueGranularity = 'day' | 'week' | 'month' | 'year';
+
+export interface RevenueTimeSeriesPoint {
+  /** Date ISO du début du groupe (ex. début de journée/semaine/mois selon la granularité). */
+  period: string;
+  commission: Money;
+}

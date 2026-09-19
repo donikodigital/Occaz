@@ -9,6 +9,7 @@ import { AccountType, DocumentOwnerType, DriverAccountStatus, NotificationChanne
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../audit/audit.service';
 import { DocumentsService } from '../../documents/documents.service';
+import { DOCUMENT_TYPES } from '../../documents/constants/document-types.constants';
 import { CreateDocumentDto } from '../../documents/dto/create-document.dto';
 import { StorageService } from '../../storage/storage.service';
 import { RequestUploadUrlDto, extensionForContentType } from '../../storage/dto/request-upload-url.dto';
@@ -189,7 +190,14 @@ export class DriverProfilesService {
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 
-  /** Validation d'un chauffeur — attribue le badge "Conducteur vérifié" (section 25). */
+  /**
+   * Validation d'un chauffeur — attribue le badge "Conducteur vérifié"
+   * (section 25). Trois pièces sont obligatoires avant validation, pour
+   * permettre à l'admin de comparer la photo de profil au permis : la
+   * photo, le permis de conduire, et la carte grise d'au moins un
+   * véhicule. Voir document-types.constants.ts pour une remarque sur la
+   * fiabilité de DRIVER_LICENSE.
+   */
   async verify(id: string, actorId: string) {
     const existing = await this.findOne(id);
     if (!existing.photoUrl) {
@@ -197,6 +205,33 @@ export class DriverProfilesService {
         'Ce chauffeur doit avoir une photo de profil avant de pouvoir être validé.',
       );
     }
+
+    const driverDocuments = await this.documentsService.findAllForOwner(DocumentOwnerType.DRIVER, id);
+    const hasDriverLicense = driverDocuments.some((doc) => doc.type === DOCUMENT_TYPES.DRIVER_LICENSE);
+    if (!hasDriverLicense) {
+      throw new BadRequestException(
+        'Ce chauffeur doit avoir envoyé son permis de conduire avant de pouvoir être validé.',
+      );
+    }
+
+    if (!existing.vehicles || existing.vehicles.length === 0) {
+      throw new BadRequestException(
+        'Ce chauffeur doit avoir au moins un véhicule enregistré avant de pouvoir être validé.',
+      );
+    }
+
+    const vehicleDocumentLists = await Promise.all(
+      existing.vehicles.map((vehicle) => this.documentsService.findAllForOwner(DocumentOwnerType.VEHICLE, vehicle.id)),
+    );
+    const hasVehicleRegistration = vehicleDocumentLists.some((docs) =>
+      docs.some((doc) => doc.type === DOCUMENT_TYPES.VEHICLE_REGISTRATION),
+    );
+    if (!hasVehicleRegistration) {
+      throw new BadRequestException(
+        'La carte grise du véhicule doit être envoyée avant de pouvoir valider ce chauffeur.',
+      );
+    }
+
     const profile = await this.prisma.driverProfile.update({
       where: { id },
       data: { status: DriverAccountStatus.VALIDATED, isVerifiedBadge: true },
@@ -217,12 +252,36 @@ export class DriverProfilesService {
     return profile;
   }
 
+  /**
+   * Suspend le profil chauffeur ET le compte User associé dans la même
+   * transaction — DriverProfile.status et User.isSuspended sont deux
+   * champs distincts (voir schema.prisma) ; sans cette synchronisation,
+   * "Suspendre" changeait le badge affiché mais laissait le chauffeur se
+   * reconnecter normalement, car c'est bien User.isSuspended que
+   * JwtStrategy revérifie à chaque requête (jwt.strategy.ts), jamais
+   * DriverProfile.status. Les sessions actives sont aussi révoquées
+   * immédiatement, plutôt que d'attendre l'expiration naturelle (courte)
+   * de l'access token déjà émis.
+   */
   async suspend(id: string, reason: string, actorId: string) {
-    await this.findOne(id);
-    const profile = await this.prisma.driverProfile.update({
-      where: { id },
-      data: { status: DriverAccountStatus.SUSPENDED },
+    const existing = await this.findOne(id);
+
+    const profile = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const updated = await tx.driverProfile.update({
+        where: { id },
+        data: { status: DriverAccountStatus.SUSPENDED },
+      });
+      await tx.user.update({
+        where: { id: existing.userId },
+        data: { isSuspended: true, suspendedReason: reason },
+      });
+      await tx.session.updateMany({
+        where: { userId: existing.userId, isRevoked: false },
+        data: { isRevoked: true },
+      });
+      return updated;
     });
+
     await this.audit.log({
       actorId,
       entityType: 'DriverProfile',
@@ -233,12 +292,22 @@ export class DriverProfilesService {
     return profile;
   }
 
+  /** Symétrique de suspend() — lève aussi User.isSuspended, sinon le chauffeur resterait bloqué à la connexion malgré un profil réactivé. */
   async reactivate(id: string, actorId: string) {
-    await this.findOne(id);
-    const profile = await this.prisma.driverProfile.update({
-      where: { id },
-      data: { status: DriverAccountStatus.VALIDATED },
+    const existing = await this.findOne(id);
+
+    const profile = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const updated = await tx.driverProfile.update({
+        where: { id },
+        data: { status: DriverAccountStatus.VALIDATED },
+      });
+      await tx.user.update({
+        where: { id: existing.userId },
+        data: { isSuspended: false, suspendedReason: null },
+      });
+      return updated;
     });
+
     await this.audit.log({
       actorId,
       entityType: 'DriverProfile',

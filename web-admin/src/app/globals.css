@@ -9,7 +9,7 @@
  * pas un thème générique de tableau de bord.
  */
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 
   --color-primary: #4f46e5;
   --color-primary-dark: #3730a3;
@@ -81,22 +81,6 @@ body {
     scroll-behavior: auto !important;
   }
 }
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-in {
-  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
 
 @keyframes fadeIn {
   from {

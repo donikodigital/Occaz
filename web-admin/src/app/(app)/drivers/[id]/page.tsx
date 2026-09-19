@@ -88,6 +88,15 @@ export default function DriverDetailPage() {
   const [reason, setReason] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
+  async function handleVerify() {
+    setErrorMessage(undefined);
+    try {
+      await verifyDriver.mutateAsync();
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+    }
+  }
+
   async function handleSuspend() {
     setErrorMessage(undefined);
     if (reason.trim().length < 3) {
@@ -120,10 +129,13 @@ export default function DriverDetailPage() {
             {driver.lastName.charAt(0)}
           </div>
         )}
-        <h1 className="flex items-center gap-2 text-2xl font-semibold text-text-primary">
-          {driver.firstName} {driver.lastName}
-          {driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={20} className="text-success-dark" /> : null}
-        </h1>
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold text-text-primary">
+            {driver.firstName} {driver.lastName}
+            {driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={20} className="text-success-dark" /> : null}
+          </h1>
+          {!driver.photoUrl ? <p className="text-xs font-medium text-danger">Aucune photo de profil envoyée</p> : null}
+        </div>
       </div>
 
       <Card className="grid grid-cols-2 gap-4">
@@ -182,8 +194,8 @@ export default function DriverDetailPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {driver.status === 'PENDING' ? (
-            <Button variant="success" onClick={() => verifyDriver.mutate()} loading={verifyDriver.isPending}>
+          {driver.status === 'PENDING' || driver.status === 'IN_VERIFICATION' ? (
+            <Button variant="success" onClick={handleVerify} loading={verifyDriver.isPending}>
               Valider le chauffeur
             </Button>
           ) : null}
@@ -196,6 +208,7 @@ export default function DriverDetailPage() {
 
         {driver.status !== 'SUSPENDED' ? (
           <div className="space-y-3 border-t border-border pt-4">
+            {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
             <TextArea
               label="Motif de suspension"
               value={reason}
@@ -203,7 +216,6 @@ export default function DriverDetailPage() {
               rows={3}
               placeholder="Expliquez la raison de cette suspension…"
             />
-            {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
             <Button variant="danger" onClick={handleSuspend} loading={suspendDriver.isPending}>
               Suspendre le chauffeur
             </Button>

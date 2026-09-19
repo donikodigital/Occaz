@@ -11,3 +11,8 @@ export function formatMoney(amount: Money | number, currencyCode = 'GNF'): strin
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat('fr-FR').format(value);
 }
+
+/** Additionne deux montants BigInt sérialisés en chaîne — jamais via Number() pour cette opération (perte de précision possible sur de gros volumes cumulés). */
+export function sumMoney(a: Money, b: Money): Money {
+  return String(BigInt(String(a)) + BigInt(String(b))) as Money;
+}

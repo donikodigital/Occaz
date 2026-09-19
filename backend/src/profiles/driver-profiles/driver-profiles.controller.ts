@@ -1,11 +1,9 @@
 // backend/src/profiles/driver-profiles/driver-profiles.controller.ts
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { DriverAccountStatus } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../../common/types/request-with-user.interface';
 import { DriverProfilesService } from './driver-profiles.service';
 import { CreateDriverProfileDto } from './dto/create-driver-profile.dto';
@@ -14,6 +12,7 @@ import { SuspendDriverDto } from './dto/suspend-driver.dto';
 import { CreateDocumentDto } from '../../documents/dto/create-document.dto';
 import { RequestUploadUrlDto } from '../../storage/dto/request-upload-url.dto';
 import { ConfirmPhotoDto } from './dto/confirm-photo.dto';
+import { ListDriverProfilesQueryDto } from './dto/list-driver-profiles-query.dto';
 
 @ApiTags('Profils — Chauffeurs')
 @ApiBearerAuth()
@@ -63,12 +62,8 @@ export class DriverProfilesController {
 
   @Permissions(PERMISSIONS.DRIVER_READ)
   @Get()
-  findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('status') status?: DriverAccountStatus,
-    @Query('countryId') countryId?: string,
-  ) {
-    return this.driverProfilesService.findAll(query, { status, countryId });
+  findAll(@Query() query: ListDriverProfilesQueryDto) {
+    return this.driverProfilesService.findAll(query, { status: query.status, countryId: query.countryId });
   }
 
   @Permissions(PERMISSIONS.DRIVER_READ)

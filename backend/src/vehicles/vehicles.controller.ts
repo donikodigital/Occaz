@@ -1,11 +1,9 @@
 // backend/src/vehicles/vehicles.controller.ts
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { DocumentStatus } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { VehiclesService } from './vehicles.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
@@ -13,6 +11,7 @@ import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { CreateDocumentDto } from '../documents/dto/create-document.dto';
 import { RequestUploadUrlDto } from '../storage/dto/request-upload-url.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
+import { ListVehiclesQueryDto } from './dto/list-vehicles-query.dto';
 
 @ApiTags('Véhicules')
 @ApiBearerAuth()
@@ -83,12 +82,8 @@ export class VehiclesController {
 
   @Permissions(PERMISSIONS.VEHICLE_READ)
   @Get()
-  findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('verificationStatus') verificationStatus?: DocumentStatus,
-    @Query('driverId') driverId?: string,
-  ) {
-    return this.vehiclesService.findAll(query, { verificationStatus, driverId });
+  findAll(@Query() query: ListVehiclesQueryDto) {
+    return this.vehiclesService.findAll(query, { verificationStatus: query.verificationStatus, driverId: query.driverId });
   }
 
   @Permissions(PERMISSIONS.VEHICLE_VERIFY)

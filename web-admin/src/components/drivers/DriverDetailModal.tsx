@@ -40,6 +40,15 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
     setErrorMessage(undefined);
   }, [open, driverId]);
 
+  async function handleVerify() {
+    setErrorMessage(undefined);
+    try {
+      await verifyDriver.mutateAsync();
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+    }
+  }
+
   async function handleSuspend() {
     setErrorMessage(undefined);
     if (reason.trim().length < 3) {
@@ -85,18 +94,13 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
                 {driver.city?.name ?? '—'} · {driver.country?.name ?? '—'}
               </p>
               <p className="text-xs text-text-muted">Membre depuis le {formatDate(driver.createdAt)}</p>
+              {!driver.photoUrl ? <p className="mt-1 text-xs font-medium text-danger">Aucune photo de profil envoyée</p> : null}
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2.5">
             {driver.status === 'PENDING' || driver.status === 'IN_VERIFICATION' ? (
-              <TintedIconButton
-                icon={IconShieldCheck}
-                label="Valider le chauffeur"
-                tone="success"
-                onClick={() => verifyDriver.mutate()}
-                loading={verifyDriver.isPending}
-              />
+              <TintedIconButton icon={IconShieldCheck} label="Valider le chauffeur" tone="success" onClick={handleVerify} loading={verifyDriver.isPending} />
             ) : null}
             <TintedIconButton icon={IconEye} label="Voir la fiche complète" tone="neutral" onClick={() => router.push(`/drivers/${driver.id}`)} />
             {driver.status === 'SUSPENDED' ? (
@@ -112,6 +116,8 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
             )}
           </div>
 
+          {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
+
           {showSuspendForm ? (
             <div className="space-y-2 rounded-lg bg-danger-light/40 p-3">
               <TextArea
@@ -122,7 +128,6 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
                 placeholder="Expliquez la raison…"
                 autoFocus
               />
-              {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => setShowSuspendForm(false)}>
                   Annuler
