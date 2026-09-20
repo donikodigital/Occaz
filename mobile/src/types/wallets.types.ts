@@ -18,6 +18,8 @@ export interface Wallet {
   balance: Money;
   pendingBalance: Money;
   currencyId: string;
+  /** Ajouté — WalletsService.findByDriverId inclut désormais la devise ; évite un "GNF" codé en dur côté mobile, faux en zone XOF. */
+  currency: { id: string; isoCode: string };
 }
 
 export interface WalletTransaction {

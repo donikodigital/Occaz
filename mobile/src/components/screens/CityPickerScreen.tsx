@@ -1,17 +1,15 @@
 // mobile/src/components/screens/CityPickerScreen.tsx
-import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import React from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconMapPin, IconX } from '@tabler/icons-react-native';
-import { AppText, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { IconX } from '@tabler/icons-react-native';
+import { AppText, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, spacing } from '@/theme';
-import { useCitySearch } from '@/hooks/useCities';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import type { City } from '@/types/geography.types';
+import { CitySearchPanel } from './CitySearchPanel';
 
 export function CityPickerScreen() {
-  const [search, setSearch] = useState('');
-  const { data, isLoading } = useCitySearch(search);
   const selectCity = useCitySelectionStore((state) => state.select);
 
   function handleSelect(city: City) {
@@ -22,9 +20,14 @@ export function CityPickerScreen() {
   return (
     <ScreenContainer edges={['top', 'bottom']} maxWidth="form">
       <View style={styles.header}>
-        <AppText variant="lg" weight="semibold">
-          Choisir une ville
-        </AppText>
+        <View style={styles.headerText}>
+          <AppText variant="lg" weight="semibold">
+            Choisir une ville
+          </AppText>
+          <AppText variant="sm" color="textSecondary">
+            Tapez les premières lettres de son nom.
+          </AppText>
+        </View>
         <IconButton
           icon={<IconX size={18} color={colors.textPrimary} />}
           accessibilityLabel="Fermer"
@@ -32,35 +35,13 @@ export function CityPickerScreen() {
         />
       </View>
 
-      <TextField
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Rechercher une ville…"
-        autoFocus
-        style={styles.searchField}
-      />
-
-      <FlatList
-        data={data?.data ?? []}
-        keyExtractor={(item) => item.id}
+      <ScrollView
         keyboardShouldPersistTaps="handled"
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={
-          search.length < 2
-            ? undefined
-            : () => (
-                <AppText variant="sm" color="textMuted" style={styles.empty}>
-                  {isLoading ? 'Recherche…' : 'Aucune ville trouvée.'}
-                </AppText>
-              )
-        }
-        renderItem={({ item }) => (
-          <Pressable onPress={() => handleSelect(item)} style={styles.row}>
-            <IconMapPin size={16} color={colors.textSecondary} />
-            <AppText variant="base">{item.name}</AppText>
-          </Pressable>
-        )}
-      />
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
+        <CitySearchPanel autoFocus onSelect={handleSelect} />
+      </ScrollView>
     </ScreenContainer>
   );
 }
@@ -70,24 +51,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  searchField: {
-    marginBottom: spacing.sm,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
+    marginBottom: spacing.lg,
   },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
+  headerText: {
+    flex: 1,
+    gap: 2,
   },
-  empty: {
-    textAlign: 'center',
-    marginTop: spacing.xl,
+  content: {
+    paddingBottom: spacing.xl,
   },
 });

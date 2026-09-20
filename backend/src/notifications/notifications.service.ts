@@ -60,12 +60,19 @@ export class NotificationsService {
       ? this.renderTemplate(template.subject, params.payload)
       : params.fallbackTitle;
 
+    // title/body persistés désormais (auparavant jetés après l'envoi) —
+    // sans ça, le client ne pouvait distinguer aucune notification du
+    // même NotificationType (ex: STATUS_CHANGE couvre validation
+    // chauffeur, suspension, vérif véhicule/document...), toutes
+    // rendues avec le même libellé générique côté mobile.
     const notification = await this.prisma.notification.create({
       data: {
         userId: params.userId,
         templateId: template?.id,
         type: params.type,
         channel,
+        title: subject ?? null,
+        body,
         payload: params.payload as never,
       },
     });

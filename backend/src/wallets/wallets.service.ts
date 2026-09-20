@@ -10,38 +10,36 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ExchangeRateService } from '../pricing/exchange-rate.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { toMoneyBigInt, formatMoney } from '../common/utils/money.util';
 
 type BalanceField = 'balance' | 'pendingBalance';
 
-/**
- * Toute écriture passe par une des méthodes ci-dessous, jamais par un
- * `prisma.wallet.update` direct ailleurs dans le code — c'est la règle
- * posée Partie VII / section 16 (ledger immuable + verrou optimiste).
- * Chaque méthode gère sa propre transaction : les appelants (Payments,
- * Payouts) enchaînent des appels séquentiels plutôt que d'imbriquer une
- * transaction Prisma commune à travers les services, pour rester simple.
- * En cas de forte contention sur un même portefeuille, le conflit de
- * version fait échouer l'appel avec un 409 — l'appelant peut réessayer.
- */
 @Injectable()
 export class WalletsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly exchangeRates: ExchangeRateService,
   ) {}
 
   async findByDriverId(driverId: string) {
-    const wallet = await this.prisma.wallet.findUnique({ where: { driverId } });
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { driverId },
+      include: { currency: true },
+    });
     if (!wallet) throw new NotFoundException('Portefeuille introuvable.');
     return wallet;
   }
 
   async findOne(id: string) {
-    const wallet = await this.prisma.wallet.findUnique({ where: { id } });
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { id },
+      include: { currency: true },
+    });
     if (!wallet) throw new NotFoundException('Portefeuille introuvable.');
     return wallet;
   }
@@ -63,12 +61,6 @@ export class WalletsService {
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 
-  /**
-   * Écriture atomique avec verrou optimiste : relit la version courante,
-   * tente la mise à jour conditionnée à cette version. Un conflit
-   * (quelqu'un d'autre a écrit entre-temps) renvoie 409 plutôt que de
-   * silencieusement écraser une écriture concurrente.
-   */
   private async applyDelta(
     walletId: string,
     field: BalanceField,
@@ -116,28 +108,37 @@ export class WalletsService {
   }
 
   /**
-   * Paiement capturé : les fonds sont "tenus" (pendingBalance), pas
-   * encore disponibles — ils ne le deviennent qu'à la fin de la
-   * prestation validée par OTP (releaseHeldFunds, appelé au Lot 6). Deux
-   * lignes de ledger distinctes (revenu brut, puis commission) plutôt
-   * qu'un seul montant net, pour un historique auditable (section 16).
+   * `sourceCurrencyId` : devise dans laquelle grossAmount/commission sont
+   * exprimés (celle du Booking/Payment) — peut différer de la devise du
+   * portefeuille du chauffeur (ex : trajet transfrontalier payé en XOF,
+   * chauffeur inscrit en Guinée avec un wallet en GNF). Convertie ici
+   * avant tout crédit ; voir ExchangeRateService pour le détail. Cas le
+   * plus fréquent (même devise) : aucun appel supplémentaire, aucun
+   * changement de comportement.
    */
   async holdBookingRevenue(params: {
     driverId: string;
     bookingId: string;
     grossAmount: bigint;
     commission: bigint;
+    sourceCurrencyId: string;
   }) {
     const wallet = await this.findByDriverId(params.driverId);
-    await this.applyDelta(wallet.id, 'pendingBalance', params.grossAmount, {
+
+    const gross = await this.exchangeRates.convert(params.grossAmount, params.sourceCurrencyId, wallet.currencyId);
+    await this.applyDelta(wallet.id, 'pendingBalance', gross.amount, {
       type: WalletTransactionType.BOOKING_REVENUE,
       status: WalletTransactionStatus.PENDING,
       bookingId: params.bookingId,
+      metadata: gross.conversion ? ({ conversion: gross.conversion } as unknown as Prisma.InputJsonValue) : undefined,
     });
-    await this.applyDelta(wallet.id, 'pendingBalance', -params.commission, {
+
+    const commission = await this.exchangeRates.convert(params.commission, params.sourceCurrencyId, wallet.currencyId);
+    await this.applyDelta(wallet.id, 'pendingBalance', -commission.amount, {
       type: WalletTransactionType.COMMISSION,
       status: WalletTransactionStatus.PENDING,
       bookingId: params.bookingId,
+      metadata: commission.conversion ? ({ conversion: commission.conversion } as unknown as Prisma.InputJsonValue) : undefined,
     });
   }
 
@@ -146,24 +147,31 @@ export class WalletsService {
     shipmentId: string;
     grossAmount: bigint;
     commission: bigint;
+    sourceCurrencyId: string;
   }) {
     const wallet = await this.findByDriverId(params.driverId);
-    await this.applyDelta(wallet.id, 'pendingBalance', params.grossAmount, {
+
+    const gross = await this.exchangeRates.convert(params.grossAmount, params.sourceCurrencyId, wallet.currencyId);
+    await this.applyDelta(wallet.id, 'pendingBalance', gross.amount, {
       type: WalletTransactionType.SHIPMENT_REVENUE,
       status: WalletTransactionStatus.PENDING,
       shipmentId: params.shipmentId,
+      metadata: gross.conversion ? ({ conversion: gross.conversion } as unknown as Prisma.InputJsonValue) : undefined,
     });
-    await this.applyDelta(wallet.id, 'pendingBalance', -params.commission, {
+
+    const commission = await this.exchangeRates.convert(params.commission, params.sourceCurrencyId, wallet.currencyId);
+    await this.applyDelta(wallet.id, 'pendingBalance', -commission.amount, {
       type: WalletTransactionType.COMMISSION,
       status: WalletTransactionStatus.PENDING,
       shipmentId: params.shipmentId,
+      metadata: commission.conversion ? ({ conversion: commission.conversion } as unknown as Prisma.InputJsonValue) : undefined,
     });
   }
 
   /**
-   * À appeler par le Lot 6 quand l'OTP de fin de prestation confirme
-   * COMPLETED : déplace le montant net des entrées PENDING liées vers le
-   * solde disponible et les marque COMPLETED.
+   * Opère uniquement sur des WalletTransaction déjà enregistrées (donc
+   * déjà dans la devise du wallet, la conversion a eu lieu une seule
+   * fois à la mise en attente) — aucune conversion à refaire ici.
    */
   async releaseHeldFunds(params: { driverId: string; bookingId?: string; shipmentId?: string }) {
     const wallet = await this.findByDriverId(params.driverId);
@@ -213,13 +221,6 @@ export class WalletsService {
     }
   }
 
-  /**
-   * Annulation avant la fin de la prestation : les entrées PENDING liées
-   * sont reversées (le chauffeur n'a rien fait, il ne touche rien) et
-   * une écriture REFUND compensatoire réduit pendingBalance d'autant.
-   * Appelé par PaymentsService en réaction à BOOKING_CANCELLED /
-   * SHIPMENT_CANCELLED (voir common/events/domain-events.ts).
-   */
   async reverseHeldFunds(params: {
     driverId: string;
     bookingId?: string;
@@ -252,10 +253,6 @@ export class WalletsService {
     });
   }
 
-  /**
-   * Ajustement manuel (WALLET_ADJUST) — corrections exceptionnelles par
-   * le responsable financier, toujours motivées et tracées.
-   */
   async adjustBalance(driverId: string, amountStr: string, reason: string, actorId: string) {
     const wallet = await this.findByDriverId(driverId);
     const amount = toMoneyBigInt(amountStr.replace('-', '')) * (amountStr.startsWith('-') ? -1n : 1n);
@@ -274,17 +271,6 @@ export class WalletsService {
     return transaction;
   }
 
-  // -----------------------------------------------------------------------
-  // Retraits (Payout) — utilisées exclusivement par PayoutsService, pour
-  // que WalletsService reste le seul point d'écriture sur Wallet.balance
-  // et Wallet.pendingBalance (règle posée en tête de ce fichier).
-  // -----------------------------------------------------------------------
-
-  /**
-   * Réserve les fonds pour un retrait demandé : bascule balance ->
-   * pendingBalance. Échoue proprement si le solde est insuffisant, sans
-   * jamais laisser un solde négatif.
-   */
   async reserveForPayout(driverId: string, amount: bigint, payoutId: string) {
     const wallet = await this.findByDriverId(driverId);
     if (wallet.balance < amount) {
@@ -320,7 +306,6 @@ export class WalletsService {
     });
   }
 
-  /** Retrait effectivement versé : retire le montant du pendingBalance (l'argent a quitté la plateforme). */
   async finalizePayout(driverId: string, amount: bigint, payoutId: string): Promise<void> {
     const wallet = await this.findByDriverId(driverId);
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -339,7 +324,6 @@ export class WalletsService {
     });
   }
 
-  /** Retrait échoué côté prestataire : restaure les fonds vers le solde disponible. */
   async reversePayout(driverId: string, amount: bigint, payoutId: string): Promise<void> {
     const wallet = await this.findByDriverId(driverId);
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {

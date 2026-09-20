@@ -1,7 +1,7 @@
 // backend/src/trips/trips.controller.ts
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AccountType, TripStatus } from '@prisma/client';
+import { AccountType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
@@ -14,6 +14,7 @@ import { UpdateTripDto } from './dto/update-trip.dto';
 import { SearchTripsDto } from './dto/search-trips.dto';
 import { CancelTripDto } from './dto/cancel-trip.dto';
 import { TripStopInputDto } from './dto/trip-stop-input.dto';
+import { ListTripsQueryDto } from './dto/list-trips-query.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 import { UpdateTripPositionDto } from './dto/update-trip-position.dto';
@@ -146,8 +147,6 @@ export class TripsController {
 
   @Get(':id/bookings')
   async findBookings(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    // Liste des passagers/réservations : donnée sensible, réservée au
-    // chauffeur propriétaire du trajet ou au support (BOOKING_READ).
     if (!user.permissions.includes(PERMISSIONS.BOOKING_READ)) {
       const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
       await this.tripsService.findOne(id).then((trip) => {
@@ -161,11 +160,7 @@ export class TripsController {
 
   @Permissions(PERMISSIONS.TRIP_READ)
   @Get()
-  findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('status') status?: TripStatus,
-    @Query('driverId') driverId?: string,
-  ) {
-    return this.tripsService.findAll(query, { status, driverId });
+  findAll(@Query() query: ListTripsQueryDto) {
+    return this.tripsService.findAll(query, { status: query.status, driverId: query.driverId });
   }
 }

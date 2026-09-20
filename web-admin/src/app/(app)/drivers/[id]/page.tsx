@@ -87,6 +87,11 @@ export default function DriverDetailPage() {
 
   const [reason, setReason] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  // Repli sur les initiales si l'URL de la photo échoue à charger (lien
+  // signé expiré, etc.) — voir EntityAvatar.tsx pour le même principe,
+  // appliqué ici car cette page garde son propre <img> plutôt que ce
+  // composant partagé.
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   async function handleVerify() {
     setErrorMessage(undefined);
@@ -120,9 +125,14 @@ export default function DriverDetailPage() {
         <Link href="/drivers" className="text-text-secondary hover:text-text-primary">
           <IconArrowLeft size={20} />
         </Link>
-        {driver.photoUrl ? (
+        {driver.photoUrl && !photoFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={driver.photoUrl} alt="" className="h-11 w-11 rounded-full object-cover" />
+          <img
+            src={driver.photoUrl}
+            alt=""
+            onError={() => setPhotoFailed(true)}
+            className="h-11 w-11 rounded-full object-cover"
+          />
         ) : (
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-light text-sm font-semibold text-primary-dark">
             {driver.firstName.charAt(0)}
@@ -134,7 +144,7 @@ export default function DriverDetailPage() {
             {driver.firstName} {driver.lastName}
             {driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={20} className="text-success-dark" /> : null}
           </h1>
-          {!driver.photoUrl ? <p className="text-xs font-medium text-danger">Aucune photo de profil envoyée</p> : null}
+          {!driver.photoUrl || photoFailed ? <p className="text-xs font-medium text-danger">Aucune photo de profil valide</p> : null}
         </div>
       </div>
 

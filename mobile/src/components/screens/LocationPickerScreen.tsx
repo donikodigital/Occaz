@@ -1,121 +1,59 @@
 // mobile/src/components/screens/LocationPickerScreen.tsx
 //
-// v2 — Corrige deux bugs :
-//  1. Une adresse choisie via la recherche Mapbox n'avait jamais de ville
-//     rattachée (GeocodingSuggestion ne porte que label/adresse/lat/lng —
-//     aucune info de ville, et City n'a pas de frontière géographique
-//     stockée pour une résolution automatique). Après sélection, on
-//     demande maintenant de confirmer la ville avant de créer la Location,
-//     au lieu de la créer immédiatement sans cityId.
-//  2. Le sélecteur de ville naviguait en dur vers /(customer)/select-city,
-//     y compris quand cet écran est ouvert depuis le contexte chauffeur
-//     (trip-new.tsx → /(driver)/select-location) — jamais remarqué côté
-//     client, mais aurait cassé la navigation chauffeur. Paramétré via
-//     `basePath`, même principe que ConversationsListScreen.tsx.
-//
-// IMPORTANT : les fichiers route qui montent cet écran
-// (probablement mobile/app/(customer)/select-location.tsx et
-// mobile/app/(driver)/select-location.tsx) doivent maintenant lui passer
-// basePath="/(customer)" ou basePath="/(driver)" respectivement — envoie-
-// les-moi si tu veux que je les corrige aussi, je ne les ai pas vus.
+// v3 — Saisie d'adresse simplifiée. Avant : recherche -> choix de la ville
+// sur un autre écran -> re-saisie de l'adresse. Maintenant :
+//   - on tape, on touche un résultat : la ville est détectée toute seule ;
+//   - les adresses déjà utilisées sont proposées en premier (« Récentes ») ;
+//   - la ville ne se choisit à la main, sur place, que si la détection échoue ;
+//   - la recherche est limitée aux pays actifs de la plateforme.
+// Tout le parcours vit dans useLocationPicker (partagé avec le champ desktop
+// LocationAutocompleteField).
 
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconMapPin, IconX } from '@tabler/icons-react-native';
-import { AppText, Button, Card, IconButton, ScreenContainer, TextField } from '@/components/ui';
-import { LocationSearchField } from './LocationSearchField';
+import { IconX } from '@tabler/icons-react-native';
+import { AppText, IconButton, ScreenContainer } from '@/components/ui';
 import { colors, spacing } from '@/theme';
-import { useCitySelectionStore } from '@/stores/citySelectionStore';
+import { useLocationPicker, useSearchCountryCodes } from '@/hooks/useLocationPicker';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
-import { locationsApi } from '@/services/api/locations.api';
-import { ApiError } from '@/services/api/ApiError';
-import type { City } from '@/types/geography.types';
-import type { GeocodingSuggestion } from '@/types/geocoding.types';
-
-const CITY_PICKER_FIELD = 'shipment-address-city';
+import { LocationConfirmCard } from './LocationConfirmCard';
+import { LocationSearchField } from './LocationSearchField';
 
 export interface LocationPickerScreenProps {
-  /** Racine de navigation du groupe appelant — (customer) et (driver) sont deux Stacks Expo Router isolés. */
-  basePath: '/(customer)' | '/(driver)';
+  /**
+   * Conservé pour compatibilité avec les fichiers route existants
+   * ((customer) et (driver) passent encore basePath). Plus utilisé : la
+   * ville se choisit désormais sur place, sans navigation.
+   */
+  basePath?: '/(customer)' | '/(driver)';
+  /** Code(s) pays ISO pour restreindre la recherche. Par défaut : les pays actifs de la plateforme. */
+  countryCode?: string;
 }
 
-export function LocationPickerScreen({ basePath }: LocationPickerScreenProps) {
+export function LocationPickerScreen({ countryCode }: LocationPickerScreenProps) {
   const { title } = useLocalSearchParams<{ title?: string }>();
-  const [showCityStep, setShowCityStep] = useState(false);
-  const [city, setCity] = useState<City | null>(null);
-  const [addressLabel, setAddressLabel] = useState('');
-  const [geocoded, setGeocoded] = useState<{
-    formattedAddress?: string;
-    latitude: number;
-    longitude: number;
-  } | null>(null);
-  const [isSubmitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | undefined>();
-
-  const citySelection = useCitySelectionStore((state) => state.selection);
-  const consumeCitySelection = useCitySelectionStore((state) => state.consume);
-  const openCityPicker = useCitySelectionStore((state) => state.openFor);
   const selectLocation = useLocationSelectionStore((state) => state.select);
+  const searchCountryCodes = useSearchCountryCodes(countryCode);
 
-  useEffect(() => {
-    if (citySelection?.field === CITY_PICKER_FIELD) {
-      setCity(citySelection.city);
-      consumeCitySelection();
-    }
-  }, [citySelection, consumeCitySelection]);
+  const picker = useLocationPicker((location) => {
+    selectLocation(location);
+    router.back();
+  });
 
-  function handleSearchSelect(suggestion: GeocodingSuggestion) {
-    setErrorMessage(undefined);
-    setAddressLabel(suggestion.label);
-    setGeocoded({
-      formattedAddress: suggestion.formattedAddress,
-      latitude: suggestion.latitude,
-      longitude: suggestion.longitude,
-    });
-    setShowCityStep(true);
-  }
-
-  async function handleConfirm() {
-    setErrorMessage(undefined);
-    if (!city) {
-      setErrorMessage('Choisissez une ville pour confirmer cette adresse.');
-      return;
-    }
-    if (addressLabel.trim().length < 3) {
-      setErrorMessage("Précisez l'adresse (quartier, repère...).");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const location = await locationsApi.create({
-        label: addressLabel.trim(),
-        cityId: city.id,
-        ...(geocoded
-          ? {
-              formattedAddress: geocoded.formattedAddress,
-              latitude: geocoded.latitude,
-              longitude: geocoded.longitude,
-              geocodeTrust: 'EXACT' as const,
-            }
-          : { geocodeTrust: 'MANUAL' as const }),
-      });
-      selectLocation(location);
-      router.back();
-    } catch (error) {
-      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const isSearchStep = picker.step === 'search';
 
   return (
-    <ScreenContainer scroll edges={['top', 'bottom']} maxWidth="form">
+    <ScreenContainer edges={['top', 'bottom']} maxWidth="form">
       <View style={styles.header}>
-        <AppText variant="lg" weight="semibold">
-          {title ?? 'Adresse'}
-        </AppText>
+        <View style={styles.headerText}>
+          <AppText variant="lg" weight="semibold">
+            {title ?? 'Adresse'}
+          </AppText>
+          <AppText variant="sm" color="textSecondary">
+            {isSearchStep ? 'Recherchez un lieu, un quartier ou un repère.' : 'Vérifiez avant de confirmer.'}
+          </AppText>
+        </View>
         <IconButton
           icon={<IconX size={18} color={colors.textPrimary} />}
           accessibilityLabel="Fermer"
@@ -123,91 +61,26 @@ export function LocationPickerScreen({ basePath }: LocationPickerScreenProps) {
         />
       </View>
 
-      <View style={styles.body}>
-        <LocationSearchField onSelect={handleSearchSelect} placeholder="Ex : Marché de Madina, Conakry" />
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
+        {/* Le champ reste monté (simplement masqué) à l'étape 2 : « Changer de lieu » retrouve la recherche et ses résultats. */}
+        <View style={isSearchStep ? undefined : styles.hidden}>
+          <LocationSearchField
+            autoFocus
+            clearOnSelect={false}
+            countryCode={searchCountryCodes}
+            placeholder="Ex : Marché de Madina, Conakry"
+            onSelect={picker.pickSuggestion}
+            onSelectSaved={picker.pickSaved}
+            onManualEntry={picker.startManual}
+          />
+        </View>
 
-        {errorMessage && !showCityStep ? (
-          <AppText variant="sm" color="danger" style={styles.error}>
-            {errorMessage}
-          </AppText>
-        ) : null}
-
-        {!showCityStep ? (
-          <AppText
-            variant="sm"
-            color="primary"
-            style={styles.manualToggle}
-            onPress={() => setShowCityStep(true)}
-            suppressHighlighting
-          >
-            Adresse introuvable ? Saisir manuellement
-          </AppText>
-        ) : (
-          <View style={styles.manualSection}>
-            {geocoded ? (
-              <AppText variant="xs" color="textSecondary" style={styles.geocodedHint}>
-                Confirmez la ville pour : {addressLabel}
-              </AppText>
-            ) : null}
-
-            <AppText variant="sm" weight="medium" color="textSecondary" style={styles.label}>
-              Ville
-            </AppText>
-            <Card
-              onPress={() => {
-                openCityPicker(CITY_PICKER_FIELD);
-                router.push(`${basePath}/select-city`);
-              }}
-              style={styles.cityCard}
-            >
-              <View style={styles.cityRow}>
-                <IconMapPin size={16} color={colors.textSecondary} />
-                <AppText variant="base" color={city ? 'textPrimary' : 'textSecondary'}>
-                  {city?.name ?? 'Choisir une ville'}
-                </AppText>
-              </View>
-            </Card>
-
-            <TextField
-              label="Adresse précise"
-              value={addressLabel}
-              onChangeText={setAddressLabel}
-              placeholder="Ex : Marché de Madina, près de l'arrêt taxi"
-              multiline
-              style={styles.addressField}
-            />
-
-            {errorMessage ? (
-              <AppText variant="sm" color="danger" style={styles.error}>
-                {errorMessage}
-              </AppText>
-            ) : null}
-
-            <Button
-              label="Valider l'adresse"
-              onPress={handleConfirm}
-              loading={isSubmitting}
-              style={styles.submit}
-            />
-
-            {geocoded ? (
-              <AppText
-                variant="sm"
-                color="textMuted"
-                style={styles.manualToggle}
-                onPress={() => {
-                  setShowCityStep(false);
-                  setGeocoded(null);
-                  setAddressLabel('');
-                }}
-                suppressHighlighting
-              >
-                ← Refaire une recherche
-              </AppText>
-            ) : null}
-          </View>
-        )}
-      </View>
+        {isSearchStep ? null : <LocationConfirmCard picker={picker} />}
+      </ScrollView>
     </ScreenContainer>
   );
 }
@@ -217,44 +90,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.sm,
     paddingTop: spacing.sm,
     marginBottom: spacing.lg,
   },
-  body: {
+  headerText: {
     flex: 1,
+    gap: 2,
   },
-  label: {
-    marginBottom: spacing.xxs,
+  content: {
+    paddingBottom: spacing.xl,
   },
-  manualToggle: {
-    marginTop: spacing.md,
-    textAlign: 'center',
-  },
-  geocodedHint: {
-    marginBottom: spacing.sm,
-  },
-  manualSection: {
-    marginTop: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    paddingTop: spacing.lg,
-  },
-  cityCard: {
-    marginBottom: spacing.md,
-  },
-  cityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  addressField: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  error: {
-    marginTop: spacing.sm,
-  },
-  submit: {
-    marginBottom: spacing.md,
+  hidden: {
+    display: 'none',
   },
 });

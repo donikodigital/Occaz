@@ -277,6 +277,10 @@ export class ShipmentsService {
       shipmentId,
       grossAmount: (shipment.totalAmount as bigint) - (shipment.platformFee as bigint),
       commission: shipment.platformFee,
+      // Devise dans laquelle le client a payé (Shipment.currencyId) — peut
+      // différer de la devise du wallet du chauffeur ; conversion faite
+      // dans WalletsService.holdShipmentRevenue.
+      sourceCurrencyId: shipment.currencyId,
     });
 
     const customer = await this.prisma.customerProfile.findUnique({

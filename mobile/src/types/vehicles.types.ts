@@ -1,5 +1,5 @@
 // mobile/src/types/vehicles.types.ts
-export type VehicleType = 'SEDAN' | 'SUV' | 'VAN' | 'MINIBUS' | 'PICKUP' | 'MOTORCYCLE';
+export type VehicleType = 'SEDAN' | 'SUV' | 'MINIVAN' | 'MINIBUS' | 'PICKUP' | 'MOTORCYCLE' | 'TRUCK' | 'OTHER';
 export type DocumentStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
 export interface Vehicle {
@@ -25,3 +25,6 @@ export interface CreateVehiclePayload {
   type?: VehicleType;
   totalSeats: number;
 }
+
+/** Mêmes champs que CreateVehiclePayload sauf plateNumber — non modifiable en libre-service côté backend (risque de fraude, voir UpdateVehicleDto). */
+export type UpdateVehiclePayload = Partial<Omit<CreateVehiclePayload, 'plateNumber'>>;

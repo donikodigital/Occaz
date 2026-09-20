@@ -1,5 +1,5 @@
 // mobile/src/components/screens/NotificationsInboxScreen.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -13,11 +13,11 @@ import {
   IconRoute,
   IconShieldCheck,
 } from '@tabler/icons-react-native';
-import { AppText, Card, IconButton, ResponsiveList, ScreenContainer } from '@/components/ui';
+import { AppText, Badge, Card, IconButton, ResponsiveList, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications } from '@/hooks/useNotifications';
 import { NOTIFICATION_TYPE_LABELS } from '@/utils/notificationLabels';
-import { formatDateShort, formatTime } from '@/utils/date';
+import { formatTime } from '@/utils/date';
 import type { AppNotification, NotificationType } from '@/types/notifications.types';
 
 const TYPE_ICON: Record<NotificationType, React.ComponentType<{ size?: number; color?: string }>> = {
@@ -36,10 +36,26 @@ const TYPE_ICON: Record<NotificationType, React.ComponentType<{ size?: number; c
   SUPPORT_MESSAGE: IconMessageCircle,
 };
 
+type ListRow = { kind: 'header'; key: string; label: string } | { kind: 'item'; key: string; notification: AppNotification };
+
+function sectionLabelFor(dateIso: string, now: Date): string {
+  const date = new Date(dateIso);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfItemDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((startOfToday.getTime() - startOfItemDay.getTime()) / 86_400_000);
+  if (diffDays <= 0) return "Aujourd'hui";
+  if (diffDays === 1) return 'Hier';
+  if (diffDays < 7) return 'Cette semaine';
+  return 'Plus tôt';
+}
+
 function NotificationRow({ notification }: { notification: AppNotification }) {
   const markRead = useMarkNotificationRead();
   const Icon = TYPE_ICON[notification.type];
   const isUnread = !notification.readAt;
+  // Repli sur le libellé générique du type uniquement pour les lignes
+  // antérieures à la persistance de title/body (voir notifications.types.ts).
+  const title = notification.title ?? NOTIFICATION_TYPE_LABELS[notification.type];
 
   return (
     <Card
@@ -52,14 +68,21 @@ function NotificationRow({ notification }: { notification: AppNotification }) {
         <Icon size={18} color={isUnread ? colors.primary : colors.textMuted} />
       </View>
       <View style={{ flex: 1 }}>
-        <AppText variant="sm" weight={isUnread ? 'semibold' : 'regular'}>
-          {NOTIFICATION_TYPE_LABELS[notification.type]}
+        <AppText variant="sm" weight={isUnread ? 'semibold' : 'regular'} numberOfLines={1}>
+          {title}
         </AppText>
-        <AppText variant="xs" color="textSecondary">
-          {formatDateShort(notification.createdAt)} · {formatTime(notification.createdAt)}
-        </AppText>
+        {notification.body ? (
+          <AppText variant="xs" color="textSecondary" numberOfLines={2} style={styles.rowBody}>
+            {notification.body}
+          </AppText>
+        ) : null}
       </View>
-      {isUnread ? <View style={styles.unreadDot} /> : null}
+      <View style={styles.rowMeta}>
+        <AppText variant="xs" color="textMuted">
+          {formatTime(notification.createdAt)}
+        </AppText>
+        {isUnread ? <View style={styles.unreadDot} /> : null}
+      </View>
     </Card>
   );
 }
@@ -68,7 +91,25 @@ export function NotificationsInboxScreen() {
   const { data, isLoading } = useMyNotifications();
   const markAllRead = useMarkAllNotificationsRead();
 
-  const hasUnread = (data?.data ?? []).some((n) => !n.readAt);
+  const unreadCount = (data?.data ?? []).filter((n) => !n.readAt).length;
+
+  // Backend trie déjà par createdAt desc (voir NotificationsService.findMine)
+  // — le regroupement suppose cet ordre pour rester contigu par section.
+  const rows = useMemo<ListRow[]>(() => {
+    const items = data?.data ?? [];
+    const now = new Date();
+    const out: ListRow[] = [];
+    let lastLabel: string | null = null;
+    for (const notification of items) {
+      const label = sectionLabelFor(notification.createdAt, now);
+      if (label !== lastLabel) {
+        out.push({ kind: 'header', key: `header-${label}`, label });
+        lastLabel = label;
+      }
+      out.push({ kind: 'item', key: notification.id, notification });
+    }
+    return out;
+  }, [data]);
 
   return (
     <ScreenContainer padded={false} maxWidth="detail">
@@ -78,10 +119,13 @@ export function NotificationsInboxScreen() {
           accessibilityLabel="Retour"
           onPress={() => router.back()}
         />
-        <AppText variant="lg" weight="semibold">
-          Notifications
-        </AppText>
-        {hasUnread ? (
+        <View style={styles.headerTitleGroup}>
+          <AppText variant="lg" weight="semibold">
+            Notifications
+          </AppText>
+          {unreadCount > 0 ? <Badge label={String(unreadCount)} tone="primary" /> : null}
+        </View>
+        {unreadCount > 0 ? (
           <AppText
             variant="sm"
             weight="semibold"
@@ -97,8 +141,8 @@ export function NotificationsInboxScreen() {
       </View>
 
       <ResponsiveList
-        data={data?.data ?? []}
-        keyExtractor={(item) => item.id}
+        data={rows}
+        keyExtractor={(row) => row.key}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
         ListEmptyComponent={
@@ -113,7 +157,15 @@ export function NotificationsInboxScreen() {
               )
             : undefined
         }
-        renderItem={({ item }) => <NotificationRow notification={item} />}
+        renderItem={({ item }: { item: ListRow }) =>
+          item.kind === 'header' ? (
+            <AppText variant="xs" weight="semibold" color="textMuted" style={styles.sectionLabel}>
+              {item.label}
+            </AppText>
+          ) : (
+            <NotificationRow notification={item.notification} />
+          )
+        }
       />
     </ScreenContainer>
   );
@@ -128,18 +180,30 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     marginBottom: spacing.md,
   },
+  headerTitleGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   list: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
+  sectionLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xxs,
+  },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
   },
   rowIcon: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: radius.sm + 2,
     backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
@@ -147,6 +211,13 @@ const styles = StyleSheet.create({
   },
   rowIconUnread: {
     backgroundColor: colors.primaryLight,
+  },
+  rowBody: {
+    marginTop: 2,
+  },
+  rowMeta: {
+    alignItems: 'flex-end',
+    gap: spacing.xxs,
   },
   unreadDot: {
     width: 8,

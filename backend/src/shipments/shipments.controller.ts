@@ -1,7 +1,7 @@
 // backend/src/shipments/shipments.controller.ts
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AccountType, CancellationInitiator, ShipmentStatus } from '@prisma/client';
+import { AccountType, CancellationInitiator } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
@@ -13,6 +13,7 @@ import { AssignShipmentDto } from './dto/assign-shipment.dto';
 import { CancelShipmentDto } from './dto/cancel-shipment.dto';
 import { SearchAvailableShipmentsDto } from './dto/search-available-shipments.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
+import { ListShipmentsQueryDto } from './dto/list-shipments-query.dto';
 import { CreateDocumentDto } from '../documents/dto/create-document.dto';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
@@ -117,10 +118,6 @@ export class ShipmentsController {
     return this.shipmentsService.findEvidence(id);
   }
 
-  // -----------------------------------------------------------------------
-  // Cycle de vie opérationnel + OTP (Lot 6, section 17/20)
-  // -----------------------------------------------------------------------
-
   @Post(':id/pickup-pending')
   async markPickupPending(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
@@ -173,7 +170,7 @@ export class ShipmentsController {
 
   @Permissions(PERMISSIONS.SHIPMENT_READ)
   @Get()
-  findAll(@Query() query: PaginationQueryDto, @Query('status') status?: ShipmentStatus) {
-    return this.shipmentsService.findAll(query, { status });
+  findAll(@Query() query: ListShipmentsQueryDto) {
+    return this.shipmentsService.findAll(query, { status: query.status });
   }
 }

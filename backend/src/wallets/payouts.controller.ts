@@ -1,7 +1,6 @@
 // backend/src/wallets/payouts.controller.ts
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { PayoutStatus } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
@@ -10,6 +9,7 @@ import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { PayoutsService } from './payouts.service';
 import { RequestPayoutDto } from './dto/request-payout.dto';
 import { FailPayoutDto } from './dto/fail-payout.dto';
+import { ListPayoutsQueryDto } from './dto/list-payouts-query.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 
 @ApiTags('Retraits')
@@ -35,8 +35,8 @@ export class PayoutsController {
 
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)
   @Get()
-  findAll(@Query() query: PaginationQueryDto, @Query('status') status?: PayoutStatus) {
-    return this.payoutsService.findAll(query, { status });
+  findAll(@Query() query: ListPayoutsQueryDto) {
+    return this.payoutsService.findAll(query, { status: query.status });
   }
 
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)

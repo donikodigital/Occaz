@@ -13,7 +13,7 @@ import { AppText } from './AppText';
 export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'outline' | 'ghost' | 'danger';
 export type ButtonSize = 'md' | 'lg';
 
-export interface ButtonProps extends Omit<PressableProps, 'style'> {
+export interface ButtonProps extends PressableProps {
   label: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
@@ -39,6 +39,11 @@ const VARIANT_STYLES: Record<
  * Bouton unique pour toute l'app. Une seule action "primary" par écran
  * (cohérent avec la hiérarchie visuelle des maquettes) — les actions
  * secondaires utilisent "secondary" ou "outline".
+ *
+ * Correctif : `style` était extrait des props mais jamais appliqué, donc
+ * toutes les marges passées par les écrans (`style={styles.submit}`…)
+ * étaient ignorées. Il est maintenant appliqué en dernier, il peut donc
+ * aussi surcharger le style de base (objet, tableau ou fonction `({ pressed })`).
  */
 export function Button({
   label,
@@ -51,7 +56,7 @@ export function Button({
   disabled,
   style,
   ...rest
-}: ButtonProps & { style?: PressableProps['style'] }) {
+}: ButtonProps) {
   const variantStyle = VARIANT_STYLES[variant];
   const isDisabled = disabled || loading;
 
@@ -60,16 +65,17 @@ export function Button({
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       disabled={isDisabled}
-      style={({ pressed }) => [
+      style={(state) => [
         styles.base,
         size === 'lg' ? styles.lg : styles.md,
         {
           backgroundColor: variantStyle.background,
           borderColor: variantStyle.border ?? 'transparent',
           borderWidth: variantStyle.border ? 1.5 : 0,
-          opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1,
+          opacity: isDisabled ? 0.5 : state.pressed ? 0.85 : 1,
           alignSelf: fullWidth ? 'stretch' : 'flex-start',
         },
+        typeof style === 'function' ? style(state) : style,
       ]}
       {...rest}
     >

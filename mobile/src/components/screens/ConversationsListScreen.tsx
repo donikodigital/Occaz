@@ -1,17 +1,32 @@
 // mobile/src/components/screens/ConversationsListScreen.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconMessageCircle, IconPackage, IconRoute } from '@tabler/icons-react-native';
+import { IconChevronRight, IconMessageCircle, IconPackage, IconRoute } from '@tabler/icons-react-native';
 import { AppText, Card, ResponsiveList, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { useMyConversations } from '@/hooks/useConversations';
-import { formatDateShort, formatTime } from '@/utils/date';
+import { formatTime } from '@/utils/date';
 import type { ConversationSummary } from '@/types/conversations.types';
 
 export interface ConversationsListScreenProps {
   /** Racine de navigation du groupe appelant — (customer) et (driver) sont deux Stacks Expo Router isolés. */
   basePath: '/(customer)' | '/(driver)';
+}
+
+type ListRow =
+  | { kind: 'header'; key: string; label: string }
+  | { kind: 'item'; key: string; conversation: ConversationSummary };
+
+function sectionLabelFor(dateIso: string, now: Date): string {
+  const date = new Date(dateIso);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfItemDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((startOfToday.getTime() - startOfItemDay.getTime()) / 86_400_000);
+  if (diffDays <= 0) return "Aujourd'hui";
+  if (diffDays === 1) return 'Hier';
+  if (diffDays < 7) return 'Cette semaine';
+  return 'Plus tôt';
 }
 
 function ConversationRow({ conversation, basePath }: { conversation: ConversationSummary; basePath: string }) {
@@ -20,9 +35,9 @@ function ConversationRow({ conversation, basePath }: { conversation: Conversatio
     <Card onPress={() => router.push(`${basePath}/conversation/${conversation.id}`)} style={styles.row}>
       <View style={[styles.rowIcon, isShipment && { backgroundColor: colors.accentLight }]}>
         {isShipment ? (
-          <IconPackage size={18} color={colors.accentDark} />
+          <IconPackage size={19} color={colors.accentDark} />
         ) : (
-          <IconRoute size={18} color={colors.primary} />
+          <IconRoute size={19} color={colors.primary} />
         )}
       </View>
       <View style={{ flex: 1 }}>
@@ -30,22 +45,40 @@ function ConversationRow({ conversation, basePath }: { conversation: Conversatio
           {isShipment ? 'Envoi' : 'Trajet'}
         </AppText>
         <AppText variant="xs" color="textSecondary">
-          {formatDateShort(conversation.createdAt)} · {formatTime(conversation.createdAt)}
+          {formatTime(conversation.createdAt)}
         </AppText>
       </View>
+      <IconChevronRight size={16} color={colors.textMuted} />
     </Card>
   );
 }
 
 /**
  * Le backend (GET /conversations/mine) ne renvoie ni le nom du
- * correspondant ni le nombre de messages non lus — seulement les
- * références booking/shipment. Cette liste reste donc volontairement
- * sobre (type de conversation + date) ; le contexte riche (qui écrit
- * quoi) apparaît une fois dans le fil.
+ * correspondant ni un aperçu du dernier message ni un compteur de non
+ * lus — seulement les références booking/shipment et la date de
+ * création. Cette liste reste donc volontairement sobre (type +
+ * horaire, regroupés par jour comme NotificationsInboxScreen) ; le
+ * contexte riche (qui écrit quoi) apparaît une fois dans le fil.
  */
 export function ConversationsListScreen({ basePath }: ConversationsListScreenProps) {
   const { data, isLoading } = useMyConversations();
+
+  const rows = useMemo<ListRow[]>(() => {
+    const items = data?.data ?? [];
+    const now = new Date();
+    const out: ListRow[] = [];
+    let lastLabel: string | null = null;
+    for (const conversation of items) {
+      const label = sectionLabelFor(conversation.createdAt, now);
+      if (label !== lastLabel) {
+        out.push({ kind: 'header', key: `header-${label}`, label });
+        lastLabel = label;
+      }
+      out.push({ kind: 'item', key: conversation.id, conversation });
+    }
+    return out;
+  }, [data]);
 
   return (
     <ScreenContainer padded={false} maxWidth="wide">
@@ -56,10 +89,10 @@ export function ConversationsListScreen({ basePath }: ConversationsListScreenPro
       </View>
 
       <ResponsiveList
-        data={data?.data ?? []}
-        keyExtractor={(item) => item.id}
+        data={rows}
+        keyExtractor={(row) => row.key}
         contentContainerStyle={styles.list}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
         ListEmptyComponent={
           !isLoading
             ? () => (
@@ -68,11 +101,22 @@ export function ConversationsListScreen({ basePath }: ConversationsListScreenPro
                   <AppText variant="sm" color="textMuted" style={{ marginTop: spacing.xs }}>
                     Aucune conversation pour le moment.
                   </AppText>
+                  <AppText variant="xs" color="textMuted" align="center" style={styles.emptyHint}>
+                    Une conversation apparaît ici dès qu'un trajet ou un envoi est réservé.
+                  </AppText>
                 </View>
               )
             : undefined
         }
-        renderItem={({ item }) => <ConversationRow conversation={item} basePath={basePath} />}
+        renderItem={({ item }: { item: ListRow }) =>
+          item.kind === 'header' ? (
+            <AppText variant="xs" weight="semibold" color="textMuted" style={styles.sectionLabel}>
+              {item.label}
+            </AppText>
+          ) : (
+            <ConversationRow conversation={item.conversation} basePath={basePath} />
+          )
+        }
       />
     </ScreenContainer>
   );
@@ -88,14 +132,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
+  sectionLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xxs,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
   rowIcon: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: radius.sm + 2,
     backgroundColor: colors.primaryLight,
     alignItems: 'center',
@@ -104,5 +154,9 @@ const styles = StyleSheet.create({
   empty: {
     alignItems: 'center',
     marginTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+  },
+  emptyHint: {
+    marginTop: spacing.xxs,
   },
 });

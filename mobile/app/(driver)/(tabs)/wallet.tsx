@@ -24,7 +24,7 @@ const TX_LABELS: Record<WalletTransactionType, string> = {
   REFUND: 'Remboursement',
   PAYOUT: 'Retrait',
   ADJUSTMENT: 'Ajustement',
-  CANCELLATION_FEE: 'Frais d\'annulation',
+  CANCELLATION_FEE: "Frais d'annulation",
 };
 
 const PAYOUT_STATUS_LABELS: Record<PayoutStatus, string> = {
@@ -43,7 +43,11 @@ const PAYOUT_STATUS_TONE: Record<PayoutStatus, 'primary' | 'success' | 'danger' 
   CANCELLED: 'danger',
 };
 
-function TransactionRow({ tx }: { tx: WalletTransaction }) {
+const OCEAN_BG = '#071019';
+const OCEAN_CARD = 'rgba(255,255,255,0.06)';
+const OCEAN_BORDER = 'rgba(255,255,255,0.12)';
+
+function TransactionRow({ tx, currencyCode }: { tx: WalletTransaction; currencyCode: string }) {
   const isCredit = Number(tx.amount) >= 0;
   return (
     <Card style={styles.txRow}>
@@ -64,7 +68,7 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
       </View>
       <AppText variant="sm" weight="semibold" color={isCredit ? 'success' : 'danger'}>
         {isCredit ? '+' : ''}
-        {formatMoney(tx.amount)}
+        {formatMoney(tx.amount, currencyCode)}
       </AppText>
     </Card>
   );
@@ -76,141 +80,135 @@ export default function DriverWalletScreen() {
   const { data: payoutsPage } = useMyPayouts();
 
   const recentPayouts = payoutsPage?.data.slice(0, 3) ?? [];
+  const hasPending = wallet && Number(wallet.pendingBalance) > 0;
+  const currencyCode = wallet?.currency.isoCode ?? 'GNF';
 
   return (
     <ScreenContainer padded={false} maxWidth="wide">
-      <View style={styles.header}>
-        <AppText variant="xxl" weight="semibold">
-          Portefeuille
+      <View style={styles.hero}>
+        <AppText variant="sm" weight="medium" color={colors.textOnDark} style={styles.heroLabel}>
+          Solde disponible
         </AppText>
-      </View>
+        <AppText variant="display" weight="bold" color={colors.textOnDark}>
+          {wallet ? formatMoney(wallet.balance, currencyCode) : '…'}
+        </AppText>
 
-      <View style={styles.balanceSection}>
-        <Card style={styles.balanceCard}>
-          <View style={styles.balanceIcon}>
-            <IconWallet size={22} color={colors.successDark} />
-          </View>
-          <AppText variant="sm" color="textSecondary">
-            Solde disponible
-          </AppText>
-          <AppText variant="display" weight="bold">
-            {wallet ? formatMoney(wallet.balance) : '…'}
-          </AppText>
-          {wallet && Number(wallet.pendingBalance) > 0 ? (
-            <AppText variant="xs" color="textMuted" style={styles.pendingNote}>
-              + {formatMoney(wallet.pendingBalance)} en attente (prestations en cours)
+        {hasPending ? (
+          <View style={styles.pendingPill}>
+            <IconWallet size={13} color={colors.textOnDark} />
+            <AppText variant="xs" color="rgba(255,255,255,0.9)">
+              + {formatMoney(wallet!.pendingBalance, currencyCode)} en attente
             </AppText>
-          ) : null}
-          <Button
-            label="Retirer"
-            onPress={() => router.push('/(driver)/payout-new')}
-            fullWidth={false}
-            style={styles.withdrawButton}
-          />
-        </Card>
-
-        {recentPayouts.length > 0 ? (
-          <View style={styles.payoutsSection}>
-            <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
-              Retraits récents
-            </AppText>
-            <View style={styles.payoutsList}>
-              {recentPayouts.map((payout) => (
-                <Card key={payout.id} style={styles.payoutRow}>
-                  <View style={styles.txIcon}>
-                    <IconReceipt size={16} color={colors.textSecondary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <AppText variant="sm" weight="medium">
-                      {formatMoney(payout.amount)}
-                    </AppText>
-                    <AppText variant="xs" color="textSecondary">
-                      {formatDateShort(payout.requestedAt)}
-                    </AppText>
-                  </View>
-                  <Badge label={PAYOUT_STATUS_LABELS[payout.status]} tone={PAYOUT_STATUS_TONE[payout.status]} />
-                </Card>
-              ))}
-            </View>
           </View>
         ) : null}
 
+        <Button
+          label="Retirer"
+          onPress={() => router.push('/(driver)/payout-new')}
+          fullWidth={false}
+          style={styles.withdrawButton}
+        />
+
+        {recentPayouts.length > 0 ? (
+          <View style={styles.heroPayouts}>
+            <AppText variant="xs" weight="semibold" color="rgba(255,255,255,0.6)" style={styles.heroPayoutsTitle}>
+              RETRAITS RÉCENTS
+            </AppText>
+            {recentPayouts.map((payout) => (
+              <View key={payout.id} style={styles.heroPayoutRow}>
+                <View style={styles.heroPayoutIcon}>
+                  <IconReceipt size={15} color={colors.textOnDark} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="sm" weight="medium" color={colors.textOnDark}>
+                    {formatMoney(payout.amount, currencyCode)}
+                  </AppText>
+                  <AppText variant="xs" color="rgba(255,255,255,0.55)">
+                    {formatDateShort(payout.requestedAt)}
+                  </AppText>
+                </View>
+                <Badge label={PAYOUT_STATUS_LABELS[payout.status]} tone={PAYOUT_STATUS_TONE[payout.status]} />
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.body}>
         <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
           Historique
         </AppText>
+        <ResponsiveList
+          data={transactionsPage?.data ?? []}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
+          ListEmptyComponent={
+            !isLoading
+              ? () => (
+                  <View style={styles.empty}>
+                    <IconReceipt size={20} color={colors.textMuted} />
+                    <AppText variant="sm" color="textMuted" style={{ marginTop: spacing.xs }}>
+                      Aucune transaction pour le moment.
+                    </AppText>
+                  </View>
+                )
+              : undefined
+          }
+          renderItem={({ item }) => <TransactionRow tx={item} currencyCode={currencyCode} />}
+        />
       </View>
-
-      <ResponsiveList
-        data={transactionsPage?.data ?? []}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
-        ListEmptyComponent={
-          !isLoading
-            ? () => (
-                <View style={styles.empty}>
-                  <IconReceipt size={20} color={colors.textMuted} />
-                  <AppText variant="sm" color="textMuted" style={{ marginTop: spacing.xs }}>
-                    Aucune transaction pour le moment.
-                  </AppText>
-                </View>
-              )
-            : undefined
-        }
-        renderItem={({ item }) => <TransactionRow tx={item} />}
-      />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
+  hero: {
+    backgroundColor: OCEAN_BG,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    marginBottom: spacing.md,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
   },
-  balanceSection: {
-    paddingHorizontal: spacing.lg,
-  },
-  balanceCard: {
+  heroLabel: { opacity: 0.7, marginBottom: 2 },
+  pendingPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    gap: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: OCEAN_CARD,
+    borderWidth: 1,
+    borderColor: OCEAN_BORDER,
+    borderRadius: radius.pill,
+    paddingVertical: 5,
+    paddingHorizontal: spacing.sm,
+    marginTop: spacing.sm,
   },
-  balanceIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.lg,
-    backgroundColor: colors.successLight,
+  withdrawButton: { marginTop: spacing.lg, minWidth: 160 },
+  heroPayouts: { marginTop: spacing.xl, gap: spacing.xs },
+  heroPayoutsTitle: { letterSpacing: 0.6, marginBottom: spacing.xxs },
+  heroPayoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: OCEAN_CARD,
+    borderWidth: 1,
+    borderColor: OCEAN_BORDER,
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+  },
+  heroPayoutIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.sm + 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
   },
-  pendingNote: {
-    marginTop: spacing.xxs,
-  },
-  withdrawButton: {
-    marginTop: spacing.md,
-    minWidth: 160,
-  },
-  payoutsSection: {
-    marginBottom: spacing.lg,
-  },
-  payoutsList: {
-    gap: spacing.xs,
-  },
-  payoutRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  sectionTitle: {
-    marginBottom: spacing.sm,
-  },
-  txRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
+  body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  sectionTitle: { marginBottom: spacing.sm },
+  txRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   txIcon: {
     width: 34,
     height: 34,
@@ -219,12 +217,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  list: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  empty: {
-    alignItems: 'center',
-    marginTop: spacing.xl,
-  },
+  list: { paddingBottom: spacing.xl },
+  empty: { alignItems: 'center', marginTop: spacing.xl },
 });

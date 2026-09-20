@@ -9,6 +9,15 @@ export function useMyConversations(page = 1) {
   });
 }
 
+/** Détail (correspondant + contexte trajet/envoi) — voir ConversationDetail. Absent avant l'ajout de GET /conversations/:id. */
+export function useConversation(conversationId: string | undefined) {
+  return useQuery({
+    queryKey: ['conversations', conversationId, 'detail'],
+    queryFn: () => conversationsApi.getOne(conversationId!),
+    enabled: Boolean(conversationId),
+  });
+}
+
 export function useConversationMessages(conversationId: string | undefined, page = 1) {
   return useQuery({
     queryKey: ['conversations', conversationId, 'messages', page],

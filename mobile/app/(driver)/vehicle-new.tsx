@@ -1,23 +1,27 @@
 // mobile/app/(driver)/vehicle-new.tsx
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowLeft, IconMinus, IconPlus } from '@tabler/icons-react-native';
+import { IconArrowLeft } from '@tabler/icons-react-native';
 import { AppText, Button, DocumentUploadField, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { SeatsStepper } from '@/components/screens/SeatsStepper';
+import { VehicleTypePicker } from '@/components/screens/VehicleTypePicker';
 import { colors, radius, spacing } from '@/theme';
 import { useCreateVehicle } from '@/hooks/useVehicles';
 import { useVehicleDocumentUpload, useVehicleDocuments } from '@/hooks/useVehicleDocuments';
 import { ApiError } from '@/services/api/ApiError';
 import type { VehicleType } from '@/types/vehicles.types';
 
-const VEHICLE_TYPES: { value: VehicleType; label: string }[] = [
-  { value: 'SEDAN', label: 'Berline' },
-  { value: 'SUV', label: 'SUV' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'MINIBUS', label: 'Minibus' },
-  { value: 'PICKUP', label: 'Pick-up' },
-  { value: 'MOTORCYCLE', label: 'Moto' },
-];
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <AppText variant="md" weight="semibold">
+        {title}
+      </AppText>
+      {children}
+    </View>
+  );
+}
 
 /** Deuxième étape affichée juste après la création — le véhicule existe déjà en base, seuls ses documents manquent avant validation. */
 function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
@@ -41,7 +45,7 @@ function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
         Véhicule ajouté. Envoyez sa carte grise et son assurance pour qu&apos;il soit validé par notre équipe.
       </AppText>
 
-      <View style={styles.fields}>
+      <View style={styles.docs}>
         <DocumentUploadField
           label="Carte grise"
           document={registrationDoc}
@@ -121,61 +125,56 @@ export default function NewVehicleScreen() {
         <View style={{ width: 38 }} />
       </View>
 
-      <View style={styles.typeRow}>
-        {VEHICLE_TYPES.map((item) => {
-          const isActive = item.value === type;
-          return (
-            <Pressable
-              key={item.value}
-              onPress={() => setType(item.value)}
-              style={[styles.typeChip, isActive && styles.typeChipActive]}
-            >
-              <AppText variant="sm" weight="medium" color={isActive ? colors.onPrimary : 'textPrimary'}>
-                {item.label}
-              </AppText>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={styles.fields}>
-        <TextField label="Marque" value={brand} onChangeText={setBrand} placeholder="Toyota" />
-        <TextField label="Modèle" value={model} onChangeText={setModel} placeholder="Corolla" />
-        <TextField label="Couleur (optionnel)" value={color} onChangeText={setColor} placeholder="Gris" />
-        <TextField
-          label="Plaque d'immatriculation"
-          value={plateNumber}
-          onChangeText={setPlateNumber}
-          placeholder="RC-1234-GN"
-          autoCapitalize="characters"
-        />
-
-        <View>
-          <AppText variant="sm" weight="medium" color="textSecondary" style={styles.stepperLabel}>
-            Nombre de places
-          </AppText>
-          <View style={styles.stepper}>
-            <IconButton
-              icon={<IconMinus size={16} color={colors.textPrimary} />}
-              accessibilityLabel="Retirer une place"
-              onPress={() => setTotalSeats((s) => Math.max(1, s - 1))}
-            />
-            <AppText variant="lg" weight="semibold" style={styles.stepperValue}>
-              {totalSeats}
-            </AppText>
-            <IconButton
-              icon={<IconPlus size={16} color={colors.textPrimary} />}
-              accessibilityLabel="Ajouter une place"
-              onPress={() => setTotalSeats((s) => Math.min(12, s + 1))}
-            />
+      <View style={styles.sections}>
+        <Section title="Informations">
+          <View style={styles.row}>
+            <View style={styles.cell}>
+              <TextField
+                label="Marque"
+                value={brand}
+                onChangeText={setBrand}
+                placeholder="Toyota"
+                autoCapitalize="words"
+              />
+            </View>
+            <View style={styles.cell}>
+              <TextField
+                label="Modèle"
+                value={model}
+                onChangeText={setModel}
+                placeholder="Corolla"
+                autoCapitalize="words"
+              />
+            </View>
           </View>
-        </View>
+          <TextField
+            label="Couleur (optionnel)"
+            value={color}
+            onChangeText={setColor}
+            placeholder="Gris"
+            autoCapitalize="words"
+          />
+          <TextField
+            label="Plaque d'immatriculation"
+            value={plateNumber}
+            onChangeText={setPlateNumber}
+            placeholder="RC-1234-GN"
+            autoCapitalize="characters"
+          />
+        </Section>
+
+        <Section title="Type et capacité">
+          <VehicleTypePicker value={type} onChange={setType} />
+          <SeatsStepper value={totalSeats} onChange={setTotalSeats} />
+        </Section>
       </View>
 
       {errorMessage ? (
-        <AppText variant="sm" color="danger" style={styles.error}>
-          {errorMessage}
-        </AppText>
+        <View style={styles.errorBox} accessibilityLiveRegion="polite">
+          <AppText variant="sm" color="dangerDark">
+            {errorMessage}
+          </AppText>
+        </View>
       ) : null}
 
       <Button
@@ -199,41 +198,28 @@ const styles = StyleSheet.create({
   intro: {
     marginBottom: spacing.lg,
   },
-  typeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
+  sections: {
+    gap: spacing.xl,
+    marginBottom: spacing.xl,
   },
-  typeChip: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm + 2,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  typeChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  fields: {
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  stepperLabel: {
-    marginBottom: spacing.xxs,
-  },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  section: {
     gap: spacing.md,
   },
-  stepperValue: {
-    minWidth: 24,
-    textAlign: 'center',
+  row: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
-  error: {
+  cell: {
+    flex: 1,
+  },
+  docs: {
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  errorBox: {
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.dangerLight,
     marginBottom: spacing.sm,
   },
   submit: {

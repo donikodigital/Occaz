@@ -98,7 +98,6 @@ export class PaymentsService {
         status: PaymentStatus.PENDING,
       },
     });
-
     const adapter = this.registry.resolve(providerRow.type);
     const result = await adapter.initiate({
       paymentId: payment.id,
@@ -241,6 +240,11 @@ export class PaymentsService {
         bookingId: booking.id,
         grossAmount: (booking.totalAmount as bigint) - (booking.platformFee as bigint),
         commission: booking.platformFee,
+        // Devise dans laquelle le client a payé — Booking.currencyId,
+        // déjà disponible sans requête supplémentaire. Peut différer de
+        // la devise du portefeuille du chauffeur (trajet transfrontalier)
+        // ; WalletsService.holdBookingRevenue convertit si besoin.
+        sourceCurrencyId: booking.currencyId,
       });
       await this.notifications.notify({
         userId: booking.customer.userId,
@@ -266,6 +270,7 @@ export class PaymentsService {
           shipmentId: shipment.id,
           grossAmount: (shipment.totalAmount as bigint) - (shipment.platformFee as bigint),
           commission: shipment.platformFee,
+          sourceCurrencyId: shipment.currencyId,
         });
       }
       await this.notifications.notify({

@@ -379,9 +379,18 @@ export class DriverProfilesService {
     return { storageKey, uploadUrl, expiresInSeconds };
   }
 
+  /**
+   * `{ public: true }` explicite ici — c'est le SEUL appel de tout le
+   * backend autorisé à demander une URL publique/permanente (voir
+   * StorageService.createDownloadUrl). Corrige le bug où la photo
+   * devenait cassée pour toujours après 5 minutes : la cause n'était pas
+   * seulement l'absence de STORAGE_PUBLIC_BASE_URL, mais le fait que ce
+   * risque touchait alors indifféremment les photos ET les pièces
+   * d'identité sensibles, faute de distinction dans createDownloadUrl.
+   */
   async confirmPhotoForUser(userId: string, dto: ConfirmPhotoDto) {
     const driverId = await this.getProfileIdForUser(userId);
-    const photoUrl = await this.storageService.createDownloadUrl(dto.storageKey);
+    const photoUrl = await this.storageService.createDownloadUrl(dto.storageKey, { public: true });
     return this.prisma.driverProfile.update({
       where: { id: driverId },
       data: { photoUrl },

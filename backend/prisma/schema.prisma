@@ -1,9 +1,12 @@
 // backend/prisma/schema.prisma
 // =============================================================================
 // schema.prisma — Plateforme régionale de transport partagé (Trajets + Envois)
-// Version : v1.0.0
+// Version : v1.1.0
 // -----------------------------------------------------------------------------
 // Changelog
+//   v1.1.0 — Ajout de SavedLocation : mémoire des adresses utilisées par
+//            chaque utilisateur, proposées en premier lors de la recherche
+//            d'adresse (relations User.savedLocations / Location.savedBy).
 //   v1.0.0 — Schéma complet initial. Couvre les Parties I à XV du cahier des
 //            charges optimisé, et applique les 12 décisions de la Partie VII
 //            (UUID partout, soft delete, argent en entier + devise, verrou
@@ -321,6 +324,10 @@ model User {
   disputeResolutions DisputeResolution[]
 
   messagesSent Message[]
+
+  // Adresses que cet utilisateur a déjà utilisées (proposées en premier
+  // lors de ses recherches d'adresse).
+  savedLocations SavedLocation[]
 
   notifications                Notification[]
   auditLogs                    AuditLog[]
@@ -664,12 +671,37 @@ model Location {
   shipmentsAsSender    Shipment[] @relation("ShipmentSenderLocation")
   shipmentsAsRecipient Shipment[] @relation("ShipmentRecipientLocation")
 
+  // Utilisateurs qui ont mémorisé cette adresse (voir SavedLocation).
+  savedBy SavedLocation[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([cityId])
   @@map("locations")
+}
+
+// Mémoire des adresses par utilisateur : à chaque adresse créée ou
+// réutilisée, une ligne (userId, locationId) est créée ou mise à jour.
+// `usageCount` classe les adresses les plus utilisées, `lastUsedAt` alimente
+// la liste "Récentes". Les adresses ne sont jamais partagées entre
+// utilisateurs : une adresse de livraison saisie par un client ne sera
+// jamais proposée à un chauffeur.
+model SavedLocation {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+  usageCount Int      @default(1)
+  lastUsedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, locationId])
+  @@index([userId, lastUsedAt])
+  @@map("saved_locations")
 }
 
 // =============================================================================
@@ -1312,6 +1344,7 @@ model NotificationTemplate {
   @@map("notification_templates")
 }
 
+// backend/prisma/schema.prisma
 model Notification {
   id           String                @id @default(uuid())
   userId       String
@@ -1320,6 +1353,8 @@ model Notification {
   template     NotificationTemplate? @relation(fields: [templateId], references: [id])
   type         NotificationType
   channel      NotificationChannel
+  title        String?
+  body         String?
   payload      Json?
   readAt       DateTime?
   sentAt       DateTime?

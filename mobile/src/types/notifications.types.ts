@@ -20,6 +20,9 @@ export interface AppNotification {
   id: string;
   type: NotificationType;
   channel: NotificationChannel;
+  /** null pour les notifications envoyées avant cette migration — voir NotificationsInboxScreen pour le repli sur NOTIFICATION_TYPE_LABELS. */
+  title: string | null;
+  body: string | null;
   readAt: string | null;
   sentAt: string | null;
   failedReason: string | null;

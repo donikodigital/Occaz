@@ -1,5 +1,5 @@
 // backend/src/otp/otp.service.ts
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OtpPurpose, OtpStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -43,10 +43,27 @@ export class OtpService {
     @Inject(SMS_PROVIDER) private readonly smsProvider: SmsProvider,
   ) {}
 
+  /**
+   * Le code est envoyé AVANT d'être persisté : si l'envoi SMS échoue
+   * (panne du prestataire, clé manquante, réseau...), aucune ligne
+   * OtpCode n'est créée — plutôt qu'un code en base jamais communiqué au
+   * bénéficiaire (qui aurait bloqué silencieusement toute tentative de
+   * vérification ultérieure, et pollué "le plus récent" consulté par
+   * verify()). L'échec remonte comme une 503 explicite (dépendance
+   * externe indisponible), jamais un crash 500 générique.
+   */
   async generateAndSend(params: GenerateOtpParams, message: string): Promise<{ expiresInSeconds: number }> {
     const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
     const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;
     const code = generateOtpCode();
+
+    try {
+      await this.smsProvider.send(params.phone, `${message} ${code}`);
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        `Impossible d'envoyer le code par SMS pour le moment — réessayez dans quelques instants. (${(error as Error).message})`,
+      );
+    }
 
     await this.prisma.otpCode.create({
       data: {
@@ -60,8 +77,6 @@ export class OtpService {
         expiresAt: addDuration(`${expirySeconds}s`),
       },
     });
-
-    await this.smsProvider.send(params.phone, `${message} ${code}`);
 
     return { expiresInSeconds: expirySeconds };
   }

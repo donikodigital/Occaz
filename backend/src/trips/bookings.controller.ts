@@ -1,7 +1,7 @@
 // backend/src/trips/bookings.controller.ts
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AccountType, BookingStatus } from '@prisma/client';
+import { AccountType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
@@ -11,6 +11,7 @@ import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
+import { ListBookingsQueryDto } from './dto/list-bookings-query.dto';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { TripOtpService } from './trip-otp.service';
@@ -49,9 +50,6 @@ export class BookingsController {
       const customer = await this.customerProfilesService.findByUserId(user.id).catch(() => null);
       const isOwningCustomer = customer?.id === booking.customerId;
 
-      // Le chauffeur du trajet peut aussi consulter la réservation (il en a
-      // besoin pour l'OTP / la prise en charge, section 17) — uniquement
-      // s'il est bien le chauffeur de CE trajet.
       let isOwningDriver = false;
       if (!isOwningCustomer && user.accountType === AccountType.DRIVER) {
         const driverId = await this.driverProfilesService
@@ -111,11 +109,7 @@ export class BookingsController {
 
   @Permissions(PERMISSIONS.BOOKING_READ)
   @Get()
-  findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('status') status?: BookingStatus,
-    @Query('tripId') tripId?: string,
-  ) {
-    return this.bookingsService.findAll(query, { status, tripId });
+  findAll(@Query() query: ListBookingsQueryDto) {
+    return this.bookingsService.findAll(query, { status: query.status, tripId: query.tripId });
   }
 }

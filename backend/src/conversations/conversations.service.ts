@@ -94,6 +94,53 @@ export class ConversationsService {
     return conversation;
   }
 
+  /**
+   * Détail d'UNE conversation — jusqu'ici absent de l'API : le client
+   * mobile ne pouvait afficher qu'un titre générique ("Conversation"),
+   * faute de savoir avec qui il échangeait ou à quel trajet/envoi ça se
+   * rapportait. `select` explicite (jamais `include: true`) pour ne
+   * renvoyer que prénom/nom des deux parties — jamais mobileMoneyNumber,
+   * dateOfBirth, address ou tout autre champ sensible de leur profil.
+   */
+  async findOne(conversationId: string, requesterUserId: string, hasSupportAccess: boolean) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: {
+        id: true,
+        bookingId: true,
+        shipmentId: true,
+        createdAt: true,
+        customer: { select: { id: true, userId: true, firstName: true, lastName: true } },
+        driver: { select: { id: true, userId: true, firstName: true, lastName: true } },
+        booking: {
+          select: {
+            id: true,
+            trip: {
+              select: {
+                originCity: { select: { name: true } },
+                destinationCity: { select: { name: true } },
+              },
+            },
+          },
+        },
+        shipment: {
+          select: { id: true, senderName: true, recipientName: true },
+        },
+      },
+    });
+    if (!conversation) throw new NotFoundException('Conversation introuvable.');
+
+    if (
+      !hasSupportAccess &&
+      requesterUserId !== conversation.customer.userId &&
+      requesterUserId !== conversation.driver.userId
+    ) {
+      throw new ForbiddenException("Vous n'êtes pas partie à cette conversation.");
+    }
+
+    return conversation;
+  }
+
   async sendMessage(
     conversationId: string,
     sender: { id: string; hasSupportAccess: boolean },

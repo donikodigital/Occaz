@@ -73,14 +73,26 @@ export class StorageService {
   }
 
   /**
-   * URL de lecture signée et temporaire — jamais d'URL publique permanente
-   * pour des pièces d'identité, même si le bucket lui-même le permettait.
+   * URL de lecture. Par défaut TOUJOURS signée et temporaire (5 min) —
+   * c'est le seul comportement sûr pour une pièce d'identité, et il ne
+   * dépend d'aucune variable d'environnement : même si
+   * STORAGE_PUBLIC_BASE_URL est configuré pour d'autres usages, un
+   * appel sans `{ public: true }` reste signé.
+   *
+   * `{ public: true }` n'est à passer QUE pour un contenu explicitement
+   * non sensible, prévu pour être vu en permanence (ex : la photo de
+   * profil d'un chauffeur — voir requestPhotoUploadUrlForUser). Dans ce
+   * cas seulement, si STORAGE_PUBLIC_BASE_URL est configuré, l'URL
+   * publique stable est utilisée ; sinon, repli sur une URL signée
+   * (donc temporaire — voir STORAGE_PUBLIC_BASE_URL dans .env.example
+   * pour l'activer durablement).
    */
-  async createDownloadUrl(key: string): Promise<string> {
-    const publicBaseUrl = process.env.STORAGE_PUBLIC_BASE_URL;
-    if (publicBaseUrl) {
-      // Bucket avec domaine public déjà configuré (cas d'usage non sensible) : pas besoin de signer.
-      return `${publicBaseUrl.replace(/\/$/, '')}/${key}`;
+  async createDownloadUrl(key: string, options: { public?: boolean } = {}): Promise<string> {
+    if (options.public) {
+      const publicBaseUrl = process.env.STORAGE_PUBLIC_BASE_URL;
+      if (publicBaseUrl) {
+        return `${publicBaseUrl.replace(/\/$/, '')}/${key}`;
+      }
     }
     const command = new GetObjectCommand({ Bucket: this.getBucket(), Key: key });
     return getSignedUrl(this.getClient(), command, { expiresIn: this.urlTtlSeconds });

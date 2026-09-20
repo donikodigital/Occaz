@@ -1,10 +1,11 @@
 // mobile/app/(driver)/(tabs)/home.tsx
 //
-// v4 — badge de notifications non lues sur la cloche (calculé à partir
-// de useMyNotifications, pas d'endpoint compteur dédié — voir note dans
-// le composant), et anneau "trajets terminés" basé sur de vrais paliers
-// (voir utils/milestones.ts) avec pourcentage affiché, au lieu de la
-// valeur décorative fixe de la v3.
+// v5 — statCard passe en carré (aspectRatio: 1), toujours 3 par ligne
+// (déjà garanti par statsRow en row sans wrap, inchangé). Les 2 grandes
+// tuiles reçoivent un flourish illustré en haut à droite
+// (TripTileIllustration / ShipmentTileIllustration, fichiers isolés) au
+// lieu d'un fond photo — évite toute dépendance réseau à l'exécution et
+// tout souci de licence, voir échange avec Doniko.
 
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -20,6 +21,8 @@ import {
   IconStarFilled,
 } from '@tabler/icons-react-native';
 import { AppText, Badge, Card, IconButton, ProgressRing, RouteMap, ScreenContainer } from '@/components/ui';
+import { TripTileIllustration } from '@/components/illustrations/TripTileIllustration';
+import { ShipmentTileIllustration } from '@/components/illustrations/ShipmentTileIllustration';
 import { colors, radius, spacing } from '@/theme';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useMyVehicles } from '@/hooks/useVehicles';
@@ -114,6 +117,9 @@ export default function DriverHomeScreen() {
             onPress={() => router.push('/(driver)/trip-new')}
             style={[styles.tile, { backgroundColor: colors.primary }]}
           >
+            <View style={styles.tileIllustration}>
+              <TripTileIllustration />
+            </View>
             <IconCar size={36} color={colors.onPrimary} style={styles.tileIcon} />
             <AppText variant="base" weight="semibold" color={colors.onPrimary}>
               Créer un trajet
@@ -126,6 +132,9 @@ export default function DriverHomeScreen() {
             onPress={() => router.push('/(driver)/shipment-available')}
             style={[styles.tile, { backgroundColor: colors.accent }]}
           >
+            <View style={styles.tileIllustration}>
+              <ShipmentTileIllustration />
+            </View>
             <IconPackage size={36} color={colors.onAccent} style={styles.tileIcon} />
             <AppText variant="base" weight="semibold" color={colors.onAccent}>
               Envois disponibles
@@ -265,6 +274,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     minHeight: 140,
     justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  tileIllustration: {
+    position: 'absolute',
+    top: -14,
+    right: -18,
+    transform: [{ rotate: '-6deg' }],
   },
   tileIcon: {
     marginBottom: spacing.md,
@@ -291,7 +307,9 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
+    aspectRatio: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
     paddingVertical: spacing.md,
   },

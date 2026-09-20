@@ -29,6 +29,15 @@ export class ConversationsController {
     return this.conversationsService.getOrCreateForShipment(shipmentId, user.id);
   }
 
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.conversationsService.findOne(
+      id,
+      user.id,
+      user.permissions.includes(PERMISSIONS.CONVERSATION_READ),
+    );
+  }
+
   @Get(':id/messages')
   findMessages(
     @Param('id') id: string,
