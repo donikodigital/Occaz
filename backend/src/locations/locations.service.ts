@@ -52,8 +52,12 @@ interface CityCandidate extends ResolvedCity {
   normalizedName: string;
 }
 
-/** Les villes changent rarement (gérées par l'admin) : un cache court évite de les relire à chaque recherche. */
-const CITIES_CACHE_TTL_MS = 10 * 60_000;
+/**
+ * Les villes changent rarement, mais une ville (ou ses coordonnées) ajoutée
+ * dans l'admin doit être prise en compte vite : un cache d'une minute évite
+ * de relire la table à chaque recherche sans faire attendre la détection.
+ */
+const CITIES_CACHE_TTL_MS = 60_000;
 /** Au-delà, la ville la plus proche n'est plus fiable : on préfère demander à l'utilisateur. */
 const NEAREST_CITY_MAX_KM = 60;
 /** Deux adresses de même libellé dans la même ville sont fusionnées si elles sont à moins de cette distance. */

@@ -1,15 +1,11 @@
 // web-admin/src/components/drivers/DriverDetailModal.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { IconEye, IconPlayerPause, IconPlayerPlay, IconRosetteDiscountCheck, IconShieldCheck } from '@tabler/icons-react';
-import { Button, DetailField, DetailSection, EntityAvatar, Modal, TextArea, TintedIconButton } from '@/components/ui';
-import { DocumentsPanel } from '@/components/layout/DocumentsPanel';
-import { VehicleDetailRow } from './VehicleDetailRow';
-import { useDriver, useReactivateDriver, useSuspendDriver, useVerifyDriver } from '@/hooks/useDrivers';
-import { DRIVER_STATUS_LABELS } from '@/utils/driverLabels';
-import { ApiError } from '@/services/api/ApiError';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { IconX } from '@tabler/icons-react';
+import { DisputeMotionStyles, disputeFont } from '@/components/disputes/disputeUi';
+import { DriverProfile } from './DriverProfile';
 
 export interface DriverDetailModalProps {
   open: boolean;
@@ -17,157 +13,68 @@ export interface DriverDetailModalProps {
   driverId: string | null;
 }
 
-function formatDate(value: string | null): string {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
-}
-
 export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModalProps) {
-  const router = useRouter();
-  const { data: driver, isLoading, isError } = useDriver(driverId ?? undefined);
-  const verifyDriver = useVerifyDriver(driverId ?? '');
-  const suspendDriver = useSuspendDriver(driverId ?? '');
-  const reactivateDriver = useReactivateDriver(driverId ?? '');
-
-  const [showSuspendForm, setShowSuspendForm] = useState(false);
-  const [reason, setReason] = useState('');
-  const [errorMessage, setErrorMessage] = useState<string | undefined>();
-
   useEffect(() => {
-    if (!open) return;
-    setShowSuspendForm(false);
-    setReason('');
-    setErrorMessage(undefined);
-  }, [open, driverId]);
+    if (!open) return undefined;
 
-  async function handleVerify() {
-    setErrorMessage(undefined);
-    try {
-      await verifyDriver.mutateAsync();
-    } catch (error) {
-      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
-    }
-  }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
 
-  async function handleSuspend() {
-    setErrorMessage(undefined);
-    if (reason.trim().length < 3) {
-      setErrorMessage('Indique un motif de suspension.');
-      return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
     }
-    try {
-      await suspendDriver.mutateAsync({ reason: reason.trim() });
-      setShowSuspendForm(false);
-      setReason('');
-    } catch (error) {
-      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
-    }
-  }
+    window.addEventListener('keydown', handleKeyDown);
 
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={driver ? `${driver.firstName} ${driver.lastName}` : 'Chauffeur'}
-      description={driver ? DRIVER_STATUS_LABELS[driver.status] : undefined}
-      size="lg"
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open || driverId === null || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className={`${disputeFont.className} fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-6`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Fiche chauffeur"
     >
-      {isError ? (
-        <p className="text-sm text-danger">Impossible de charger ce chauffeur.</p>
-      ) : isLoading || !driver ? (
-        <p className="text-sm text-text-secondary">Chargement…</p>
-      ) : (
-        <div className="space-y-5">
-          <div className="flex items-start gap-4">
-            <EntityAvatar
-              initials={`${driver.firstName.charAt(0)}${driver.lastName.charAt(0)}`}
-              imageUrl={driver.photoUrl}
-              size="lg"
-              tone={driver.status === 'VALIDATED' ? 'success' : 'primary'}
-            />
-            <div className="min-w-0 pt-1">
-              <p className="flex items-center gap-1.5 truncate font-serif text-xl text-text-primary">
-                {driver.firstName} {driver.lastName}
-                {driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={17} className="shrink-0 text-success-dark" /> : null}
-              </p>
-              <p className="mt-1 text-xs text-text-muted">
-                {driver.city?.name ?? '—'} · {driver.country?.name ?? '—'}
-              </p>
-              <p className="text-xs text-text-muted">Membre depuis le {formatDate(driver.createdAt)}</p>
-              {!driver.photoUrl ? <p className="mt-1 text-xs font-medium text-danger">Aucune photo de profil envoyée</p> : null}
-            </div>
-          </div>
+      <DisputeMotionStyles />
+      <style>{`
+        @keyframes driver-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes driver-sheet-in {
+          from { opacity: 0; transform: translateY(40px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .driver-overlay { animation: driver-overlay-in 0.25s ease-out backwards; }
+        .driver-sheet { animation: driver-sheet-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+        @media (prefers-reduced-motion: reduce) {
+          .driver-overlay, .driver-sheet { animation: none; }
+        }
+      `}</style>
 
-          <div className="flex flex-wrap gap-2.5">
-            {driver.status === 'PENDING' || driver.status === 'IN_VERIFICATION' ? (
-              <TintedIconButton icon={IconShieldCheck} label="Valider le chauffeur" tone="success" onClick={handleVerify} loading={verifyDriver.isPending} />
-            ) : null}
-            <TintedIconButton icon={IconEye} label="Voir la fiche complète" tone="neutral" onClick={() => router.push(`/drivers/${driver.id}`)} />
-            {driver.status === 'SUSPENDED' ? (
-              <TintedIconButton
-                icon={IconPlayerPlay}
-                label="Réactiver"
-                tone="success"
-                onClick={() => reactivateDriver.mutate()}
-                loading={reactivateDriver.isPending}
-              />
-            ) : (
-              <TintedIconButton icon={IconPlayerPause} label="Suspendre" tone="danger" onClick={() => setShowSuspendForm(true)} />
-            )}
-          </div>
+      <div className="driver-overlay absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
-          {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
-
-          {showSuspendForm ? (
-            <div className="space-y-2 rounded-lg bg-danger-light/40 p-3">
-              <TextArea
-                label="Motif de la suspension"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={2}
-                placeholder="Expliquez la raison…"
-                autoFocus
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => setShowSuspendForm(false)}>
-                  Annuler
-                </Button>
-                <Button variant="danger" loading={suspendDriver.isPending} onClick={handleSuspend}>
-                  Confirmer
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
-          <DetailSection title="Activité">
-            <DetailField label="Trajets terminés" value={driver.completedTripsCount} />
-            <DetailField label="Envois terminés" value={driver.completedShipmentsCount} />
-            <DetailField label="Annulations" value={driver.cancellationCount} />
-            <DetailField
-              label="Note moyenne"
-              value={driver.averageRating ? `${driver.averageRating.toFixed(1)} (${driver.ratingsCount} avis)` : 'Aucun avis'}
-            />
-          </DetailSection>
-
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wide text-primary">Pièces d&apos;identité</h4>
-            <DocumentsPanel ownerType="DRIVER" ownerId={driver.id} />
-          </div>
-
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wide text-primary">Véhicules</h4>
-            {driver.vehicles && driver.vehicles.length > 0 ? (
-              <div className="space-y-2">
-                {driver.vehicles.map((vehicle) => (
-                  <VehicleDetailRow key={vehicle.id} vehicle={vehicle} driverId={driver.id} />
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-text-muted">Aucun véhicule enregistré.</p>
-            )}
-          </div>
+      <div className="driver-sheet relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/10 sm:max-w-2xl sm:rounded-3xl">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 bg-white px-5 py-3.5">
+          <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">Fiche chauffeur</p>
+          <button
+            type="button"
+            autoFocus
+            onClick={onClose}
+            aria-label="Fermer"
+            className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95"
+          >
+            <IconX size={18} />
+          </button>
         </div>
-      )}
-    </Modal>
+
+        <div className="overflow-y-auto overscroll-contain p-4 sm:p-5">
+          <DriverProfile key={driverId} driverId={driverId} showFullPageLink />
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

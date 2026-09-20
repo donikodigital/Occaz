@@ -72,7 +72,7 @@ export function LocationPickerScreen({ countryCode }: LocationPickerScreenProps)
             autoFocus
             clearOnSelect={false}
             countryCode={searchCountryCodes}
-            placeholder="Ex : Marché de Madina, Conakry"
+            placeholder="Ex : marché, gare routière, quartier…"
             onSelect={picker.pickSuggestion}
             onSelectSaved={picker.pickSaved}
             onManualEntry={picker.startManual}

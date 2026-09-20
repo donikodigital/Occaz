@@ -58,7 +58,7 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
           label="Nom du lieu ou repère"
           value={draft.label}
           onChangeText={picker.setLabel}
-          placeholder="Ex : Rond-point de Bambeto, près de la station"
+          placeholder="Ex : nom du lieu, près de la station"
         />
 
         <View style={styles.citySection}>

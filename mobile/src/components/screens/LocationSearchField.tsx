@@ -206,7 +206,7 @@ export function LocationSearchField({
             Où se trouve ce lieu ?
           </AppText>
           <AppText variant="sm" color="textSecondary" style={styles.hintText}>
-            Tapez un quartier, un repère ou un lieu connu, par exemple « Marché de Madina » ou « Rond-point de Bambeto ».
+            Tapez un quartier, un repère ou un lieu connu (marché, gare routière, station…).
             Vos adresses déjà utilisées apparaîtront ici.
           </AppText>
         </View>

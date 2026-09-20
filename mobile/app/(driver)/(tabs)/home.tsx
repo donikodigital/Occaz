@@ -1,5 +1,15 @@
 // mobile/app/(driver)/(tabs)/home.tsx
 //
+// v8 — Plus d'air entre l'en-tête (profil + cloche) et ce qui suit (bandeau
+// de statut, carte véhicule ou tuiles violette/jaune) : HomeHeader est
+// enveloppé dans une vue avec une marge basse, valable quel que soit le
+// bloc qui vient dessous.
+//
+// v7 — Le badge de places du « Prochain trajet » passe par
+// formatSeatsAvailability (utils/seats.ts) : « Complet » / « 2 places
+// libres » au lieu de « 0/2 places », qui se lisait aussi bien « 0 libre »
+// que « 0 réservée » et ne collait pas avec l'écran détail du trajet.
+//
 // v6 — Header refondu dans un composant isolé (HomeHeader) : avatar
 // cliquable + salutation à gauche, cloche de notifications en haut à
 // droite. Le bouton de déconnexion est retiré d'ici — il reste dans
@@ -43,6 +53,7 @@ import { useMyTrips } from '@/hooks/useDriverTrips';
 import { useMyNotifications } from '@/hooks/useNotifications';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { getTripMilestoneProgress } from '@/utils/milestones';
+import { formatSeatsAvailability } from '@/utils/seats';
 
 const UPCOMING_STATUSES = new Set(['PUBLISHED', 'DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS']);
 
@@ -72,15 +83,17 @@ export default function DriverHomeScreen() {
 
   return (
     <ScreenContainer scroll>
-      <HomeHeader
-        firstName={profile?.firstName}
-        initials={initials}
-        photoUri={profile?.photoUrl}
-        isVerified={profile?.status === 'VALIDATED'}
-        unreadCount={unreadCount}
-        onPressAvatar={() => router.navigate('/(driver)/(tabs)/profile')}
-        onPressNotifications={() => router.push('/(driver)/notifications')}
-      />
+      <View style={styles.header}>
+        <HomeHeader
+          firstName={profile?.firstName}
+          initials={initials}
+          photoUri={profile?.photoUrl}
+          isVerified={profile?.status === 'VALIDATED'}
+          unreadCount={unreadCount}
+          onPressAvatar={() => router.navigate('/(driver)/(tabs)/profile')}
+          onPressNotifications={() => router.push('/(driver)/notifications')}
+        />
+      </View>
 
       {profile && profile.status !== 'VALIDATED' ? (
         <Card style={styles.statusBanner}>
@@ -156,7 +169,10 @@ export default function DriverHomeScreen() {
                   {formatDateShort(nextTrip.departureAt)} à {formatTime(nextTrip.departureAt)}
                 </AppText>
               </View>
-              <Badge label={`${nextTrip.availableSeats}/${nextTrip.totalSeats} places`} tone="primary" />
+              <Badge
+                label={formatSeatsAvailability(nextTrip.availableSeats)}
+                tone={nextTrip.availableSeats > 0 ? 'primary' : 'success'}
+              />
             </View>
           </Card>
         </>
@@ -212,6 +228,9 @@ export default function DriverHomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    marginBottom: spacing.lg,
+  },
   statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
