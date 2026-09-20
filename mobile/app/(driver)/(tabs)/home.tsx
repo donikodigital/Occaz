@@ -1,5 +1,17 @@
 // mobile/app/(driver)/(tabs)/home.tsx
 //
+// v6 — Header refondu dans un composant isolé (HomeHeader) : avatar
+// cliquable + salutation à gauche, cloche de notifications en haut à
+// droite. Le bouton de déconnexion est retiré d'ici — il reste dans
+// l'écran Profil. Cartes de stats refaites dans un composant isolé
+// (StatCard) : cause racine du débordement = `aspectRatio: 1` du v5, qui
+// figeait la hauteur (~110 px) alors que le contenu (icône + valeur +
+// libellé retombant sur 3-4 lignes) était plus haut. La hauteur suit
+// maintenant le contenu, libellés courts à coupure explicite, et
+// l'anneau ne porte plus que le nombre de trajets (le "0%" empilé dessous
+// débordait de l'anneau). Carte "Prochain trajet" affinée : trajet en
+// titre, date avec icône, places en badge, chevron.
+//
 // v5 — statCard passe en carré (aspectRatio: 1), toujours 3 par ligne
 // (déjà garanti par statsRow en row sans wrap, inchangé). Les 2 grandes
 // tuiles reçoivent un flourish illustré en haut à droite
@@ -12,15 +24,16 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   IconAlertTriangle,
-  IconBell,
+  IconCalendarEvent,
   IconCar,
-  IconLogout,
+  IconChevronRight,
   IconPackage,
-  IconPlus,
   IconRoute,
   IconStarFilled,
 } from '@tabler/icons-react-native';
-import { AppText, Badge, Card, IconButton, ProgressRing, RouteMap, ScreenContainer } from '@/components/ui';
+import { AppText, Badge, Card, ProgressRing, RouteMap, ScreenContainer } from '@/components/ui';
+import { HomeHeader } from '@/components/screens/HomeHeader';
+import { StatCard, StatIconBadge } from '@/components/screens/StatCard';
 import { TripTileIllustration } from '@/components/illustrations/TripTileIllustration';
 import { ShipmentTileIllustration } from '@/components/illustrations/ShipmentTileIllustration';
 import { colors, radius, spacing } from '@/theme';
@@ -28,7 +41,6 @@ import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useMyTrips } from '@/hooks/useDriverTrips';
 import { useMyNotifications } from '@/hooks/useNotifications';
-import { useAuthStore } from '@/stores/authStore';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { getTripMilestoneProgress } from '@/utils/milestones';
 
@@ -48,48 +60,27 @@ export default function DriverHomeScreen() {
   // page de notifications (30 les plus récentes). Sous-compte si plus de
   // 30 non lues d'un coup, cas limite acceptable pour un badge d'accueil.
   const { data: notificationsPage } = useMyNotifications(1);
-  const logout = useAuthStore((state) => state.logout);
 
   const nextTrip = tripsPage?.data.find((trip) => UPCOMING_STATUSES.has(trip.status));
   const unreadCount = notificationsPage?.data.filter((n) => !n.readAt).length ?? 0;
   const tripMilestone = getTripMilestoneProgress(profile?.completedTripsCount ?? 0);
 
-  async function handleLogout() {
-    await logout();
-    router.replace('/(auth)/onboarding');
-  }
+  const completedTrips = profile?.completedTripsCount ?? 0;
+  const ratingsCount = profile?.ratingsCount ?? 0;
+  const vehiclesCount = vehicles?.length ?? 0;
+  const initials = profile ? `${profile.firstName[0] ?? ''}${profile.lastName[0] ?? ''}` : '…';
 
   return (
     <ScreenContainer scroll>
-      <View style={styles.header}>
-        <View>
-          <AppText variant="sm" color="textSecondary">
-            Bonjour
-          </AppText>
-          <AppText variant="xl" weight="semibold">
-            {profile?.firstName ?? '…'}
-          </AppText>
-        </View>
-        <View style={styles.bellWrapper}>
-          <IconButton
-            icon={<IconBell size={18} color={colors.textPrimary} />}
-            accessibilityLabel="Notifications"
-            onPress={() => router.push('/(driver)/notifications')}
-          />
-          {unreadCount > 0 ? (
-            <View style={styles.notificationBadge}>
-              <AppText variant="xs" weight="semibold" color="#fff" style={styles.notificationBadgeText}>
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </AppText>
-            </View>
-          ) : null}
-        </View>
-        <IconButton
-          icon={<IconLogout size={18} color={colors.danger} />}
-          accessibilityLabel="Se déconnecter"
-          onPress={handleLogout}
-        />
-      </View>
+      <HomeHeader
+        firstName={profile?.firstName}
+        initials={initials}
+        photoUri={profile?.photoUrl}
+        isVerified={profile?.status === 'VALIDATED'}
+        unreadCount={unreadCount}
+        onPressAvatar={() => router.navigate('/(driver)/(tabs)/profile')}
+        onPressNotifications={() => router.push('/(driver)/notifications')}
+      />
 
       {profile && profile.status !== 'VALIDATED' ? (
         <Card style={styles.statusBanner}>
@@ -148,65 +139,68 @@ export default function DriverHomeScreen() {
 
       {nextTrip ? (
         <>
-          <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
+          <AppText variant="md" weight="semibold" style={styles.sectionTitle}>
             Prochain trajet
           </AppText>
           <Card onPress={() => router.push(`/(driver)/trip/${nextTrip.id}`)} style={styles.tripCard}>
-            <AppText variant="sm" color="textSecondary">
-              {nextTrip.originCity.name} → {nextTrip.destinationCity.name}
-            </AppText>
-            <AppText variant="base" weight="semibold">
-              {formatDateShort(nextTrip.departureAt)} à {formatTime(nextTrip.departureAt)}
-            </AppText>
-            <View style={styles.tripMeta}>
+            <View style={styles.tripTop}>
+              <AppText variant="md" weight="semibold" style={styles.tripRoute} numberOfLines={1}>
+                {nextTrip.originCity.name} → {nextTrip.destinationCity.name}
+              </AppText>
+              <IconChevronRight size={18} color={colors.textMuted} />
+            </View>
+            <View style={styles.tripBottom}>
+              <View style={styles.tripWhen}>
+                <IconCalendarEvent size={16} color={colors.textSecondary} />
+                <AppText variant="sm" color="textSecondary">
+                  {formatDateShort(nextTrip.departureAt)} à {formatTime(nextTrip.departureAt)}
+                </AppText>
+              </View>
               <Badge label={`${nextTrip.availableSeats}/${nextTrip.totalSeats} places`} tone="primary" />
             </View>
           </Card>
         </>
       ) : null}
 
-      <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
+      <AppText variant="md" weight="semibold" style={styles.sectionTitle}>
         Vos statistiques
       </AppText>
       <View style={styles.statsRow}>
-        <Card style={styles.statCard}>
-          <IconStarFilled size={18} color={colors.accent} />
-          <AppText variant="lg" weight="semibold">
-            {profile?.averageRating ? profile.averageRating.toFixed(1) : '—'}
-          </AppText>
-          <AppText variant="xs" color="textSecondary" align="center">
-            Note globale{'\n'}sur {profile?.ratingsCount ?? 0} trajets
-          </AppText>
-        </Card>
-
-        <Card style={styles.statCard}>
-          <ProgressRing progress={tripMilestone.progress} size={48} strokeWidth={4}>
-            <AppText variant="xs" weight="semibold">
-              {profile?.completedTripsCount ?? 0}
-            </AppText>
-            <AppText variant="xs" color="textSecondary" style={styles.ringPercent}>
-              {Math.round(tripMilestone.progress * 100)}%
-            </AppText>
-          </ProgressRing>
-          <AppText variant="xs" color="textSecondary" align="center" style={{ marginTop: spacing.xxs }}>
-            Trajets terminés{'\n'}depuis votre inscription
-          </AppText>
-        </Card>
-
-        <Card style={styles.statCard}>
-          <IconCar size={18} color={colors.primary} />
-          <AppText variant="lg" weight="semibold">
-            {vehicles?.length ?? 0}
-          </AppText>
-          <AppText variant="xs" color="textSecondary" align="center">
-            Véhicule{(vehicles?.length ?? 0) > 1 ? 's' : ''}{'\n'}enregistré{(vehicles?.length ?? 0) > 1 ? 's' : ''}
-          </AppText>
-        </Card>
+        <StatCard
+          visual={
+            <StatIconBadge
+              background={colors.accentLight}
+              icon={<IconStarFilled size={18} color={colors.accent} />}
+            />
+          }
+          value={profile?.averageRating ? profile.averageRating.toFixed(1) : '—'}
+          label={`Note moyenne\n${ratingsCount} avis`}
+        />
+        <StatCard
+          visual={
+            <ProgressRing progress={tripMilestone.progress} size={56} strokeWidth={5}>
+              <AppText variant="lg" weight="bold">
+                {completedTrips}
+              </AppText>
+            </ProgressRing>
+          }
+          label={'Trajets\nterminés'}
+        />
+        <StatCard
+          visual={
+            <StatIconBadge
+              background={colors.primaryLight}
+              icon={<IconCar size={18} color={colors.primary} />}
+            />
+          }
+          value={String(vehiclesCount)}
+          label={vehiclesCount > 1 ? 'Véhicules\nenregistrés' : 'Véhicule\nenregistré'}
+        />
       </View>
 
       <View style={styles.routeSectionHeader}>
         <IconRoute size={16} color={colors.textSecondary} />
-        <AppText variant="base" weight="semibold">
+        <AppText variant="md" weight="semibold">
           Itinéraire Conakry → Dakar
         </AppText>
       </View>
@@ -218,34 +212,6 @@ export default function DriverHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  bellWrapper: {
-    position: 'relative',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 4,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.background,
-  },
-  notificationBadgeText: {
-    fontSize: 10,
-    lineHeight: 12,
-  },
   statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,28 +259,32 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   tripCard: {
-    gap: 4,
+    gap: spacing.xs,
     marginBottom: spacing.lg,
   },
-  tripMeta: {
+  tripTop: {
     flexDirection: 'row',
-    marginTop: spacing.xxs,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  tripRoute: {
+    flex: 1,
+  },
+  tripBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
+  },
+  tripWhen: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs + 2,
   },
   statsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
     marginBottom: spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: spacing.md,
-  },
-  ringPercent: {
-    fontSize: 9,
   },
   routeSectionHeader: {
     flexDirection: 'row',
