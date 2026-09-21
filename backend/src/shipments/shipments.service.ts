@@ -1,4 +1,6 @@
 // backend/src/shipments/shipments.service.ts
+// [21/09/2026] v4 — l'autre partie est prévenue d'une annulation (chauffeur ou client).
+// [21/09/2026] v3 — devise jointe aux listes client et chauffeur ; liste admin avec villes, chauffeur et devise.
 // [21/09/2026] v2 — plage de dates, prix unique, acceptation atomique (premier arrivé), chauffeur sans trajet, annulation remboursée à 100 %, prolongation, expiration ; profil chauffeur limité aux champs publics.
 import {
   BadRequestException,
@@ -70,6 +72,9 @@ const PUBLIC_DRIVER_SELECT = {
   ratingsCount: true,
 } as const;
 
+/** Devise à joindre aux listes pour que les écrans affichent les montants dans la bonne monnaie. */
+const CURRENCY_SELECT = { select: { id: true, isoCode: true, symbol: true } } as const;
+
 /**
  * Cycle de vie d'un envoi (section 20) — flux v2 :
  *
@@ -109,7 +114,7 @@ export class ShipmentsService {
         trip: { include: { driver: { select: PUBLIC_DRIVER_SELECT } } },
         driver: { select: PUBLIC_DRIVER_SELECT },
         category: true,
-        currency: { select: { id: true, isoCode: true, symbol: true } },
+        currency: CURRENCY_SELECT,
         senderLocation: true,
         recipientLocation: true,
         items: true,
@@ -682,7 +687,57 @@ export class ShipmentsService {
       new ShipmentCancelledEvent(id, reason, FULL_REFUND_PERCENTAGE),
     );
 
+    await this.notifyCancellation(id, shipment.customerId, shipment.driverId, cancelledBy);
+
     return { ...updated, refundEligiblePercentage: FULL_REFUND_PERCENTAGE };
+  }
+
+  /**
+   * L'autre partie doit le savoir tout de suite : un chauffeur qui roule vers
+   * un colis annulé, ou un client qui attend un chauffeur qui a renoncé. Le
+   * remboursement du client est notifié séparément (PaymentsService). Jamais
+   * bloquant : l'annulation est déjà faite, une notification manquée ne doit
+   * pas la faire échouer.
+   */
+  private async notifyCancellation(
+    shipmentId: string,
+    customerId: string,
+    driverId: string | null,
+    cancelledBy: CancellationInitiator,
+  ): Promise<void> {
+    try {
+      if (driverId && cancelledBy !== CancellationInitiator.DRIVER) {
+        const driver = await this.prisma.driverProfile.findUnique({ where: { id: driverId }, select: { userId: true } });
+        if (driver) {
+          await this.notifications.notify({
+            userId: driver.userId,
+            type: NotificationType.STATUS_CHANGE,
+            channels: [NotificationChannel.PUSH],
+            fallbackTitle: 'Envoi annulé',
+            fallbackBody: 'Cet envoi a été annulé : vous n’avez plus à le récupérer.',
+            pushData: { type: 'STATUS_CHANGE', shipmentId },
+          });
+        }
+      }
+      if (cancelledBy !== CancellationInitiator.CUSTOMER) {
+        const customer = await this.prisma.customerProfile.findUnique({ where: { id: customerId }, select: { userId: true } });
+        if (customer) {
+          await this.notifications.notify({
+            userId: customer.userId,
+            type: NotificationType.STATUS_CHANGE,
+            channels: [NotificationChannel.PUSH],
+            fallbackTitle: 'Envoi annulé',
+            fallbackBody:
+              cancelledBy === CancellationInitiator.DRIVER
+                ? 'Le chauffeur a annulé votre envoi. Votre paiement vous est remboursé intégralement.'
+                : 'Votre envoi a été annulé. Votre paiement vous est remboursé intégralement.',
+            pushData: { type: 'STATUS_CHANGE', shipmentId },
+          });
+        }
+      }
+    } catch {
+      // Volontairement silencieux — voir le commentaire de la méthode.
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -700,7 +755,7 @@ export class ShipmentsService {
         skip: query.skip,
         take: query.take,
         orderBy: { createdAt: 'desc' },
-        include: { category: true, trip: true },
+        include: { category: true, trip: true, currency: CURRENCY_SELECT },
       }),
       this.prisma.shipment.count({ where }),
     ]);
@@ -716,7 +771,7 @@ export class ShipmentsService {
         skip: query.skip,
         take: query.take,
         orderBy: { createdAt: 'desc' },
-        include: { category: true, trip: true },
+        include: { category: true, trip: true, currency: CURRENCY_SELECT },
       }),
       this.prisma.shipment.count({ where }),
     ]);
@@ -734,7 +789,14 @@ export class ShipmentsService {
         skip: query.skip,
         take: query.take,
         orderBy: { createdAt: 'desc' },
-        include: { category: true, trip: true },
+        include: {
+          category: true,
+          currency: CURRENCY_SELECT,
+          // Champs publics seulement — jamais le profil complet (coordonnées de paiement).
+          driver: { select: PUBLIC_DRIVER_SELECT },
+          senderLocation: { include: { city: true } },
+          recipientLocation: { include: { city: true } },
+        },
       }),
       this.prisma.shipment.count({ where }),
     ]);

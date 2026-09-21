@@ -1,9 +1,11 @@
 // backend/src/shipments/shipment-dispatch.service.ts
 // [21/09/2026] v1 — annonce d'un envoi à tous les chauffeurs validés (push avec son + e-mail), sans donnée client.
+// [21/09/2026] v2 — e-mail aux chauffeurs désactivable (shipment.dispatch_email_enabled).
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { DriverAccountStatus, NotificationChannel, NotificationType, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PricingService } from '../pricing/pricing.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DOMAIN_EVENTS, ShipmentSearchOpenedEvent } from '../common/events/domain-events';
 
@@ -16,7 +18,10 @@ const NOTIFY_BATCH_SIZE = 25;
 /**
  * Annonce d'un envoi aux chauffeurs : quand une demande passe en recherche
  * de chauffeur (ou est prolongée), TOUS les chauffeurs validés sont prévenus
- * en même temps par push (avec son) et e-mail — avec ou sans trajet établi.
+ * en même temps par push (avec son) et, par défaut, par e-mail — avec ou sans
+ * trajet établi. L'e-mail se coupe dans les paramètres
+ * (`shipment.dispatch_email_enabled` = 0) : il part à chaque chauffeur pour
+ * chaque demande, ce qui peut dépasser le quota d'un fournisseur d'e-mails.
  * Le premier qui accepte l'emporte (ShipmentsService.accept). Le message ne
  * contient jamais de donnée personnelle du client : villes, poids et gain
  * net seulement.
@@ -27,6 +32,7 @@ export class ShipmentDispatchService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly pricing: PricingService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -58,6 +64,11 @@ export class ShipmentDispatchService {
     const amount = `${new Intl.NumberFormat('fr-FR').format(Number(netAmount))} ${shipment.currency.isoCode}`;
     const until = shipment.windowEnd.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
+    const emailEnabled = (await this.pricing.getNumericSetting('shipment.dispatch_email_enabled', 1)) !== 0;
+    const channels = emailEnabled
+      ? [NotificationChannel.PUSH, NotificationChannel.EMAIL]
+      : [NotificationChannel.PUSH];
+
     const drivers = await this.prisma.driverProfile.findMany({
       where: { status: DriverAccountStatus.VALIDATED, deletedAt: null, user: { isSuspended: false } },
       select: { userId: true },
@@ -70,7 +81,7 @@ export class ShipmentDispatchService {
           this.notifications.notify({
             userId: driver.userId,
             type: NotificationType.SHIPMENT_REQUEST,
-            channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+            channels,
             payload: { category: shipment.category.name, from, to, weightKg: shipment.weightKg, amount, until },
             fallbackTitle: shipment.isUrgent ? 'Envoi urgent à transporter' : "Nouvelle demande d'envoi",
             fallbackBody: `${shipment.category.name} de ${from} vers ${to}, ${shipment.weightKg} kg, jusqu'au ${until}. Vous recevrez ${amount}. Premier arrivé, premier servi.`,

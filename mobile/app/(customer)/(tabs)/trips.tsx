@@ -1,4 +1,5 @@
 // mobile/app/(customer)/(tabs)/trips.tsx
+// [21/09/2026] v+ — le montant d'un envoi s'affiche dans sa devise.
 //
 // v2 — « Mon activité » en bleu océan, dans le style de l'accueil et du
 // profil. Un titre, deux segments (Trajets / Envois) avec leur compteur, un
@@ -123,7 +124,7 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
       </View>
       <View style={styles.rowEnd}>
         <AppText variant="sm" weight="bold" color={OCEAN.deep}>
-          {formatMoney(shipment.totalAmount)}
+          {formatMoney(shipment.totalAmount, shipment.currency?.isoCode)}
         </AppText>
         <OceanPill label={SHIPMENT_STATUS_LABELS[shipment.status]} tone={TONE_TO_PILL[SHIPMENT_STATUS_TONE[shipment.status]]} />
       </View>

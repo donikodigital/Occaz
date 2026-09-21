@@ -1,4 +1,5 @@
 // mobile/src/hooks/useShipments.ts
+// [21/09/2026] v3 — le suivi d'un envoi se rafraîchit tout seul tant qu'il n'est pas terminé.
 // [21/09/2026] v2 — useShipmentQuote et useExtendShipment.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { shipmentsApi } from '@/services/api/shipments.api';
@@ -16,11 +17,18 @@ export function useMyShipments(page = 1) {
   });
 }
 
+/** Tant que l'envoi n'est pas terminé, l'écran de suivi se met à jour tout seul : « chauffeur trouvé », colis récupéré, livré… */
+const LIVE_STATUSES = ['CREATED', 'SEARCHING_DRIVER', 'DRIVER_ASSIGNED', 'PICKUP_PENDING', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERY_PENDING'];
+
 export function useShipment(id: string | undefined) {
   return useQuery({
     queryKey: ['shipments', id],
     queryFn: () => shipmentsApi.getOne(id!),
     enabled: Boolean(id),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && LIVE_STATUSES.includes(status) ? 15_000 : false;
+    },
   });
 }
 

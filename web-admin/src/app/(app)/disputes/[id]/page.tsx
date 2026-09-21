@@ -1,4 +1,5 @@
 // web-admin/src/app/(app)/disputes/[id]/page.tsx
+// [21/09/2026] v+ — le chauffeur d'un envoi s'affiche aussi quand il n'a pas de trajet (Shipment.driver).
 'use client';
 
 import React, { useState } from 'react';
@@ -140,6 +141,8 @@ function DisputeContext({
   }
 
   if (subjectType === 'SHIPMENT' && shipment.data) {
+    // Le chauffeur d'un envoi est `driver` (il peut ne pas avoir de trajet) ; `trip.driver` ne sert que de repli.
+    const driver = shipment.data.driver ?? shipment.data.trip?.driver;
     return (
       <Panel title="Envoi concerné" icon={<IconPackage size={18} />} delay={80}>
         <div className="grid grid-cols-2 gap-3">
@@ -147,12 +150,7 @@ function DisputeContext({
           <Stat label="Catégorie" value={shipment.data.category?.name ?? '—'} />
           <Stat label="Expéditeur" value={shipment.data.senderName} />
           <Stat label="Destinataire" value={shipment.data.recipientName} />
-          {shipment.data.trip?.driver ? (
-            <Stat
-              label="Chauffeur"
-              value={`${shipment.data.trip.driver.firstName} ${shipment.data.trip.driver.lastName}`}
-            />
-          ) : null}
+          {driver ? <Stat label="Chauffeur" value={`${driver.firstName} ${driver.lastName}`} /> : null}
         </div>
       </Panel>
     );

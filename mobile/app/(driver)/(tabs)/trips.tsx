@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/trips.tsx
+// [21/09/2026] v+ — la ligne d'un envoi affiche le gain net du chauffeur (et non le prix payé par le client) dans la bonne devise, avec la période.
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
@@ -15,6 +16,7 @@ import {
   TRIP_STATUS_TONE,
 } from '@/utils/tripStatusLabels';
 import { formatMoney } from '@/utils/money';
+import { driverNetAmount, formatWindow } from '@/utils/shipmentDisplay';
 import type { Trip } from '@/types/trips.types';
 import type { Shipment } from '@/types/shipments.types';
 
@@ -50,7 +52,7 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
           {shipment.recipientName}
         </AppText>
         <AppText variant="xs" color="textSecondary" numberOfLines={1}>
-          {formatMoney(shipment.price)}
+          Vous recevrez {formatMoney(driverNetAmount(shipment), shipment.currency?.isoCode)} · {formatWindow(shipment)}
         </AppText>
       </View>
       <Badge label={SHIPMENT_STATUS_LABELS[shipment.status]} tone={SHIPMENT_STATUS_TONE[shipment.status]} />

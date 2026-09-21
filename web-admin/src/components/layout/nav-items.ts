@@ -12,6 +12,7 @@ import {
   IconSettings,
   IconShieldLock,
   IconSteeringWheel,
+  IconTruckDelivery,
   IconUsers,
   IconWallet,
 } from '@tabler/icons-react';
@@ -40,6 +41,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/dashboard', label: 'Tableau de bord', icon: IconLayoutDashboard },
       { href: '/users', label: 'Utilisateurs', icon: IconUsers },
       { href: '/drivers', label: 'Chauffeurs', icon: IconSteeringWheel },
+      { href: '/shipments', label: 'Envois', icon: IconTruckDelivery },
       { href: '/disputes', label: 'Litiges', icon: IconAlertTriangle },
     ],
   },
