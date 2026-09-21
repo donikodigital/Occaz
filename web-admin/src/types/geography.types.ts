@@ -1,4 +1,5 @@
 // web-admin/src/types/geography.types.ts
+// [21/09/2026] v+ — latitude et longitude sur City et CreateCityPayload (utilisées par la page Géographie v4).
 export interface Country {
   id: string;
   isoCode: string;
@@ -35,6 +36,9 @@ export interface City {
   prefectureId: string | null;
   name: string;
   address: string | null;
+  /** Centre de la ville — sert à retrouver la ville d'une adresse. Nul tant que non renseigné. */
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface CreateCountryPayload {
@@ -70,5 +74,8 @@ export interface CreateCityPayload {
   prefectureId?: string;
   name: string;
   address?: string;
+  /** `null` efface les coordonnées d'une ville existante. */
+  latitude?: number | null;
+  longitude?: number | null;
 }
 export type UpdateCityPayload = Partial<CreateCityPayload>;
