@@ -1,4 +1,5 @@
 // backend/src/ratings/ratings.service.ts
+// [21/09/2026] v2 — note d'un envoi via Shipment.driverId.
 import {
   BadRequestException,
   ConflictException,
@@ -78,21 +79,21 @@ export class RatingsService {
       where: { id: shipmentId },
       include: {
         customer: { include: { user: true } },
-        trip: { include: { driver: { include: { user: true } } } },
+        driver: { include: { user: true } },
       },
     });
     if (!shipment) throw new NotFoundException('Envoi introuvable.');
     if (shipment.status !== ShipmentStatus.COMPLETED) {
       throw new BadRequestException('Seul un envoi terminé peut être noté.');
     }
-    if (!shipment.trip) {
+    if (!shipment.driver) {
       throw new BadRequestException('Aucun chauffeur associé à cet envoi.');
     }
 
     const { role, fromUserId, toUserId } = this.resolveDirection(
       raterUserId,
       shipment.customer.user.id,
-      shipment.trip.driver.user.id,
+      shipment.driver.user.id,
     );
 
     await this.assertNotAlreadyRated(fromUserId, { shipmentId });
@@ -121,7 +122,7 @@ export class RatingsService {
     });
 
     if (role === RatingRole.CUSTOMER_TO_DRIVER) {
-      await this.refreshDriverRatingCache(shipment.trip.driverId);
+      await this.refreshDriverRatingCache(shipment.driver.id);
     }
 
     return rating;

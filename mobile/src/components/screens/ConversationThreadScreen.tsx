@@ -1,10 +1,17 @@
 // mobile/src/components/screens/ConversationThreadScreen.tsx
+//
+// v2 — Habillage bleu océan (partagé client / chauffeur) : en-tête avec
+// bouton de retour rond, avatar aux initiales et contexte (trajet ou envoi),
+// bulles bleues pour soi et claires pour l'autre, message du support en
+// doré, zone de saisie arrondie avec un bouton d'envoi bleu. Logique
+// inchangée.
 import React, { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { IconArrowLeft, IconPackage, IconRoute, IconSend } from '@tabler/icons-react-native';
-import { AppText, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, ScreenContainer, TextField } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useConversation, useConversationMessages, useMarkConversationRead, useSendMessage } from '@/hooks/useConversations';
 import { useAuthStore } from '@/stores/authStore';
 import { formatTime } from '@/utils/date';
@@ -19,8 +26,8 @@ function MessageBubble({ message, isMine }: { message: Message; isMine: boolean 
     return (
       <View style={styles.supportRow}>
         <View style={styles.supportBubble}>
-          <AppText variant="xs" weight="semibold" color="accentDark" style={styles.supportLabel}>
-            Support
+          <AppText variant="xs" weight="bold" color={OCEAN.goldInk} style={styles.supportLabel}>
+            SUPPORT
           </AppText>
           <AppText variant="sm">{message.content}</AppText>
         </View>
@@ -31,7 +38,7 @@ function MessageBubble({ message, isMine }: { message: Message; isMine: boolean 
   return (
     <View style={[styles.bubbleRow, isMine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
       <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
-        <AppText variant="sm" color={isMine ? colors.onPrimary : 'textPrimary'}>
+        <AppText variant="sm" color={isMine ? OCEAN.onDark : 'textPrimary'}>
           {message.content}
         </AppText>
       </View>
@@ -93,6 +100,7 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
   const markRead = useMarkConversationRead(conversationId);
 
   const header = useThreadHeader(detail, currentUserId);
+  const canSend = Boolean(draft.trim()) && !sendMessage.isPending;
 
   useFocusEffect(
     useCallback(() => {
@@ -122,29 +130,32 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
           />
           <Pressable
             onPress={handleSend}
-            disabled={!draft.trim() || sendMessage.isPending}
-            style={[styles.sendButton, (!draft.trim() || sendMessage.isPending) && styles.sendButtonDisabled]}
+            disabled={!canSend}
+            style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
             accessibilityRole="button"
             accessibilityLabel="Envoyer"
           >
-            <IconSend size={18} color={colors.onPrimary} />
+            <IconSend size={18} color={OCEAN.onDark} />
           </Pressable>
         </View>
       }
     >
       <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
+        <Pressable
           onPress={() => router.back()}
-        />
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+        >
+          <IconArrowLeft size={18} color={OCEAN.base} />
+        </Pressable>
         <View style={styles.avatar}>
-          <AppText variant="xs" weight="semibold" color="primary">
+          <AppText variant="sm" weight="bold" color={OCEAN.base}>
             {header.initials}
           </AppText>
         </View>
         <View style={styles.headerTextGroup}>
-          <AppText variant="md" weight="semibold" numberOfLines={1}>
+          <AppText variant="md" weight="bold" color={OCEAN.deep} numberOfLines={1}>
             {header.name}
           </AppText>
           {header.subtitle ? (
@@ -183,30 +194,48 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
 }
 
 const styles = StyleSheet.create({
+  pressed: {
+    opacity: 0.75,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingTop: spacing.sm,
-    marginBottom: spacing.sm,
+    paddingBottom: spacing.sm,
+    marginBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: OCEAN.line,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: OCEAN.line,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primaryLight,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: OCEAN.mist,
+    borderWidth: 1.5,
+    borderColor: OCEAN.sky,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTextGroup: {
     flex: 1,
     minWidth: 0,
+    gap: 1,
   },
   subtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 1,
   },
   list: {
     paddingVertical: spacing.sm,
@@ -224,17 +253,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    borderRadius: radius.lg,
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.sm + 2,
+    borderRadius: 20,
+    paddingVertical: spacing.xs + 3,
+    paddingHorizontal: spacing.sm + 4,
   },
   bubbleMine: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
+    backgroundColor: OCEAN.base,
+    borderBottomRightRadius: 6,
   },
   bubbleTheirs: {
-    backgroundColor: colors.surfaceMuted,
-    borderBottomLeftRadius: 4,
+    backgroundColor: OCEAN.mist,
+    borderWidth: 1,
+    borderColor: OCEAN.line,
+    borderBottomLeftRadius: 6,
   },
   timeLabel: {
     marginTop: 2,
@@ -246,12 +277,13 @@ const styles = StyleSheet.create({
   },
   supportBubble: {
     maxWidth: '85%',
-    backgroundColor: colors.accentLight,
-    borderRadius: radius.md,
+    backgroundColor: OCEAN.goldSoft,
+    borderRadius: 16,
     paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.sm + 2,
+    paddingHorizontal: spacing.sm + 4,
   },
   supportLabel: {
+    letterSpacing: 0.8,
     marginBottom: 2,
   },
   empty: {
@@ -269,14 +301,14 @@ const styles = StyleSheet.create({
     maxHeight: 100,
   },
   sendButton: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 46,
     borderRadius: radius.pill,
-    backgroundColor: colors.primary,
+    backgroundColor: OCEAN.base,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
 });

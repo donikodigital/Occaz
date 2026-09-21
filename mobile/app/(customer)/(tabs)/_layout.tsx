@@ -3,7 +3,7 @@ import React from 'react';
 import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/tabs';
 import { IconHome, IconMessageCircle, IconRoute, IconUser } from '@tabler/icons-react-native';
-import { colors } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useCustomerProfile, isProfileMissingError } from '@/hooks/useCustomerProfile';
 import { ResponsiveTabBar } from '@/components/navigation/ResponsiveTabBar';
 
@@ -19,7 +19,7 @@ export default function CustomerTabsLayout() {
 
   return (
     <Tabs
-      tabBar={(props) => <ResponsiveTabBar {...props} accentColor={colors.primary} brandLabel="Espace client" />}
+      tabBar={(props) => <ResponsiveTabBar {...props} accentColor={OCEAN.base} brandLabel="Espace client" />}
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen

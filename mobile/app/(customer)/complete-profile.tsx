@@ -1,18 +1,24 @@
 // mobile/app/(customer)/complete-profile.tsx
+//
+// v2 — Habillage bleu océan : un bandeau d'accueil sombre, le formulaire sur
+// une carte à en-tête soulignée, et le bouton plein. Logique inchangée.
+//
+// Étape obligatoire après la toute première connexion (section 57) : le
+// compte User existe mais aucun CustomerProfile n'est encore rattaché
+// (POST /customer-profiles/me côté backend, Lot 2). Sans cet écran,
+// l'app resterait bloquée sur un accueil qui ne peut rien afficher.
+
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { AppText, Button, ScreenContainer, TextField } from '@/components/ui';
+import { IconUserCircle, IconUserPlus } from '@tabler/icons-react-native';
+import { AppText, ScreenContainer, TextField } from '@/components/ui';
+import { OceanButton, OceanHeroCard, OceanSection } from '@/components/ocean/OceanKit';
 import { spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useCreateCustomerProfile } from '@/hooks/useCustomerProfile';
 import { ApiError } from '@/services/api/ApiError';
 
-/**
- * Étape obligatoire après la toute première connexion (section 57) : le
- * compte User existe mais aucun CustomerProfile n'est encore rattaché
- * (POST /customer-profiles/me côté backend, Lot 2). Sans cet écran,
- * l'app resterait bloquée sur un accueil qui ne peut rien afficher.
- */
 export default function CompleteProfileScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -43,23 +49,22 @@ export default function CompleteProfileScreen() {
   }
 
   return (
-    <ScreenContainer maxWidth="form">
+    <ScreenContainer scroll maxWidth="form">
       <View style={styles.body}>
-        <AppText variant="xxl" weight="semibold" style={styles.title}>
-          Complétez votre profil
-        </AppText>
-        <AppText variant="base" color="textSecondary" style={styles.subtitle}>
-          Ces informations sont partagées avec votre chauffeur au moment de la réservation.
-        </AppText>
+        <OceanHeroCard style={styles.hero}>
+          <View style={styles.heroIcon}>
+            <IconUserPlus size={26} color={OCEAN.onDark} />
+          </View>
+          <AppText variant="xxl" weight="bold" color={OCEAN.onDark}>
+            Complétez votre <AppText variant="xxl" weight="bold" color={OCEAN.gold}>profil</AppText>
+          </AppText>
+          <AppText variant="sm" color={OCEAN.sky}>
+            Ces informations sont partagées avec votre chauffeur au moment de la réservation.
+          </AppText>
+        </OceanHeroCard>
 
-        <View style={styles.fields}>
-          <TextField
-            label="Prénom"
-            value={firstName}
-            onChangeText={setFirstName}
-            placeholder="Fatoumata"
-            autoFocus
-          />
+        <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title="Vos informations">
+          <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Fatoumata" autoFocus />
           <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Diallo" />
           <TextField
             label="Email (optionnel)"
@@ -72,7 +77,7 @@ export default function CompleteProfileScreen() {
           <AppText variant="xs" color="textMuted">
             Pour recevoir aussi vos notifications par email.
           </AppText>
-        </View>
+        </OceanSection>
 
         {errorMessage ? (
           <AppText variant="sm" color="danger" style={styles.error}>
@@ -81,7 +86,7 @@ export default function CompleteProfileScreen() {
         ) : null}
       </View>
 
-      <Button label="Continuer" onPress={handleSubmit} loading={createProfile.isPending} />
+      <OceanButton label="Continuer" onPress={handleSubmit} loading={createProfile.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }
@@ -89,18 +94,25 @@ export default function CompleteProfileScreen() {
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
   },
-  title: {
-    marginBottom: spacing.xxs,
+  hero: {
+    gap: spacing.xs,
+    marginBottom: spacing.md,
   },
-  subtitle: {
-    marginBottom: spacing.xl,
-  },
-  fields: {
-    gap: spacing.md,
+  heroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
   error: {
-    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  submit: {
+    marginBottom: spacing.lg,
   },
 });

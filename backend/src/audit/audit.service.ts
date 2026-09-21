@@ -15,6 +15,15 @@ export interface AuditLogInput {
 }
 
 /**
+ * Seuls ces champs de l'acteur sont renvoyés avec une entrée du journal.
+ * `include: { actor: true }` renvoyait la ligne User complète — donc
+ * passwordHash et twoFactorSecret — à toute personne ayant AUDIT_READ.
+ * Même principe que UsersService.toSafeUser : ces deux champs ne quittent
+ * jamais le backend.
+ */
+const ACTOR_SELECT = { id: true, email: true, phone: true } as const;
+
+/**
  * Point d'entrée unique pour journaliser une action administrative
  * sensible (section 49 du cahier des charges). Même le SuperAdmin doit
  * laisser une trace — c'est pourquoi ce service ne fait aucune
@@ -53,7 +62,7 @@ export class AuditService {
         skip: query.skip,
         take: query.take,
         orderBy: { createdAt: 'desc' },
-        include: { actor: true },
+        include: { actor: { select: ACTOR_SELECT } },
       }),
       this.prisma.auditLog.count({ where }),
     ]);

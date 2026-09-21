@@ -1,10 +1,17 @@
 // mobile/src/components/screens/ConversationsListScreen.tsx
+//
+// v2 — Habillage bleu océan (partagé client / chauffeur) : titre avec
+// sous-titre, cartes ombrées avec une pastille de couleur par type
+// (bleu pour un trajet, doré pour un envoi), et un état vide qui explique
+// quand une conversation apparaît. Logique inchangée.
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconChevronRight, IconMessageCircle, IconPackage, IconRoute } from '@tabler/icons-react-native';
-import { AppText, Card, ResponsiveList, ScreenContainer } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { AppText, ResponsiveList, ScreenContainer } from '@/components/ui';
+import { OceanCard, OceanEmpty } from '@/components/ocean/OceanKit';
+import { colors, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useMyConversations } from '@/hooks/useConversations';
 import { formatTime } from '@/utils/date';
 import type { ConversationSummary } from '@/types/conversations.types';
@@ -32,15 +39,15 @@ function sectionLabelFor(dateIso: string, now: Date): string {
 function ConversationRow({ conversation, basePath }: { conversation: ConversationSummary; basePath: string }) {
   const isShipment = Boolean(conversation.shipmentId);
   return (
-    <Card onPress={() => router.push(`${basePath}/conversation/${conversation.id}`)} style={styles.row}>
-      <View style={[styles.rowIcon, isShipment && { backgroundColor: colors.accentLight }]}>
-        {isShipment ? (
-          <IconPackage size={19} color={colors.accentDark} />
-        ) : (
-          <IconRoute size={19} color={colors.primary} />
-        )}
+    <OceanCard
+      onPress={() => router.push(`${basePath}/conversation/${conversation.id}`)}
+      style={styles.row}
+      accessibilityLabel={isShipment ? 'Conversation sur un envoi' : 'Conversation sur un trajet'}
+    >
+      <View style={[styles.rowIcon, isShipment && styles.rowIconShipment]}>
+        {isShipment ? <IconPackage size={20} color={OCEAN.goldInk} /> : <IconRoute size={20} color={OCEAN.base} />}
       </View>
-      <View style={{ flex: 1 }}>
+      <View style={styles.rowText}>
         <AppText variant="sm" weight="semibold">
           {isShipment ? 'Envoi' : 'Trajet'}
         </AppText>
@@ -49,7 +56,7 @@ function ConversationRow({ conversation, basePath }: { conversation: Conversatio
         </AppText>
       </View>
       <IconChevronRight size={16} color={colors.textMuted} />
-    </Card>
+    </OceanCard>
   );
 }
 
@@ -80,37 +87,37 @@ export function ConversationsListScreen({ basePath }: ConversationsListScreenPro
     return out;
   }, [data]);
 
+  const header = (
+    <View style={styles.header}>
+      <AppText variant="xxl" weight="bold" color={OCEAN.deep}>
+        Messages
+      </AppText>
+      <AppText variant="sm" color="textSecondary">
+        Vos échanges liés aux trajets et aux envois.
+      </AppText>
+    </View>
+  );
+
   return (
     <ScreenContainer padded={false} maxWidth="wide">
-      <View style={styles.header}>
-        <AppText variant="xxl" weight="semibold">
-          Messages
-        </AppText>
-      </View>
-
       <ResponsiveList
         data={rows}
         keyExtractor={(row) => row.key}
         contentContainerStyle={styles.list}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.xs + 2 }} />}
+        ListHeaderComponent={header}
         ListEmptyComponent={
-          !isLoading
-            ? () => (
-                <View style={styles.empty}>
-                  <IconMessageCircle size={22} color={colors.textMuted} />
-                  <AppText variant="sm" color="textMuted" style={{ marginTop: spacing.xs }}>
-                    Aucune conversation pour le moment.
-                  </AppText>
-                  <AppText variant="xs" color="textMuted" align="center" style={styles.emptyHint}>
-                    Une conversation apparaît ici dès qu'un trajet ou un envoi est réservé.
-                  </AppText>
-                </View>
-              )
-            : undefined
+          !isLoading ? (
+            <OceanEmpty
+              icon={<IconMessageCircle size={28} color={OCEAN.base} />}
+              title="Aucune conversation"
+              text="Une conversation apparaît ici dès qu'un trajet ou un envoi est réservé."
+            />
+          ) : undefined
         }
         renderItem={({ item }: { item: ListRow }) =>
           item.kind === 'header' ? (
-            <AppText variant="xs" weight="semibold" color="textMuted" style={styles.sectionLabel}>
+            <AppText variant="xs" weight="bold" color={OCEAN.base} style={styles.sectionLabel}>
               {item.label}
             </AppText>
           ) : (
@@ -124,17 +131,18 @@ export function ConversationsListScreen({ basePath }: ConversationsListScreenPro
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     marginBottom: spacing.md,
+    gap: 2,
   },
   list: {
+    flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
   sectionLabel: {
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.8,
     marginTop: spacing.sm,
     marginBottom: spacing.xxs,
   },
@@ -142,21 +150,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    padding: spacing.sm + 4,
   },
   rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.sm + 2,
-    backgroundColor: colors.primaryLight,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  empty: {
-    alignItems: 'center',
-    marginTop: spacing.xl,
-    paddingHorizontal: spacing.xl,
+  rowIconShipment: {
+    backgroundColor: OCEAN.goldSoft,
   },
-  emptyHint: {
-    marginTop: spacing.xxs,
+  rowText: {
+    flex: 1,
+    gap: 2,
   },
 });

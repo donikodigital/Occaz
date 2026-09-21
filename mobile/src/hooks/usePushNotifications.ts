@@ -1,6 +1,8 @@
 // mobile/src/hooks/usePushNotifications.ts
+// [21/09/2026] v2 — canal Android « shipment-requests » (importance max) et ouverture de l'écran concerné au toucher d'une notification.
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
+import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { devicesApi } from '@/services/api/devices.api';
@@ -20,6 +22,28 @@ Notifications.setNotificationHandler({
 });
 
 /**
+ * Canal Android des nouvelles demandes d'envoi — même identifiant que
+ * SHIPMENT_REQUEST_CHANNEL_ID côté backend (shipment-dispatch.service.ts),
+ * qui l'indique dans chaque push. Importance maximale : l'alerte sonne, vibre
+ * et s'affiche en bandeau même écran verrouillé, pour que le premier chauffeur
+ * disponible puisse accepter tout de suite. Sur Android 8+ le son et
+ * l'importance se règlent uniquement par canal, jamais par notification.
+ */
+const SHIPMENT_REQUEST_CHANNEL_ID = 'shipment-requests';
+
+async function ensureAndroidChannels(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(SHIPMENT_REQUEST_CHANNEL_ID, {
+    name: "Nouvelles demandes d'envoi",
+    importance: Notifications.AndroidImportance.MAX,
+    sound: 'default',
+    vibrationPattern: [0, 400, 250, 400],
+    enableVibrate: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  });
+}
+
+/**
  * Enregistre l'appareil pour les notifications push — appelé une fois
  * authentifié (voir app/_layout.tsx), jamais avant, puisque
  * POST /devices exige une session. Entièrement best-effort : aucune
@@ -34,6 +58,9 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
 
     async function register() {
       try {
+        // Avant la demande de permission : sur Android 13+, la fenêtre de permission n'apparaît qu'une fois un canal créé.
+        await ensureAndroidChannels();
+
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
         if (existingStatus !== 'granted') {
@@ -59,8 +86,21 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
     }
 
     register();
+
+    // Toucher une notification ouvre directement l'écran concerné : la liste
+    // des demandes pour un chauffeur, le suivi de l'envoi pour un client.
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as { type?: string; shipmentId?: string } | undefined;
+      if (data?.type === 'SHIPMENT_REQUEST') {
+        router.push('/(driver)/shipment-available');
+      } else if (data?.shipmentId && (data.type === 'SHIPMENT_EXTENSION' || data.type === 'DRIVER_ACCEPTED')) {
+        router.push(`/(customer)/shipment/${data.shipmentId}`);
+      }
+    });
+
     return () => {
       cancelled = true;
+      responseSubscription.remove();
     };
   }, [isAuthenticated]);
 }

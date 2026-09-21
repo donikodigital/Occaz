@@ -1,8 +1,11 @@
 // backend/src/shipments/shipments.module.ts
+// [21/09/2026] v2 — ShipmentDispatchService et ShipmentWindowService.
 import { Module } from '@nestjs/common';
 import { ShipmentsController } from './shipments.controller';
 import { ShipmentsService } from './shipments.service';
 import { ShipmentOtpService } from './shipment-otp.service';
+import { ShipmentDispatchService } from './shipment-dispatch.service';
+import { ShipmentWindowService } from './shipment-window.service';
 import { ShipmentCategoriesModule } from '../shipment-categories/shipment-categories.module';
 import { DocumentsModule } from '../documents/documents.module';
 import { PricingModule } from '../pricing/pricing.module';
@@ -24,7 +27,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     NotificationsModule,
   ],
   controllers: [ShipmentsController],
-  providers: [ShipmentsService, ShipmentOtpService],
+  providers: [ShipmentsService, ShipmentOtpService, ShipmentDispatchService, ShipmentWindowService],
   exports: [ShipmentsService, ShipmentOtpService],
 })
 export class ShipmentsModule {}

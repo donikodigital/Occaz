@@ -264,6 +264,8 @@ enum NotificationType {
   REFUND
   STATUS_CHANGE
   SUPPORT_MESSAGE
+  SHIPMENT_REQUEST
+  SHIPMENT_EXTENSION
 }
 
 enum RatingRole {
@@ -489,6 +491,7 @@ model DriverProfile {
 
   vehicles      Vehicle[]
   trips         Trip[]
+  shipments     Shipment[]
   wallet        Wallet?
   verifications Verification[]
   conversations Conversation[]
@@ -875,8 +878,16 @@ model ShipmentCategory {
 
 model Shipment {
   id         String           @id @default(uuid())
-  tripId     String? // nul tant que SEARCHING_DRIVER
+  // Trajet auquel l'envoi est rattaché, s'il y en a un. Nul tant que SEARCHING_DRIVER,
+  // et reste nul si le chauffeur qui accepte n'a pas de trajet établi : tout chauffeur
+  // validé peut accepter un envoi, avec ou sans trajet.
+  tripId     String?
   trip       Trip?            @relation(fields: [tripId], references: [id])
+  // Chauffeur qui a accepté l'envoi — posé à l'acceptation (ou à la création si un
+  // trajet a été choisi d'avance). Source de vérité du "chauffeur de l'envoi", que
+  // tripId soit renseigné ou non.
+  driverId   String?
+  driver     DriverProfile?   @relation(fields: [driverId], references: [id])
   customerId String
   customer   CustomerProfile  @relation(fields: [customerId], references: [id])
   categoryId String
@@ -903,6 +914,14 @@ model Shipment {
   // Urgence (section 40, facteur de tarification) — applique une
   // majoration configurable via PlatformSetting "shipment.urgent_surcharge".
   isUrgent      Boolean @default(false)
+
+  // Plage de dates pendant laquelle le client veut que son colis parte (obligatoire).
+  // Passé windowEnd sans chauffeur, le client doit prolonger ou être remboursé
+  // intégralement (voir ShipmentWindowService).
+  windowStart DateTime
+  windowEnd   DateTime
+  // Posé quand le client a été invité à prolonger (windowEnd dépassé, aucun chauffeur).
+  extensionRequestedAt DateTime?
 
   status ShipmentStatus @default(CREATED)
 
@@ -931,6 +950,8 @@ model Shipment {
 
   @@index([status])
   @@index([tripId])
+  @@index([driverId])
+  @@index([status, windowEnd])
   @@map("shipments")
 }
 

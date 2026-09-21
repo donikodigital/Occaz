@@ -1,9 +1,14 @@
 // backend/src/shipments/dto/assign-shipment.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+// [21/09/2026] v2 — tripId facultatif : un chauffeur sans trajet peut accepter.
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 
 export class AssignShipmentDto {
-  @ApiProperty({ description: "Trajet du chauffeur auquel rattacher l'envoi" })
+  @ApiPropertyOptional({
+    description:
+      "Trajet du chauffeur auquel rattacher l'envoi. Facultatif : un chauffeur validé sans trajet établi peut aussi accepter un envoi.",
+  })
+  @IsOptional()
   @IsString()
-  tripId: string;
+  tripId?: string;
 }

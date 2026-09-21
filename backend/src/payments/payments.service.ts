@@ -1,4 +1,5 @@
 // backend/src/payments/payments.service.ts
+// [21/09/2026] v2 — retenue via Shipment.driverId ; commission déduite une seule fois du montant unique payé (fin du double prélèvement).
 import {
   BadRequestException,
   ConflictException,
@@ -258,17 +259,19 @@ export class PaymentsService {
     if (payment.shipmentId) {
       const shipment = await this.prisma.shipment.findUniqueOrThrow({
         where: { id: payment.shipmentId },
-        include: { trip: true, customer: true },
+        include: { customer: true },
       });
       await this.shipmentsService.confirmPayment(shipment.id);
-      if (shipment.trip) {
+      if (shipment.driverId) {
         // Un chauffeur était déjà choisi avant le paiement : on peut
         // provisionner tout de suite. Sinon (SEARCHING_DRIVER), le hold
-        // est différé jusqu'à ShipmentsService.assignToTrip.
+        // est différé jusqu'à ShipmentsService.accept. Le client a payé un
+        // montant unique (totalAmount) ; la commission en est déduite du gain
+        // du chauffeur, une seule fois.
         await this.wallets.holdShipmentRevenue({
-          driverId: shipment.trip.driverId,
+          driverId: shipment.driverId,
           shipmentId: shipment.id,
-          grossAmount: (shipment.totalAmount as bigint) - (shipment.platformFee as bigint),
+          grossAmount: shipment.totalAmount,
           commission: shipment.platformFee,
           sourceCurrencyId: shipment.currencyId,
         });
@@ -315,14 +318,13 @@ export class PaymentsService {
     try {
       const shipment = await this.prisma.shipment.findUnique({
         where: { id: event.shipmentId },
-        include: { trip: true },
       });
       if (!shipment) return;
 
       await this.refundShipment(event.shipmentId, event.refundEligiblePercentage ?? 0);
-      if (shipment.trip) {
+      if (shipment.driverId) {
         await this.wallets.reverseHeldFunds({
-          driverId: shipment.trip.driverId,
+          driverId: shipment.driverId,
           shipmentId: event.shipmentId,
           reason: event.reason,
         });

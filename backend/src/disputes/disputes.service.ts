@@ -1,4 +1,5 @@
 // backend/src/disputes/disputes.service.ts
+// [21/09/2026] v2 — parties d'un envoi identifiées via Shipment.driverId.
 import {
   BadRequestException,
   ForbiddenException,
@@ -124,11 +125,11 @@ export class DisputesService {
     } else if (dto.shipmentId) {
       const shipment = await this.prisma.shipment.findUnique({
         where: { id: dto.shipmentId },
-        include: { customer: true, trip: { include: { driver: true } } },
+        include: { customer: true, driver: true },
       });
       if (!shipment) throw new NotFoundException('Envoi introuvable.');
       const isParty =
-        shipment.customer.userId === userId || shipment.trip?.driver.userId === userId;
+        shipment.customer.userId === userId || shipment.driver?.userId === userId;
       if (!isParty) throw new ForbiddenException("Vous n'êtes pas partie à cet envoi.");
     }
   }
@@ -140,7 +141,7 @@ export class DisputesService {
       where: { id: disputeId },
       include: {
         booking: { include: { customer: true, trip: { include: { driver: true } } } },
-        shipment: { include: { customer: true, trip: { include: { driver: true } } } },
+        shipment: { include: { customer: true, driver: true } },
       },
     });
     if (!dispute) throw new NotFoundException('Litige introuvable.');
@@ -152,7 +153,7 @@ export class DisputesService {
       (dispute.booking.customer.userId === userId || dispute.booking.trip.driver.userId === userId);
     const isShipmentParty =
       dispute.shipment &&
-      (dispute.shipment.customer.userId === userId || dispute.shipment.trip?.driver.userId === userId);
+      (dispute.shipment.customer.userId === userId || dispute.shipment.driver?.userId === userId);
 
     if (!isOpener && !isAssignedAgent && !isBookingParty && !isShipmentParty) {
       throw new ForbiddenException('Accès non autorisé à ce litige.');
@@ -232,11 +233,11 @@ export class DisputesService {
     if (dispute.shipment) {
       const shipment = await this.prisma.shipment.findUnique({
         where: { id: dispute.shipmentId! },
-        include: { customer: true, trip: { include: { driver: true } } },
+        include: { customer: true, driver: true },
       });
       if (shipment) {
         recipientIds.add(shipment.customer.userId);
-        if (shipment.trip) recipientIds.add(shipment.trip.driver.userId);
+        if (shipment.driver) recipientIds.add(shipment.driver.userId);
       }
     }
     if (dispute.assignedAgentId) recipientIds.add(dispute.assignedAgentId);
@@ -508,9 +509,9 @@ export class DisputesService {
     }
     const shipment = await this.prisma.shipment.findUnique({
       where: { id: targetId },
-      include: { trip: true },
+      select: { driverId: true },
     });
-    return shipment?.trip?.driverId;
+    return shipment?.driverId ?? undefined;
   }
 
   /** Notifie client et chauffeur de l'issue du litige (section 22). */
@@ -533,11 +534,11 @@ export class DisputesService {
     if (dispute.shipment) {
       const shipment = await this.prisma.shipment.findUnique({
         where: { id: dispute.shipmentId! },
-        include: { customer: true, trip: { include: { driver: true } } },
+        include: { customer: true, driver: true },
       });
       if (shipment) {
         recipientIds.add(shipment.customer.userId);
-        if (shipment.trip) recipientIds.add(shipment.trip.driver.userId);
+        if (shipment.driver) recipientIds.add(shipment.driver.userId);
       }
     }
 

@@ -1,10 +1,11 @@
 // backend/src/notifications/notifications.service.ts
+// [21/09/2026] v2 — pushData et pushOptions transmis au fournisseur push.
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { NotificationChannel, NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationTemplatesService } from './notification-templates.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
-import { PUSH_PROVIDER, PushProvider } from '../integrations/push/push-provider.interface';
+import { PUSH_PROVIDER, PushOptions, PushProvider } from '../integrations/push/push-provider.interface';
 import { EMAIL_PROVIDER, EmailProvider } from '../integrations/email/email-provider.interface';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
@@ -19,6 +20,10 @@ export interface NotifyParams {
   /** Utilisés si aucun NotificationTemplate actif n'existe pour (type, canal, locale). */
   fallbackTitle?: string;
   fallbackBody?: string;
+  /** Données jointes au push (ex: { type, shipmentId }) pour que l'app sache où ouvrir la notification. */
+  pushData?: Record<string, unknown>;
+  /** Canal Android / priorité du push — voir PushOptions. */
+  pushOptions?: PushOptions;
 }
 
 /**
@@ -78,7 +83,7 @@ export class NotificationsService {
     });
 
     try {
-      await this.send(params.userId, channel, subject ?? '', body);
+      await this.send(params.userId, channel, subject ?? '', body, params.pushData, params.pushOptions);
       await this.prisma.notification.update({
         where: { id: notification.id },
         data: { sentAt: new Date() },
@@ -91,7 +96,14 @@ export class NotificationsService {
     }
   }
 
-  private async send(userId: string, channel: NotificationChannel, title: string, body: string): Promise<void> {
+  private async send(
+    userId: string,
+    channel: NotificationChannel,
+    title: string,
+    body: string,
+    pushData?: Record<string, unknown>,
+    pushOptions?: PushOptions,
+  ): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('Utilisateur introuvable.');
 
@@ -101,7 +113,7 @@ export class NotificationsService {
           where: { userId, pushToken: { not: null } },
         });
         const tokens = devices.map((d) => d.pushToken).filter((t): t is string => Boolean(t));
-        await this.pushProvider.send(tokens, title, body);
+        await this.pushProvider.send(tokens, title, body, pushData, pushOptions);
         return;
       }
       case NotificationChannel.SMS:

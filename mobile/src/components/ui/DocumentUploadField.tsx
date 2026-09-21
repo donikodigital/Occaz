@@ -1,4 +1,5 @@
 // mobile/src/components/ui/DocumentUploadField.tsx
+// [21/09/2026] v+ — strokeWidth au lieu de stroke.
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { IconAlertCircle, IconCamera, IconFileText, IconPhoto } from '@tabler/icons-react-native';
@@ -74,7 +75,7 @@ export function DocumentUploadField({ label, document, isUploading, onPickLibrar
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={[styles.iconTile, { backgroundColor: tile.background }]}>
-          <IconFileText size={20} color={tile.icon} stroke={1.8} />
+          <IconFileText size={20} color={tile.icon} strokeWidth={1.8} />
         </View>
         <AppText variant="sm" weight="semibold" style={styles.title}>
           {label}

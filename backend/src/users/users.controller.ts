@@ -1,15 +1,14 @@
 // backend/src/users/users.controller.ts
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AccountType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { ListUsersQueryDto } from './dto/list-users-query.dto';
 
 @ApiTags('Utilisateurs')
 @ApiBearerAuth()
@@ -27,13 +26,15 @@ export class UsersController {
     return this.usersService.updateSelf(user.id, dto);
   }
 
+  /**
+   * Un seul DTO pour toute la query (pagination, recherche, accountType) :
+   * un @Query('accountType') séparé serait rejeté en 400 par le
+   * ValidationPipe global (forbidNonWhitelisted) — voir ListUsersQueryDto.
+   */
   @Permissions(PERMISSIONS.USER_READ)
   @Get()
-  findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('accountType') accountType?: AccountType,
-  ) {
-    return this.usersService.findAll(query, accountType);
+  findAll(@Query() query: ListUsersQueryDto) {
+    return this.usersService.findAll(query, query.accountType);
   }
 
   @Permissions(PERMISSIONS.USER_READ)

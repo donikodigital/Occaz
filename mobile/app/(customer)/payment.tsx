@@ -1,10 +1,17 @@
 // mobile/app/(customer)/payment.tsx
+//
+// v2 — Habillage bleu océan ; logique inchangée. Le montant à payer occupe
+// un bandeau sombre, les moyens de paiement sont des cartes avec un
+// indicateur de choix, et « Payer » reprend le bouton plein du profil.
+
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconCheck, IconCreditCard } from '@tabler/icons-react-native';
-import { AppText, Button, Card, IconButton, ScreenContainer } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { IconCheck, IconCreditCard, IconShieldLock } from '@tabler/icons-react-native';
+import { AppText, ScreenContainer } from '@/components/ui';
+import { OceanButton, OceanCard, OceanEmpty, OceanHeroCard, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { colors, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useActivePaymentProviders, useInitiatePayment } from '@/hooks/usePayments';
 import { useBooking } from '@/hooks/useBookings';
 import { useShipment } from '@/hooks/useShipments';
@@ -60,63 +67,58 @@ export default function PaymentScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Paiement
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+      <OceanScreenHeader title="Paiement" subtitle="Choisissez comment payer" onBack={() => router.back()} />
 
-      <Card style={styles.amountCard}>
-        <AppText variant="sm" color="textSecondary">
+      <OceanHeroCard style={styles.amountHero}>
+        <AppText variant="sm" color={OCEAN.sky}>
           Montant à payer
         </AppText>
-        <AppText variant="display" weight="bold">
+        <AppText variant="display" weight="bold" color={OCEAN.onDark}>
           {isLoadingAmount ? '…' : formatMoney(totalAmount ?? '0')}
         </AppText>
-      </Card>
+        <View style={styles.secure}>
+          <IconShieldLock size={14} color={OCEAN.gold} />
+          <AppText variant="xs" color={OCEAN.sky}>
+            Paiement sécurisé, traité par votre prestataire de paiement.
+          </AppText>
+        </View>
+      </OceanHeroCard>
 
-      <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
+      <AppText variant="md" weight="bold" color={OCEAN.deep} style={styles.sectionTitle}>
         Moyen de paiement
       </AppText>
 
       {providersLoading ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={OCEAN.base} style={styles.loader} />
       ) : !providers || providers.length === 0 ? (
-        <Card style={styles.emptyCard}>
-          <AppText variant="sm" color="textSecondary" align="center">
-            Aucun moyen de paiement n'est disponible pour le moment. Contactez le support.
-          </AppText>
-        </Card>
+        <OceanCard>
+          <OceanEmpty
+            icon={<IconCreditCard size={28} color={OCEAN.base} />}
+            title="Aucun moyen de paiement"
+            text="Aucun moyen de paiement n'est disponible pour le moment. Contactez le support."
+          />
+        </OceanCard>
       ) : (
         <View style={styles.providerList}>
           {providers.map((provider) => {
             const isSelected = provider.id === selectedProviderId;
             return (
-              <Card
+              <OceanCard
                 key={provider.id}
                 onPress={() => setSelectedProviderId(provider.id)}
                 style={[styles.providerCard, isSelected && styles.providerCardActive]}
+                accessibilityLabel={provider.name || PROVIDER_LABELS[provider.type]}
               >
-                <View style={styles.providerRow}>
-                  <View style={styles.providerIcon}>
-                    <IconCreditCard size={18} color={colors.primary} />
-                  </View>
-                  <AppText variant="base" weight="medium" style={{ flex: 1 }}>
-                    {provider.name || PROVIDER_LABELS[provider.type]}
-                  </AppText>
-                  {isSelected ? (
-                    <View style={styles.checkIcon}>
-                      <IconCheck size={13} color={colors.onPrimary} />
-                    </View>
-                  ) : null}
+                <View style={[styles.providerIcon, isSelected && styles.providerIconActive]}>
+                  <IconCreditCard size={20} color={isSelected ? OCEAN.onDark : OCEAN.base} />
                 </View>
-              </Card>
+                <AppText variant="base" weight="semibold" style={styles.providerName}>
+                  {provider.name || PROVIDER_LABELS[provider.type]}
+                </AppText>
+                <View style={[styles.radio, isSelected && styles.radioActive]}>
+                  {isSelected ? <IconCheck size={13} color={OCEAN.onDark} /> : null}
+                </View>
+              </OceanCard>
             );
           })}
         </View>
@@ -128,7 +130,7 @@ export default function PaymentScreen() {
         </AppText>
       ) : null}
 
-      <Button
+      <OceanButton
         label="Payer"
         onPress={handlePay}
         disabled={!selectedProviderId}
@@ -140,16 +142,17 @@ export default function PaymentScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
+  amountHero: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
+    gap: spacing.xs,
+    paddingVertical: spacing.lg,
     marginBottom: spacing.lg,
   },
-  amountCard: {
+  secure: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    gap: 6,
+    marginTop: spacing.xs,
   },
   sectionTitle: {
     marginBottom: spacing.sm,
@@ -157,45 +160,53 @@ const styles = StyleSheet.create({
   loader: {
     marginTop: spacing.lg,
   },
-  emptyCard: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.surfaceMuted,
-  },
   providerList: {
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
   providerCard: {
-    padding: spacing.sm + 2,
-  },
-  providerCardActive: {
-    borderColor: colors.primary,
-  },
-  providerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1.5,
+  },
+  providerCardActive: {
+    borderColor: OCEAN.base,
+    backgroundColor: OCEAN.mist,
   },
   providerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.sm + 2,
-    backgroundColor: colors.primaryLight,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
+  providerIconActive: {
+    backgroundColor: OCEAN.base,
+  },
+  providerName: {
+    flex: 1,
+  },
+  radio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: OCEAN.line,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  radioActive: {
+    backgroundColor: OCEAN.base,
+    borderColor: OCEAN.base,
   },
   error: {
     marginBottom: spacing.sm,
   },
   submit: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
 });

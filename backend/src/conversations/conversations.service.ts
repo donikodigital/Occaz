@@ -1,4 +1,5 @@
 // backend/src/conversations/conversations.service.ts
+// [21/09/2026] v2 — conversation d'un envoi via Shipment.driverId (chauffeur avec ou sans trajet).
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
@@ -42,13 +43,13 @@ export class ConversationsService {
   async getOrCreateForShipment(shipmentId: string, requesterUserId: string) {
     const shipment = await this.prisma.shipment.findUnique({
       where: { id: shipmentId },
-      include: { customer: true, trip: { include: { driver: true } } },
+      include: { customer: true, driver: true },
     });
     if (!shipment) throw new NotFoundException('Envoi introuvable.');
-    if (!shipment.trip) {
+    if (!shipment.driver) {
       throw new ForbiddenException("Aucun chauffeur n'est encore assigné à cet envoi.");
     }
-    this.assertParty(requesterUserId, shipment.customer.userId, shipment.trip.driver.userId);
+    this.assertParty(requesterUserId, shipment.customer.userId, shipment.driver.userId);
 
     const existing = await this.prisma.conversation.findFirst({ where: { shipmentId } });
     if (existing) return existing;
@@ -57,7 +58,7 @@ export class ConversationsService {
       data: {
         shipmentId,
         customerId: shipment.customerId,
-        driverId: shipment.trip.driverId,
+        driverId: shipment.driver.id,
       },
     });
   }

@@ -1,10 +1,16 @@
 // mobile/src/components/screens/CreateDisputeScreen.tsx
+//
+// v2 — Habillage bleu océan (partagé client / chauffeur) : en-tête avec
+// retour, encadré qui rassure (le support répond ici), saisie dans une
+// section à en-tête soulignée, bouton plein. Logique inchangée.
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft } from '@tabler/icons-react-native';
-import { AppText, Button, IconButton, ScreenContainer, TextField } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { IconAlertTriangle, IconLifebuoy } from '@tabler/icons-react-native';
+import { AppText, ScreenContainer, TextField } from '@/components/ui';
+import { OceanButton, OceanCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useCreateDispute } from '@/hooks/useDisputes';
 import { ApiError } from '@/services/api/ApiError';
 import type { DisputeSubjectType } from '@/types/disputes.types';
@@ -51,23 +57,18 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Signaler un problème
+      <OceanScreenHeader title="Signaler un problème" subtitle="Notre équipe vous répond ici" onBack={() => router.back()} />
+
+      <OceanCard style={styles.intro}>
+        <View style={styles.introIcon}>
+          <IconLifebuoy size={22} color={OCEAN.base} />
+        </View>
+        <AppText variant="sm" color="textSecondary" style={styles.introText}>
+          Décrivez ce qui s'est passé — notre équipe support vous répondra directement ici.
         </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+      </OceanCard>
 
-      <AppText variant="sm" color="textSecondary" style={styles.intro}>
-        Décrivez ce qui s'est passé — notre équipe support vous répondra directement ici.
-      </AppText>
-
-      <View style={styles.fields}>
+      <OceanSection icon={<IconAlertTriangle size={17} color={OCEAN.base} />} title="Votre signalement">
         <TextField
           label="Motif"
           value={reason}
@@ -83,7 +84,7 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
           multiline
           style={styles.descriptionField}
         />
-      </View>
+      </OceanSection>
 
       {errorMessage ? (
         <AppText variant="sm" color="danger" style={styles.error}>
@@ -91,30 +92,29 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
         </AppText>
       ) : null}
 
-      <Button
-        label="Envoyer au support"
-        onPress={handleSubmit}
-        loading={createDispute.isPending}
-        style={styles.submit}
-      />
+      <OceanButton label="Envoyer au support" onPress={handleSubmit} loading={createDispute.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
+  intro: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
+    gap: spacing.sm,
+    padding: spacing.md,
     marginBottom: spacing.md,
   },
-  intro: {
-    marginBottom: spacing.lg,
+  introIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: OCEAN.mist,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  fields: {
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+  introText: {
+    flex: 1,
   },
   descriptionField: {
     minHeight: 90,
@@ -124,6 +124,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   submit: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
 });

@@ -1,6 +1,7 @@
 // backend/src/integrations/push/expo-push.provider.ts
+// [21/09/2026] v2 — options par push : canal Android et priorité (alerte qui sonne).
 import { Injectable, Logger } from '@nestjs/common';
-import { PushProvider } from './push-provider.interface';
+import { PushOptions, PushProvider } from './push-provider.interface';
 
 /**
  * Service push d'Expo — gratuit, aucun compte tiers à créer (contrairement
@@ -21,7 +22,13 @@ export class ExpoPushProvider implements PushProvider {
   /** Limite recommandée par Expo par requête — on découpe au-delà. */
   private readonly maxMessagesPerRequest = 100;
 
-  async send(pushTokens: string[], title: string, body: string, data?: Record<string, unknown>): Promise<void> {
+  async send(
+    pushTokens: string[],
+    title: string,
+    body: string,
+    data?: Record<string, unknown>,
+    options?: PushOptions,
+  ): Promise<void> {
     // Un token invalide (mauvais format) ferait échouer tout le lot côté
     // Expo — filtré ici plutôt que de risquer de perdre les envois valides
     // à cause d'un seul mauvais token.
@@ -33,7 +40,15 @@ export class ExpoPushProvider implements PushProvider {
       return;
     }
 
-    const messages = validTokens.map((to) => ({ to, title, body, data, sound: 'default' as const }));
+    const messages = validTokens.map((to) => ({
+      to,
+      title,
+      body,
+      data,
+      sound: 'default' as const,
+      ...(options?.channelId ? { channelId: options.channelId } : {}),
+      ...(options?.priority ? { priority: options.priority } : {}),
+    }));
     const chunks = this.chunk(messages, this.maxMessagesPerRequest);
 
     for (const messageChunk of chunks) {

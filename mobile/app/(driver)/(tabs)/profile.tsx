@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/profile.tsx
+// [21/09/2026] v+ — StyleSheet.absoluteFillObject remplacé par absoluteFill (retiré des versions récentes de React Native).
 import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
@@ -399,7 +400,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   heroDecor: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 24,
     overflow: 'hidden',
   },

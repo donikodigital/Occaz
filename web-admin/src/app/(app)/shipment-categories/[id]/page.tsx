@@ -1,11 +1,15 @@
 // web-admin/src/app/(app)/shipment-categories/[id]/page.tsx
+//
+// v2 — Refonte : même formulaire que la page Ajouter (ShipmentCategoryForm),
+// pré-rempli. Le formulaire est monté une fois la catégorie chargée : sa
+// saisie n'est plus écrasée par un rechargement après enregistrement.
+
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { IconArrowLeft } from '@tabler/icons-react';
-import { Button, Card, Select, Switch, TextField } from '@/components/ui';
+import { BackHeader, Chip, Notice } from '@/components/admin/AdminUi';
+import { ShipmentCategoryForm, type ShipmentCategoryFormValues } from '@/components/shipmentCategories/ShipmentCategoryForm';
 import { useShipmentCategory, useUpdateShipmentCategory } from '@/hooks/useShipmentCategories';
 import { useCountries } from '@/hooks/useGeography';
 import { ApiError } from '@/services/api/ApiError';
@@ -16,92 +20,59 @@ export default function EditShipmentCategoryPage() {
   const { data: countries } = useCountries();
   const updateCategory = useUpdateShipmentCategory(id);
 
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [isAllowed, setIsAllowed] = useState(true);
-  const [countryId, setCountryId] = useState('');
-  const [priceMultiplier, setPriceMultiplier] = useState('1');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    if (!category) return;
-    setName(category.name);
-    setDescription(category.description ?? '');
-    setIsAllowed(category.isAllowed);
-    setCountryId(category.countryId ?? '');
-    setPriceMultiplier(String(category.priceMultiplier));
-  }, [category]);
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleSubmit(values: ShipmentCategoryFormValues) {
     setErrorMessage(undefined);
     setSaved(false);
-
-    const multiplier = Number(priceMultiplier.replace(',', '.'));
-    if (!Number.isFinite(multiplier) || multiplier < 0) {
-      setErrorMessage('La majoration de tarif doit être un nombre positif.');
-      return;
-    }
-
     try {
-      await updateCategory.mutateAsync({
-        name: name.trim(),
-        description: description.trim() || undefined,
-        isAllowed,
-        countryId: countryId || undefined,
-        priceMultiplier: multiplier,
-      });
+      await updateCategory.mutateAsync(values);
       setSaved(true);
     } catch (error) {
       setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
     }
   }
 
-  if (isError) return <p className="text-sm text-danger">Catégorie introuvable.</p>;
-  if (isLoading || !category) return <p className="text-sm text-text-secondary">Chargement…</p>;
+  if (isError) {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <BackHeader href="/shipment-categories" backLabel="Catégories" title="Catégorie introuvable" />
+        <Notice tone="danger">Cette catégorie n’existe plus ou n’a pas pu être chargée.</Notice>
+      </div>
+    );
+  }
+
+  if (isLoading || !category) {
+    return (
+      <div className="max-w-2xl space-y-4">
+        <div className="h-10 w-40 animate-pulse rounded-xl bg-border/50" />
+        <div className="h-24 animate-pulse rounded-2xl bg-border/50" />
+        <div className="h-40 animate-pulse rounded-2xl bg-border/50" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/shipment-categories" className="text-text-secondary hover:text-text-primary">
-          <IconArrowLeft size={20} />
-        </Link>
-        <h1 className="text-2xl font-semibold text-text-primary">{category.name}</h1>
-      </div>
+    <div className="max-w-2xl space-y-6">
+      <BackHeader
+        href="/shipment-categories"
+        backLabel="Catégories"
+        title={category.name}
+        subtitle="Modifier la catégorie d’envoi"
+        badge={<Chip tone={category.isAllowed ? 'success' : 'danger'}>{category.isAllowed ? 'Autorisée' : 'Interdite'}</Chip>}
+      />
 
-      <Card>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <TextField label="Nom" value={name} onChange={(e) => setName(e.target.value)} required />
-          <TextField
-            label="Description (optionnel)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-          <Select label="Pays (optionnel)" value={countryId} onChange={(e) => setCountryId(e.target.value)}>
-            <option value="">Règle globale (tous pays)</option>
-            {(countries ?? []).map((country) => (
-              <option key={country.id} value={country.id}>
-                {country.name}
-              </option>
-            ))}
-          </Select>
-          <TextField
-            label="Majoration de tarif"
-            value={priceMultiplier}
-            onChange={(e) => setPriceMultiplier(e.target.value)}
-            hint="1 = tarif standard, 1.5 = +50%"
-          />
-          <Switch checked={isAllowed} onChange={setIsAllowed} label="Catégorie autorisée" />
-
-          {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
-          {saved ? <p className="text-sm text-success-dark">Modifications enregistrées.</p> : null}
-
-          <Button type="submit" loading={updateCategory.isPending}>
-            Enregistrer les modifications
-          </Button>
-        </form>
-      </Card>
+      <ShipmentCategoryForm
+        key={category.id}
+        mode="edit"
+        countries={countries ?? []}
+        initial={category}
+        isSubmitting={updateCategory.isPending}
+        errorMessage={errorMessage}
+        saved={saved}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

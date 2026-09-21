@@ -1,10 +1,18 @@
 // mobile/src/components/screens/DisputeDetailScreen.tsx
+//
+// v2 — Habillage bleu océan (partagé client / chauffeur) : en-tête avec
+// retour rond, pastilles de statut et de priorité, carte verte « Litige
+// résolu », fil de messages aux bulles bleues (soi) et claires (l'autre),
+// message du support en doré, saisie arrondie avec bouton d'envoi bleu.
+// Logique inchangée.
 import React, { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconSend } from '@tabler/icons-react-native';
-import { AppText, Badge, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { router } from 'expo-router';
+import { IconArrowLeft, IconCircleCheck, IconSend } from '@tabler/icons-react-native';
+import { AppText, ScreenContainer, TextField } from '@/components/ui';
+import { OceanPill, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useAddDisputeMessage, useDispute } from '@/hooks/useDisputes';
 import { useAuthStore } from '@/stores/authStore';
 import { DISPUTE_PRIORITY_LABELS, DISPUTE_STATUS_LABELS, DISPUTE_STATUS_TONE } from '@/utils/disputeLabels';
@@ -14,6 +22,13 @@ import type { DisputeMessage } from '@/types/disputes.types';
 
 export interface DisputeDetailScreenProps {
   disputeId: string;
+}
+
+function pillToneFor(tone: string): OceanPillTone {
+  if (tone === 'success') return 'success';
+  if (tone === 'danger') return 'danger';
+  if (tone === 'neutral') return 'neutral';
+  return 'ocean';
 }
 
 function DisputeMessageBubble({
@@ -29,8 +44,8 @@ function DisputeMessageBubble({
     return (
       <View style={styles.agentRow}>
         <View style={styles.agentBubble}>
-          <AppText variant="xs" weight="semibold" color="accentDark" style={styles.agentLabel}>
-            Support
+          <AppText variant="xs" weight="bold" color={OCEAN.goldInk} style={styles.agentLabel}>
+            SUPPORT
           </AppText>
           <AppText variant="sm">{message.message}</AppText>
         </View>
@@ -41,7 +56,7 @@ function DisputeMessageBubble({
   return (
     <View style={[styles.bubbleRow, isMine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
       <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
-        <AppText variant="sm" color={isMine ? colors.onPrimary : 'textPrimary'}>
+        <AppText variant="sm" color={isMine ? OCEAN.onDark : 'textPrimary'}>
           {message.message}
         </AppText>
       </View>
@@ -67,7 +82,7 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
             Impossible de charger ce litige.
           </AppText>
         ) : (
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={OCEAN.base} />
         )}
       </ScreenContainer>
     );
@@ -75,6 +90,7 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
 
   const messages = [...(dispute.messages ?? [])].reverse();
   const canReply = dispute.status !== 'CLOSED';
+  const canSend = Boolean(draft.trim()) && !addMessage.isPending;
 
   function handleSend() {
     const content = draft.trim();
@@ -98,31 +114,34 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
             />
             <Pressable
               onPress={handleSend}
-              disabled={!draft.trim() || addMessage.isPending}
-              style={[styles.sendButton, (!draft.trim() || addMessage.isPending) && styles.sendButtonDisabled]}
+              disabled={!canSend}
+              style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
               accessibilityRole="button"
               accessibilityLabel="Envoyer"
             >
-              <IconSend size={18} color={colors.onPrimary} />
+              <IconSend size={18} color={OCEAN.onDark} />
             </Pressable>
           </View>
         ) : undefined
       }
     >
       <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
+        <Pressable
           onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold" numberOfLines={1} style={{ flex: 1 }}>
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+        >
+          <IconArrowLeft size={18} color={OCEAN.base} />
+        </Pressable>
+        <AppText variant="lg" weight="bold" color={OCEAN.deep} numberOfLines={2} style={styles.title}>
           {dispute.reason}
         </AppText>
       </View>
 
       <View style={styles.badgeRow}>
-        <Badge label={DISPUTE_STATUS_LABELS[dispute.status]} tone={DISPUTE_STATUS_TONE[dispute.status]} />
-        <Badge label={DISPUTE_PRIORITY_LABELS[dispute.priority]} tone="neutral" />
+        <OceanPill label={DISPUTE_STATUS_LABELS[dispute.status]} tone={pillToneFor(DISPUTE_STATUS_TONE[dispute.status])} />
+        <OceanPill label={DISPUTE_PRIORITY_LABELS[dispute.priority]} tone="neutral" />
       </View>
 
       {dispute.description ? (
@@ -133,9 +152,12 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
 
       {dispute.resolution ? (
         <View style={styles.resolutionCard}>
-          <AppText variant="sm" weight="semibold" color="successDark">
-            Litige résolu
-          </AppText>
+          <View style={styles.resolutionTitle}>
+            <IconCircleCheck size={18} color={colors.successDark} />
+            <AppText variant="sm" weight="bold" color="successDark">
+              Litige résolu
+            </AppText>
+          </View>
           {dispute.resolution.refundAmount ? (
             <AppText variant="xs" color="textSecondary">
               Remboursement : {formatMoney(dispute.resolution.refundAmount)}
@@ -172,6 +194,9 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
 }
 
 const styles = StyleSheet.create({
+  pressed: {
+    opacity: 0.75,
+  },
   center: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -183,8 +208,22 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     marginBottom: spacing.sm,
   },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: OCEAN.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    flex: 1,
+  },
   badgeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.xs,
     marginBottom: spacing.sm,
   },
@@ -193,10 +232,15 @@ const styles = StyleSheet.create({
   },
   resolutionCard: {
     backgroundColor: colors.successLight,
-    borderRadius: radius.md,
-    padding: spacing.sm + 2,
-    gap: 2,
+    borderRadius: 18,
+    padding: spacing.md,
+    gap: 4,
     marginBottom: spacing.md,
+  },
+  resolutionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   list: {
     paddingVertical: spacing.sm,
@@ -218,17 +262,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    borderRadius: radius.lg,
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.sm + 2,
+    borderRadius: 20,
+    paddingVertical: spacing.xs + 3,
+    paddingHorizontal: spacing.sm + 4,
   },
   bubbleMine: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
+    backgroundColor: OCEAN.base,
+    borderBottomRightRadius: 6,
   },
   bubbleTheirs: {
-    backgroundColor: colors.surfaceMuted,
-    borderBottomLeftRadius: 4,
+    backgroundColor: OCEAN.mist,
+    borderWidth: 1,
+    borderColor: OCEAN.line,
+    borderBottomLeftRadius: 6,
   },
   timeLabel: {
     marginTop: 2,
@@ -240,12 +286,13 @@ const styles = StyleSheet.create({
   },
   agentBubble: {
     maxWidth: '85%',
-    backgroundColor: colors.accentLight,
-    borderRadius: radius.md,
+    backgroundColor: OCEAN.goldSoft,
+    borderRadius: 16,
     paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.sm + 2,
+    paddingHorizontal: spacing.sm + 4,
   },
   agentLabel: {
+    letterSpacing: 0.8,
     marginBottom: 2,
   },
   composer: {
@@ -259,14 +306,14 @@ const styles = StyleSheet.create({
     maxHeight: 100,
   },
   sendButton: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 46,
     borderRadius: radius.pill,
-    backgroundColor: colors.primary,
+    backgroundColor: OCEAN.base,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
 });

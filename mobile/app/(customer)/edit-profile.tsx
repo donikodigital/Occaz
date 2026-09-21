@@ -1,17 +1,20 @@
 // mobile/app/(customer)/edit-profile.tsx
 //
-// v4 — Ajoute la date de naissance en saisie manuelle, format JJ/MM/AAAA
-// avec les slashs insérés automatiquement pendant la frappe (pas de
+// v5 — Habillage bleu océan (en-tête de retour, sections à en-tête
+// soulignée, bouton plein). Logique inchangée : date de naissance en saisie
+// manuelle JJ/MM/AAAA avec les slashs insérés pendant la frappe (pas de
 // CalendarPicker : son usage ailleurs dans l'app suggère des dates
 // futures uniquement — trip-new.tsx — pas adapté à une date de naissance).
 
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowLeft, IconMapPin } from '@tabler/icons-react-native';
-import { AppText, Button, Card, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { IconChevronRight, IconMapPin, IconUserCircle } from '@tabler/icons-react-native';
+import { AppText, ScreenContainer, TextField } from '@/components/ui';
 import { CountrySelectField } from '@/components/screens/CountrySelectField';
+import { OceanButton, OceanCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useCustomerProfile, useUpdateCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { ApiError } from '@/services/api/ApiError';
@@ -117,22 +120,11 @@ export default function EditProfileScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Modifier le profil
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+      <OceanScreenHeader title="Modifier le profil" subtitle="Compte client" onBack={() => router.back()} />
 
-      <View style={styles.fields}>
+      <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title="Identité">
         <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Fatoumata" />
         <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Diallo" />
-
         <TextField
           label="Date de naissance (optionnel)"
           value={dateOfBirth}
@@ -141,38 +133,42 @@ export default function EditProfileScreen() {
           keyboardType="number-pad"
           maxLength={10}
         />
+      </OceanSection>
 
+      <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Localisation">
         <CountrySelectField label="Pays" value={country} onSelect={setCountry} />
 
         <View>
           <AppText variant="sm" weight="medium" color="textSecondary" style={styles.cityLabel}>
             Ville
           </AppText>
-          <Card
+          <OceanCard
             onPress={() => {
               openCityPicker(CITY_FIELD);
               router.push('/(customer)/select-city');
             }}
             style={styles.cityCard}
+            accessibilityLabel="Choisir une ville"
           >
-            <View style={styles.cityRow}>
-              <IconMapPin size={16} color={colors.textSecondary} />
-              <AppText variant="base" color={city ? 'textPrimary' : 'textSecondary'}>
-                {city?.name ?? 'Choisir une ville'}
-              </AppText>
+            <View style={styles.cityIcon}>
+              <IconMapPin size={16} color={OCEAN.base} />
             </View>
-          </Card>
+            <AppText variant="base" weight={city ? 'semibold' : 'medium'} color={city ? 'textPrimary' : 'textSecondary'} style={styles.cityText}>
+              {city?.name ?? 'Choisir une ville'}
+            </AppText>
+            <IconChevronRight size={16} color={colors.textMuted} />
+          </OceanCard>
         </View>
 
         <TextField
           label="Adresse (optionnel)"
           value={address}
           onChangeText={setAddress}
-          placeholder="Ex : Quartier Almamya, non loin de la mosquée Fayçal"
+          placeholder="Ex : quartier, repère connu"
           multiline
           style={styles.addressField}
         />
-      </View>
+      </OceanSection>
 
       {errorMessage ? (
         <AppText variant="sm" color="danger" style={styles.error}>
@@ -180,33 +176,31 @@ export default function EditProfileScreen() {
         </AppText>
       ) : null}
 
-      <Button label="Enregistrer" onPress={handleSubmit} loading={updateProfile.isPending} style={styles.submit} />
+      <OceanButton label="Enregistrer" onPress={handleSubmit} loading={updateProfile.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  fields: {
-    gap: spacing.md,
-    flex: 1,
-  },
   cityLabel: {
     marginBottom: spacing.xxs,
   },
   cityCard: {
-    padding: spacing.sm + 2,
-  },
-  cityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    padding: spacing.sm + 2,
+  },
+  cityIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: OCEAN.mist,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cityText: {
+    flex: 1,
   },
   addressField: {
     minHeight: 70,
@@ -216,6 +210,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   submit: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
 });

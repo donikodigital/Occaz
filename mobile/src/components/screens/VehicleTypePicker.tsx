@@ -1,4 +1,5 @@
 // mobile/src/components/screens/VehicleTypePicker.tsx
+// [21/09/2026] v+ — strokeWidth au lieu de stroke.
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
@@ -17,7 +18,7 @@ import { colors, radius, spacing } from '@/theme';
 import { VEHICLE_TYPE_OPTIONS } from '@/utils/vehicleLabels';
 import type { VehicleType } from '@/types/vehicles.types';
 
-export type VehicleIcon = React.ComponentType<{ size?: number; color?: string; stroke?: number }>;
+export type VehicleIcon = React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 
 /**
  * Une icône par type — seul endroit à modifier si tu veux en changer une.
@@ -73,7 +74,7 @@ export function VehicleTypePicker({ value, onChange }: VehicleTypePickerProps) {
                 pressed && styles.tilePressed,
               ]}
             >
-              <Icon size={26} color={isActive ? colors.primary : colors.textSecondary} stroke={1.7} />
+              <Icon size={26} color={isActive ? colors.primary : colors.textSecondary} strokeWidth={1.7} />
               <AppText
                 variant="xs"
                 weight={isActive ? 'semibold' : 'medium'}
@@ -88,7 +89,7 @@ export function VehicleTypePicker({ value, onChange }: VehicleTypePickerProps) {
 
               {isActive ? (
                 <View style={styles.check}>
-                  <IconCheck size={10} color={colors.onPrimary} stroke={3} />
+                  <IconCheck size={10} color={colors.onPrimary} strokeWidth={3} />
                 </View>
               ) : null}
             </Pressable>

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/VehicleDetailModal.tsx
+// [21/09/2026] v+ — strokeWidth au lieu de stroke.
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -139,7 +140,7 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
           <View style={styles.hero}>
             <View style={styles.heroRow}>
               <View style={styles.heroIcon}>
-                <TypeIcon size={28} color={colors.onPrimary} stroke={1.7} />
+                <TypeIcon size={28} color={colors.onPrimary} strokeWidth={1.7} />
               </View>
               <View style={styles.heroText}>
                 <AppText variant="xl" weight="bold" color={colors.onPrimary} numberOfLines={1}>

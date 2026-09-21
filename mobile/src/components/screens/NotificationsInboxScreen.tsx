@@ -1,11 +1,19 @@
 // mobile/src/components/screens/NotificationsInboxScreen.tsx
+// [21/09/2026] v+ — icônes des types SHIPMENT_REQUEST et SHIPMENT_EXTENSION.
+//
+// v2 — Habillage bleu océan (partagé client / chauffeur) : en-tête avec
+// retour rond, sous-titre « 3 non lues » ou « Tout est à jour » et bouton
+// « Tout marquer lu » en pastille ; une carte par notification avec une
+// pastille de couleur selon le type (doré pour les paiements, rouge pour un
+// litige, vert pour une livraison, bleu pour le reste), un point bleu quand
+// elle n'est pas lue ; les notifications lues s'estompent. Logique inchangée.
 import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   IconAlertTriangle,
-  IconArrowLeft,
   IconBellRinging,
+  IconChecks,
   IconCreditCard,
   IconMessageCircle,
   IconPackage,
@@ -13,8 +21,10 @@ import {
   IconRoute,
   IconShieldCheck,
 } from '@tabler/icons-react-native';
-import { AppText, Badge, Card, IconButton, ResponsiveList, ScreenContainer } from '@/components/ui';
+import { AppText, ResponsiveList, ScreenContainer } from '@/components/ui';
+import { OceanCard, OceanEmpty, OceanScreenHeader } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications } from '@/hooks/useNotifications';
 import { NOTIFICATION_TYPE_LABELS } from '@/utils/notificationLabels';
 import { formatTime } from '@/utils/date';
@@ -34,6 +44,33 @@ const TYPE_ICON: Record<NotificationType, React.ComponentType<{ size?: number; c
   REFUND: IconCreditCard,
   STATUS_CHANGE: IconRefresh,
   SUPPORT_MESSAGE: IconMessageCircle,
+  SHIPMENT_REQUEST: IconPackage,
+  SHIPMENT_EXTENSION: IconRefresh,
+};
+
+type Tone = 'ocean' | 'gold' | 'danger' | 'success';
+
+/** Un type inconnu retombe sur le bleu : une nouvelle notification ne casse jamais l'écran. */
+function toneFor(type: NotificationType): Tone {
+  switch (type) {
+    case 'PAYMENT':
+    case 'DRIVER_PAYMENT':
+    case 'REFUND':
+      return 'gold';
+    case 'DISPUTE':
+      return 'danger';
+    case 'DELIVERY':
+      return 'success';
+    default:
+      return 'ocean';
+  }
+}
+
+const TILE_TONES: Record<Tone, { background: string; foreground: string }> = {
+  ocean: { background: OCEAN.mist, foreground: OCEAN.base },
+  gold: { background: OCEAN.goldSoft, foreground: OCEAN.goldInk },
+  danger: { background: '#FDE8E8', foreground: colors.danger },
+  success: { background: colors.successLight, foreground: colors.successDark },
 };
 
 type ListRow = { kind: 'header'; key: string; label: string } | { kind: 'item'; key: string; notification: AppNotification };
@@ -53,22 +90,24 @@ function NotificationRow({ notification }: { notification: AppNotification }) {
   const markRead = useMarkNotificationRead();
   const Icon = TYPE_ICON[notification.type];
   const isUnread = !notification.readAt;
+  const tone = TILE_TONES[toneFor(notification.type)];
   // Repli sur le libellé générique du type uniquement pour les lignes
   // antérieures à la persistance de title/body (voir notifications.types.ts).
   const title = notification.title ?? NOTIFICATION_TYPE_LABELS[notification.type];
 
   return (
-    <Card
+    <OceanCard
       onPress={() => {
         if (isUnread) markRead.mutate(notification.id);
       }}
-      style={styles.row}
+      style={[styles.row, isUnread ? styles.rowUnread : styles.rowRead]}
+      accessibilityLabel={title}
     >
-      <View style={[styles.rowIcon, isUnread && styles.rowIconUnread]}>
-        <Icon size={18} color={isUnread ? colors.primary : colors.textMuted} />
+      <View style={[styles.rowIcon, { backgroundColor: isUnread ? tone.background : colors.surfaceMuted }]}>
+        <Icon size={19} color={isUnread ? tone.foreground : colors.textMuted} />
       </View>
-      <View style={{ flex: 1 }}>
-        <AppText variant="sm" weight={isUnread ? 'semibold' : 'regular'} numberOfLines={1}>
+      <View style={styles.rowText}>
+        <AppText variant="sm" weight={isUnread ? 'bold' : 'medium'} numberOfLines={1}>
           {title}
         </AppText>
         {notification.body ? (
@@ -83,7 +122,7 @@ function NotificationRow({ notification }: { notification: AppNotification }) {
         </AppText>
         {isUnread ? <View style={styles.unreadDot} /> : null}
       </View>
-    </Card>
+    </OceanCard>
   );
 }
 
@@ -111,55 +150,55 @@ export function NotificationsInboxScreen() {
     return out;
   }, [data]);
 
+  const subtitle = isLoading
+    ? undefined
+    : unreadCount > 0
+      ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}`
+      : 'Tout est à jour';
+
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
+        <OceanScreenHeader
+          title="Notifications"
+          subtitle={subtitle}
+          onBack={() => router.back()}
+          right={
+            unreadCount > 0 ? (
+              <Pressable
+                onPress={() => markAllRead.mutate()}
+                disabled={markAllRead.isPending}
+                accessibilityRole="button"
+                accessibilityLabel="Tout marquer comme lu"
+                style={({ pressed }) => [styles.markAll, pressed && styles.pressed, markAllRead.isPending && styles.markAllDisabled]}
+              >
+                <IconChecks size={15} color={OCEAN.base} />
+                <AppText variant="xs" weight="bold" color={OCEAN.base}>
+                  Tout lire
+                </AppText>
+              </Pressable>
+            ) : undefined
+          }
         />
-        <View style={styles.headerTitleGroup}>
-          <AppText variant="lg" weight="semibold">
-            Notifications
-          </AppText>
-          {unreadCount > 0 ? <Badge label={String(unreadCount)} tone="primary" /> : null}
-        </View>
-        {unreadCount > 0 ? (
-          <AppText
-            variant="sm"
-            weight="semibold"
-            color="primary"
-            onPress={() => markAllRead.mutate()}
-            suppressHighlighting
-          >
-            Tout marquer lu
-          </AppText>
-        ) : (
-          <View style={{ width: 38 }} />
-        )}
       </View>
 
       <ResponsiveList
         data={rows}
         keyExtractor={(row) => row.key}
         contentContainerStyle={styles.list}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.xs + 2 }} />}
         ListEmptyComponent={
-          !isLoading
-            ? () => (
-                <View style={styles.empty}>
-                  <IconBellRinging size={22} color={colors.textMuted} />
-                  <AppText variant="sm" color="textMuted" style={{ marginTop: spacing.xs }}>
-                    Aucune notification pour le moment.
-                  </AppText>
-                </View>
-              )
-            : undefined
+          !isLoading ? (
+            <OceanEmpty
+              icon={<IconBellRinging size={28} color={OCEAN.base} />}
+              title="Rien de nouveau"
+              text="Vos notifications — paiements, trajets, envois, messages du support — apparaîtront ici."
+            />
+          ) : undefined
         }
         renderItem={({ item }: { item: ListRow }) =>
           item.kind === 'header' ? (
-            <AppText variant="xs" weight="semibold" color="textMuted" style={styles.sectionLabel}>
+            <AppText variant="xs" weight="bold" color={OCEAN.base} style={styles.sectionLabel}>
               {item.label}
             </AppText>
           ) : (
@@ -172,27 +211,32 @@ export function NotificationsInboxScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    marginBottom: spacing.md,
+  pressed: {
+    opacity: 0.75,
   },
-  headerTitleGroup: {
-    flex: 1,
+  header: {
+    paddingHorizontal: spacing.lg,
+  },
+  markAll: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 5,
+    height: 40,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radius.pill,
+    backgroundColor: OCEAN.mist,
+  },
+  markAllDisabled: {
+    opacity: 0.5,
   },
   list: {
+    flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
   sectionLabel: {
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.8,
     marginTop: spacing.sm,
     marginBottom: spacing.xxs,
   },
@@ -200,33 +244,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
+    padding: spacing.sm + 4,
+  },
+  rowUnread: {
+    borderColor: OCEAN.sky,
+  },
+  rowRead: {
+    opacity: 0.85,
   },
   rowIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.sm + 2,
-    backgroundColor: colors.surfaceMuted,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowIconUnread: {
-    backgroundColor: colors.primaryLight,
+  rowText: {
+    flex: 1,
+    gap: 2,
   },
   rowBody: {
-    marginTop: 2,
+    marginTop: 1,
   },
   rowMeta: {
     alignItems: 'flex-end',
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-  },
-  empty: {
-    alignItems: 'center',
-    marginTop: spacing.xl,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: OCEAN.bright,
   },
 });

@@ -3,8 +3,8 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuditService } from './audit.service';
+import { ListAuditLogsQueryDto } from './dto/list-audit-logs-query.dto';
 
 @ApiTags('Administration — Journal d\'audit')
 @ApiBearerAuth()
@@ -13,13 +13,17 @@ import { AuditService } from './audit.service';
 export class AuditLogsController {
   constructor(private readonly auditService: AuditService) {}
 
+  /**
+   * Un seul DTO pour toute la query (pagination + filtres) : des
+   * @Query('entityType') séparés seraient rejetés en 400 par le
+   * ValidationPipe global (forbidNonWhitelisted) — voir ListAuditLogsQueryDto.
+   */
   @Get()
-  findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('entityType') entityType?: string,
-    @Query('entityId') entityId?: string,
-    @Query('actorId') actorId?: string,
-  ) {
-    return this.auditService.findAll(query, { entityType, entityId, actorId });
+  findAll(@Query() query: ListAuditLogsQueryDto) {
+    return this.auditService.findAll(query, {
+      entityType: query.entityType,
+      entityId: query.entityId,
+      actorId: query.actorId,
+    });
   }
 }

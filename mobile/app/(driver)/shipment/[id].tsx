@@ -1,13 +1,12 @@
 // mobile/app/(driver)/shipment/[id].tsx
+// [21/09/2026] v2 — gain net et période affichés, téléphones appelables, annulation avant récupération seulement ; l'attribution se fait depuis la liste.
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconMapPin, IconMessageCircle, IconPhone } from '@tabler/icons-react-native';
+import { IconArrowLeft, IconCalendarEvent, IconMapPin, IconMessageCircle, IconPhone } from '@tabler/icons-react-native';
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useShipment, useCancelShipment } from '@/hooks/useShipments';
-import { useAssignShipment } from '@/hooks/useDriverShipments';
-import { useMyTrips } from '@/hooks/useDriverTrips';
 import {
   useMarkShipmentPickupPending,
   useMarkShipmentInTransit,
@@ -18,9 +17,27 @@ import {
   useVerifyShipmentDeliveryOtp,
 } from '@/hooks/useShipmentOtp';
 import { formatMoney } from '@/utils/money';
+import { driverNetAmount, formatWindow } from '@/utils/shipmentDisplay';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_TONE } from '@/utils/tripStatusLabels';
 import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { ApiError } from '@/services/api/ApiError';
+
+/** Numéro appelable d'un geste : le chauffeur doit joindre l'expéditeur et le destinataire pour la remise. */
+function PhoneRow({ phone }: { phone: string }) {
+  return (
+    <Pressable
+      onPress={() => Linking.openURL(`tel:${phone}`)}
+      accessibilityRole="link"
+      accessibilityLabel={`Appeler le ${phone}`}
+      style={styles.metaRow}
+    >
+      <IconPhone size={12} color={colors.primary} />
+      <AppText variant="xs" color={colors.primary} weight="medium">
+        {phone}
+      </AppText>
+    </Pressable>
+  );
+}
 
 function OtpSection({
   title,
@@ -79,10 +96,7 @@ function OtpSection({
 export default function DriverShipmentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: shipment, isLoading, isError } = useShipment(id);
-  const { data: tripsPage } = useMyTrips();
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
 
-  const assignShipment = useAssignShipment(id ?? '');
   const cancelShipment = useCancelShipment(id ?? '');
   const getOrCreateConversation = useGetOrCreateConversationForShipment();
   const markPickupPending = useMarkShipmentPickupPending(id ?? '');
@@ -107,20 +121,12 @@ export default function DriverShipmentDetailScreen() {
     );
   }
 
-  const publishableTrips = (tripsPage?.data ?? []).filter((t) => t.status === 'PUBLISHED' && t.allowsShipments);
-  const isUnassigned = !shipment.tripId && shipment.status === 'SEARCHING_DRIVER';
-  const canCancel = !['DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED'].includes(shipment.status);
-
-  function handleAssign() {
-    if (!selectedTripId) return;
-    assignShipment.mutate(
-      { tripId: selectedTripId },
-      { onError: (error) => Alert.alert('Erreur', error instanceof ApiError ? error.message : 'Échec de l\'assignation.') },
-    );
-  }
+  // Une fois le colis récupéré, l'annulation n'est plus possible (le client serait remboursé à 100 % alors que le colis est en route) : le recours est « Signaler un problème ».
+  const canCancel = ['DRIVER_ASSIGNED', 'PICKUP_PENDING'].includes(shipment.status);
+  const currencyCode = shipment.currency?.isoCode;
 
   function handleCancel() {
-    Alert.alert('Annuler cet envoi ?', 'Cette action ne peut pas être annulée.', [
+    Alert.alert('Annuler cet envoi ?', 'Le client sera remboursé intégralement et l\'envoi sera annulé.', [
       { text: 'Retour', style: 'cancel' },
       {
         text: "Annuler l'envoi",
@@ -128,7 +134,10 @@ export default function DriverShipmentDetailScreen() {
         onPress: () =>
           cancelShipment.mutate(
             { reason: "Annulé depuis l'application" },
-            { onError: () => Alert.alert('Erreur', "L'annulation a échoué.") },
+            {
+              onError: (error) =>
+                Alert.alert('Erreur', error instanceof ApiError ? error.message : "L'annulation a échoué."),
+            },
           ),
       },
     ]);
@@ -142,7 +151,7 @@ export default function DriverShipmentDetailScreen() {
           accessibilityLabel="Retour"
           onPress={() => router.back()}
         />
-        {shipment.tripId ? (
+        {shipment.driverId ? (
           <IconButton
             icon={<IconMessageCircle size={18} color={colors.textPrimary} />}
             accessibilityLabel="Contacter le client"
@@ -158,11 +167,20 @@ export default function DriverShipmentDetailScreen() {
 
       <Card style={styles.card}>
         <AppText variant="sm" color="textSecondary">
-          {shipment.category?.name ?? 'Colis'} · {shipment.weightKg} kg
+          {shipment.category?.name ?? 'Colis'}, {shipment.weightKg} kg
+        </AppText>
+        <AppText variant="xs" color="textSecondary">
+          Vous recevrez
         </AppText>
         <AppText variant="lg" weight="semibold">
-          {formatMoney(shipment.price)}
+          {formatMoney(driverNetAmount(shipment), currencyCode)}
         </AppText>
+        <View style={styles.metaRow}>
+          <IconCalendarEvent size={12} color={colors.textSecondary} />
+          <AppText variant="xs" color="textSecondary">
+            {formatWindow(shipment)}
+          </AppText>
+        </View>
 
         <Divider />
 
@@ -173,12 +191,7 @@ export default function DriverShipmentDetailScreen() {
           <AppText variant="sm" weight="medium">
             {shipment.senderName}
           </AppText>
-          <View style={styles.metaRow}>
-            <IconPhone size={12} color={colors.textSecondary} />
-            <AppText variant="xs" color="textSecondary">
-              {shipment.senderPhone}
-            </AppText>
-          </View>
+          <PhoneRow phone={shipment.senderPhone} />
           <View style={styles.metaRow}>
             <IconMapPin size={12} color={colors.textSecondary} />
             <AppText variant="xs" color="textSecondary" style={{ flex: 1 }}>
@@ -194,12 +207,7 @@ export default function DriverShipmentDetailScreen() {
           <AppText variant="sm" weight="medium">
             {shipment.recipientName}
           </AppText>
-          <View style={styles.metaRow}>
-            <IconPhone size={12} color={colors.textSecondary} />
-            <AppText variant="xs" color="textSecondary">
-              {shipment.recipientPhone}
-            </AppText>
-          </View>
+          <PhoneRow phone={shipment.recipientPhone} />
           <View style={styles.metaRow}>
             <IconMapPin size={12} color={colors.textSecondary} />
             <AppText variant="xs" color="textSecondary" style={{ flex: 1 }}>
@@ -208,43 +216,6 @@ export default function DriverShipmentDetailScreen() {
           </View>
         </View>
       </Card>
-
-      {isUnassigned ? (
-        <Card style={styles.card}>
-          <AppText variant="base" weight="semibold" style={styles.otpTitle}>
-            Assigner à un de vos trajets
-          </AppText>
-          {publishableTrips.length === 0 ? (
-            <AppText variant="sm" color="textSecondary">
-              Aucun de vos trajets publiés n'accepte les colis pour le moment.
-            </AppText>
-          ) : (
-            <View style={styles.tripList}>
-              {publishableTrips.map((trip) => {
-                const isSelected = trip.id === selectedTripId;
-                return (
-                  <Card
-                    key={trip.id}
-                    onPress={() => setSelectedTripId(trip.id)}
-                    style={[styles.tripOption, isSelected && styles.tripOptionActive]}
-                  >
-                    <AppText variant="sm" weight="medium">
-                      {trip.originCity.name} → {trip.destinationCity.name}
-                    </AppText>
-                  </Card>
-                );
-              })}
-            </View>
-          )}
-          <Button
-            label="Confirmer l'assignation"
-            onPress={handleAssign}
-            disabled={!selectedTripId}
-            loading={assignShipment.isPending}
-            style={styles.assignButton}
-          />
-        </Card>
-      ) : null}
 
       {shipment.status === 'DRIVER_ASSIGNED' ? (
         <Button
@@ -355,19 +326,6 @@ const styles = StyleSheet.create({
   },
   otpTitle: {
     marginBottom: spacing.sm,
-  },
-  tripList: {
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  tripOption: {
-    padding: spacing.sm + 2,
-  },
-  tripOptionActive: {
-    borderColor: colors.primary,
-  },
-  assignButton: {
-    marginTop: spacing.xs,
   },
   otpCard: {
     marginBottom: spacing.md,

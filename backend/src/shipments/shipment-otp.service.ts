@@ -1,4 +1,5 @@
 // backend/src/shipments/shipment-otp.service.ts
+// [21/09/2026] v2 — propriété de l'envoi via Shipment.driverId.
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationChannel, NotificationType, OtpPurpose, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -33,9 +34,14 @@ export class ShipmentOtpService {
     return shipment;
   }
 
-  private assertDriverOwnsShipment(shipment: { trip: { driverId: string } | null }, driverId: string) {
-    if (!shipment.trip || shipment.trip.driverId !== driverId) {
-      throw new ForbiddenException("Cet envoi n'est pas rattaché à un de vos trajets.");
+  /** Le chauffeur de l'envoi est celui qui l'a accepté (avec ou sans trajet) ; repli sur le trajet pour les anciennes lignes. */
+  private assertDriverOwnsShipment(
+    shipment: { driverId: string | null; trip: { driverId: string } | null },
+    driverId: string,
+  ) {
+    const owner = shipment.driverId ?? shipment.trip?.driverId;
+    if (owner !== driverId) {
+      throw new ForbiddenException("Cet envoi ne vous est pas attribué.");
     }
   }
 

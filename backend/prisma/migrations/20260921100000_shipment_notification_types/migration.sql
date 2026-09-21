@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "NotificationType" ADD VALUE 'SHIPMENT_REQUEST';
+ALTER TYPE "NotificationType" ADD VALUE 'SHIPMENT_EXTENSION';

@@ -1,11 +1,19 @@
 // web-admin/src/app/(app)/notification-templates/[id]/page.tsx
+//
+// v2 — Refonte : même formulaire que la page Créer (NotificationTemplateForm),
+// pré-rempli ; l'évènement, le canal et la langue identifient le modèle et ne
+// sont pas modifiables. Seuls l'objet (email), le texte et l'état sont
+// envoyés à l'API, comme avant.
+
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { IconArrowLeft } from '@tabler/icons-react';
-import { Button, Card, Switch, TextArea, TextField } from '@/components/ui';
+import { BackHeader, Chip, Notice } from '@/components/admin/AdminUi';
+import {
+  NotificationTemplateForm,
+  type NotificationTemplateFormValues,
+} from '@/components/notificationTemplates/NotificationTemplateForm';
 import { useNotificationTemplate, useUpdateNotificationTemplate } from '@/hooks/useNotificationTemplates';
 import { NOTIFICATION_CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS } from '@/utils/notificationLabels';
 import { ApiError } from '@/services/api/ApiError';
@@ -15,75 +23,58 @@ export default function EditNotificationTemplatePage() {
   const { data: template, isLoading, isError } = useNotificationTemplate(id);
   const updateTemplate = useUpdateNotificationTemplate(id);
 
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [isActive, setIsActive] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    if (!template) return;
-    setSubject(template.subject ?? '');
-    setBody(template.body);
-    setIsActive(template.isActive);
-  }, [template]);
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleSubmit(values: NotificationTemplateFormValues) {
     setErrorMessage(undefined);
     setSaved(false);
-
     try {
-      await updateTemplate.mutateAsync({
-        subject: template?.channel === 'EMAIL' ? subject.trim() || undefined : undefined,
-        body: body.trim(),
-        isActive,
-      });
+      await updateTemplate.mutateAsync({ subject: values.subject, body: values.body, isActive: values.isActive });
       setSaved(true);
     } catch (error) {
       setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
     }
   }
 
-  if (isError) return <p className="text-sm text-danger">Modèle introuvable.</p>;
-  if (isLoading || !template) return <p className="text-sm text-text-secondary">Chargement…</p>;
+  if (isError) {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <BackHeader href="/notification-templates" backLabel="Modèles" title="Modèle introuvable" />
+        <Notice tone="danger">Ce modèle n’existe plus ou n’a pas pu être chargé.</Notice>
+      </div>
+    );
+  }
+
+  if (isLoading || !template) {
+    return (
+      <div className="max-w-2xl space-y-4">
+        <div className="h-10 w-40 animate-pulse rounded-xl bg-border/50" />
+        <div className="h-14 animate-pulse rounded-2xl bg-border/50" />
+        <div className="h-48 animate-pulse rounded-2xl bg-border/50" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/notification-templates" className="text-text-secondary hover:text-text-primary">
-          <IconArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-semibold text-text-primary">{NOTIFICATION_TYPE_LABELS[template.type]}</h1>
-          <p className="text-xs text-text-muted">
-            {NOTIFICATION_CHANNEL_LABELS[template.channel]} · {template.locale}
-          </p>
-        </div>
-      </div>
+    <div className="max-w-2xl space-y-6">
+      <BackHeader
+        href="/notification-templates"
+        backLabel="Modèles"
+        title={NOTIFICATION_TYPE_LABELS[template.type]}
+        subtitle={`${NOTIFICATION_CHANNEL_LABELS[template.channel]} · ${template.locale.toUpperCase()}`}
+        badge={<Chip tone={template.isActive ? 'success' : 'neutral'}>{template.isActive ? 'Actif' : 'Inactif'}</Chip>}
+      />
 
-      <Card>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {template.channel === 'EMAIL' ? (
-            <TextField label="Objet" value={subject} onChange={(e) => setSubject(e.target.value)} />
-          ) : null}
-          <TextArea
-            label="Texte du message"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={4}
-            hint="Les {{placeholders}} sont remplacés par les valeurs réelles au moment de l'envoi."
-          />
-          <Switch checked={isActive} onChange={setIsActive} label="Modèle actif" />
-
-          {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
-          {saved ? <p className="text-sm text-success-dark">Modifications enregistrées.</p> : null}
-
-          <Button type="submit" loading={updateTemplate.isPending}>
-            Enregistrer les modifications
-          </Button>
-        </form>
-      </Card>
+      <NotificationTemplateForm
+        key={template.id}
+        mode="edit"
+        initial={template}
+        isSubmitting={updateTemplate.isPending}
+        errorMessage={errorMessage}
+        saved={saved}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

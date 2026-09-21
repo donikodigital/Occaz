@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.controller.ts
+// [21/09/2026] v2 — /quote, /extend, /available réservé aux chauffeurs validés, assign = acceptation.
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccountType, CancellationInitiator } from '@prisma/client';
@@ -12,6 +13,8 @@ import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { AssignShipmentDto } from './dto/assign-shipment.dto';
 import { CancelShipmentDto } from './dto/cancel-shipment.dto';
 import { SearchAvailableShipmentsDto } from './dto/search-available-shipments.dto';
+import { QuoteShipmentDto } from './dto/quote-shipment.dto';
+import { ExtendShipmentDto } from './dto/extend-shipment.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
 import { ListShipmentsQueryDto } from './dto/list-shipments-query.dto';
 import { CreateDocumentDto } from '../documents/dto/create-document.dto';
@@ -45,9 +48,20 @@ export class ShipmentsController {
     return this.shipmentsService.findAllForDriverTrips(driverId, query);
   }
 
+  /**
+   * Demandes ouvertes, visibles des seuls chauffeurs validés et sans
+   * données personnelles du client (voir shipment-views.ts).
+   */
   @Get('available')
-  findAvailable(@Query() query: SearchAvailableShipmentsDto) {
+  async findAvailable(@Query() query: SearchAvailableShipmentsDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.shipmentsService.requireEligibleDriver(user.id);
     return this.shipmentsService.findAvailable(query);
+  }
+
+  /** Prix affiché au client avant paiement — même calcul que la création. */
+  @Post('quote')
+  quote(@Body() dto: QuoteShipmentDto) {
+    return this.shipmentsService.quote(dto);
   }
 
   @Post()
@@ -58,21 +72,18 @@ export class ShipmentsController {
 
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    const shipment = (await this.shipmentsService.findOne(id)) as unknown as {
-      customerId: string;
-      trip: { driverId: string } | null;
-    };
+    const shipment = await this.shipmentsService.findOne(id);
 
     if (!user.permissions.includes(PERMISSIONS.SHIPMENT_READ)) {
       const customer = await this.customerProfilesService.findByUserId(user.id).catch(() => null);
       const isOwningCustomer = customer?.id === shipment.customerId;
 
       let isOwningDriver = false;
-      if (!isOwningCustomer && user.accountType === AccountType.DRIVER && shipment.trip) {
+      if (!isOwningCustomer && user.accountType === AccountType.DRIVER && shipment.driverId) {
         const driverId = await this.driverProfilesService
           .getProfileIdForUser(user.id)
           .catch(() => null);
-        isOwningDriver = driverId !== null && driverId === shipment.trip.driverId;
+        isOwningDriver = driverId !== null && driverId === shipment.driverId;
       }
 
       if (!isOwningCustomer && !isOwningDriver) {
@@ -82,14 +93,20 @@ export class ShipmentsController {
     return shipment;
   }
 
+  /**
+   * Un chauffeur validé accepte une demande, avec un de ses trajets ou sans
+   * trajet. Le premier qui accepte l'emporte : les suivants reçoivent 409.
+   */
   @Post(':id/assign')
-  async assign(
-    @Param('id') id: string,
-    @Body() dto: AssignShipmentDto,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
-    return this.shipmentsService.assignToTrip(id, dto.tripId, driverId);
+  assign(@Param('id') id: string, @Body() dto: AssignShipmentDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.shipmentsService.accept(id, user.id, dto.tripId);
+  }
+
+  /** Le client prolonge sa demande après la fin de la plage. Pour renoncer (et être remboursé), il appelle /cancel. */
+  @Post(':id/extend')
+  async extend(@Param('id') id: string, @Body() dto: ExtendShipmentDto, @CurrentUser() user: AuthenticatedUser) {
+    const customer = await this.customerProfilesService.findByUserId(user.id);
+    return this.shipmentsService.extendWindow(id, customer.id, dto.windowEnd);
   }
 
   @Post(':id/cancel')

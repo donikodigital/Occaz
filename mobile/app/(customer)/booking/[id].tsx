@@ -1,5 +1,10 @@
 // mobile/app/(customer)/booking/[id].tsx
 //
+// v3 — Habillage bleu océan, sur le modèle du suivi d'envoi : bandeau de
+// statut coloré (bleu en cours, vert confirmé ou terminé, gris annulé, rouge
+// litige), carte du trajet, passagers, détail du prix, et les actions
+// (payer, noter, annuler, signaler) en boutons pleins. Logique inchangée.
+//
 // v2 — Alert.alert() ne s'affiche pas sur le web (react-native-web ne
 // l'implémente pas) : le bouton "Annuler la réservation" semblait ne
 // rien faire. Remplacé par ConfirmDialog (nouveau composant, même
@@ -9,21 +14,13 @@
 // occasion plutôt que de laisser un piège identique juste après.
 
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconCheck, IconMessageCircle } from '@tabler/icons-react-native';
-import {
-  AppText,
-  Badge,
-  Button,
-  Card,
-  ConfirmDialog,
-  Divider,
-  DriverPositionCard,
-  IconButton,
-  ScreenContainer,
-} from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { IconCash, IconMessageCircle, IconRoute, IconTicket, IconUsers } from '@tabler/icons-react-native';
+import { AppText, ConfirmDialog, DriverPositionCard, ScreenContainer } from '@/components/ui';
+import { OceanButton, OceanHeroCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { colors, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useBooking, useCancelBooking } from '@/hooks/useBookings';
 import { useBookingRatings } from '@/hooks/useRatings';
 import { useGetOrCreateConversationForBooking } from '@/hooks/useConversations';
@@ -43,6 +40,14 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
 
 const CANCELLABLE_STATUSES: BookingStatus[] = ['PENDING_PAYMENT', 'PAID', 'CONFIRMED'];
 
+/** La couleur du bandeau raconte l'état de la réservation au premier coup d'œil. */
+function heroColorFor(status: BookingStatus): string {
+  if (status === 'CONFIRMED' || status === 'COMPLETED') return colors.success;
+  if (status === 'CANCELLED' || status === 'REFUNDED') return colors.textSecondary;
+  if (status === 'DISPUTED') return colors.danger;
+  return OCEAN.deep;
+}
+
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: booking, isLoading, isError } = useBooking(id);
@@ -61,7 +66,7 @@ export default function BookingDetailScreen() {
             Impossible de charger cette réservation.
           </AppText>
         ) : (
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={OCEAN.base} />
         )}
       </ScreenContainer>
     );
@@ -84,93 +89,106 @@ export default function BookingDetailScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Réservation
-        </AppText>
-        <IconButton
-          icon={<IconMessageCircle size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Contacter le chauffeur"
-          onPress={() =>
-            getOrCreateConversation.mutate(booking.id, {
-              onSuccess: (conversation) => router.push(`/(customer)/conversation/${conversation.id}`),
-            })
-          }
-        />
-      </View>
+      <OceanScreenHeader
+        title="Réservation"
+        subtitle={trip ? `${trip.originCity.name} → ${trip.destinationCity.name}` : undefined}
+        onBack={() => router.back()}
+        right={
+          <Pressable
+            onPress={() =>
+              getOrCreateConversation.mutate(booking.id, {
+                onSuccess: (conversation) => router.push(`/(customer)/conversation/${conversation.id}`),
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Contacter le chauffeur"
+            style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
+          >
+            <IconMessageCircle size={18} color={OCEAN.base} />
+          </Pressable>
+        }
+      />
 
-      <View style={styles.statusBlock}>
-        <View style={styles.statusIcon}>
-          <IconCheck size={26} color={colors.successDark} />
+      <OceanHeroCard style={[styles.hero, { backgroundColor: heroColorFor(booking.status) }]}>
+        <View style={styles.heroRow}>
+          <View style={styles.heroIcon}>
+            <IconTicket size={26} color={OCEAN.onDark} />
+          </View>
+          <View style={styles.heroText}>
+            <AppText variant="xs" color={OCEAN.sky}>
+              Statut de la réservation
+            </AppText>
+            <AppText variant="lg" weight="bold" color={OCEAN.onDark}>
+              {STATUS_LABELS[booking.status]}
+            </AppText>
+          </View>
         </View>
-        <Badge
-          label={STATUS_LABELS[booking.status]}
-          tone={booking.status === 'CANCELLED' ? 'danger' : booking.status === 'CONFIRMED' ? 'success' : 'primary'}
-        />
-      </View>
+      </OceanHeroCard>
+
+      {trip ? <DriverPositionCard tripId={trip.id} isActive={trip.status === 'IN_PROGRESS'} /> : null}
 
       {trip ? (
-        <DriverPositionCard tripId={trip.id} isActive={trip.status === 'IN_PROGRESS'} />
-      ) : null}
-
-      {trip ? (
-        <Card style={styles.card}>
-          <AppText variant="sm" color="textSecondary">
-            {trip.originCity.name} → {trip.destinationCity.name}
-          </AppText>
-          <AppText variant="base" weight="semibold">
-            {formatDateLong(trip.departureAt)} à {formatTime(trip.departureAt)}
-          </AppText>
-          <AppText variant="sm" color="textSecondary">
-            {trip.driver.firstName} {trip.driver.lastName[0]}. · {trip.vehicle.brand} {trip.vehicle.model}
-          </AppText>
-        </Card>
+        <OceanSection icon={<IconRoute size={17} color={OCEAN.base} />} title="Trajet">
+          <View style={styles.tripBlock}>
+            <AppText variant="base" weight="bold" color={OCEAN.deep}>
+              {trip.originCity.name} → {trip.destinationCity.name}
+            </AppText>
+            <AppText variant="sm" weight="semibold">
+              {formatDateLong(trip.departureAt)} à {formatTime(trip.departureAt)}
+            </AppText>
+            <AppText variant="sm" color="textSecondary">
+              {trip.driver.firstName} {trip.driver.lastName[0]}. · {trip.vehicle.brand} {trip.vehicle.model}
+            </AppText>
+          </View>
+        </OceanSection>
       ) : null}
 
       {booking.passengers && booking.passengers.length > 0 ? (
-        <Card style={styles.card}>
-          <AppText variant="base" weight="semibold" style={styles.cardTitle}>
-            Passagers
-          </AppText>
-          {booking.passengers.map((passenger) => (
-            <AppText key={passenger.id} variant="sm" color="textSecondary">
-              {passenger.fullName}
-            </AppText>
-          ))}
-        </Card>
+        <OceanSection icon={<IconUsers size={17} color={OCEAN.base} />} title="Passagers">
+          <View style={styles.passengers}>
+            {booking.passengers.map((passenger) => (
+              <View key={passenger.id} style={styles.passengerRow}>
+                <View style={styles.passengerDot} />
+                <AppText variant="sm" weight="semibold">
+                  {passenger.fullName}
+                </AppText>
+              </View>
+            ))}
+          </View>
+        </OceanSection>
       ) : null}
 
-      <Card style={styles.card}>
-        <View style={styles.priceRow}>
-          <AppText variant="sm" color="textSecondary">
-            {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
-          </AppText>
-          <AppText variant="sm">{formatMoney((Number(booking.pricePerSeat) * booking.seatsCount).toString())}</AppText>
+      <OceanSection icon={<IconCash size={17} color={OCEAN.base} />} title="Détail du prix">
+        <View style={styles.priceRows}>
+          <View style={styles.priceRow}>
+            <AppText variant="sm" color="textSecondary">
+              {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
+            </AppText>
+            <AppText variant="sm" weight="semibold">
+              {formatMoney((Number(booking.pricePerSeat) * booking.seatsCount).toString())}
+            </AppText>
+          </View>
+          <View style={styles.priceRow}>
+            <AppText variant="sm" color="textSecondary">
+              Frais de service
+            </AppText>
+            <AppText variant="sm" weight="semibold">
+              {formatMoney(booking.platformFee)}
+            </AppText>
+          </View>
+          <View style={styles.totalRow}>
+            <AppText variant="base" weight="bold">
+              Total
+            </AppText>
+            <AppText variant="lg" weight="bold" color={OCEAN.deep}>
+              {formatMoney(booking.totalAmount)}
+            </AppText>
+          </View>
         </View>
-        <View style={styles.priceRow}>
-          <AppText variant="sm" color="textSecondary">
-            Frais de service
-          </AppText>
-          <AppText variant="sm">{formatMoney(booking.platformFee)}</AppText>
-        </View>
-        <Divider />
-        <View style={styles.priceRow}>
-          <AppText variant="base" weight="semibold">
-            Total
-          </AppText>
-          <AppText variant="base" weight="semibold">
-            {formatMoney(booking.totalAmount)}
-          </AppText>
-        </View>
-      </Card>
+      </OceanSection>
 
       {booking.status === 'PENDING_PAYMENT' ? (
-        <Button
+        <OceanButton
           label="Payer maintenant"
           onPress={() => router.push({ pathname: '/(customer)/payment', params: { bookingId: booking.id } })}
           style={styles.actionButton}
@@ -178,9 +196,9 @@ export default function BookingDetailScreen() {
       ) : null}
 
       {booking.status === 'COMPLETED' && !hasRated ? (
-        <Button
+        <OceanButton
           label="Noter ce trajet"
-          variant="secondary"
+          variant="soft"
           onPress={() => router.push({ pathname: '/(customer)/rate', params: { type: 'booking', id: booking.id } })}
           style={styles.actionButton}
         />
@@ -193,7 +211,7 @@ export default function BookingDetailScreen() {
               {cancelErrorMessage}
             </AppText>
           ) : null}
-          <Button
+          <OceanButton
             label="Annuler la réservation"
             variant="outline"
             onPress={() => {
@@ -205,9 +223,9 @@ export default function BookingDetailScreen() {
         </>
       ) : null}
 
-      <Button
+      <OceanButton
         label="Signaler un problème"
-        variant="ghost"
+        variant="soft"
         onPress={() =>
           router.push({
             pathname: '/(customer)/dispute-new',
@@ -232,45 +250,79 @@ export default function BookingDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  pressed: {
+    opacity: 0.75,
+  },
   center: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  statusBlock: {
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  statusIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.xl,
-    backgroundColor: colors.successLight,
+  chatButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: OCEAN.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  card: {
-    gap: 4,
+  hero: {
     marginBottom: spacing.md,
   },
-  cardTitle: {
-    marginBottom: spacing.xxs,
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  heroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroText: {
+    flex: 1,
+    gap: 2,
+  },
+  tripBlock: {
+    gap: 3,
+  },
+  passengers: {
+    gap: spacing.xs,
+  },
+  passengerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  passengerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: OCEAN.bright,
+  },
+  priceRows: {
+    gap: spacing.xs + 2,
   },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2,
+    alignItems: 'center',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: spacing.sm,
+    marginTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: OCEAN.line,
   },
   actionButton: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   cancelError: {
     marginBottom: spacing.xs,

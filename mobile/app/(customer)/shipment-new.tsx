@@ -1,22 +1,72 @@
 // mobile/app/(customer)/shipment-new.tsx
-import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+// [21/09/2026] v3 — Habillage bleu océan ; logique inchangée : plage de dates obligatoire, dimensions, prix calculé par le serveur.
+//
+// Le formulaire est découpé en sections à en-tête soulignée (Expéditeur,
+// Destinataire, Colis, Période), avec des puces pour la catégorie, un
+// stepper pour la quantité et un interrupteur pour « Envoi urgent ». Le
+// devis en direct (ShipmentQuoteCard) reste au-dessus du bouton.
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   IconAlertCircle,
-  IconArrowLeft,
+  IconCalendarEvent,
+  IconCheck,
+  IconChevronRight,
   IconMapPin,
-  IconMinus,
-  IconPlus,
+  IconPackage,
+  IconUser,
+  IconUserCheck,
 } from '@tabler/icons-react-native';
-import { AppText, Button, Card, Divider, IconButton, ScreenContainer, TextField } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { AppText, ScreenContainer, TextField } from '@/components/ui';
+import {
+  OceanButton,
+  OceanCard,
+  OceanChip,
+  OceanScreenHeader,
+  OceanSection,
+  OceanStepper,
+  OceanSwitchRow,
+} from '@/components/ocean/OceanKit';
+import { colors, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
+import { ShipmentQuoteCard } from '@/components/screens/ShipmentQuoteCard';
+import { ShipmentWindowField, toShipmentWindow } from '@/components/screens/ShipmentWindowField';
 import { useShipmentCategories } from '@/hooks/useShipmentCategories';
 import { useCreateShipment } from '@/hooks/useShipments';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { normalizePhoneInput } from '@/utils/phone';
 import { ApiError } from '@/services/api/ApiError';
+import type { QuoteShipmentPayload } from '@/types/shipments.types';
 import type { TripLocation } from '@/types/trips.types';
+
+function AddressCard({
+  label,
+  location,
+  onPress,
+}: {
+  label: string;
+  location: TripLocation | null;
+  onPress: () => void;
+}) {
+  return (
+    <OceanCard onPress={onPress} style={styles.addressCard} accessibilityLabel={label}>
+      <View style={[styles.addressIcon, location && styles.addressIconDone]}>
+        {location ? <IconCheck size={16} color={colors.successDark} /> : <IconMapPin size={16} color={OCEAN.base} />}
+      </View>
+      <View style={styles.addressText}>
+        <AppText variant="xs" color="textSecondary">
+          {label}
+        </AppText>
+        <AppText variant="sm" weight="semibold" numberOfLines={1} color={location ? 'textPrimary' : OCEAN.base}>
+          {location ? location.label : 'Appuyez pour choisir'}
+        </AppText>
+      </View>
+      <IconChevronRight size={16} color={colors.textMuted} />
+    </OceanCard>
+  );
+}
 
 export default function NewShipmentScreen() {
   const [senderName, setSenderName] = useState('');
@@ -30,8 +80,13 @@ export default function NewShipmentScreen() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [weightKg, setWeightKg] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [lengthCm, setLengthCm] = useState('');
+  const [widthCm, setWidthCm] = useState('');
+  const [heightCm, setHeightCm] = useState('');
   const [declaredValue, setDeclaredValue] = useState('');
   const [description, setDescription] = useState('');
+  const [windowStart, setWindowStart] = useState<Date | null>(null);
+  const [windowEnd, setWindowEnd] = useState<Date | null>(null);
   const [isUrgent, setIsUrgent] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
@@ -48,6 +103,25 @@ export default function NewShipmentScreen() {
     else setRecipientLocation(locationSelection.location);
     consumeLocationSelection();
   }, [locationSelection, consumeLocationSelection]);
+
+  // Devis en direct : `null` tant que adresses, catégorie et poids ne sont pas tous renseignés.
+  const quotePayload = useMemo<QuoteShipmentPayload | null>(() => {
+    const weight = Number(weightKg.replace(',', '.'));
+    if (!senderLocation || !recipientLocation || !categoryId || !Number.isFinite(weight) || weight <= 0) return null;
+    const dimensions = [lengthCm, widthCm, heightCm].map((value) => Number(value.replace(',', '.')));
+    const hasDimensions = dimensions.every((value) => Number.isFinite(value) && value > 0);
+    const declared = declaredValue.replace(/\D/g, '');
+    return {
+      categoryId,
+      senderLocationId: senderLocation.id,
+      recipientLocationId: recipientLocation.id,
+      weightKg: weight,
+      ...(hasDimensions ? { lengthCm: dimensions[0], widthCm: dimensions[1], heightCm: dimensions[2] } : {}),
+      quantity,
+      ...(declared ? { declaredValue: declared } : {}),
+      isUrgent,
+    };
+  }, [senderLocation, recipientLocation, categoryId, weightKg, lengthCm, widthCm, heightCm, quantity, declaredValue, isUrgent]);
 
   function openAddressPicker(field: 'sender' | 'recipient') {
     openLocationPicker(field);
@@ -77,6 +151,10 @@ export default function NewShipmentScreen() {
       setErrorMessage('Indiquez le poids du colis.');
       return;
     }
+    if (!windowStart || !windowEnd) {
+      setErrorMessage('Indiquez la période pendant laquelle le colis peut partir.');
+      return;
+    }
 
     createShipment.mutate(
       {
@@ -89,9 +167,13 @@ export default function NewShipmentScreen() {
         recipientLocationId: recipientLocation.id,
         description: description.trim() || undefined,
         weightKg: weight,
+        ...(quotePayload?.lengthCm !== undefined
+          ? { lengthCm: quotePayload.lengthCm, widthCm: quotePayload.widthCm, heightCm: quotePayload.heightCm }
+          : {}),
         quantity,
-        declaredValue: declaredValue.trim() || undefined,
+        declaredValue: declaredValue.replace(/\D/g, '') || undefined,
         isUrgent,
+        ...toShipmentWindow(windowStart, windowEnd),
       },
       {
         onSuccess: (shipment) => router.replace(`/(customer)/shipment/${shipment.id}`),
@@ -104,20 +186,9 @@ export default function NewShipmentScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Envoyer un colis
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+      <OceanScreenHeader title="Envoyer un colis" subtitle="Remplissez les 4 étapes ci-dessous" onBack={() => router.back()} />
 
-      <SectionTitle label="Expéditeur" />
-      <View style={styles.fields}>
+      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Expéditeur">
         <TextField label="Nom complet" value={senderName} onChangeText={setSenderName} placeholder="Nom de l'expéditeur" />
         <TextField
           label="Téléphone"
@@ -126,15 +197,10 @@ export default function NewShipmentScreen() {
           keyboardType="phone-pad"
           placeholder="+224620000000"
         />
-        <AddressCard
-          label="Adresse de récupération"
-          location={senderLocation}
-          onPress={() => openAddressPicker('sender')}
-        />
-      </View>
+        <AddressCard label="Adresse de récupération" location={senderLocation} onPress={() => openAddressPicker('sender')} />
+      </OceanSection>
 
-      <SectionTitle label="Destinataire" />
-      <View style={styles.fields}>
+      <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title="Destinataire">
         <TextField
           label="Nom complet"
           value={recipientName}
@@ -148,32 +214,26 @@ export default function NewShipmentScreen() {
           keyboardType="phone-pad"
           placeholder="+224620000000"
         />
-        <AddressCard
-          label="Adresse de livraison"
-          location={recipientLocation}
-          onPress={() => openAddressPicker('recipient')}
-        />
-      </View>
+        <AddressCard label="Adresse de livraison" location={recipientLocation} onPress={() => openAddressPicker('recipient')} />
+      </OceanSection>
 
-      <SectionTitle label="Colis" />
-      <View style={styles.categoryRow}>
-        {(categories ?? []).map((category) => {
-          const isActive = category.id === categoryId;
-          return (
-            <Pressable
-              key={category.id}
-              onPress={() => setCategoryId(category.id)}
-              style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-            >
-              <AppText variant="sm" weight="medium" color={isActive ? colors.onPrimary : 'textPrimary'}>
-                {category.name}
-              </AppText>
-            </Pressable>
-          );
-        })}
-      </View>
+      <OceanSection icon={<IconPackage size={17} color={OCEAN.base} />} title="Colis">
+        <View style={styles.block}>
+          <AppText variant="sm" weight="medium" color="textSecondary">
+            Catégorie
+          </AppText>
+          <View style={styles.categoryRow}>
+            {(categories ?? []).map((category) => (
+              <OceanChip
+                key={category.id}
+                label={category.name}
+                active={category.id === categoryId}
+                onPress={() => setCategoryId(category.id)}
+              />
+            ))}
+          </View>
+        </View>
 
-      <View style={styles.fields}>
         <TextField
           label="Poids (kg)"
           value={weightKg}
@@ -182,24 +242,27 @@ export default function NewShipmentScreen() {
           placeholder="Ex : 3"
         />
 
-        <View>
-          <AppText variant="sm" weight="medium" color="textSecondary" style={styles.stepperLabel}>
+        <View style={styles.block}>
+          <AppText variant="sm" weight="medium" color="textSecondary">
             Quantité
           </AppText>
-          <View style={styles.stepper}>
-            <IconButton
-              icon={<IconMinus size={16} color={colors.textPrimary} />}
-              accessibilityLabel="Retirer"
-              onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-            />
-            <AppText variant="lg" weight="semibold" style={styles.stepperValue}>
-              {quantity}
-            </AppText>
-            <IconButton
-              icon={<IconPlus size={16} color={colors.textPrimary} />}
-              accessibilityLabel="Ajouter"
-              onPress={() => setQuantity((q) => Math.min(20, q + 1))}
-            />
+          <OceanStepper value={quantity} onChange={setQuantity} min={1} max={20} label="quantité" />
+        </View>
+
+        <View style={styles.block}>
+          <AppText variant="sm" weight="medium" color="textSecondary">
+            Dimensions d'un colis, en cm (optionnel)
+          </AppText>
+          <View style={styles.dimensionsRow}>
+            <View style={styles.dimensionCell}>
+              <TextField value={lengthCm} onChangeText={setLengthCm} keyboardType="decimal-pad" placeholder="Long." />
+            </View>
+            <View style={styles.dimensionCell}>
+              <TextField value={widthCm} onChangeText={setWidthCm} keyboardType="decimal-pad" placeholder="Larg." />
+            </View>
+            <View style={styles.dimensionCell}>
+              <TextField value={heightCm} onChangeText={setHeightCm} keyboardType="decimal-pad" placeholder="Haut." />
+            </View>
           </View>
         </View>
 
@@ -208,7 +271,7 @@ export default function NewShipmentScreen() {
           value={declaredValue}
           onChangeText={setDeclaredValue}
           keyboardType="numeric"
-          placeholder="En GNF"
+          placeholder="Montant en chiffres"
         />
 
         <TextField
@@ -220,19 +283,25 @@ export default function NewShipmentScreen() {
           style={styles.multiline}
         />
 
-        <Pressable onPress={() => setIsUrgent((v) => !v)} style={styles.urgentRow}>
-          <View style={[styles.checkbox, isUrgent && styles.checkboxActive]}>
-            {isUrgent ? <IconAlertCircle size={13} color={colors.onAccent} /> : null}
-          </View>
-          <AppText variant="sm">Envoi urgent</AppText>
-        </Pressable>
-      </View>
+        <OceanSwitchRow
+          value={isUrgent}
+          onChange={setIsUrgent}
+          label="Envoi urgent"
+          description="Une majoration peut s’appliquer au prix — voir le devis."
+          icon={<IconAlertCircle size={18} color={OCEAN.base} />}
+        />
+      </OceanSection>
 
-      <Card style={styles.noticeCard}>
-        <AppText variant="xs" color="textMuted">
-          Le prix exact est calculé à la validation, selon le poids, la distance et la catégorie choisie.
-        </AppText>
-      </Card>
+      <OceanSection icon={<IconCalendarEvent size={17} color={OCEAN.base} />} title="Période">
+        <ShipmentWindowField
+          startDate={windowStart}
+          endDate={windowEnd}
+          onChangeStart={setWindowStart}
+          onChangeEnd={setWindowEnd}
+        />
+      </OceanSection>
+
+      <ShipmentQuoteCard payload={quotePayload} />
 
       {errorMessage ? (
         <AppText variant="sm" color="danger" style={styles.error}>
@@ -240,135 +309,57 @@ export default function NewShipmentScreen() {
         </AppText>
       ) : null}
 
-      <Button
-        label="Confirmer l'envoi"
-        onPress={handleSubmit}
-        loading={createShipment.isPending}
-        style={styles.submit}
-      />
+      <OceanButton label="Confirmer l'envoi" onPress={handleSubmit} loading={createShipment.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }
 
-function SectionTitle({ label }: { label: string }) {
-  return (
-    <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
-      {label}
-    </AppText>
-  );
-}
-
-function AddressCard({
-  label,
-  location,
-  onPress,
-}: {
-  label: string;
-  location: TripLocation | null;
-  onPress: () => void;
-}) {
-  return (
-    <Card onPress={onPress} style={styles.addressCard}>
-      <View style={styles.addressRow}>
-        <IconMapPin size={16} color={location ? colors.successDark : colors.textSecondary} />
-        <View style={{ flex: 1 }}>
-          <AppText variant="xs" color="textSecondary">
-            {label}
-          </AppText>
-          <AppText variant="sm" weight="medium" numberOfLines={1}>
-            {location ? location.label : 'Appuyez pour choisir'}
-          </AppText>
-        </View>
-      </View>
-    </Card>
-  );
-}
-
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  sectionTitle: {
-    marginBottom: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  fields: {
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
   addressCard: {
-    padding: spacing.sm + 2,
-  },
-  addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    padding: spacing.sm + 2,
+  },
+  addressIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: OCEAN.mist,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addressIconDone: {
+    backgroundColor: colors.successLight,
+  },
+  addressText: {
+    flex: 1,
+    gap: 2,
+  },
+  block: {
+    gap: spacing.xs,
   },
   categoryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-    marginBottom: spacing.md,
   },
-  categoryChip: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm + 2,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  categoryChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  stepperLabel: {
-    marginBottom: spacing.xxs,
-  },
-  stepper: {
+  dimensionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.xs,
   },
-  stepperValue: {
-    minWidth: 24,
-    textAlign: 'center',
+  dimensionCell: {
+    flex: 1,
   },
   multiline: {
     minHeight: 70,
     textAlignVertical: 'top',
   },
-  urgentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  noticeCard: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.surfaceMuted,
-    marginBottom: spacing.md,
-  },
   error: {
     marginBottom: spacing.sm,
   },
   submit: {
-    marginBottom: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
   },
 });

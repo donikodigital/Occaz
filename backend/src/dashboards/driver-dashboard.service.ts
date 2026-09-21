@@ -1,4 +1,5 @@
 // backend/src/dashboards/driver-dashboard.service.ts
+// [21/09/2026] v2 — compteurs d'envois via Shipment.driverId.
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { BookingStatus, ShipmentStatus, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -33,11 +34,11 @@ export class DriverDashboardService {
         _sum: { seatsCount: true },
       }),
       this.prisma.shipment.count({
-        where: { trip: { driverId }, status: { in: [ShipmentStatus.DRIVER_ASSIGNED, ShipmentStatus.PICKUP_PENDING] } },
+        where: { driverId, status: { in: [ShipmentStatus.DRIVER_ASSIGNED, ShipmentStatus.PICKUP_PENDING] } },
       }),
       this.prisma.shipment.count({
         where: {
-          trip: { driverId },
+          driverId,
           status: { in: [ShipmentStatus.PICKED_UP, ShipmentStatus.IN_TRANSIT, ShipmentStatus.DELIVERY_PENDING] },
         },
       }),

@@ -1,14 +1,65 @@
 // mobile/app/(customer)/trip-search.tsx
+//
+// v2 — Refonte bleu océan. L'itinéraire devient un tracé (rond creux au
+// départ, rond plein à l'arrivée) avec un bouton d'inversion, comme sur
+// l'écran « Envois disponibles » côté chauffeur ; la date et les passagers
+// passent en sections à en-tête soulignée. Logique inchangée.
+
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowLeft, IconArrowsUpDown, IconMapPin, IconMinus, IconPlus } from '@tabler/icons-react-native';
-import { AppText, Button, CalendarPicker, Card, IconButton, ScreenContainer } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { IconArrowsUpDown, IconChevronRight, IconSearch, IconUsers, IconCalendarEvent } from '@tabler/icons-react-native';
+import { AppText, CalendarPicker, ScreenContainer } from '@/components/ui';
+import { OceanButton, OceanCard, OceanScreenHeader, OceanSection, OceanStepper } from '@/components/ocean/OceanKit';
+import { colors, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { recentSearchesStorage } from '@/services/storage/recentSearches';
 import { toDateOnly } from '@/utils/date';
 import type { City } from '@/types/geography.types';
+
+/** Hauteur d'une ligne de l'itinéraire : le tracé est positionné à partir d'elle. */
+const ROW_HEIGHT = 60;
+const ROW_GAP = spacing.xs + 2;
+const DOT = 12;
+
+function RouteRow({
+  index,
+  label,
+  value,
+  placeholder,
+  onPress,
+}: {
+  index: 0 | 1;
+  label: string;
+  value?: string;
+  placeholder: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label} : ${value ?? placeholder}`}
+      style={({ pressed }) => [
+        styles.routeField,
+        { top: index * (ROW_HEIGHT + ROW_GAP) },
+        value ? styles.routeFieldActive : null,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={styles.routeFieldText}>
+        <AppText variant="xs" color="textMuted">
+          {label}
+        </AppText>
+        <AppText variant="base" weight="semibold" color={value ? OCEAN.deep : 'textSecondary'} numberOfLines={1}>
+          {value ?? placeholder}
+        </AppText>
+      </View>
+      <IconChevronRight size={18} color={colors.textMuted} />
+    </Pressable>
+  );
+}
 
 export default function TripSearchScreen() {
   const [origin, setOrigin] = useState<City | null>(null);
@@ -58,150 +109,156 @@ export default function TripSearchScreen() {
     setDestination(origin);
   }
 
+  function pickCity(field: 'origin' | 'destination') {
+    openCityPicker(field);
+    router.push('/(customer)/select-city');
+  }
+
+  const firstDotTop = ROW_HEIGHT / 2 - DOT / 2;
+  const secondDotTop = ROW_HEIGHT + ROW_GAP + ROW_HEIGHT / 2 - DOT / 2;
+
   return (
-    <ScreenContainer maxWidth="detail">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Rechercher un trajet
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+    <ScreenContainer scroll maxWidth="detail">
+      <OceanScreenHeader title="Rechercher un trajet" subtitle="Où allez-vous ?" onBack={() => router.back()} />
 
-      <Card style={styles.citiesCard} padded={false}>
-        <Pressable
-          onPress={() => {
-            openCityPicker('origin');
-            router.push('/(customer)/select-city');
-          }}
-          style={styles.cityRow}
-        >
-          <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-          <AppText variant="base" color={origin ? 'textPrimary' : 'textSecondary'}>
-            {origin?.name ?? 'Ville de départ'}
-          </AppText>
-        </Pressable>
+      <OceanCard style={styles.routeCard}>
+        <View style={[styles.routeBox, { height: ROW_HEIGHT * 2 + ROW_GAP }]}>
+          <View style={[styles.railDot, styles.railDotStart, { top: firstDotTop }]} />
+          <View style={[styles.railLine, { top: firstDotTop + DOT, height: secondDotTop - firstDotTop - DOT }]} />
+          <View style={[styles.railDot, styles.railDotEnd, { top: secondDotTop }]} />
 
-        <View style={styles.divider} />
+          <RouteRow index={0} label="Départ" value={origin?.name} placeholder="Ville de départ" onPress={() => pickCity('origin')} />
+          <RouteRow
+            index={1}
+            label="Arrivée"
+            value={destination?.name}
+            placeholder="Ville d’arrivée"
+            onPress={() => pickCity('destination')}
+          />
 
-        <Pressable
-          onPress={() => {
-            openCityPicker('destination');
-            router.push('/(customer)/select-city');
-          }}
-          style={styles.cityRow}
-        >
-          <IconMapPin size={14} color={colors.accentDark} />
-          <AppText variant="base" color={destination ? 'textPrimary' : 'textSecondary'}>
-            {destination?.name ?? 'Où allez-vous ?'}
-          </AppText>
-        </Pressable>
+          {origin || destination ? (
+            <Pressable
+              onPress={swapCities}
+              accessibilityRole="button"
+              accessibilityLabel="Inverser les villes"
+              style={({ pressed }) => [styles.swapButton, pressed && styles.pressed]}
+            >
+              <IconArrowsUpDown size={16} color={OCEAN.base} />
+            </Pressable>
+          ) : null}
+        </View>
+      </OceanCard>
 
-        {origin || destination ? (
-          <Pressable onPress={swapCities} style={styles.swapButton} accessibilityLabel="Inverser les villes">
-            <IconArrowsUpDown size={16} color={colors.textSecondary} />
-          </Pressable>
-        ) : null}
-      </Card>
+      <OceanSection icon={<IconCalendarEvent size={17} color={OCEAN.base} />} title="Date">
+        <CalendarPicker label="" selectedDate={selectedDate} onSelectDate={setSelectedDate} flexibleLabel="Dates flexibles" />
+      </OceanSection>
 
-      <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
-        Date
-      </AppText>
-      <View style={styles.dateField}>
-        <CalendarPicker
-          label=""
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-          flexibleLabel="Dates flexibles"
-        />
-      </View>
+      <OceanSection icon={<IconUsers size={17} color={OCEAN.base} />} title="Passagers">
+        <View style={styles.passengersRow}>
+          <View style={styles.passengersText}>
+            <AppText variant="sm" weight="semibold">
+              Nombre de places
+            </AppText>
+            <AppText variant="xs" color="textSecondary">
+              Pour vous et les personnes qui voyagent avec vous.
+            </AppText>
+          </View>
+          <OceanStepper value={passengersCount} onChange={setPassengersCount} min={1} max={8} label="passager" />
+        </View>
+      </OceanSection>
 
-      <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
-        Passagers
-      </AppText>
-      <View style={styles.stepper}>
-        <IconButton
-          icon={<IconMinus size={16} color={colors.textPrimary} />}
-          accessibilityLabel="Retirer un passager"
-          onPress={() => setPassengersCount((c) => Math.max(1, c - 1))}
-        />
-        <AppText variant="lg" weight="semibold" style={styles.stepperValue}>
-          {passengersCount}
-        </AppText>
-        <IconButton
-          icon={<IconPlus size={16} color={colors.textPrimary} />}
-          accessibilityLabel="Ajouter un passager"
-          onPress={() => setPassengersCount((c) => Math.min(8, c + 1))}
-        />
-      </View>
-
-      <Button label="Rechercher" onPress={handleSearch} disabled={!canSearch} style={styles.submit} />
+      <OceanButton
+        label="Rechercher"
+        icon={<IconSearch size={18} color={OCEAN.onDark} />}
+        onPress={handleSearch}
+        disabled={!canSearch}
+        style={styles.submit}
+      />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
+  pressed: {
+    opacity: 0.75,
   },
-  citiesCard: {
-    marginBottom: spacing.lg,
+  routeCard: {
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  routeBox: {
     position: 'relative',
   },
-  cityRow: {
+  railDot: {
+    position: 'absolute',
+    left: 2,
+    width: DOT,
+    height: DOT,
+    borderRadius: DOT / 2,
+  },
+  railDotStart: {
+    borderWidth: 2,
+    borderColor: OCEAN.base,
+    backgroundColor: colors.surface,
+  },
+  railDotEnd: {
+    backgroundColor: OCEAN.base,
+  },
+  railLine: {
+    position: 'absolute',
+    left: 7,
+    width: 2,
+    backgroundColor: OCEAN.line,
+  },
+  routeField: {
+    position: 'absolute',
+    left: 26,
+    right: 0,
+    height: ROW_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    gap: spacing.xs,
+    paddingLeft: spacing.sm + 2,
+    paddingRight: spacing.sm + 2,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: OCEAN.line,
+    backgroundColor: colors.surface,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  routeFieldActive: {
+    borderColor: OCEAN.base,
+    backgroundColor: OCEAN.mist,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.md,
+  routeFieldText: {
+    flex: 1,
+    gap: 2,
+    paddingRight: 34,
   },
   swapButton: {
     position: 'absolute',
-    right: spacing.md,
-    top: '50%',
-    marginTop: -16,
+    right: 14,
+    top: ROW_HEIGHT + ROW_GAP / 2 - 16,
     width: 32,
     height: 32,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceMuted,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: OCEAN.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionTitle: {
-    marginBottom: spacing.sm,
-  },
-  dateField: {
-    marginBottom: spacing.lg,
-  },
-  stepper: {
+  passengersRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
-  stepperValue: {
-    minWidth: 24,
-    textAlign: 'center',
+  passengersText: {
+    flex: 1,
+    gap: 2,
   },
   submit: {
-    marginBottom: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
   },
 });

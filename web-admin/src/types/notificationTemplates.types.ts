@@ -1,4 +1,5 @@
 // web-admin/src/types/notificationTemplates.types.ts
+// [21/09/2026] v+ — types SHIPMENT_REQUEST et SHIPMENT_EXTENSION.
 export type NotificationType =
   | 'BOOKING'
   | 'PAYMENT'
@@ -12,7 +13,9 @@ export type NotificationType =
   | 'DISPUTE'
   | 'REFUND'
   | 'STATUS_CHANGE'
-  | 'SUPPORT_MESSAGE';
+  | 'SUPPORT_MESSAGE'
+  | 'SHIPMENT_REQUEST'
+  | 'SHIPMENT_EXTENSION';
 
 export type NotificationChannel = 'PUSH' | 'SMS' | 'EMAIL';
 

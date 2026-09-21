@@ -1,4 +1,5 @@
 // mobile/src/components/screens/HomeHeader.tsx
+// [21/09/2026] v+ — strokeWidth au lieu de stroke (stroke est la couleur dans Tabler React Native).
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { IconBell, IconCheck } from '@tabler/icons-react-native';
@@ -55,7 +56,7 @@ export function HomeHeader({
           <Avatar initials={initials} imageUri={photoUri} size={AVATAR_SIZE} />
           {isVerified ? (
             <View style={styles.verifiedDot}>
-              <IconCheck size={10} color={colors.onSuccess} stroke={3} />
+              <IconCheck size={10} color={colors.onSuccess} strokeWidth={3} />
             </View>
           ) : null}
         </View>
