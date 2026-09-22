@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/home.tsx
+// [21/09/2026] v9 — tuile « Créer un trajet », badge de places et carte véhicule des statistiques passent en bleu Ocean ; la tuile « Envois disponibles » garde son jaune, propre aux colis.
 //
 // v8 — Plus d'air entre l'en-tête (profil + cloche) et ce qui suit (bandeau
 // de statut, carte véhicule ou tuiles violette/jaune) : HomeHeader est
@@ -41,12 +42,14 @@ import {
   IconRoute,
   IconStarFilled,
 } from '@tabler/icons-react-native';
-import { AppText, Badge, Card, ProgressRing, RouteMap, ScreenContainer } from '@/components/ui';
+import { AppText, Card, ProgressRing, RouteMap, ScreenContainer } from '@/components/ui';
+import { OceanPill } from '@/components/ocean/OceanKit';
 import { HomeHeader } from '@/components/screens/HomeHeader';
 import { StatCard, StatIconBadge } from '@/components/screens/StatCard';
 import { TripTileIllustration } from '@/components/illustrations/TripTileIllustration';
 import { ShipmentTileIllustration } from '@/components/illustrations/ShipmentTileIllustration';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useMyTrips } from '@/hooks/useDriverTrips';
@@ -110,7 +113,7 @@ export default function DriverHomeScreen() {
 
       {vehicles && vehicles.length === 0 ? (
         <Pressable onPress={() => router.push('/(driver)/vehicle-new')} style={styles.setupCard}>
-          <IconCar size={20} color={colors.primary} />
+          <IconCar size={20} color={OCEAN.base} />
           <AppText variant="sm" weight="medium" style={{ flex: 1 }}>
             Ajoutez un véhicule pour commencer à proposer des trajets
           </AppText>
@@ -119,16 +122,16 @@ export default function DriverHomeScreen() {
         <View style={styles.tileRow}>
           <Pressable
             onPress={() => router.push('/(driver)/trip-new')}
-            style={[styles.tile, { backgroundColor: colors.primary }]}
+            style={[styles.tile, { backgroundColor: OCEAN.deep }]}
           >
             <View style={styles.tileIllustration}>
               <TripTileIllustration />
             </View>
-            <IconCar size={36} color={colors.onPrimary} style={styles.tileIcon} />
-            <AppText variant="base" weight="semibold" color={colors.onPrimary}>
+            <IconCar size={36} color={OCEAN.onDark} style={styles.tileIcon} />
+            <AppText variant="base" weight="semibold" color={OCEAN.onDark}>
               Créer un trajet
             </AppText>
-            <AppText variant="xs" color={colors.onPrimary} style={styles.tileSubtitle}>
+            <AppText variant="xs" color={OCEAN.onDark} style={styles.tileSubtitle}>
               Partager votre route
             </AppText>
           </Pressable>
@@ -169,16 +172,16 @@ export default function DriverHomeScreen() {
                   {formatDateShort(nextTrip.departureAt)} à {formatTime(nextTrip.departureAt)}
                 </AppText>
               </View>
-              <Badge
+              <OceanPill
                 label={formatSeatsAvailability(nextTrip.availableSeats)}
-                tone={nextTrip.availableSeats > 0 ? 'primary' : 'success'}
+                tone={nextTrip.availableSeats > 0 ? 'ocean' : 'success'}
               />
             </View>
           </Card>
         </>
       ) : null}
 
-      <AppText variant="md" weight="semibold" style={styles.sectionTitle}>
+      <AppText variant="md" weight="semibold" color={OCEAN.deep} style={styles.sectionTitle}>
         Vos statistiques
       </AppText>
       <View style={styles.statsRow}>
@@ -205,8 +208,8 @@ export default function DriverHomeScreen() {
         <StatCard
           visual={
             <StatIconBadge
-              background={colors.primaryLight}
-              icon={<IconCar size={18} color={colors.primary} />}
+              background={OCEAN.mist}
+              icon={<IconCar size={18} color={OCEAN.base} />}
             />
           }
           value={String(vehiclesCount)}
@@ -243,7 +246,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: OCEAN.mist,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.lg,

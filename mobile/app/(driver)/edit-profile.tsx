@@ -1,10 +1,14 @@
 // mobile/app/(driver)/edit-profile.tsx
+// [21/09/2026] v2 — habillage bleu Ocean, comme l'espace client : en-tête,
+// photo de profil et champs dans une section à en-tête souligné.
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowLeft } from '@tabler/icons-react-native';
-import { AppText, Button, IconButton, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { IconUserCircle } from '@tabler/icons-react-native';
+import { AppText, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
+import { OceanButton, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useDriverProfile, useUpdateDriverProfile } from '@/hooks/useDriverProfile';
 import { useDriverPhotoUpload } from '@/hooks/useDriverPhotoUpload';
 import { ApiError } from '@/services/api/ApiError';
@@ -42,18 +46,8 @@ export default function DriverEditProfileScreen() {
   }
 
   return (
-    <ScreenContainer maxWidth="form">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Modifier le profil
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+    <ScreenContainer scroll maxWidth="form">
+      <OceanScreenHeader title="Modifier le profil" subtitle="Compte chauffeur" onBack={() => router.back()} />
 
       <ProfilePhotoField
         photoUrl={photoUrl}
@@ -65,7 +59,7 @@ export default function DriverEditProfileScreen() {
       />
       <View style={{ height: spacing.lg }} />
 
-      <View style={styles.fields}>
+      <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title="Identité">
         <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Mamadou" />
         <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Barry" />
         <TextField
@@ -75,7 +69,7 @@ export default function DriverEditProfileScreen() {
           placeholder="+224620000000"
           keyboardType="phone-pad"
         />
-      </View>
+      </OceanSection>
 
       {errorMessage ? (
         <AppText variant="sm" color="danger" style={styles.error}>
@@ -83,27 +77,16 @@ export default function DriverEditProfileScreen() {
         </AppText>
       ) : null}
 
-      <Button label="Enregistrer" onPress={handleSubmit} loading={updateProfile.isPending} style={styles.submit} />
+      <OceanButton label="Enregistrer" onPress={handleSubmit} loading={updateProfile.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  fields: {
-    gap: spacing.md,
-    flex: 1,
-  },
   error: {
     marginBottom: spacing.sm,
   },
   submit: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
 });

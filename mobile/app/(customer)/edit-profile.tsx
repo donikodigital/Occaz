@@ -1,4 +1,5 @@
 // mobile/app/(customer)/edit-profile.tsx
+// [21/09/2026] v6 — photo de profil modifiable (galerie ou appareil photo), comme côté chauffeur.
 //
 // v5 — Habillage bleu océan (en-tête de retour, sections à en-tête
 // soulignée, bouton plein). Logique inchangée : date de naissance en saisie
@@ -10,12 +11,13 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconChevronRight, IconMapPin, IconUserCircle } from '@tabler/icons-react-native';
-import { AppText, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { CountrySelectField } from '@/components/screens/CountrySelectField';
 import { OceanButton, OceanCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCustomerProfile, useUpdateCustomerProfile } from '@/hooks/useCustomerProfile';
+import { useCustomerPhotoUpload } from '@/hooks/useCustomerPhotoUpload';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { City, Country } from '@/types/geography.types';
@@ -70,8 +72,10 @@ export default function EditProfileScreen() {
   const [dateOfBirth, setDateOfBirth] = useState(isoToDateOfBirthDisplay(profile?.dateOfBirth));
   const [country, setCountry] = useState<Country | null>(profile?.country ?? null);
   const [city, setCity] = useState<City | null>(profile?.city ?? null);
+  const [photoUrl, setPhotoUrl] = useState(profile?.photoUrl ?? null);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const updateProfile = useUpdateCustomerProfile();
+  const photoUpload = useCustomerPhotoUpload((updated) => setPhotoUrl(updated.photoUrl));
 
   const citySelection = useCitySelectionStore((state) => state.selection);
   const consumeCitySelection = useCitySelectionStore((state) => state.consume);
@@ -121,6 +125,15 @@ export default function EditProfileScreen() {
   return (
     <ScreenContainer scroll maxWidth="form">
       <OceanScreenHeader title="Modifier le profil" subtitle="Compte client" onBack={() => router.back()} />
+
+      <ProfilePhotoField
+        photoUrl={photoUrl}
+        initials={`${firstName.charAt(0)}${lastName.charAt(0)}`}
+        isUploading={photoUpload.isUploading}
+        onPickLibrary={photoUpload.pickFromLibrary}
+        onPickCamera={photoUpload.pickFromCamera}
+      />
+      <View style={{ height: spacing.lg }} />
 
       <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title="Identité">
         <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Fatoumata" />

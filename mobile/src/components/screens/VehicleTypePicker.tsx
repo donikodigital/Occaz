@@ -1,4 +1,5 @@
 // mobile/src/components/screens/VehicleTypePicker.tsx
+// [21/09/2026] v+ — bleu Ocean au lieu de l'indigo, comme le reste du profil chauffeur.
 // [21/09/2026] v+ — strokeWidth au lieu de stroke.
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -15,6 +16,7 @@ import {
 } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { VEHICLE_TYPE_OPTIONS } from '@/utils/vehicleLabels';
 import type { VehicleType } from '@/types/vehicles.types';
 
@@ -74,11 +76,11 @@ export function VehicleTypePicker({ value, onChange }: VehicleTypePickerProps) {
                 pressed && styles.tilePressed,
               ]}
             >
-              <Icon size={26} color={isActive ? colors.primary : colors.textSecondary} strokeWidth={1.7} />
+              <Icon size={26} color={isActive ? OCEAN.base : colors.textSecondary} strokeWidth={1.7} />
               <AppText
                 variant="xs"
                 weight={isActive ? 'semibold' : 'medium'}
-                color={isActive ? 'primaryDark' : 'textPrimary'}
+                color={isActive ? OCEAN.deep : 'textPrimary'}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.8}
@@ -89,7 +91,7 @@ export function VehicleTypePicker({ value, onChange }: VehicleTypePickerProps) {
 
               {isActive ? (
                 <View style={styles.check}>
-                  <IconCheck size={10} color={colors.onPrimary} strokeWidth={3} />
+                  <IconCheck size={10} color={OCEAN.onDark} strokeWidth={3} />
                 </View>
               ) : null}
             </Pressable>
@@ -122,8 +124,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   tileActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
+    backgroundColor: OCEAN.mist,
+    borderColor: OCEAN.base,
   },
   tilePressed: {
     transform: [{ scale: 0.96 }],
@@ -139,7 +141,7 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: colors.primary,
+    backgroundColor: OCEAN.base,
     alignItems: 'center',
     justifyContent: 'center',
   },

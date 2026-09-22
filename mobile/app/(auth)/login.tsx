@@ -1,11 +1,17 @@
 // mobile/app/(auth)/login.tsx
+// [22/09/2026] v2 — Habillage bleu Ocean, dans l'esprit Tiime : illustration
+// à étincelles au-dessus du titre, bouton retour en carte flottante, champ
+// téléphone dans une carte. Logique inchangée.
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { IconArrowLeft, IconPhone } from '@tabler/icons-react-native';
-import { AppText, Button, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { OceanButton } from '@/components/ocean/OceanKit';
+import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { colors, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
@@ -46,10 +52,12 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.body}>
-        <AppText variant="xxl" weight="semibold" style={styles.title}>
+        <AuthIllustration icon={<IconPhone size={26} color={OCEAN.onDark} />} size={104} style={styles.illustration} />
+
+        <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>
           Votre numéro
         </AppText>
-        <AppText variant="base" color="textSecondary" style={styles.subtitle}>
+        <AppText variant="base" color="textSecondary" align="center" style={styles.subtitle}>
           Nous vous envoyons un code par SMS pour confirmer votre identité.
         </AppText>
 
@@ -60,17 +68,12 @@ export default function LoginScreen() {
           placeholder="+224620000000"
           keyboardType="phone-pad"
           autoFocus
-          leftIcon={<IconPhone size={18} color={colors.textSecondary} />}
+          leftIcon={<IconPhone size={18} color={OCEAN.base} />}
           error={fieldError}
         />
       </View>
 
-      <Button
-        label="Continuer"
-        onPress={handleContinue}
-        loading={requestOtp.isPending}
-        style={styles.submit}
-      />
+      <OceanButton label="Continuer" onPress={handleContinue} loading={requestOtp.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }
@@ -82,13 +85,18 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
+  },
+  illustration: {
+    alignSelf: 'center',
   },
   title: {
+    marginTop: spacing.lg,
     marginBottom: spacing.xxs,
   },
   subtitle: {
     marginBottom: spacing.xl,
+    alignSelf: 'stretch',
   },
   submit: {
     marginBottom: spacing.md,

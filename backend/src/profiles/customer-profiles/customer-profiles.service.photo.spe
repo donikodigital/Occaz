@@ -1,0 +1,56 @@
+// backend/src/profiles/customer-profiles/customer-profiles.service.photo.spec.ts
+import { NotFoundException } from '@nestjs/common';
+import { CustomerProfilesService } from './customer-profiles.service';
+
+/**
+ * Photo de profil côté client : même flux en 2 étapes que côté chauffeur
+ * (clé de stockage dédiée « customer-avatar », URL publique et durable).
+ */
+function createService(options: { hasProfile?: boolean } = {}) {
+  const prisma = {
+    customerProfile: {
+      findUnique: jest.fn().mockResolvedValue(options.hasProfile === false ? null : { id: 'cust1' }),
+      update: jest.fn().mockResolvedValue({ id: 'cust1', photoUrl: 'https://cdn.example.com/customer-avatar/cust1/x.jpg' }),
+    },
+  };
+  const storageService = {
+    buildKey: jest.fn().mockReturnValue('customer-avatar/cust1/generated.jpg'),
+    createUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: 'https://upload.example.com/x', expiresInSeconds: 300 }),
+    createDownloadUrl: jest.fn().mockResolvedValue('https://cdn.example.com/customer-avatar/cust1/x.jpg'),
+  };
+  const service = new CustomerProfilesService(prisma as never, {} as never, {} as never, storageService as never);
+  return { service, prisma, storageService };
+}
+
+describe('CustomerProfilesService — photo de profil', () => {
+  it('demande une URL de dépôt sous la clé "customer-avatar", propre au client', async () => {
+    const { service, storageService } = createService();
+    const result = await service.requestPhotoUploadUrlForUser('u1', { type: 'profile_photo', contentType: 'image/jpeg' });
+
+    expect(storageService.buildKey).toHaveBeenCalledWith('customer-avatar', 'cust1', 'jpg');
+    expect(result).toEqual({
+      storageKey: 'customer-avatar/cust1/generated.jpg',
+      uploadUrl: 'https://upload.example.com/x',
+      expiresInSeconds: 300,
+    });
+  });
+
+  it('confirme avec une URL publique et durable (pas signée à 5 minutes) et met à jour le profil', async () => {
+    const { service, prisma, storageService } = createService();
+    const profile = await service.confirmPhotoForUser('u1', { storageKey: 'customer-avatar/cust1/x.jpg' });
+
+    expect(storageService.createDownloadUrl).toHaveBeenCalledWith('customer-avatar/cust1/x.jpg', { public: true });
+    expect(prisma.customerProfile.update).toHaveBeenCalledWith({
+      where: { id: 'cust1' },
+      data: { photoUrl: 'https://cdn.example.com/customer-avatar/cust1/x.jpg' },
+    });
+    expect(profile.photoUrl).toBe('https://cdn.example.com/customer-avatar/cust1/x.jpg');
+  });
+
+  it('refuse un utilisateur sans profil client', async () => {
+    const { service } = createService({ hasProfile: false });
+    await expect(
+      service.requestPhotoUploadUrlForUser('u1', { type: 'profile_photo', contentType: 'image/jpeg' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});

@@ -1,15 +1,18 @@
 // mobile/app/(driver)/(tabs)/wallet.tsx
+//
+// v2 — Habillage bleu océan, comme l'espace client : bandeau OceanHeroCard
+// (au lieu du fond noir), bouton Retirer en OceanButton, pastilles de
+// statut des retraits en OceanPill. Logique inchangée : mêmes hooks, même
+// solde, même historique.
+
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import {
-  IconArrowDownCircle,
-  IconArrowUpCircle,
-  IconReceipt,
-  IconWallet,
-} from '@tabler/icons-react-native';
-import { AppText, Badge, Button, Card, ResponsiveList, ScreenContainer } from '@/components/ui';
+import { IconArrowDownCircle, IconArrowUpCircle, IconReceipt, IconWallet } from '@tabler/icons-react-native';
+import { AppText, Card, ResponsiveList, ScreenContainer } from '@/components/ui';
+import { OceanButton, OceanHeroCard, OceanPill, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useMyWallet, useMyWalletTransactions } from '@/hooks/useWallet';
 import { useMyPayouts } from '@/hooks/usePayouts';
 import { formatMoney } from '@/utils/money';
@@ -35,17 +38,13 @@ const PAYOUT_STATUS_LABELS: Record<PayoutStatus, string> = {
   CANCELLED: 'Annulé',
 };
 
-const PAYOUT_STATUS_TONE: Record<PayoutStatus, 'primary' | 'success' | 'danger' | 'neutral'> = {
+const PAYOUT_STATUS_TONE: Record<PayoutStatus, OceanPillTone> = {
   REQUESTED: 'neutral',
-  PROCESSING: 'primary',
+  PROCESSING: 'ocean',
   PAID: 'success',
   FAILED: 'danger',
   CANCELLED: 'danger',
 };
-
-const OCEAN_BG = '#071019';
-const OCEAN_CARD = 'rgba(255,255,255,0.06)';
-const OCEAN_BORDER = 'rgba(255,255,255,0.12)';
 
 function TransactionRow({ tx, currencyCode }: { tx: WalletTransaction; currencyCode: string }) {
   const isCredit = Number(tx.amount) >= 0;
@@ -85,57 +84,58 @@ export default function DriverWalletScreen() {
 
   return (
     <ScreenContainer padded={false} maxWidth="wide">
-      <View style={styles.hero}>
-        <AppText variant="sm" weight="medium" color={colors.textOnDark} style={styles.heroLabel}>
-          Solde disponible
-        </AppText>
-        <AppText variant="display" weight="bold" color={colors.textOnDark}>
-          {wallet ? formatMoney(wallet.balance, currencyCode) : '…'}
-        </AppText>
+      <View style={styles.heroWrap}>
+        <OceanHeroCard style={styles.hero}>
+          <AppText variant="sm" weight="medium" color={OCEAN.sky} style={styles.heroLabel}>
+            Solde disponible
+          </AppText>
+          <AppText variant="display" weight="bold" color={OCEAN.onDark}>
+            {wallet ? formatMoney(wallet.balance, currencyCode) : '…'}
+          </AppText>
 
-        {hasPending ? (
-          <View style={styles.pendingPill}>
-            <IconWallet size={13} color={colors.textOnDark} />
-            <AppText variant="xs" color="rgba(255,255,255,0.9)">
-              + {formatMoney(wallet!.pendingBalance, currencyCode)} en attente
-            </AppText>
-          </View>
-        ) : null}
+          {hasPending ? (
+            <View style={styles.pendingPill}>
+              <IconWallet size={13} color={OCEAN.onDark} />
+              <AppText variant="xs" color={OCEAN.sky}>
+                + {formatMoney(wallet!.pendingBalance, currencyCode)} en attente
+              </AppText>
+            </View>
+          ) : null}
 
-        <Button
-          label="Retirer"
-          onPress={() => router.push('/(driver)/payout-new')}
-          fullWidth={false}
-          style={styles.withdrawButton}
-        />
+          <OceanButton
+            label="Retirer"
+            onPress={() => router.push('/(driver)/payout-new')}
+            style={styles.withdrawButton}
+          />
 
-        {recentPayouts.length > 0 ? (
-          <View style={styles.heroPayouts}>
-            <AppText variant="xs" weight="semibold" color="rgba(255,255,255,0.6)" style={styles.heroPayoutsTitle}>
-              RETRAITS RÉCENTS
-            </AppText>
-            {recentPayouts.map((payout) => (
-              <View key={payout.id} style={styles.heroPayoutRow}>
-                <View style={styles.heroPayoutIcon}>
-                  <IconReceipt size={15} color={colors.textOnDark} />
+          {recentPayouts.length > 0 ? (
+            <View style={styles.heroPayouts}>
+              <AppText variant="xs" weight="semibold" color={OCEAN.sky} style={styles.heroPayoutsTitle}>
+                RETRAITS RÉCENTS
+              </AppText>
+              {recentPayouts.map((payout) => (
+                <View key={payout.id} style={styles.heroPayoutRow}>
+                  <View style={styles.heroPayoutIcon}>
+                    <IconReceipt size={15} color={OCEAN.onDark} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="sm" weight="medium" color={OCEAN.onDark}>
+                      {formatMoney(payout.amount, currencyCode)}
+                    </AppText>
+                    <AppText variant="xs" color={OCEAN.sky}>
+                      {formatDateShort(payout.requestedAt)}
+                    </AppText>
+                  </View>
+                  <OceanPill label={PAYOUT_STATUS_LABELS[payout.status]} tone={PAYOUT_STATUS_TONE[payout.status]} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <AppText variant="sm" weight="medium" color={colors.textOnDark}>
-                    {formatMoney(payout.amount, currencyCode)}
-                  </AppText>
-                  <AppText variant="xs" color="rgba(255,255,255,0.55)">
-                    {formatDateShort(payout.requestedAt)}
-                  </AppText>
-                </View>
-                <Badge label={PAYOUT_STATUS_LABELS[payout.status]} tone={PAYOUT_STATUS_TONE[payout.status]} />
-              </View>
-            ))}
-          </View>
-        ) : null}
+              ))}
+            </View>
+          ) : null}
+        </OceanHeroCard>
       </View>
 
       <View style={styles.body}>
-        <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
+        <AppText variant="base" weight="semibold" color={OCEAN.deep} style={styles.sectionTitle}>
           Historique
         </AppText>
         <ResponsiveList
@@ -163,38 +163,33 @@ export default function DriverWalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: OCEAN_BG,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
+  heroWrap: {
     paddingHorizontal: spacing.lg,
-    borderBottomLeftRadius: radius.xl,
-    borderBottomRightRadius: radius.xl,
+    paddingTop: spacing.sm,
   },
-  heroLabel: { opacity: 0.7, marginBottom: 2 },
+  hero: {
+    alignItems: 'flex-start',
+  },
+  heroLabel: { opacity: 0.9, marginBottom: 2 },
   pendingPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     alignSelf: 'flex-start',
-    backgroundColor: OCEAN_CARD,
-    borderWidth: 1,
-    borderColor: OCEAN_BORDER,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     borderRadius: radius.pill,
     paddingVertical: 5,
     paddingHorizontal: spacing.sm,
     marginTop: spacing.sm,
   },
-  withdrawButton: { marginTop: spacing.lg, minWidth: 160 },
-  heroPayouts: { marginTop: spacing.xl, gap: spacing.xs },
+  withdrawButton: { marginTop: spacing.lg, alignSelf: 'flex-start', minWidth: 160 },
+  heroPayouts: { marginTop: spacing.xl, gap: spacing.xs, alignSelf: 'stretch' },
   heroPayoutsTitle: { letterSpacing: 0.6, marginBottom: spacing.xxs },
   heroPayoutRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: OCEAN_CARD,
-    borderWidth: 1,
-    borderColor: OCEAN_BORDER,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: radius.md,
     padding: spacing.sm + 2,
   },
@@ -202,7 +197,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: radius.sm + 2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },

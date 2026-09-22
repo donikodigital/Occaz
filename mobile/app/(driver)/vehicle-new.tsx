@@ -1,27 +1,19 @@
 // mobile/app/(driver)/vehicle-new.tsx
+// [21/09/2026] v2 — habillage bleu Ocean (en-tête, sections), comme la modale de modification du véhicule.
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowLeft } from '@tabler/icons-react-native';
-import { AppText, Button, DocumentUploadField, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { IconCar, IconFileText, IconSteeringWheel } from '@tabler/icons-react-native';
+import { AppText, DocumentUploadField, ScreenContainer, TextField } from '@/components/ui';
+import { OceanButton, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
 import { SeatsStepper } from '@/components/screens/SeatsStepper';
 import { VehicleTypePicker } from '@/components/screens/VehicleTypePicker';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useCreateVehicle } from '@/hooks/useVehicles';
 import { useVehicleDocumentUpload, useVehicleDocuments } from '@/hooks/useVehicleDocuments';
 import { ApiError } from '@/services/api/ApiError';
 import type { VehicleType } from '@/types/vehicles.types';
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <AppText variant="md" weight="semibold">
-        {title}
-      </AppText>
-      {children}
-    </View>
-  );
-}
 
 /** Deuxième étape affichée juste après la création — le véhicule existe déjà en base, seuls ses documents manquent avant validation. */
 function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
@@ -33,13 +25,7 @@ function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <View style={styles.header}>
-        <View style={{ width: 38 }} />
-        <AppText variant="lg" weight="semibold">
-          Documents du véhicule
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+      <OceanScreenHeader title="Documents du véhicule" subtitle="Dernière étape" onBack={() => router.back()} />
 
       <AppText variant="sm" color="textSecondary" style={styles.intro}>
         Véhicule ajouté. Envoyez sa carte grise et son assurance pour qu&apos;il soit validé par notre équipe.
@@ -62,7 +48,7 @@ function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
         />
       </View>
 
-      <Button label="Terminer" onPress={() => router.back()} style={styles.submit} />
+      <OceanButton label="Terminer" onPress={() => router.back()} style={styles.submit} />
     </ScreenContainer>
   );
 }
@@ -113,20 +99,10 @@ export default function NewVehicleScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Ajouter un véhicule
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+      <OceanScreenHeader title="Ajouter un véhicule" onBack={() => router.back()} />
 
       <View style={styles.sections}>
-        <Section title="Informations">
+        <OceanSection icon={<IconFileText size={17} color={OCEAN.base} />} title="Informations">
           <View style={styles.row}>
             <View style={styles.cell}>
               <TextField
@@ -161,12 +137,12 @@ export default function NewVehicleScreen() {
             placeholder="RC-1234-GN"
             autoCapitalize="characters"
           />
-        </Section>
+        </OceanSection>
 
-        <Section title="Type et capacité">
+        <OceanSection icon={<IconSteeringWheel size={17} color={OCEAN.base} />} title="Type et capacité">
           <VehicleTypePicker value={type} onChange={setType} />
           <SeatsStepper value={totalSeats} onChange={setTotalSeats} />
-        </Section>
+        </OceanSection>
       </View>
 
       {errorMessage ? (
@@ -177,7 +153,7 @@ export default function NewVehicleScreen() {
         </View>
       ) : null}
 
-      <Button
+      <OceanButton
         label="Ajouter le véhicule"
         onPress={handleSubmit}
         loading={createVehicle.isPending}
@@ -188,22 +164,12 @@ export default function NewVehicleScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
   intro: {
     marginBottom: spacing.lg,
   },
   sections: {
     gap: spacing.xl,
     marginBottom: spacing.xl,
-  },
-  section: {
-    gap: spacing.md,
   },
   row: {
     flexDirection: 'row',

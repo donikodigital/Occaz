@@ -1,4 +1,5 @@
 // backend/src/profiles/customer-profiles/customer-profiles.service.ts
+// [21/09/2026] v3 — photo de profil : upload-url puis confirmation, même flux que le chauffeur (storageKey 'customer-avatar', URL publique).
 //
 // v2 — Ajout du champ address (texte libre, même esprit que Location.label)
 // sur CustomerProfile. Seul createForUser change : il liste ses champs
@@ -15,10 +16,13 @@ import { AccountType, NotificationChannel, NotificationType, Prisma } from '@pri
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../audit/audit.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { StorageService } from '../../storage/storage.service';
+import { RequestUploadUrlDto, extensionForContentType } from '../../storage/dto/request-upload-url.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../../common/dto/pagination-response.dto';
 import { CreateCustomerProfileDto } from './dto/create-customer-profile.dto';
 import { UpdateCustomerProfileDto } from './dto/update-customer-profile.dto';
+import { ConfirmPhotoDto } from './dto/confirm-photo.dto';
 
 @Injectable()
 export class CustomerProfilesService {
@@ -26,7 +30,17 @@ export class CustomerProfilesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly storageService: StorageService,
   ) {}
+
+  /** Même logique que DriverProfilesService.getProfileIdForUser — l'id du profil, pour les routes qui en ont besoin sans tout recharger. */
+  async getProfileIdForUser(userId: string): Promise<string> {
+    const profile = await this.prisma.customerProfile.findUnique({ where: { userId }, select: { id: true } });
+    if (!profile) {
+      throw new NotFoundException('Aucun profil client pour cet utilisateur.');
+    }
+    return profile.id;
+  }
 
   async findByUserId(userId: string) {
     const profile = await this.prisma.customerProfile.findUnique({
@@ -116,6 +130,26 @@ export class CustomerProfilesService {
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
       },
     });
+  }
+
+  /**
+   * Même flux en 2 étapes et même distinction `customer-avatar` que côté
+   * chauffeur (DriverProfilesService.requestPhotoUploadUrlForUser) : une
+   * photo de profil est vue en permanence dans l'app (par le chauffeur qui
+   * accepte l'envoi ou la course), contrairement à une pièce d'identité.
+   */
+  async requestPhotoUploadUrlForUser(userId: string, dto: RequestUploadUrlDto) {
+    const customerId = await this.getProfileIdForUser(userId);
+    const storageKey = this.storageService.buildKey('customer-avatar', customerId, extensionForContentType(dto.contentType));
+    const { uploadUrl, expiresInSeconds } = await this.storageService.createUploadUrl(storageKey, dto.contentType);
+    return { storageKey, uploadUrl, expiresInSeconds };
+  }
+
+  /** `{ public: true }` — même choix que côté chauffeur (voir StorageService.createDownloadUrl) : une photo de profil doit rester affichable durablement, pas seulement 5 minutes. */
+  async confirmPhotoForUser(userId: string, dto: ConfirmPhotoDto) {
+    const customerId = await this.getProfileIdForUser(userId);
+    const photoUrl = await this.storageService.createDownloadUrl(dto.storageKey, { public: true });
+    return this.prisma.customerProfile.update({ where: { id: customerId }, data: { photoUrl } });
   }
 
   async findAll(

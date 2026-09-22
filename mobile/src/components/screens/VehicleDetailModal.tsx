@@ -1,11 +1,13 @@
 // mobile/src/components/screens/VehicleDetailModal.tsx
-// [21/09/2026] v+ — strokeWidth au lieu de stroke.
+// [21/09/2026] v2 — habillage bleu Ocean : bandeau, sections et bouton Enregistrer comme le reste du profil chauffeur.
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { IconCheck, IconLock, IconX } from '@tabler/icons-react-native';
-import { AppText, Badge, Button, DocumentUploadField, IconButton, TextField } from '@/components/ui';
+import { IconCar, IconCheck, IconFileText, IconLock, IconSteeringWheel, IconX } from '@tabler/icons-react-native';
+import { AppText, Badge, DocumentUploadField, IconButton, TextField } from '@/components/ui';
+import { OceanButton, OceanSection } from '@/components/ocean/OceanKit';
 import { colors, maxContentWidth, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useUpdateVehicle } from '@/hooks/useVehicles';
 import { useVehicleDocumentUpload, useVehicleDocuments } from '@/hooks/useVehicleDocuments';
 import { VEHICLE_TYPE_LABELS } from '@/utils/vehicleLabels';
@@ -30,7 +32,6 @@ const STATUS_TONE: Record<Vehicle['verificationStatus'], 'success' | 'danger' | 
   PENDING: 'accent',
 };
 
-const HERO_MUTED = 'rgba(255,255,255,0.78)';
 const HERO_ICON_BG = 'rgba(255,255,255,0.16)';
 
 /** Champs modifiables — sert à savoir si quelque chose a changé (bouton Enregistrer). */
@@ -50,17 +51,6 @@ function fieldsFromVehicle(vehicle: Vehicle): VehicleFields {
     type: vehicle.type,
     totalSeats: vehicle.totalSeats,
   };
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <AppText variant="md" weight="semibold">
-        {title}
-      </AppText>
-      {children}
-    </View>
-  );
 }
 
 function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose: () => void }) {
@@ -126,11 +116,11 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
       >
         <View style={styles.inner}>
           <View style={styles.topBar}>
-            <AppText variant="lg" weight="semibold">
+            <AppText variant="lg" weight="bold" color={OCEAN.deep}>
               Mon véhicule
             </AppText>
             <IconButton
-              icon={<IconX size={18} color={colors.textPrimary} />}
+              icon={<IconX size={18} color={OCEAN.base} />}
               accessibilityLabel="Fermer"
               onPress={onClose}
             />
@@ -143,10 +133,10 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
                 <TypeIcon size={28} color={colors.onPrimary} strokeWidth={1.7} />
               </View>
               <View style={styles.heroText}>
-                <AppText variant="xl" weight="bold" color={colors.onPrimary} numberOfLines={1}>
+                <AppText variant="xl" weight="bold" color={OCEAN.onDark} numberOfLines={1}>
                   {title}
                 </AppText>
-                <AppText variant="sm" color={HERO_MUTED}>
+                <AppText variant="sm" color={OCEAN.sky}>
                   {subtitle}
                 </AppText>
               </View>
@@ -170,7 +160,7 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
             </View>
           </View>
 
-          <Section title="Informations">
+          <OceanSection icon={<IconFileText size={17} color={OCEAN.base} />} title="Informations">
             <View style={styles.row}>
               <View style={styles.cell}>
                 <TextField
@@ -198,14 +188,14 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
               placeholder="Gris"
               autoCapitalize="words"
             />
-          </Section>
+          </OceanSection>
 
-          <Section title="Type et capacité">
+          <OceanSection icon={<IconSteeringWheel size={17} color={OCEAN.base} />} title="Type et capacité">
             <VehicleTypePicker value={type} onChange={setType} />
             <SeatsStepper value={totalSeats} onChange={setTotalSeats} />
-          </Section>
+          </OceanSection>
 
-          <Section title="Documents">
+          <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title="Documents">
             <DocumentUploadField
               label="Carte grise"
               document={registrationDoc}
@@ -220,7 +210,7 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
               onPickLibrary={() => upload.pickFromLibrary('vehicle_insurance')}
               onPickCamera={() => upload.pickFromCamera('vehicle_insurance')}
             />
-          </Section>
+          </OceanSection>
         </View>
       </ScrollView>
 
@@ -234,9 +224,9 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
               </AppText>
             </View>
           ) : null}
-          <Button
+          <OceanButton
             label={justSaved ? 'Enregistré' : 'Enregistrer'}
-            leftIcon={justSaved ? <IconCheck size={18} color={colors.onPrimary} /> : undefined}
+            icon={justSaved ? <IconCheck size={18} color={OCEAN.onDark} /> : undefined}
             onPress={handleSave}
             loading={updateVehicle.isPending}
             disabled={!isDirty}
@@ -300,7 +290,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.lg,
     borderRadius: radius.xl,
-    backgroundColor: colors.primary,
+    backgroundColor: OCEAN.deep,
   },
   heroRow: {
     flexDirection: 'row',
@@ -340,9 +330,6 @@ const styles = StyleSheet.create({
   },
 
   // --- Sections ---
-  section: {
-    gap: spacing.md,
-  },
   row: {
     flexDirection: 'row',
     gap: spacing.sm,

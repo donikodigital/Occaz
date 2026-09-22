@@ -1,10 +1,13 @@
 // mobile/src/components/illustrations/TripTileIllustration.tsx
 //
-// Flourish décoratif pour la tuile "Créer un trajet" (fond indigo) —
-// forme géométrique abstraite, pas une reproduction de véhicule réel
-// ni de marque. Fichier isolé (voir HoverCard.tsx pour le même principe)
-// plutôt que du SVG inline dans home.tsx, pour rester réutilisable et
-// ne pas alourdir l'écran.
+// [21/09/2026] v+ — vitres retintées en bleu Ocean (la tuile est passée
+// du fond indigo au bleu profond OCEAN.deep).
+//
+// Flourish décoratif pour la tuile "Créer un trajet" — forme géométrique
+// abstraite, pas une reproduction de véhicule réel ni de marque. Fichier
+// isolé (voir HoverCard.tsx pour le même principe) plutôt que du SVG
+// inline dans home.tsx, pour rester réutilisable et ne pas alourdir
+// l'écran.
 
 import React from 'react';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
@@ -36,8 +39,8 @@ export function TripTileIllustration({ size = 130 }: TripTileIllustrationProps) 
       />
 
       {/* vitres */}
-      <Path d="M50 45 L56 45 L56 56 L44 56 Z" fill="#4F46E5" opacity={0.55} />
-      <Path d="M60 45 L76 45 L84 56 L60 56 Z" fill="#4F46E5" opacity={0.55} />
+      <Path d="M50 45 L56 45 L56 56 L44 56 Z" fill="#1E9BD7" opacity={0.55} />
+      <Path d="M60 45 L76 45 L84 56 L60 56 Z" fill="#1E9BD7" opacity={0.55} />
 
       {/* roues */}
       <Circle cx="39" cy="76" r="9" fill="#1C1B1A" opacity={0.85} />

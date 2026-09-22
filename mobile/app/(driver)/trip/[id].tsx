@@ -1,17 +1,10 @@
 // mobile/app/(driver)/trip/[id].tsx
 //
-// v2 — Refonte visuelle complète, logique métier inchangée (mêmes hooks,
-// mêmes actions, mêmes codes OTP).
-//   - Le trajet devient un « billet » : bandeau coloré avec l'heure de
-//     départ et l'itinéraire en frise verticale (ville + adresse choisie),
-//     puis coupon détachable avec les places (une pastille par siège) et
-//     le prix. La couleur du bandeau suit l'état : indigo en cours de vie,
-//     vert une fois terminé, gris si annulé, rouge en litige.
-//   - « Étape suivante » : une carte explique où en est le trajet et porte
-//     l'unique action à faire, au lieu de boutons empilés sous la fiche.
-//   - Passagers : cartes avec initiales, zone de validation par code
-//     clairement séparée, et un vrai état vide.
-//   - Détails : véhicule (plaque en évidence), bagages/envois, note.
+// v3 — Habillage bleu océan, comme l'espace client : en-tête OceanScreenHeader,
+// billet dont le bandeau par défaut passe du indigo au bleu profond (OCEAN.deep),
+// sections « Passagers » et « Détails » en OceanSection (même en-tête souligné
+// que le profil et les envois), boutons et pastilles Ocean. Logique métier et
+// structure du billet (coupon détachable, pastilles de sièges) inchangées.
 
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from 'react-native';
@@ -29,8 +22,10 @@ import {
   IconRoute,
   IconUsers,
 } from '@tabler/icons-react-native';
-import { AppText, Badge, Button, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { OceanButton, OceanCard, OceanPill, OceanScreenHeader, OceanSection, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useTrip } from '@/hooks/useTripSearch';
 import { useTripPositionBroadcast } from '@/hooks/useTripPositionBroadcast';
 import {
@@ -61,9 +56,24 @@ type BookingPhase = 'pickup' | 'dropoff' | 'none';
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 
-const HERO_MUTED = 'rgba(255,255,255,0.72)';
+const HERO_MUTED = OCEAN.sky;
 const HERO_SOFT = 'rgba(255,255,255,0.18)';
 const MAX_SEAT_DOTS = 10;
+
+const STATUS_PILL_TONE: Record<TripStatus, OceanPillTone> = {
+  DRAFT: 'neutral',
+  PUBLISHED: 'ocean',
+  BOOKING_PENDING: 'ocean',
+  CONFIRMED: 'ocean',
+  DRIVER_ARRIVED: 'ocean',
+  PASSENGER_PICKED_UP: 'ocean',
+  IN_PROGRESS: 'ocean',
+  ARRIVED: 'ocean',
+  COMPLETED: 'success',
+  CANCELLED: 'danger',
+  DISPUTED: 'danger',
+  REFUNDED: 'neutral',
+};
 
 // ---------------------------------------------------------------------------
 // Aides
@@ -77,7 +87,7 @@ function formatKg(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-/** La couleur du bandeau raconte l'état du trajet au premier coup d'œil. */
+/** La couleur du bandeau raconte l'état du trajet au premier coup d'œil — bleu profond pour un trajet actif, comme le reste de l'espace chauffeur. */
 function heroColorFor(status: TripStatus): string {
   switch (status) {
     case 'COMPLETED':
@@ -88,11 +98,11 @@ function heroColorFor(status: TripStatus): string {
     case 'DISPUTED':
       return colors.danger;
     default:
-      return colors.primary;
+      return OCEAN.deep;
   }
 }
 
-type StageTone = 'primary' | 'success' | 'accent';
+type StageTone = 'ocean' | 'success' | 'gold';
 
 interface Stage {
   icon: IconComponent;
@@ -102,9 +112,9 @@ interface Stage {
 }
 
 const STAGE_TONES: Record<StageTone, { background: string; foreground: string }> = {
-  primary: { background: colors.primaryLight, foreground: colors.primary },
-  success: { background: colors.successLight, foreground: colors.success },
-  accent: { background: colors.accentLight, foreground: colors.accentDark },
+  ocean: { background: OCEAN.mist, foreground: OCEAN.base },
+  success: { background: colors.successLight, foreground: colors.successDark },
+  gold: { background: OCEAN.goldSoft, foreground: OCEAN.goldInk },
 };
 
 function getStage(
@@ -119,21 +129,21 @@ function getStage(
         icon: IconNotes,
         title: 'Trajet en brouillon',
         text: 'Publiez-le pour que les passagers puissent réserver.',
-        tone: 'accent',
+        tone: 'gold',
       };
     case 'PUBLISHED':
       return {
         icon: IconCircleCheck,
         title: 'Trajet publié',
         text: 'Rendez-vous au point de départ, puis signalez votre arrivée.',
-        tone: 'primary',
+        tone: 'ocean',
       };
     case 'DRIVER_ARRIVED':
       return {
         icon: IconUsers,
         title: 'Prise en charge',
         text: 'Demandez le code de chaque passager pour valider sa montée.',
-        tone: 'primary',
+        tone: 'ocean',
       };
     case 'PASSENGER_PICKED_UP':
       return {
@@ -144,7 +154,7 @@ function getStage(
       };
     case 'IN_PROGRESS':
       if (positionError) {
-        return { icon: IconInfoCircle, title: 'Position non partagée', text: positionError, tone: 'accent' };
+        return { icon: IconInfoCircle, title: 'Position non partagée', text: positionError, tone: 'gold' };
       }
       return {
         icon: IconRoute,
@@ -161,7 +171,7 @@ function getStage(
             icon: IconFlag,
             title: 'Dépose des passagers',
             text: 'Validez la dépose de chaque passager avec son code.',
-            tone: 'primary',
+            tone: 'ocean',
           }
         : {
             icon: IconFlag,
@@ -172,7 +182,7 @@ function getStage(
     case 'COMPLETED':
       return { icon: IconCircleCheck, title: 'Trajet terminé', text: 'Ce trajet est clôturé.', tone: 'success' };
     case 'CANCELLED':
-      return { icon: IconInfoCircle, title: 'Trajet annulé', text: 'Ce trajet a été annulé.', tone: 'accent' };
+      return { icon: IconInfoCircle, title: 'Trajet annulé', text: 'Ce trajet a été annulé.', tone: 'gold' };
     default:
       return null;
   }
@@ -222,8 +232,8 @@ function RouteStop({ eyebrow, city, address }: { eyebrow: string; city: string; 
 function Chip({ icon: Icon, label, active }: { icon: IconComponent; label: string; active: boolean }) {
   return (
     <View style={[styles.chip, active ? styles.chipActive : styles.chipInactive]}>
-      <Icon size={14} color={active ? colors.primary : colors.textMuted} />
-      <AppText variant="xs" weight="medium" color={active ? colors.primary : colors.textMuted}>
+      <Icon size={14} color={active ? OCEAN.base : colors.textMuted} />
+      <AppText variant="xs" weight="medium" color={active ? OCEAN.base : colors.textMuted}>
         {label}
       </AppText>
     </View>
@@ -234,7 +244,7 @@ function StageCard({ stage, action }: { stage: Stage; action: StageAction | null
   const tone = STAGE_TONES[stage.tone];
   const Icon = stage.icon;
   return (
-    <View style={styles.stageCard}>
+    <OceanCard style={styles.stageCard}>
       <View style={styles.stageHeader}>
         <View style={[styles.stageIcon, { backgroundColor: tone.background }]}>
           <Icon size={20} color={tone.foreground} />
@@ -248,8 +258,8 @@ function StageCard({ stage, action }: { stage: Stage; action: StageAction | null
           </AppText>
         </View>
       </View>
-      {action ? <Button label={action.label} onPress={action.run} loading={action.isPending} style={styles.stageButton} /> : null}
-    </View>
+      {action ? <OceanButton label={action.label} onPress={action.run} loading={action.isPending} style={styles.stageButton} /> : null}
+    </OceanCard>
   );
 }
 
@@ -300,15 +310,15 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
   const isVerifying = phase === 'pickup' ? verifyPickup.isPending : verifyDropoff.isPending;
 
   return (
-    <View style={styles.bookingCard}>
+    <OceanCard style={styles.bookingCard}>
       <View style={styles.bookingHeader}>
         <View style={styles.avatar}>
           {initials ? (
-            <AppText variant="sm" weight="bold" color="primary">
+            <AppText variant="sm" weight="bold" color={OCEAN.base}>
               {initials}
             </AppText>
           ) : (
-            <IconUsers size={18} color={colors.primary} />
+            <IconUsers size={18} color={OCEAN.base} />
           )}
         </View>
         <View style={styles.bookingText}>
@@ -319,7 +329,7 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
             <AppText variant="xs" color="textSecondary">
               {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
             </AppText>
-            <Badge
+            <OceanPill
               label={DRIVER_BOOKING_STATUS_LABELS[booking.status]}
               tone={booking.status === 'CONFIRMED' ? 'success' : 'neutral'}
             />
@@ -346,10 +356,9 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
               <AppText variant="xs" color="textSecondary">
                 Le passager reçoit un code à 6 chiffres à vous communiquer.
               </AppText>
-              <Button
+              <OceanButton
                 label={phase === 'pickup' ? 'Demander le code de prise en charge' : 'Demander le code de dépose'}
-                variant="secondary"
-                size="md"
+                variant="soft"
                 onPress={handleRequest}
                 loading={isRequesting}
               />
@@ -368,14 +377,7 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
                   maxLength={6}
                   style={styles.codeInput}
                 />
-                <Button
-                  label="Vérifier"
-                  size="md"
-                  fullWidth={false}
-                  onPress={handleVerify}
-                  loading={isVerifying}
-                  disabled={code.length !== 6}
-                />
+                <OceanButton label="Vérifier" onPress={handleVerify} loading={isVerifying} disabled={code.length !== 6} />
               </View>
             </>
           )}
@@ -397,7 +399,7 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
           Signaler un problème
         </AppText>
       </Pressable>
-    </View>
+    </OceanCard>
   );
 }
 
@@ -426,7 +428,7 @@ export default function DriverTripDetailScreen() {
             Impossible de charger ce trajet.
           </AppText>
         ) : (
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={OCEAN.base} />
         )}
       </ScreenContainer>
     );
@@ -506,16 +508,7 @@ export default function DriverTripDetailScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="md" weight="semibold">
-          Détail du trajet
-        </AppText>
-      </View>
+      <OceanScreenHeader title="Détail du trajet" onBack={() => router.back()} />
 
       {/* Billet : bandeau coloré + coupon détachable */}
       <View style={styles.ticketShadow}>
@@ -590,20 +583,19 @@ export default function DriverTripDetailScreen() {
       {stage ? <StageCard stage={stage} action={action} /> : null}
 
       {showPassengers ? (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <AppText variant="md" weight="semibold">
-              Passagers
-            </AppText>
-            {activeBookings.length > 0 ? (
+        <OceanSection
+          icon={<IconUsers size={17} color={OCEAN.base} />}
+          title="Passagers"
+          action={
+            activeBookings.length > 0 ? (
               <View style={styles.countPill}>
-                <AppText variant="xs" weight="semibold" color="primary">
+                <AppText variant="xs" weight="semibold" color={OCEAN.base}>
                   {activeBookings.length}
                 </AppText>
               </View>
-            ) : null}
-          </View>
-
+            ) : undefined
+          }
+        >
           {activeBookings.length > 0 ? (
             <View style={styles.bookingsList}>
               {activeBookings.map((booking) => (
@@ -613,7 +605,7 @@ export default function DriverTripDetailScreen() {
           ) : (
             <View style={styles.emptyBookings}>
               <View style={styles.emptyIcon}>
-                <IconUsers size={22} color={colors.primary} />
+                <IconUsers size={22} color={OCEAN.base} />
               </View>
               <AppText variant="sm" weight="semibold">
                 Aucune réservation confirmée
@@ -625,20 +617,16 @@ export default function DriverTripDetailScreen() {
               </AppText>
             </View>
           )}
-        </View>
+        </OceanSection>
       ) : null}
 
-      <View style={styles.section}>
-        <AppText variant="md" weight="semibold" style={styles.sectionTitle}>
-          Détails
-        </AppText>
-
+      <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title="Détails">
         <View style={styles.detailCard}>
           {trip.vehicle.photoUrl ? (
             <Image source={{ uri: trip.vehicle.photoUrl }} style={styles.vehiclePhoto} />
           ) : (
             <View style={styles.vehicleIcon}>
-              <IconCar size={22} color={colors.primary} />
+              <IconCar size={22} color={OCEAN.base} />
             </View>
           )}
           <View style={styles.vehicleText}>
@@ -669,10 +657,10 @@ export default function DriverTripDetailScreen() {
             </AppText>
           </View>
         ) : null}
-      </View>
+      </OceanSection>
 
       {['DRAFT', 'PUBLISHED'].includes(trip.status) ? (
-        <Button
+        <OceanButton
           label="Annuler le trajet"
           variant="outline"
           onPress={handleCancel}
@@ -691,13 +679,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
   },
 
   // Billet
@@ -778,110 +759,117 @@ const styles = StyleSheet.create({
     flex: 1,
     width: 2,
     minHeight: 24,
-    marginVertical: 4,
     backgroundColor: 'rgba(255,255,255,0.35)',
+    marginVertical: 4,
   },
   railDotDestination: {
     width: 12,
     height: 12,
-    borderRadius: 4,
+    borderRadius: 6,
     backgroundColor: colors.onPrimary,
   },
   stops: {
     flex: 1,
-    gap: spacing.md,
+    justifyContent: 'space-between',
   },
   stop: {
-    gap: 2,
+    gap: 1,
   },
-
-  // Coupon détachable
   tear: {
-    height: 24,
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 20,
   },
   notch: {
-    position: 'absolute',
-    top: 2,
     width: 20,
     height: 20,
     borderRadius: 10,
     backgroundColor: colors.background,
   },
   notchLeft: {
-    left: -10,
+    marginLeft: -10,
   },
   notchRight: {
-    right: -10,
+    marginRight: -10,
   },
   dashWrap: {
-    height: 1,
-    marginHorizontal: 18,
-    overflow: 'hidden',
+    flex: 1,
+    paddingHorizontal: 4,
   },
   dash: {
-    height: 2,
-    borderWidth: 1,
+    height: 1,
     borderStyle: 'dashed',
+    borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 1,
   },
   coupon: {
     flexDirection: 'row',
-    alignItems: 'stretch',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.lg,
+    paddingVertical: spacing.md,
     gap: spacing.md,
   },
   couponColumn: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   couponColumnRight: {
     alignItems: 'flex-end',
   },
   couponDivider: {
-    width: StyleSheet.hairlineWidth,
+    width: 1,
     backgroundColor: colors.border,
   },
   seatDots: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
+    gap: 4,
     marginVertical: 2,
   },
   seatDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     borderWidth: 1.5,
-    borderColor: colors.primary,
-    backgroundColor: 'transparent',
+    borderColor: OCEAN.base,
   },
   seatDotTaken: {
-    backgroundColor: colors.primary,
+    backgroundColor: OCEAN.base,
+  },
+
+  // Puces
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radius.pill,
+  },
+  chipActive: {
+    backgroundColor: OCEAN.mist,
+  },
+  chipInactive: {
+    backgroundColor: colors.surfaceMuted,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
   },
 
   // Étape suivante
   stageCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   stageHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
+    alignItems: 'flex-start',
+    gap: spacing.sm,
   },
   stageIcon: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -891,60 +879,41 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   stageButton: {
-    marginTop: 0,
+    marginTop: spacing.xs,
   },
 
-  // Sections
-  section: {
-    marginBottom: spacing.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    marginBottom: spacing.sm,
-  },
+  // Passagers
   countPill: {
     minWidth: 22,
     height: 22,
     borderRadius: 11,
     paddingHorizontal: 6,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // Passagers
   bookingsList: {
     gap: spacing.sm,
   },
   bookingCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.sm + 2,
+    gap: spacing.sm,
   },
   bookingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm + 2,
+    gap: spacing.sm,
   },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.primaryLight,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bookingText: {
     flex: 1,
-    gap: 3,
+    gap: 2,
   },
   bookingMeta: {
     flexDirection: 'row',
@@ -952,9 +921,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   otpPanel: {
-    gap: spacing.xs + 2,
-    backgroundColor: colors.surfaceMuted,
+    gap: spacing.xs,
     borderRadius: 16,
+    backgroundColor: OCEAN.mist,
     padding: spacing.sm + 2,
   },
   codeRow: {
@@ -968,103 +937,67 @@ const styles = StyleSheet.create({
   reportLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     gap: 5,
-    paddingVertical: 2,
+    alignSelf: 'flex-start',
   },
   emptyBookings: {
     alignItems: 'center',
-    gap: spacing.xxs + 2,
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
+    gap: 4,
+    paddingVertical: spacing.md,
   },
   emptyIcon: {
     width: 48,
     height: 48,
-    borderRadius: 16,
-    backgroundColor: colors.primaryLight,
+    borderRadius: 24,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xxs,
+    marginBottom: spacing.xs,
   },
   emptyText: {
     textAlign: 'center',
+    maxWidth: '85%',
   },
 
   // Détails
   detailCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm + 2,
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
+    gap: spacing.sm,
   },
   vehiclePhoto: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: colors.surfaceMuted,
   },
   vehicleIcon: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
     justifyContent: 'center',
   },
   vehicleText: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   plate: {
-    borderWidth: 1.5,
-    borderColor: colors.textPrimary,
     borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: colors.border,
     paddingVertical: 4,
     paddingHorizontal: 8,
-    backgroundColor: colors.surface,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs + 2,
-    marginTop: spacing.sm,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: radius.pill,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  chipActive: {
-    backgroundColor: colors.primaryLight,
-  },
-  chipInactive: {
-    backgroundColor: colors.surfaceMuted,
   },
   notes: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.xs + 2,
+    gap: spacing.xs,
     marginTop: spacing.sm,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 16,
-    padding: spacing.sm + 2,
   },
   notesText: {
     flex: 1,
   },
+
   cancelButton: {
     marginBottom: spacing.lg,
   },

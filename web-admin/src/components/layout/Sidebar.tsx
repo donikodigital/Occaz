@@ -1,16 +1,31 @@
 // web-admin/src/components/layout/Sidebar.tsx
+// [22/09/2026] v2 — Refonte visuelle : marque en médaillon dégradé, icônes
+// de navigation dans une pastille (au lieu d'un simple trait actif à
+// gauche), item actif en fond plein avec ombre douce, carte utilisateur
+// arrondie en pied de page. Structure et logique inchangées : toujours un
+// tiroir piloté par isOpen/onClose en dessous de lg, fixe au-delà.
 'use client';
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { IconLogout, IconX } from '@tabler/icons-react';
+import { IconLogout, IconRoute, IconX } from '@tabler/icons-react';
 import { useAuthStore } from '@/stores/authStore';
 import { NAV_SECTIONS } from './nav-items';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+/** "Mamadou Diallo" -> "MD" ; à défaut, les deux premières lettres de l'email ou du téléphone. */
+function initialsFor(user: { firstName?: string | null; lastName?: string | null; email?: string | null; phone?: string } | null): string {
+  if (!user) return '·';
+  if (user.firstName || user.lastName) {
+    return `${user.firstName?.charAt(0) ?? ''}${user.lastName?.charAt(0) ?? ''}`.toUpperCase() || '·';
+  }
+  const source = user.email ?? user.phone ?? '';
+  return source.slice(0, 2).toUpperCase() || '·';
 }
 
 /**
@@ -54,35 +69,42 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div
         aria-hidden="true"
         onClick={onClose}
-        className={`fixed inset-0 z-40 bg-text-primary/40 transition-opacity duration-200 lg:hidden ${
+        className={`fixed inset-0 z-40 bg-text-primary/40 backdrop-blur-[2px] transition-opacity duration-200 lg:hidden ${
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-72 shrink-0 flex-col border-r border-border bg-surface transition-transform duration-200 ease-out lg:static lg:h-screen lg:w-64 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-72 shrink-0 flex-col border-r border-border bg-surface shadow-xl transition-transform duration-200 ease-out lg:static lg:h-screen lg:w-64 lg:translate-x-0 lg:shadow-none ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between gap-2 px-5 py-6">
-          <div>
-            <p className="text-lg font-bold text-primary">Back-office</p>
-            <p className="text-xs text-text-secondary">Transport Partagé</p>
+        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-dark text-on-primary shadow-md shadow-primary/25">
+              <IconRoute size={20} />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-base font-bold leading-tight text-text-primary">Back-office</p>
+              <p className="truncate text-xs font-medium text-text-secondary">Transport Partagé</p>
+            </div>
           </div>
           <button
             onClick={onClose}
             aria-label="Fermer le menu"
-            className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-muted lg:hidden"
+            className="shrink-0 rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-muted lg:hidden"
           >
             <IconX size={18} />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
+        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
           {NAV_SECTIONS.map((section) => (
             <div key={section.title}>
-              <p className="mb-1.5 px-3 text-xs font-semibold text-text-muted">{section.title}</p>
-              <div className="space-y-1">
+              <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                {section.title}
+              </p>
+              <div className="space-y-0.5">
                 {section.items.map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
                   const Icon = item.icon;
@@ -90,14 +112,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`flex items-center gap-3 rounded-lg border-l-[3px] px-3 py-2.5 text-sm transition-colors ${
+                      className={`group flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all ${
                         isActive
-                          ? 'border-primary bg-primary-light font-semibold text-primary-dark'
-                          : 'border-transparent text-text-primary hover:bg-surface-muted'
+                          ? 'bg-primary font-semibold text-on-primary shadow-sm shadow-primary/30'
+                          : 'font-medium text-text-primary hover:bg-surface-muted'
                       }`}
                     >
-                      <Icon size={18} />
-                      {item.label}
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                          isActive
+                            ? 'bg-white/15 text-on-primary'
+                            : 'bg-surface-muted text-text-secondary group-hover:bg-surface group-hover:text-primary'
+                        }`}
+                      >
+                        <Icon size={16} />
+                      </span>
+                      <span className="truncate">{item.label}</span>
                     </Link>
                   );
                 })}
@@ -106,15 +136,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-border px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <p className="truncate text-sm font-medium text-text-primary">{user?.email ?? user?.phone}</p>
-          <button
-            onClick={handleLogout}
-            className="mt-2 flex items-center gap-2 text-sm text-danger hover:underline"
-          >
-            <IconLogout size={16} />
-            Se déconnecter
-          </button>
+        <div className="shrink-0 border-t border-border px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center gap-3 rounded-xl bg-surface-muted p-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-light text-xs font-bold text-primary-dark">
+              {initialsFor(user)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-text-primary">{user?.email ?? user?.phone}</p>
+              <button
+                onClick={handleLogout}
+                className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-danger transition-colors hover:text-danger-dark"
+              >
+                <IconLogout size={13} />
+                Se déconnecter
+              </button>
+            </div>
+          </div>
         </div>
       </aside>
     </>

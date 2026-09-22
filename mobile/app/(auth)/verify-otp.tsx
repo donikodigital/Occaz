@@ -1,11 +1,17 @@
 // mobile/app/(auth)/verify-otp.tsx
+// [22/09/2026] v2 — Habillage bleu Ocean, pour rester cohérent avec les deux
+// écrans précédents du parcours (Bienvenue, Votre numéro) : illustration à
+// étincelles, cases du code recolorées. Logique inchangée.
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
-import { IconArrowLeft } from '@tabler/icons-react-native';
-import { AppText, Button, IconButton, ScreenContainer } from '@/components/ui';
+import { IconArrowLeft, IconMessage2 } from '@tabler/icons-react-native';
+import { AppText, IconButton, ScreenContainer } from '@/components/ui';
+import { OceanButton } from '@/components/ocean/OceanKit';
+import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { useAuthStore } from '@/stores/authStore';
@@ -83,10 +89,12 @@ export default function VerifyOtpScreen() {
       </View>
 
       <View style={styles.body}>
-        <AppText variant="xxl" weight="semibold" style={styles.title}>
+        <AuthIllustration icon={<IconMessage2 size={26} color={OCEAN.onDark} />} size={104} style={styles.illustration} />
+
+        <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>
           Entrez le code
         </AppText>
-        <AppText variant="base" color="textSecondary" style={styles.subtitle}>
+        <AppText variant="base" color="textSecondary" align="center" style={styles.subtitle}>
           Code envoyé au {phone}
         </AppText>
 
@@ -97,15 +105,12 @@ export default function VerifyOtpScreen() {
               style={[
                 styles.otpBox,
                 {
-                  borderColor: errorMessage
-                    ? colors.danger
-                    : code.length === index
-                      ? colors.primary
-                      : colors.border,
+                  borderColor: errorMessage ? colors.danger : code.length === index ? OCEAN.base : colors.border,
+                  backgroundColor: code[index] !== undefined ? OCEAN.mist : colors.surface,
                 },
               ]}
             >
-              <AppText variant="xl" weight="semibold">
+              <AppText variant="xl" weight="semibold" color={OCEAN.deep}>
                 {code[index] ?? ''}
               </AppText>
             </View>
@@ -136,7 +141,7 @@ export default function VerifyOtpScreen() {
             </AppText>
           ) : (
             <Pressable onPress={() => resendOtp.mutate()} disabled={resendOtp.isPending}>
-              <AppText variant="sm" weight="semibold" color="primary">
+              <AppText variant="sm" weight="semibold" color={OCEAN.base}>
                 Renvoyer le code
               </AppText>
             </Pressable>
@@ -144,7 +149,7 @@ export default function VerifyOtpScreen() {
         </View>
       </View>
 
-      <Button
+      <OceanButton
         label="Vérifier"
         onPress={() => verifyOtp.mutate(code)}
         loading={verifyOtp.isPending}
@@ -162,9 +167,13 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
+  },
+  illustration: {
+    alignSelf: 'center',
   },
   title: {
+    marginTop: spacing.lg,
     marginBottom: spacing.xxs,
   },
   subtitle: {
@@ -172,6 +181,7 @@ const styles = StyleSheet.create({
   },
   otpRow: {
     flexDirection: 'row',
+    justifyContent: 'center',
     gap: spacing.xs,
   },
   otpBox: {
@@ -190,9 +200,11 @@ const styles = StyleSheet.create({
   },
   error: {
     marginTop: spacing.sm,
+    textAlign: 'center',
   },
   resendRow: {
     marginTop: spacing.lg,
+    alignItems: 'center',
   },
   submit: {
     marginBottom: spacing.md,

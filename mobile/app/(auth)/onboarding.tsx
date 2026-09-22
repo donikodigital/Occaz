@@ -1,10 +1,16 @@
 // mobile/app/(auth)/onboarding.tsx
+// [22/09/2026] v2 — Habillage bleu Ocean, dans l'esprit Tiime : icône posée
+// sur un aplat doux à étincelles (AuthIllustration) au lieu du carré plein
+// indigo, cartes de rôle arrondies avec ombre douce, typographie plus
+// généreuse. Logique inchangée.
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconArrowRight, IconRoute, IconSteeringWheel, IconUser } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
+import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import type { AccountType } from '@/types/auth.types';
 
 interface RoleOptionProps {
@@ -12,34 +18,31 @@ interface RoleOptionProps {
   subtitle: string;
   icon: React.ReactNode;
   iconBackground: string;
-  tone: 'primary' | 'surface';
+  tone: 'ocean' | 'surface';
   onPress: () => void;
 }
 
 function RoleOption({ title, subtitle, icon, iconBackground, tone, onPress }: RoleOptionProps) {
-  const isPrimary = tone === 'primary';
+  const isOcean = tone === 'ocean';
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.option,
-        {
-          backgroundColor: isPrimary ? colors.primary : colors.surface,
-          borderColor: isPrimary ? colors.primary : colors.border,
-          opacity: pressed ? 0.9 : 1,
-        },
+        isOcean ? styles.optionOcean : styles.optionSurface,
+        { opacity: pressed ? 0.92 : 1 },
       ]}
     >
       <View style={[styles.optionIcon, { backgroundColor: iconBackground }]}>{icon}</View>
       <View style={styles.optionText}>
-        <AppText variant="md" weight="semibold" color={isPrimary ? colors.onPrimary : 'textPrimary'}>
+        <AppText variant="md" weight="semibold" color={isOcean ? OCEAN.onDark : 'textPrimary'}>
           {title}
         </AppText>
-        <AppText variant="sm" color={isPrimary ? 'rgba(255,255,255,0.78)' : 'textSecondary'}>
+        <AppText variant="sm" color={isOcean ? OCEAN.sky : 'textSecondary'}>
           {subtitle}
         </AppText>
       </View>
-      <IconArrowRight size={18} color={isPrimary ? colors.onPrimary : colors.textPrimary} />
+      <IconArrowRight size={18} color={isOcean ? OCEAN.onDark : colors.textPrimary} />
     </Pressable>
   );
 }
@@ -52,10 +55,8 @@ export default function OnboardingScreen() {
   return (
     <ScreenContainer style={styles.container} maxWidth="form">
       <View style={styles.hero}>
-        <View style={styles.heroIcon}>
-          <IconRoute size={34} color={colors.primaryLight} />
-        </View>
-        <AppText variant="xxl" weight="semibold" align="center">
+        <AuthIllustration icon={<IconRoute size={28} color={OCEAN.onDark} />} />
+        <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>
           Bienvenue
         </AppText>
         <AppText variant="base" color="textSecondary" align="center" style={styles.tagline}>
@@ -67,9 +68,9 @@ export default function OnboardingScreen() {
         <RoleOption
           title="Je suis client"
           subtitle="Réserver un trajet ou un envoi"
-          icon={<IconUser size={19} color={colors.onPrimary} />}
-          iconBackground="rgba(255,255,255,0.15)"
-          tone="primary"
+          icon={<IconUser size={19} color={OCEAN.onDark} />}
+          iconBackground="rgba(255,255,255,0.16)"
+          tone="ocean"
           onPress={() => selectRole('CUSTOMER')}
         />
         <RoleOption
@@ -84,7 +85,10 @@ export default function OnboardingScreen() {
 
       <Pressable onPress={() => router.push({ pathname: '/(auth)/login' })} style={styles.loginLink}>
         <AppText variant="sm" color="textSecondary" align="center">
-          Déjà inscrit ? <AppText variant="sm" weight="semibold" color="primary">Se connecter</AppText>
+          Déjà inscrit ?{' '}
+          <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+            Se connecter
+          </AppText>
         </AppText>
       </Pressable>
     </ScreenContainer>
@@ -100,14 +104,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xxl,
   },
-  heroIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.xl,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
+  title: {
+    marginTop: spacing.lg,
   },
   tagline: {
     marginTop: spacing.xxs,
@@ -120,8 +118,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm + 2,
     padding: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1.5,
+  },
+  optionOcean: {
+    backgroundColor: OCEAN.deep,
+    borderColor: OCEAN.deep,
+    shadowColor: OCEAN.deep,
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  optionSurface: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   optionIcon: {
     width: 38,

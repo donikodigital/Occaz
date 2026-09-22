@@ -1,4 +1,5 @@
 // mobile/app/(customer)/(tabs)/profile.tsx
+// [21/09/2026] v5 — badge caméra sur l'avatar, ouvre la modification du profil (photo modifiable, comme côté chauffeur).
 //
 // v4 — Profil client construit sur le profil chauffeur : bandeau sombre aux
 // reflets bleus avec la photo, la pastille de statut et le nom (nom de
@@ -12,6 +13,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   IconAlertTriangle,
+  IconCamera,
   IconCheck,
   IconChevronRight,
   IconEdit,
@@ -49,6 +51,14 @@ export default function CustomerProfileScreen() {
         <View style={styles.heroRow}>
           <View style={styles.avatarFrame}>
             <Avatar initials={initials} imageUri={profile?.photoUrl} size={64} />
+            <Pressable
+              onPress={() => router.push('/(customer)/edit-profile')}
+              accessibilityRole="button"
+              accessibilityLabel="Modifier la photo"
+              style={({ pressed }) => [styles.cameraBadge, pressed && styles.pressed]}
+            >
+              <IconCamera size={13} color={OCEAN.deep} />
+            </Pressable>
           </View>
           <View style={styles.heroText}>
             <View style={styles.statusPill}>
@@ -161,10 +171,24 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   avatarFrame: {
+    position: 'relative',
     padding: 3,
     borderRadius: 24,
     borderWidth: 2,
     borderColor: OCEAN.sky,
+  },
+  cameraBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: OCEAN.sky,
+    borderWidth: 2,
+    borderColor: OCEAN.deep,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroText: {
     flex: 1,

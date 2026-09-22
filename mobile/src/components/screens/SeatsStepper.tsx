@@ -1,9 +1,11 @@
 // mobile/src/components/screens/SeatsStepper.tsx
+// [21/09/2026] v+ — bleu Ocean au lieu de l'indigo.
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { IconMinus, IconPlus, IconUsers } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 
 export interface SeatsStepperProps {
   value: number;
@@ -47,7 +49,7 @@ export function SeatsStepper({ value, onChange, min = 1, max = 12 }: SeatsSteppe
   return (
     <View style={styles.row}>
       <View style={styles.iconTile}>
-        <IconUsers size={18} color={colors.primary} />
+        <IconUsers size={18} color={OCEAN.base} />
       </View>
       <AppText variant="sm" weight="semibold" style={styles.label}>
         Nombre de places
@@ -89,7 +91,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radius.md,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
     justifyContent: 'center',
   },
