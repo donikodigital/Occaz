@@ -1,11 +1,13 @@
 // web-admin/src/app/(app)/layout.tsx
+// [22/09/2026] v2 — Barre du bas mobile retirée (BottomNavBar supprimé) :
+// sur mobile, la navigation passe entièrement par le tiroir ouvert depuis
+// le vrai en-tête (MobileTopBar). Plus de pb-24 réservé pour elle.
 'use client';
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileTopBar } from '@/components/layout/MobileTopBar';
-import { BottomNavBar } from '@/components/layout/BottomNavBar';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -26,12 +28,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar isOpen={isMobileNavOpen} onClose={() => setMobileNavOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileTopBar onOpenMenu={() => setMobileNavOpen(true)} />
-        {/* pb-24 : laisse la place à la BottomNavBar fixe sur mobile, pas
-            nécessaire sur desktop où elle est masquée (lg:hidden). */}
-        <main className="flex-1 overflow-y-auto px-4 py-6 pb-24 sm:px-6 lg:px-10 lg:py-10 lg:pb-10">
+        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
-        <BottomNavBar />
       </div>
     </div>
   );
