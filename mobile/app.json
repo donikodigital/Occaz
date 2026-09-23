@@ -72,17 +72,14 @@
     ],
     "extra": {
       "apiUrl": "https://api.transport-partage.example.com/api/v1",
+      "router": {},
       "eas": {
-        "projectId": "442c452f-5eb3-4de1-bb7b-ff269181bc5e"
-      },
-      "router": {}
+        "projectId": "e7307b16-5582-40ad-bddc-608cbea827f8"
+      }
     },
-    "owner": "dftransfer",
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "updates": {
-      "url": "https://u.expo.dev/442c452f-5eb3-4de1-bb7b-ff269181bc5e"
-    }
+    "owner": "doniko2025"
   }
 }
