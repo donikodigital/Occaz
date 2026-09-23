@@ -37,6 +37,12 @@ import { ConversationsModule } from './conversations/conversations.module';
 import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
 import { TranslationsModule } from './translations/translations.module';
 import { DashboardsModule } from './dashboards/dashboards.module';
+import { PromoCodesModule } from './promo-codes/promo-codes.module';
+import { ReferralsModule } from './referrals/referrals.module';
+import { DealsModule } from './deals/deals.module';
+import { ArticlesModule } from './articles/articles.module';
+import { SavedCardsModule } from './saved-cards/saved-cards.module';
+import { CookieConsentModule } from './cookie-consent/cookie-consent.module';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -91,6 +97,12 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     PlatformSettingsModule,
     TranslationsModule,
     DashboardsModule,
+    PromoCodesModule,
+    ReferralsModule,
+    DealsModule,
+    ArticlesModule,
+    SavedCardsModule,
+    CookieConsentModule,
 
     // Toutes les Parties du cahier des charges sont couvertes — voir
     // README.md pour la correspondance Lot / section.

@@ -17,6 +17,7 @@ import { WalletsService } from '../wallets/wallets.service';
 import { BookingsService } from '../trips/bookings.service';
 import { ShipmentsService } from '../shipments/shipments.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ReferralsService } from '../referrals/referrals.service';
 import {
   BookingCancelledEvent,
   DOMAIN_EVENTS,
@@ -50,6 +51,7 @@ export class PaymentsService {
     private readonly bookingsService: BookingsService,
     private readonly shipmentsService: ShipmentsService,
     private readonly notifications: NotificationsService,
+    private readonly referrals: ReferralsService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -254,6 +256,7 @@ export class PaymentsService {
         fallbackTitle: 'Paiement confirmé',
         fallbackBody: 'Votre paiement a été confirmé — votre réservation est validée.',
       });
+      await this.notifyReferralOfFirstPayment(booking.customer.userId);
     }
 
     if (payment.shipmentId) {
@@ -283,6 +286,20 @@ export class PaymentsService {
         fallbackTitle: 'Paiement confirmé',
         fallbackBody: 'Votre paiement a été confirmé — nous recherchons un chauffeur pour votre envoi.',
       });
+      await this.notifyReferralOfFirstPayment(shipment.customer.userId);
+    }
+  }
+
+  /**
+   * Ne doit jamais faire échouer une confirmation de paiement — un souci
+   * côté parrainage (filleul introuvable, réglage manquant...) reste
+   * isolé ici, journalé, sans remonter à l'appelant.
+   */
+  private async notifyReferralOfFirstPayment(customerUserId: string): Promise<void> {
+    try {
+      await this.referrals.handleFirstPaymentConfirmed(customerUserId);
+    } catch (error) {
+      this.logger.error(`Échec de la détection de parrainage pour l'utilisateur ${customerUserId}`, error as Error);
     }
   }
 

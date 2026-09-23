@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/services/queryClient';
 import { useAuthStore } from '@/stores/authStore';
+import { CookieBanner } from '@/components/cookies/CookieBanner';
 
 /**
  * Hydrate la session au premier chargement (vérifie qu'un jeton stocké
@@ -25,6 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {mounted && !isHydrating ? children : null}
+      {mounted ? <CookieBanner /> : null}
     </QueryClientProvider>
   );
 }

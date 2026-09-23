@@ -1,4 +1,5 @@
 // backend/src/ratings/ratings.service.ts
+// [22/09/2026] v3 — findGivenByUser() : « Mes avis », les notations données par l'utilisateur (et non reçues).
 // [21/09/2026] v2 — note d'un envoi via Shipment.driverId.
 import {
   BadRequestException,
@@ -130,6 +131,91 @@ export class RatingsService {
 
   findForUser(userId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
     return this.paginateRatings({ toUserId: userId }, query);
+  }
+
+  /**
+   * "Mes avis" (écran client) : les notations que CET utilisateur a
+   * données, pas celles qu'il a reçues (findForUser ci-dessus). `toUser`
+   * n'est jamais renvoyé en entier — seuls prénom/nom/photo, jamais le
+   * téléphone ni les coordonnées de paiement du chauffeur noté.
+   */
+  async findGivenByUser(userId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
+    const [data, total] = await Promise.all([
+      this.prisma.rating.findMany({
+        where: { fromUserId: userId },
+        skip: query.skip,
+        take: query.take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          review: true,
+          toUser: {
+            select: {
+              driverProfile: { select: { firstName: true, lastName: true, photoUrl: true } },
+              customerProfile: { select: { firstName: true, lastName: true, photoUrl: true } },
+            },
+          },
+          booking: {
+            select: {
+              trip: { select: { departureAt: true, originCity: { select: { name: true } }, destinationCity: { select: { name: true } } } },
+            },
+          },
+          shipment: {
+            select: {
+              createdAt: true,
+              senderLocation: { select: { city: { select: { name: true } } } },
+              recipientLocation: { select: { city: { select: { name: true } } } },
+            },
+          },
+        },
+      }),
+      this.prisma.rating.count({ where: { fromUserId: userId } }),
+    ]);
+
+    return new PaginatedResult(data.map((rating) => this.toGivenRatingView(rating)), total, query.page, query.limit);
+  }
+
+  private toGivenRatingView(rating: {
+    id: string;
+    score: number;
+    createdAt: Date;
+    review: { comment: string | null } | null;
+    toUser: {
+      driverProfile: { firstName: string; lastName: string; photoUrl: string | null } | null;
+      customerProfile: { firstName: string; lastName: string; photoUrl: string | null } | null;
+    };
+    booking: {
+      trip: { departureAt: Date; originCity: { name: string }; destinationCity: { name: string } };
+    } | null;
+    shipment: {
+      createdAt: Date;
+      senderLocation: { city: { name: string } | null };
+      recipientLocation: { city: { name: string } | null };
+    } | null;
+  }) {
+    const target = rating.toUser.driverProfile ?? rating.toUser.customerProfile;
+    const context = rating.booking
+      ? {
+          type: 'trip' as const,
+          route: `${rating.booking.trip.originCity.name} → ${rating.booking.trip.destinationCity.name}`,
+          date: rating.booking.trip.departureAt,
+        }
+      : rating.shipment
+        ? {
+            type: 'shipment' as const,
+            route: `${rating.shipment.senderLocation.city?.name ?? '—'} → ${rating.shipment.recipientLocation.city?.name ?? '—'}`,
+            date: rating.shipment.createdAt,
+          }
+        : null;
+
+    return {
+      id: rating.id,
+      score: rating.score,
+      comment: rating.review?.comment ?? null,
+      createdAt: rating.createdAt,
+      targetName: target ? `${target.firstName} ${target.lastName}` : 'Utilisateur supprimé',
+      targetPhotoUrl: target?.photoUrl ?? null,
+      context,
+    };
   }
 
   findForBooking(bookingId: string) {

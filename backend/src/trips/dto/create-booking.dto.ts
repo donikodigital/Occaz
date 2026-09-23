@@ -1,4 +1,5 @@
 // backend/src/trips/dto/create-booking.dto.ts
+// [23/09/2026] v+ — champ promoCode facultatif.
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
@@ -25,4 +26,9 @@ export class CreateBookingDto {
   @ValidateNested({ each: true })
   @Type(() => PassengerInputDto)
   passengers?: PassengerInputDto[];
+
+  @ApiPropertyOptional({ description: 'Code promo à appliquer, s’il y en a un.' })
+  @IsOptional()
+  @IsString()
+  promoCode?: string;
 }

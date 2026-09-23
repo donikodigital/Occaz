@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.module.ts
+// [23/09/2026] v3 — PromoCodesModule (code promo à la création d'un envoi).
 // [21/09/2026] v2 — ShipmentDispatchService et ShipmentWindowService.
 import { Module } from '@nestjs/common';
 import { ShipmentsController } from './shipments.controller';
@@ -14,6 +15,7 @@ import { DriverProfilesModule } from '../profiles/driver-profiles/driver-profile
 import { WalletsModule } from '../wallets/wallets.module';
 import { OtpModule } from '../otp/otp.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PromoCodesModule } from '../promo-codes/promo-codes.module';
 
 @Module({
   imports: [
@@ -25,6 +27,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     WalletsModule,
     OtpModule,
     NotificationsModule,
+    PromoCodesModule,
   ],
   controllers: [ShipmentsController],
   providers: [ShipmentsService, ShipmentOtpService, ShipmentDispatchService, ShipmentWindowService],

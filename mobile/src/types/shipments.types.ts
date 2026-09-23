@@ -1,4 +1,5 @@
 // mobile/src/types/shipments.types.ts
+// [23/09/2026] v3 — champ promoCode facultatif sur CreateShipmentPayload.
 // [21/09/2026] v2 — plage de dates, chauffeur direct, devis, AvailableShipment, tripId facultatif à l'acceptation.
 import type { Money } from '@/services/api/types';
 import type { TripLocation } from './trips.types';
@@ -138,6 +139,8 @@ export interface CreateShipmentPayload {
   /** Plage de dates du départ (ISO) — obligatoire. */
   windowStart: string;
   windowEnd: string;
+  /** Code promo à appliquer, s'il y en a un — voir /promo-codes/validate pour l'aperçu avant envoi. */
+  promoCode?: string;
 }
 
 /** Ce qui entre dans le calcul du prix — sert au devis affiché avant paiement. */

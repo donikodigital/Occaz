@@ -1,4 +1,5 @@
 // backend/src/shipments/dto/create-shipment.dto.ts
+// [23/09/2026] v3 — champ promoCode facultatif.
 // [21/09/2026] v2 — plage de dates obligatoire ; champs de prix hérités de QuoteShipmentDto.
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -62,4 +63,9 @@ export class CreateShipmentDto extends QuoteShipmentDto {
   @ValidateNested({ each: true })
   @Type(() => ShipmentItemInputDto)
   items?: ShipmentItemInputDto[];
+
+  @ApiPropertyOptional({ description: 'Code promo à appliquer, s’il y en a un.' })
+  @IsOptional()
+  @IsString()
+  promoCode?: string;
 }

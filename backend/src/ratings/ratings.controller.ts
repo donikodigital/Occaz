@@ -1,4 +1,5 @@
 // backend/src/ratings/ratings.controller.ts
+// [22/09/2026] v+ — route GET /ratings/given pour « Mes avis ».
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -21,6 +22,12 @@ export class RatingsController {
   @Get('mine')
   findMine(@Query() query: PaginationQueryDto, @CurrentUser() user: AuthenticatedUser) {
     return this.ratingsService.findForUser(user.id, query);
+  }
+
+  /** "Mes avis" — les notations données par l'utilisateur, pas celles reçues (voir /mine ci-dessus). */
+  @Get('given')
+  findGiven(@Query() query: PaginationQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.ratingsService.findGivenByUser(user.id, query);
   }
 
   @Post('bookings/:bookingId')

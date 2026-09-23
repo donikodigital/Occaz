@@ -49,6 +49,7 @@ export const PERMISSIONS = {
   WALLET_ADJUST: 'wallet.adjust',
   PAYOUT_MANAGE: 'payout.manage',
   COMMISSION_MANAGE: 'commission.manage',
+  PROMOTION_MANAGE: 'promotion.manage', // Codes promo, bons plans, actualités, parrainage
   CANCELLATION_POLICY_MANAGE: 'cancellation_policy.manage',
 
   // Litiges

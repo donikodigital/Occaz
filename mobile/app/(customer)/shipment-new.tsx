@@ -1,4 +1,5 @@
 // mobile/app/(customer)/shipment-new.tsx
+// [23/09/2026] v4 — champ « Code promo », entre les informations du colis et le devis en direct.
 // [21/09/2026] v3 — Habillage bleu océan ; logique inchangée : plage de dates obligatoire, dimensions, prix calculé par le serveur.
 //
 // Le formulaire est découpé en sections à en-tête soulignée (Expéditeur,
@@ -33,13 +34,23 @@ import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { ShipmentQuoteCard } from '@/components/screens/ShipmentQuoteCard';
 import { ShipmentWindowField, toShipmentWindow } from '@/components/screens/ShipmentWindowField';
+import { PromoCodeField } from '@/components/screens/PromoCodeField';
 import { useShipmentCategories } from '@/hooks/useShipmentCategories';
-import { useCreateShipment } from '@/hooks/useShipments';
+import { useCreateShipment, useShipmentQuote } from '@/hooks/useShipments';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { normalizePhoneInput } from '@/utils/phone';
 import { ApiError } from '@/services/api/ApiError';
 import type { QuoteShipmentPayload } from '@/types/shipments.types';
 import type { TripLocation } from '@/types/trips.types';
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 function AddressCard({
   label,
@@ -88,6 +99,7 @@ export default function NewShipmentScreen() {
   const [windowStart, setWindowStart] = useState<Date | null>(null);
   const [windowEnd, setWindowEnd] = useState<Date | null>(null);
   const [isUrgent, setIsUrgent] = useState(false);
+  const [promoCode, setPromoCode] = useState<string | undefined>();
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
   const { data: categories } = useShipmentCategories();
@@ -122,6 +134,12 @@ export default function NewShipmentScreen() {
       isUrgent,
     };
   }, [senderLocation, recipientLocation, categoryId, weightKg, lengthCm, widthCm, heightCm, quantity, declaredValue, isUrgent]);
+
+  // Même débounce que ShipmentQuoteCard (500 ms) : même clé de requête, donc
+  // pas d'appel réseau supplémentaire — seulement un second abonnement au
+  // même devis, pour connaître le montant à passer au champ code promo.
+  const debouncedQuotePayload = useDebouncedValue(quotePayload, 500);
+  const { data: quote } = useShipmentQuote(debouncedQuotePayload);
 
   function openAddressPicker(field: 'sender' | 'recipient') {
     openLocationPicker(field);
@@ -174,6 +192,7 @@ export default function NewShipmentScreen() {
         declaredValue: declaredValue.replace(/\D/g, '') || undefined,
         isUrgent,
         ...toShipmentWindow(windowStart, windowEnd),
+        promoCode,
       },
       {
         onSuccess: (shipment) => router.replace(`/(customer)/shipment/${shipment.id}`),
@@ -301,6 +320,10 @@ export default function NewShipmentScreen() {
         />
       </OceanSection>
 
+      <View style={styles.promoField}>
+        <PromoCodeField serviceType="SHIPMENT" amount={quote?.totalAmount ?? null} appliedCode={promoCode} onChange={setPromoCode} />
+      </View>
+
       <ShipmentQuoteCard payload={quotePayload} />
 
       {errorMessage ? (
@@ -354,6 +377,9 @@ const styles = StyleSheet.create({
   multiline: {
     minHeight: 70,
     textAlignVertical: 'top',
+  },
+  promoField: {
+    marginBottom: spacing.md,
   },
   error: {
     marginBottom: spacing.sm,

@@ -1,37 +1,27 @@
-// web-admin/src/app/(app)/layout.tsx
-// [22/09/2026] v2 — Barre du bas mobile retirée (BottomNavBar supprimé) :
-// sur mobile, la navigation passe entièrement par le tiroir ouvert depuis
-// le vrai en-tête (MobileTopBar). Plus de pb-24 réservé pour elle.
-'use client';
+// web-admin/src/app/layout.tsx
+// [23/09/2026] v+ — Restauré : ce fichier avait été écrasé par erreur avec
+// le contenu de app/(app)/layout.tsx (commit f78d317), ce qui supprimait
+// <html>/<body>, les polices, les métadonnées et Providers — cassant
+// entre autres la page de connexion, hors du groupe (app). Le vrai layout
+// du groupe authentifié reste dans app/(app)/layout.tsx, inchangé.
+import type { Metadata } from 'next';
+import { Manrope } from 'next/font/google';
+import { Providers } from '@/components/layout/Providers';
+import './globals.css';
 
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { MobileTopBar } from '@/components/layout/MobileTopBar';
-import { useAuthStore } from '@/stores/authStore';
+const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const [isMobileNavOpen, setMobileNavOpen] = useState(false);
+export const metadata: Metadata = {
+  title: 'Occaz Go — Transport Partagé',
+  description: 'Administration de la plateforme régionale de transport partagé.',
+};
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.replace('/login');
-    }
-  }, [isAuthenticated, router]);
-
-  if (!isAuthenticated) return null;
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar isOpen={isMobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <MobileTopBar onOpenMenu={() => setMobileNavOpen(true)} />
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
-        </main>
-      </div>
-    </div>
+    <html lang="fr">
+      <body className={`${manrope.variable} font-sans antialiased`}>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
   );
 }

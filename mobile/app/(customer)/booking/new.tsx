@@ -1,9 +1,11 @@
 // mobile/app/(customer)/booking/new.tsx
+// [23/09/2026] v+ — champ « Code promo », entre le nombre de places et le récapitulatif.
 import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconArrowLeft, IconMinus, IconPlus } from '@tabler/icons-react-native';
 import { AppText, Button, Card, Divider, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { PromoCodeField } from '@/components/screens/PromoCodeField';
 import { colors, spacing } from '@/theme';
 import { useTrip } from '@/hooks/useTripSearch';
 import { useCreateBooking } from '@/hooks/useBookings';
@@ -18,6 +20,7 @@ export default function NewBookingScreen() {
   const { data: profile } = useCustomerProfile();
   const [seatsCount, setSeatsCount] = useState(1);
   const [extraPassengers, setExtraPassengers] = useState<PassengerInput[]>([]);
+  const [promoCode, setPromoCode] = useState<string | undefined>();
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const createBooking = useCreateBooking();
 
@@ -64,7 +67,7 @@ export default function NewBookingScreen() {
           ];
 
     createBooking.mutate(
-      { tripId: trip.id, seatsCount, passengers },
+      { tripId: trip.id, seatsCount, passengers, promoCode },
       {
         onSuccess: (booking) => router.replace(`/(customer)/booking/${booking.id}`),
         onError: (error) => {
@@ -138,6 +141,13 @@ export default function NewBookingScreen() {
         </>
       ) : null}
 
+      <AppText variant="base" weight="semibold" style={styles.sectionTitle}>
+        Code promo
+      </AppText>
+      <View style={styles.promoField}>
+        <PromoCodeField serviceType="TRIP" amount={String(baseAmount)} appliedCode={promoCode} onChange={setPromoCode} />
+      </View>
+
       <Card style={styles.priceCard}>
         <View style={styles.priceRow}>
           <AppText variant="sm" color="textSecondary">
@@ -147,7 +157,8 @@ export default function NewBookingScreen() {
         </View>
         <Divider />
         <AppText variant="xs" color="textMuted">
-          Les frais de service sont calculés à l'étape suivante, avant paiement.
+          Les frais de service sont calculés à l'étape suivante, avant paiement
+          {promoCode ? ' — votre code promo y sera appliqué' : ''}.
         </AppText>
       </Card>
 
@@ -198,6 +209,9 @@ const styles = StyleSheet.create({
   },
   passengerFields: {
     gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  promoField: {
     marginBottom: spacing.lg,
   },
   priceCard: {

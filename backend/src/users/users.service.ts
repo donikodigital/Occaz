@@ -1,4 +1,5 @@
 // backend/src/users/users.service.ts
+// [22/09/2026] v+ — deleteSelf() : suppression de compte en libre-service, bloquée s'il reste une réservation, un envoi ou un trajet en cours.
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AccountType, Prisma, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,6 +8,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 
 /** Vue "sûre" d'un utilisateur — ne contient jamais passwordHash / twoFactorSecret. */
 export type SafeUser = Omit<User, 'passwordHash' | 'twoFactorSecret'> & {
@@ -201,6 +203,85 @@ export class UsersService {
     });
     await this.audit.log({ actorId, entityType: 'User', entityId: id, action: 'ACTIVATE' });
     return this.toSafeUser(user);
+  }
+
+  /**
+   * Suppression de compte en libre-service (section « Obtenir de l'aide »
+   * de l'app). Même mécanique que deactivate() : `isActive: false`, pas de
+   * suppression physique de la ligne — l'historique (réservations, envois,
+   * paiements passés) doit rester consultable côté support et pour la
+   * comptabilité. Le compte redevient inaccessible dès cet appel :
+   * JwtStrategy rejette tout jeton dont l'utilisateur a isActive=false
+   * (voir auth/strategies/jwt.strategy.ts).
+   *
+   * Refuse tant qu'une réservation ou un envoi est encore en cours : le
+   * chauffeur (ou le client) de l'autre côté ne doit jamais se retrouver
+   * sans interlocuteur au milieu d'une prestation.
+   */
+  async deleteSelf(userId: string, dto: DeleteAccountDto): Promise<SafeUser> {
+    await this.assertNoActiveService(userId);
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { isActive: false },
+      include: PROFILE_NAME_INCLUDE,
+    });
+    await this.audit.log({
+      actorId: userId,
+      entityType: 'User',
+      entityId: userId,
+      action: 'SELF_DELETE',
+      diff: dto.reason ? { reason: dto.reason } : undefined,
+    });
+    return this.toSafeUser(user);
+  }
+
+  private async assertNoActiveService(userId: string): Promise<void> {
+    const activeBookingsCount = await this.prisma.booking.count({
+      where: {
+        customer: { userId },
+        status: { in: ['PENDING_PAYMENT', 'PAID', 'CONFIRMED'] },
+      },
+    });
+    if (activeBookingsCount > 0) {
+      throw new BadRequestException(
+        'Vous avez une réservation en cours. Attendez sa fin ou annulez-la avant de supprimer votre compte.',
+      );
+    }
+
+    const activeShipmentsCount = await this.prisma.shipment.count({
+      where: {
+        customer: { userId },
+        status: {
+          in: [
+            'CREATED',
+            'SEARCHING_DRIVER',
+            'DRIVER_ASSIGNED',
+            'PICKUP_PENDING',
+            'PICKED_UP',
+            'IN_TRANSIT',
+            'DELIVERY_PENDING',
+          ],
+        },
+      },
+    });
+    if (activeShipmentsCount > 0) {
+      throw new BadRequestException(
+        'Vous avez un envoi en cours. Attendez sa livraison ou annulez-le avant de supprimer votre compte.',
+      );
+    }
+
+    const activeTripsCount = await this.prisma.trip.count({
+      where: {
+        driver: { userId },
+        status: { notIn: ['DRAFT', 'COMPLETED', 'CANCELLED'] },
+      },
+    });
+    if (activeTripsCount > 0) {
+      throw new BadRequestException(
+        'Vous avez un trajet en cours en tant que chauffeur. Terminez-le ou annulez-le avant de supprimer votre compte.',
+      );
+    }
   }
 
   async updateLastLogin(id: string): Promise<void> {

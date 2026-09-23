@@ -1,4 +1,5 @@
 // mobile/src/types/bookings.types.ts
+// [23/09/2026] v+ — champ promoCode facultatif sur CreateBookingPayload.
 import type { Money } from '@/services/api/types';
 import type { Trip } from './trips.types';
 
@@ -50,6 +51,8 @@ export interface CreateBookingPayload {
   tripId: string;
   seatsCount: number;
   passengers?: PassengerInput[];
+  /** Code promo à appliquer, s'il y en a un — voir /promo-codes/validate pour l'aperçu avant envoi. */
+  promoCode?: string;
 }
 
 export interface CancelBookingPayload {

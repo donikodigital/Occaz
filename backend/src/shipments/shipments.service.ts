@@ -29,6 +29,7 @@ import { ShipmentCategoriesService } from '../shipment-categories/shipment-categ
 import { DocumentsService } from '../documents/documents.service';
 import { CreateDocumentDto } from '../documents/dto/create-document.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PromoCodesService } from '../promo-codes/promo-codes.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { toMoneyBigInt } from '../common/utils/money.util';
@@ -105,6 +106,7 @@ export class ShipmentsService {
     private readonly wallets: WalletsService,
     private readonly eventEmitter: EventEmitter2,
     private readonly notifications: NotificationsService,
+    private readonly promoCodes: PromoCodesService,
   ) {}
 
   async findOne(id: string) {
@@ -221,11 +223,31 @@ export class ShipmentsService {
     // de la plateforme (règle configurée dans l'admin) en est prélevée sur
     // le gain du chauffeur — voir WalletsService.holdShipmentRevenue.
     const totalAmount = quote.price;
-    const platformFee = await this.pricing.computeCommission({
+    let platformFee = await this.pricing.computeCommission({
       serviceType: ServiceType.SHIPMENT,
       countryId: senderLocation.city?.countryId ?? null,
       baseAmount: totalAmount,
     });
+
+    // Un code promo réduit ce que le client paie, jamais ce que le
+    // chauffeur touche : le rabais est prélevé sur la commission de la
+    // plateforme, plafonné à son montant. Un code à 100% n'annule donc
+    // jamais la course du chauffeur — au pire, la plateforme renonce à
+    // toute sa commission sur cet envoi.
+    let promoCodeMatch: Awaited<ReturnType<PromoCodesService['resolveForCheckout']>> | null = null;
+    let discountAmount = 0n;
+    if (dto.promoCode) {
+      promoCodeMatch = await this.promoCodes.resolveForCheckout(
+        customerId,
+        dto.promoCode,
+        ServiceType.SHIPMENT,
+        totalAmount,
+        senderLocation.city?.countryId ?? undefined,
+      );
+      discountAmount = promoCodeMatch.discountAmount > platformFee ? platformFee : promoCodeMatch.discountAmount;
+      platformFee -= discountAmount;
+    }
+    const chargedAmount = totalAmount - discountAmount;
 
     let trip: {
       id: string;
@@ -294,10 +316,18 @@ export class ShipmentsService {
           status: ShipmentStatus.CREATED,
           price: totalAmount,
           platformFee,
-          totalAmount,
+          totalAmount: chargedAmount,
           currencyId,
         },
       });
+
+      if (promoCodeMatch) {
+        await this.promoCodes.redeem(tx, promoCodeMatch.promoCode, {
+          customerId,
+          shipmentId: shipment.id,
+          discountAmount,
+        });
+      }
 
       if (dto.items?.length) {
         await tx.shipmentItem.createMany({
@@ -464,9 +494,11 @@ export class ShipmentsService {
       return tx.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
     });
 
-    // Le client a payé un montant unique (totalAmount) ; la commission en est
-    // déduite du gain du chauffeur : ex. 150 000 payés, 10 % de commission,
-    // 135 000 crédités à la livraison.
+    // Le client a payé un montant unique (Shipment.totalAmount, déjà net
+    // d'un éventuel code promo — voir create()) ; la commission
+    // (Shipment.platformFee, déjà réduite du même rabais) en est déduite du
+    // gain du chauffeur : ex. 150 000 payés, 10 % de commission,
+    // 135 000 crédités à la livraison, qu'il y ait eu un code promo ou non.
     await this.wallets.holdShipmentRevenue({
       driverId,
       shipmentId,

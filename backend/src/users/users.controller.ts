@@ -1,5 +1,6 @@
 // backend/src/users/users.controller.ts
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+// [22/09/2026] v+ — route DELETE /users/me (suppression de compte en libre-service).
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -8,6 +9,7 @@ import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
 
 @ApiTags('Utilisateurs')
@@ -24,6 +26,17 @@ export class UsersController {
   @Patch('me')
   updateMe(@Body() dto: UpdateUserDto, @CurrentUser() user: AuthenticatedUser) {
     return this.usersService.updateSelf(user.id, dto);
+  }
+
+  /**
+   * Suppression de compte en libre-service — voir UsersService.deleteSelf.
+   * En POST plutôt qu'en DELETE : un corps de requête sur une méthode
+   * DELETE est parfois filtré par un proxy ou un client HTTP en amont,
+   * ici indispensable pour transmettre le motif facultatif.
+   */
+  @Post('me/delete')
+  deleteMe(@Body() dto: DeleteAccountDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.deleteSelf(user.id, dto);
   }
 
   /**

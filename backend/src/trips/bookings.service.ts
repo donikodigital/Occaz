@@ -9,6 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BookingStatus, CancellationInitiator, Prisma, ServiceType, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
+import { PromoCodesService } from '../promo-codes/promo-codes.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { BookingCancelledEvent, DOMAIN_EVENTS } from '../common/events/domain-events';
@@ -44,6 +45,7 @@ export class BookingsService {
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly promoCodes: PromoCodesService,
   ) {}
 
   async findOne(id: string) {
@@ -91,11 +93,29 @@ export class BookingsService {
     }
 
     const baseAmount = trip.pricePerSeat * BigInt(dto.seatsCount);
-    const platformFee = await this.pricing.computeCommission({
+    let platformFee = await this.pricing.computeCommission({
       serviceType: ServiceType.TRIP,
       countryId: trip.originCity.countryId,
       baseAmount,
     });
+
+    // Un code promo réduit ce que le client paie, jamais ce que le
+    // chauffeur touche : le rabais est prélevé sur la commission de la
+    // plateforme, plafonné à son montant — voir ShipmentsService.create
+    // pour le même principe, appliqué là aux envois.
+    let promoCodeMatch: Awaited<ReturnType<PromoCodesService['resolveForCheckout']>> | null = null;
+    let discountAmount = 0n;
+    if (dto.promoCode) {
+      promoCodeMatch = await this.promoCodes.resolveForCheckout(
+        customerId,
+        dto.promoCode,
+        ServiceType.TRIP,
+        baseAmount + platformFee,
+        trip.originCity.countryId,
+      );
+      discountAmount = promoCodeMatch.discountAmount > platformFee ? platformFee : promoCodeMatch.discountAmount;
+      platformFee -= discountAmount;
+    }
     const totalAmount = baseAmount + platformFee;
 
     return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -119,6 +139,14 @@ export class BookingsService {
           status: BookingStatus.PENDING_PAYMENT,
         },
       });
+
+      if (promoCodeMatch) {
+        await this.promoCodes.redeem(tx, promoCodeMatch.promoCode, {
+          customerId,
+          bookingId: booking.id,
+          discountAmount,
+        });
+      }
 
       await tx.tripPassenger.createMany({
         data: passengerNames!.map((p) => ({
@@ -252,6 +280,50 @@ export class BookingsService {
       where: { id },
       data: { status: BookingStatus.CONFIRMED },
     });
+  }
+
+  /**
+   * Réservation jamais payée : elle bloquait une place que personne
+   * d'autre ne pouvait réserver (voir create() — la place est décomptée
+   * dès la création, avant tout paiement). Appelée par BookingExpiryService
+   * une fois le délai de paiement dépassé, ou dès que le trajet est parti
+   * — filet de sécurité pour qu'une réservation impayée ne reste jamais
+   * "À payer" indéfiniment après le départ.
+   * Sans effet si la réservation a été payée ou annulée entre-temps.
+   */
+  async expireUnpaid(id: string, reason: string): Promise<boolean> {
+    const booking = await this.prisma.booking.findUnique({ where: { id } });
+    if (!booking) return false;
+
+    const expired = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const claimed = await tx.booking.updateMany({
+        where: { id, status: BookingStatus.PENDING_PAYMENT },
+        data: {
+          status: BookingStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancelledBy: CancellationInitiator.SYSTEM,
+          cancellationReason: reason,
+        },
+      });
+      if (claimed.count === 0) return false;
+
+      await tx.trip.update({
+        where: { id: booking.tripId },
+        data: { availableSeats: { increment: booking.seatsCount } },
+      });
+
+      return true;
+    });
+
+    // Aucun paiement n'a été capturé (règle d'or, section 13 : le mobile ne
+    // décide jamais qu'un paiement a réussi, et confirmPayment n'a jamais
+    // été appelé) — refundBooking et reverseHeldFunds n'ont donc rien à
+    // faire, mais l'événement reste émis pour rester sur le même chemin
+    // que toute autre annulation plutôt que d'en créer un second.
+    if (expired) {
+      this.eventEmitter.emit(DOMAIN_EVENTS.BOOKING_CANCELLED, new BookingCancelledEvent(id, reason, 0));
+    }
+    return expired;
   }
 
   async findMineForCustomer(

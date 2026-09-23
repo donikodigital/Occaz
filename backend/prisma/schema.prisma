@@ -285,6 +285,26 @@ enum ServiceType {
   SHIPMENT
 }
 
+enum PromoDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum ReferralStatus {
+  // Le filleul s'est inscrit avec le code, n'a pas encore payé sa première prestation.
+  PENDING
+  // Le filleul a payé sa première prestation, la récompense a été créditée au parrain.
+  COMPLETED
+  // Aucune première prestation payée dans le délai imparti — pas de récompense.
+  EXPIRED
+}
+
+enum CookieConsentChoice {
+  ACCEPT_ALL
+  REJECT_ALL
+  CUSTOM
+}
+
 // =============================================================================
 // IDENTITÉ & ACCÈS — Partie II
 // =============================================================================
@@ -330,6 +350,13 @@ model User {
   // Adresses que cet utilisateur a déjà utilisées (proposées en premier
   // lors de ses recherches d'adresse).
   savedLocations SavedLocation[]
+
+  // Généré à la première demande (voir UsersService.getOrCreateReferralCode) —
+  // jamais à l'inscription, pour ne pas imposer ce coût à chaque compte créé.
+  referralCode      String?    @unique
+  referralsSent     Referral[] @relation("ReferralsSent")
+  referralReceived  Referral?  @relation("ReferralsReceived")
+  cookieConsents    CookieConsent[]
 
   notifications                Notification[]
   auditLogs                    AuditLog[]
@@ -452,6 +479,8 @@ model CustomerProfile {
   bookings      Booking[]
   shipments     Shipment[]
   conversations Conversation[]
+  savedCards        SavedCard[]
+  promoRedemptions  PromoCodeRedemption[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -577,6 +606,9 @@ model Country {
   cancellationPolicies CancellationPolicy[]
   shipmentCategories   ShipmentCategory[]
   paymentProviders     PaymentProvider[]
+  promoCodes           PromoCode[]
+  deals                Deal[]
+  articles             Article[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -604,6 +636,8 @@ model Currency {
   cancellationFees    CancellationPolicy[]
   disputeResolutions  DisputeResolution[]
   shipmentCategories  ShipmentCategory[]
+  promoCodes          PromoCode[]
+  referrals           Referral[]
 
   @@map("currencies")
 }
@@ -818,6 +852,7 @@ model Booking {
   conversations      Conversation[]
   ratings            Rating[]
   walletTransactions WalletTransaction[]
+  promoRedemption    PromoCodeRedemption?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -943,6 +978,7 @@ model Shipment {
   conversations      Conversation[]
   ratings            Rating[]
   walletTransactions WalletTransaction[]
+  promoRedemption    PromoCodeRedemption?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -1001,6 +1037,7 @@ model PaymentProvider {
   config    Json?
 
   transactions PaymentTransaction[]
+  savedCards   SavedCard[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1166,6 +1203,30 @@ model CancellationPolicy {
 
   @@index([serviceType, countryId])
   @@map("cancellation_policies")
+}
+
+// Jamais le PAN ni le CVV : seul le jeton renvoyé par le prestataire de
+// paiement (Stripe ou équivalent) est conservé, avec des métadonnées
+// d'affichage non sensibles — jamais de quoi rejouer un paiement ailleurs
+// que via ce jeton, chez ce même prestataire (règle d'or sur les données
+// de carte, section 13).
+model SavedCard {
+  id            String          @id @default(uuid())
+  customerId    String
+  customer      CustomerProfile @relation(fields: [customerId], references: [id])
+  providerId    String
+  provider      PaymentProvider @relation(fields: [providerId], references: [id])
+  providerToken String // référence "moyen de paiement" côté prestataire — jamais le PAN
+  brand         String? // visa, mastercard...
+  last4         String
+  expiryMonth   Int
+  expiryYear    Int
+  isDefault     Boolean         @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([customerId])
+  @@map("saved_cards")
 }
 
 // =============================================================================
@@ -1424,6 +1485,163 @@ model Message {
 
   @@index([conversationId, sentAt])
   @@map("messages")
+}
+
+// =============================================================================
+// ENGAGEMENT, PROMOTIONS & CONSENTEMENT — Partie XIV
+// =============================================================================
+
+// Configuré par l'admin (page Tarification) — même esprit que
+// CommissionRule/CancellationPolicy : configurable par pays et par service.
+model PromoCode {
+  id                String            @id @default(uuid())
+  code              String            @unique
+  description       String?
+  discountType      PromoDiscountType
+  // Pourcentage (0-100) si discountType = PERCENTAGE, montant si FIXED_AMOUNT.
+  discountValue     Float
+  // null = valable pour les trajets ET les envois.
+  serviceType       ServiceType?
+  countryId         String?
+  country           Country?          @relation(fields: [countryId], references: [id])
+  // Obligatoire si discountType = FIXED_AMOUNT (unité du montant).
+  currencyId        String?
+  currency          Currency?         @relation(fields: [currencyId], references: [id])
+  // Montant minimum de la commande pour être éligible.
+  minAmount         BigInt?
+  // Plafond de la réduction — utile avec un pourcentage, pour ne pas
+  // offrir un montant démesuré sur une grosse commande.
+  maxDiscountAmount BigInt?
+  // Nombre total d'utilisations, tous clients confondus ; null = illimité.
+  usageLimit        Int?
+  usageLimitPerUser Int               @default(1)
+  usedCount         Int               @default(0)
+  startsAt          DateTime?
+  expiresAt         DateTime?
+  isActive          Boolean           @default(true)
+
+  redemptions PromoCodeRedemption[]
+  deals       Deal[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, expiresAt])
+  @@map("promo_codes")
+}
+
+// Une ligne par utilisation réelle, appliquée à une réservation ou un envoi
+// payé — jamais recréditée si le paiement échoue ou est annulé avant
+// confirmation (le compteur PromoCode.usedCount n'est incrémenté qu'à la
+// création de cette ligne, dans la même transaction que le paiement).
+model PromoCodeRedemption {
+  id             String          @id @default(uuid())
+  promoCodeId    String
+  promoCode      PromoCode       @relation(fields: [promoCodeId], references: [id])
+  customerId     String
+  customer       CustomerProfile @relation(fields: [customerId], references: [id])
+  bookingId      String?         @unique
+  booking        Booking?        @relation(fields: [bookingId], references: [id])
+  shipmentId     String?         @unique
+  shipment       Shipment?       @relation(fields: [shipmentId], references: [id])
+  discountAmount BigInt
+
+  createdAt DateTime @default(now())
+
+  @@index([promoCodeId])
+  @@index([customerId])
+  @@map("promo_code_redemptions")
+}
+
+// Chaque utilisateur a un code de parrainage (généré à la demande — voir
+// User.referralCode) ; un nouvel utilisateur ne peut le saisir qu'une
+// seule fois, à son inscription. La récompense n'est créditée qu'une fois
+// le filleul confirmé (status COMPLETED), jamais à l'inscription seule —
+// pour ne récompenser qu'un parrainage qui a réellement fait venir un
+// nouveau client ou chauffeur actif.
+model Referral {
+  id           String         @id @default(uuid())
+  referrerId   String
+  referrer     User           @relation("ReferralsSent", fields: [referrerId], references: [id])
+  refereeId    String         @unique
+  referee      User           @relation("ReferralsReceived", fields: [refereeId], references: [id])
+  status       ReferralStatus @default(PENDING)
+  rewardAmount BigInt?
+  currencyId   String?
+  currency     Currency?      @relation(fields: [currencyId], references: [id])
+  completedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([referrerId, status])
+  @@map("referrals")
+}
+
+// Contenu éditorial géré par l'admin (offres mises en avant côté client) —
+// purement informatif ; la réduction elle-même, si le bon plan en propose
+// une, passe toujours par un PromoCode classique (promoCodeId), jamais par
+// une logique de remise propre à Deal.
+model Deal {
+  id          String     @id @default(uuid())
+  title       String
+  description String
+  imageUrl    String?
+  promoCodeId String?
+  promoCode   PromoCode? @relation(fields: [promoCodeId], references: [id])
+  countryId   String?
+  country     Country?   @relation(fields: [countryId], references: [id])
+  startsAt    DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean    @default(true)
+  sortOrder   Int        @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, countryId])
+  @@map("deals")
+}
+
+// Actualités publiées par l'admin, visibles côté client (section Informations).
+model Article {
+  id            String    @id @default(uuid())
+  title         String
+  excerpt       String?
+  content       String
+  coverImageUrl String?
+  countryId     String?
+  country       Country?  @relation(fields: [countryId], references: [id])
+  publishedAt   DateTime?
+  isActive      Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, publishedAt])
+  @@map("articles")
+}
+
+// Trace de consentement aux cookies (bandeau web-admin, et tout futur site
+// public) : un enregistrement par choix, horodaté, avec la version de la
+// politique affichée à ce moment-là — jamais écrasé, pour prouver a
+// posteriori quel texte l'utilisateur a accepté. userId nul pour un
+// visiteur non connecté (le consentement n'est alors tracé que côté
+// navigateur, via le script d'acceptation — voir web-admin/CookieConsent).
+model CookieConsent {
+  id            String              @id @default(uuid())
+  userId        String?
+  user          User?               @relation(fields: [userId], references: [id])
+  choice        CookieConsentChoice
+  policyVersion String
+  // Détail par catégorie si choice = CUSTOM, ex. {"analytics": true, "marketing": false}.
+  categories    Json?
+  ipAddress     String?
+  userAgent     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("cookie_consents")
 }
 
 // =============================================================================

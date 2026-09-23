@@ -1,9 +1,12 @@
 // backend/src/trips/trips.module.ts
+// [23/09/2026] v3 — PromoCodesModule (code promo à la création d'une réservation).
+// [22/09/2026] v2 — BookingExpiryService (expiration des réservations impayées).
 import { Module } from '@nestjs/common';
 import { TripsController } from './trips.controller';
 import { TripsService } from './trips.service';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
+import { BookingExpiryService } from './booking-expiry.service';
 import { TripOtpService } from './trip-otp.service';
 import { VehiclesModule } from '../vehicles/vehicles.module';
 import { LocationsModule } from '../locations/locations.module';
@@ -12,6 +15,7 @@ import { CustomerProfilesModule } from '../profiles/customer-profiles/customer-p
 import { PricingModule } from '../pricing/pricing.module';
 import { OtpModule } from '../otp/otp.module';
 import { WalletsModule } from '../wallets/wallets.module';
+import { PromoCodesModule } from '../promo-codes/promo-codes.module';
 
 /**
  * Trip, Booking et TripOtp partagent un seul module : Booking ne peut pas
@@ -28,9 +32,10 @@ import { WalletsModule } from '../wallets/wallets.module';
     PricingModule,
     OtpModule,
     WalletsModule,
+    PromoCodesModule,
   ],
   controllers: [TripsController, BookingsController],
-  providers: [TripsService, BookingsService, TripOtpService],
+  providers: [TripsService, BookingsService, TripOtpService, BookingExpiryService],
   exports: [TripsService, BookingsService, TripOtpService],
 })
 export class TripsModule {}
