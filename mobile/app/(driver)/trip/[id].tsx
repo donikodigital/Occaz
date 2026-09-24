@@ -1,5 +1,16 @@
 // mobile/app/(driver)/trip/[id].tsx
 //
+// v4 — Corrige un vrai blocage : un trajet DRIVER_ARRIVED sans aucun
+// passager (0 réservation) affichait « Demandez le code de chaque
+// passager » — un texte qui n'a pas de sens sans passager — et le
+// bouton « Annuler le trajet » disparaissait à cette étape (il n'était
+// visible que pour DRAFT/PUBLISHED). Le chauffeur n'avait alors plus
+// aucun moyen d'avancer ni d'annuler. La carte d'étape explique
+// maintenant honnêtement la situation, et le bouton d'annulation reste
+// disponible jusqu'à DRIVER_ARRIVED inclus (pas au-delà : une fois un
+// passager pris en charge, annuler d'un simple bouton n'est plus
+// approprié — ça relève d'un signalement, pas d'une annulation propre).
+//
 // v3 — Habillage bleu océan, comme l'espace client : en-tête OceanScreenHeader,
 // billet dont le bandeau par défaut passe du indigo au bleu profond (OCEAN.deep),
 // sections « Passagers » et « Détails » en OceanSection (même en-tête souligné
@@ -139,12 +150,19 @@ function getStage(
         tone: 'ocean',
       };
     case 'DRIVER_ARRIVED':
-      return {
-        icon: IconUsers,
-        title: 'Prise en charge',
-        text: 'Demandez le code de chaque passager pour valider sa montée.',
-        tone: 'ocean',
-      };
+      return hasBookings
+        ? {
+            icon: IconUsers,
+            title: 'Prise en charge',
+            text: 'Demandez le code de chaque passager pour valider sa montée.',
+            tone: 'ocean',
+          }
+        : {
+            icon: IconInfoCircle,
+            title: 'Aucun passager pour l’instant',
+            text: 'Personne n’a réservé ce trajet — vous pouvez attendre une réservation ou l’annuler ci-dessous.',
+            tone: 'gold',
+          };
     case 'PASSENGER_PICKED_UP':
       return {
         icon: IconCar,
@@ -659,7 +677,7 @@ export default function DriverTripDetailScreen() {
         ) : null}
       </OceanSection>
 
-      {['DRAFT', 'PUBLISHED'].includes(trip.status) ? (
+      {['DRAFT', 'PUBLISHED', 'DRIVER_ARRIVED'].includes(trip.status) ? (
         <OceanButton
           label="Annuler le trajet"
           variant="outline"

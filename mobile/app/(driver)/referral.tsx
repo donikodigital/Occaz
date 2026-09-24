@@ -1,4 +1,4 @@
-// mobile/app/(customer)/referral.tsx
+// mobile/app/(driver)/referral.tsx
 //
 // v1 — Parrainage : votre code (à partager), un champ pour saisir celui
 // d'un ami, et la liste de vos filleuls avec leur statut. La récompense

@@ -1,8 +1,8 @@
-// mobile/app/(customer)/faq.tsx
+// mobile/app/(driver)/faq.tsx
 //
-// v1 — Questions fréquentes : accordéon simple, contenu reflétant les
-// règles réellement codées (annulation à 100 %, premier arrivé premier
-// servi, etc.) — à ajuster librement.
+// v1 — Questions fréquentes côté chauffeur : accordéon simple, contenu
+// reflétant les règles réellement codées (commission unique, premier
+// arrivé premier servi, retrait du portefeuille) — à ajuster librement.
 
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -15,32 +15,34 @@ import { OCEAN } from '@/theme/ocean';
 
 const QUESTIONS: { question: string; answer: string }[] = [
   {
-    question: 'Comment est calculé le prix d\'un envoi ?',
+    question: 'Comment savoir si je suis éligible pour accepter des envois ?',
     answer:
-      'Le prix dépend du poids (ou du poids volumétrique s\'il est plus grand), de la distance, de la catégorie du colis et d\'une éventuelle valeur déclarée. Il est calculé automatiquement et affiché avant paiement.',
+      'Dès que vos documents (pièce d\'identité, permis, carte grise, assurance) sont vérifiés et acceptés, votre compte passe "Chauffeur validé" — vous pouvez alors accepter des envois, avec ou sans trajet établi.',
   },
   {
-    question: 'Qui accepte ma demande d\'envoi ?',
+    question: 'Comment est calculée ma commission ?',
     answer:
-      'Tous les chauffeurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s\'en charge — vous êtes averti dès qu\'un chauffeur est trouvé.',
+      'Le client paie un seul montant. La commission de la plateforme, configurée par l\'admin, en est déduite — le solde vous est crédité automatiquement sur votre portefeuille dès validation de la prestation.',
   },
   {
-    question: 'Que se passe-t-il si aucun chauffeur n\'accepte avant la fin de ma période ?',
+    question: 'Pourquoi je n\'ai pas pu accepter cet envoi ?',
     answer:
-      'Vous êtes invité à prolonger votre demande. Si vous ne répondez pas, ou si vous préférez annuler, vous êtes remboursé intégralement.',
+      'Toutes les demandes sont envoyées à tous les chauffeurs validés en même temps : le premier à accepter l\'emporte. Si quelqu\'un a été plus rapide, la demande disparaît de votre liste.',
   },
   {
-    question: 'Puis-je annuler une réservation ou un envoi payé ?',
-    answer: 'Oui, tant que le colis n\'a pas été récupéré ou que le trajet n\'a pas commencé. Le remboursement est intégral.',
-  },
-  {
-    question: 'Comment le chauffeur valide-t-il la prise en charge ou la livraison ?',
+    question: 'Comment je retire l\'argent de mon portefeuille ?',
     answer:
-      'Un code à usage unique vous est envoyé par SMS à chaque étape (montée, descente, récupération, livraison) : vous le donnez au chauffeur pour valider.',
+      'Depuis l\'onglet Portefeuille, demandez un retrait : il est traité par l\'équipe support vers le moyen de paiement que vous avez renseigné.',
   },
   {
-    question: 'Quels moyens de paiement sont acceptés ?',
-    answer: 'Le paiement se fait via les moyens configurés dans votre pays (mobile money, carte bancaire...), en une seule fois.',
+    question: 'Comment je valide une prise en charge ou une livraison ?',
+    answer:
+      'Un code à usage unique est envoyé au client ou à l\'expéditeur : demandez-le-lui et saisissez-le dans l\'application pour valider chaque étape.',
+  },
+  {
+    question: 'Que se passe-t-il si un client annule ?',
+    answer:
+      'Le client est remboursé intégralement. Si vous aviez déjà accepté la prestation, vous en êtes averti aussitôt pour ne pas vous déplacer pour rien.',
   },
 ];
 
@@ -65,7 +67,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
   );
 }
 
-export default function FaqScreen() {
+export default function DriverFaqScreen() {
   return (
     <ScreenContainer scroll maxWidth="detail">
       <OceanScreenHeader title="Questions fréquentes" onBack={() => router.back()} />

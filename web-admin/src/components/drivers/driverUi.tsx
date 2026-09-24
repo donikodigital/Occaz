@@ -148,7 +148,7 @@ export function DriverAvatar({
 
   return (
     <span
-      className={`${base} inline-grid place-items-center bg-gradient-to-br from-indigo-500 to-violet-600 font-extrabold text-white`}
+      className={`${base} inline-grid place-items-center bg-gradient-ocean font-extrabold text-white`}
     >
       {initials}
     </span>
@@ -160,8 +160,7 @@ export function DriverAvatar({
 /* ------------------------------------------------------------------ */
 
 const TONE_BUTTON_VARIANTS = {
-  primary:
-    'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40',
+  primary: 'bg-gradient-ocean text-white shadow-lg shadow-primary-dark/30 hover:shadow-xl hover:shadow-primary-dark/40',
   success:
     'bg-gradient-to-r from-[#0b6aa8] to-[#0a4a7d] text-white shadow-lg shadow-[#0a4a7d]/30 hover:shadow-xl hover:shadow-[#0a4a7d]/40',
   danger:
@@ -202,7 +201,7 @@ export function ToneButton({
       type="button"
       {...props}
       disabled={disabled || loading}
-      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-bold transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 ${TONE_BUTTON_SIZES[size]} ${TONE_BUTTON_VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-bold transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 ${TONE_BUTTON_SIZES[size]} ${TONE_BUTTON_VARIANTS[variant]} ${className}`}
     >
       {loading ? <IconLoader2 size={16} className="animate-spin" /> : icon}
       {children}
@@ -215,7 +214,7 @@ export function ToneButton({
 /* ------------------------------------------------------------------ */
 
 const TILE_TONES = {
-  indigo: { box: 'bg-indigo-50/60 ring-indigo-100', icon: 'from-indigo-500 to-violet-600 shadow-indigo-500/30' },
+  indigo: { box: 'bg-primary-light/60 ring-primary-accent/40', icon: 'from-primary to-primary-dark shadow-primary-dark/30' },
   sky: { box: 'bg-sky-50/60 ring-sky-100', icon: 'from-sky-500 to-blue-600 shadow-sky-500/30' },
   rose: { box: 'bg-rose-50/60 ring-rose-100', icon: 'from-rose-500 to-red-600 shadow-rose-500/30' },
   amber: { box: 'bg-amber-50/60 ring-amber-100', icon: 'from-amber-400 to-orange-500 shadow-amber-500/30' },

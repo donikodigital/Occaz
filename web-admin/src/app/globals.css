@@ -2,19 +2,27 @@
 @import "tailwindcss";
 
 /*
- * Mêmes jetons que l'app mobile (voir mobile/src/theme/colors.ts) —
- * indigo pour la marque, émeraude pour l'argent/la confirmation, ambre
- * pour l'énergie/les alertes. Fond blanc cassé chaud, jamais de noir ni
- * de fond sombre. Cohérence de marque entre l'app et ce back-office,
- * pas un thème générique de tableau de bord.
+ * Marque : bleu océan — mêmes valeurs que OCEAN dans
+ * mobile/src/theme/ocean.ts (palette du profil chauffeur, partagée
+ * avec l'espace client), émeraude pour l'argent/la confirmation, ambre
+ * pour l'énergie/les alertes. Police Inter, la même que côté mobile
+ * (chauffeur et client). Fond blanc cassé chaud, jamais de noir ni de
+ * fond sombre. Cohérence de marque entre l'app et ce back-office, pas
+ * un thème générique de tableau de bord.
  */
 @theme {
-  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  --color-primary: #4f46e5;
-  --color-primary-dark: #3730a3;
-  --color-primary-light: #eeedfe;
+  --color-primary: #0b6ba8;
+  --color-primary-dark: #083a63;
+  --color-primary-light: #eaf5fb;
+  --color-primary-accent: #cfe4f2;
   --color-on-primary: #ffffff;
+
+  /* Dégradé de marque — panneaux héros, bannières, logo. Toujours ces
+     trois arrêts (repris de OCEAN.bright/base/deep), dans cet ordre,
+     pour que le bleu océan reste reconnaissable partout où il apparaît. */
+  --gradient-ocean: linear-gradient(135deg, #1e9bd7 0%, #0b6ba8 50%, #083a63 100%);
 
   --color-success: #10b981;
   --color-success-dark: #047857;
@@ -95,4 +103,8 @@ body {
 
 .animate-in {
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.bg-gradient-ocean {
+  background-image: var(--gradient-ocean);
 }

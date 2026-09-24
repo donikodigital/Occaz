@@ -1,15 +1,20 @@
 // web-admin/src/components/disputes/disputeUi.tsx
 import React from 'react';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import { IconChevronDown, IconFlag, IconLoader2 } from '@tabler/icons-react';
 import { DISPUTE_PRIORITY_LABELS, DISPUTE_STATUS_LABELS } from '@/utils/disputeLabels';
 import type { DisputePriority, DisputeStatus } from '@/types/disputes.types';
 
 /* ------------------------------------------------------------------ */
 /* Police                                                              */
+/* Alignée sur la police globale du superadmin (voir globals.css) —     */
+/* elle-même Inter, la même que côté chauffeur et client sur mobile.   */
+/* Le nom "disputeFont" est resté tel quel : il est réutilisé par les   */
+/* pages disputes, chauffeurs et moyens de paiement, pas seulement les  */
+/* litiges.                                                             */
 /* ------------------------------------------------------------------ */
 
-export const disputeFont = Plus_Jakarta_Sans({
+export const disputeFont = Inter({
   subsets: ['latin'],
   display: 'swap',
 });
@@ -181,7 +186,7 @@ export function Panel({ title, icon, children, delay = 0, className = '' }: Pane
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="mb-4 flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-50 to-violet-100 text-indigo-600 ring-1 ring-inset ring-indigo-100">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary-light text-primary ring-1 ring-inset ring-primary-accent/40">
           {icon}
         </span>
         <h2 className="text-base font-bold text-slate-900">{title}</h2>
@@ -198,7 +203,7 @@ export function Panel({ title, icon, children, delay = 0, className = '' }: Pane
 const LABEL_CLASS = 'mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500';
 
 export const CONTROL_CLASS =
-  'w-full rounded-xl bg-slate-50 px-3.5 py-3 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 transition placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 disabled:opacity-60';
+  'w-full rounded-xl bg-slate-50 px-3.5 py-3 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 transition placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary disabled:opacity-60';
 
 type NativeSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'className' | 'children'>;
 type NativeInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'className'>;
@@ -263,8 +268,7 @@ export function TextAreaField({ label, className = '', ...props }: TextAreaField
 /* ------------------------------------------------------------------ */
 
 const BUTTON_VARIANTS = {
-  primary:
-    'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40',
+  primary: 'bg-gradient-ocean text-white shadow-lg shadow-primary-dark/30 hover:shadow-xl hover:shadow-primary-dark/40',
   success:
     'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40',
   secondary:
@@ -290,7 +294,7 @@ export function ActionButton({
       type="button"
       {...props}
       disabled={disabled || loading}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 ${BUTTON_VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 ${BUTTON_VARIANTS[variant]} ${className}`}
     >
       {loading ? <IconLoader2 size={16} className="animate-spin" /> : null}
       {children}

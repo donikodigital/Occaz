@@ -37,8 +37,8 @@ type VisualRule = {
 
 const DEFAULT_VISUAL: ProviderVisual = {
   icon: IconWallet,
-  gradient: 'from-indigo-500 to-violet-600',
-  glow: 'shadow-indigo-500/30',
+  gradient: 'from-primary to-primary-dark',
+  glow: 'shadow-primary-dark/30',
 };
 
 const VISUAL_RULES: VisualRule[] = [
@@ -177,7 +177,7 @@ export function ToggleSwitch({ checked, onChange, disabled = false, label }: Tog
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full shadow-inner transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full shadow-inner transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
         checked ? 'bg-[#0b6aa8]' : 'bg-slate-300'
       }`}
     >
@@ -195,7 +195,7 @@ export function ToggleSwitch({ checked, onChange, disabled = false, label }: Tog
 /* ------------------------------------------------------------------ */
 
 const SUMMARY_TONES = {
-  indigo: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
+  indigo: 'bg-primary-light text-primary-dark ring-primary-accent/40',
   blue: 'bg-[#e6f1fa] text-[#0a4a7d] ring-[#9fc8e8]',
   amber: 'bg-amber-50 text-amber-700 ring-amber-200',
 } as const;
@@ -239,14 +239,14 @@ export function TypePicker({ value, options, onChange }: TypePickerProps) {
             role="radio"
             aria-checked={selected}
             onClick={() => onChange(option.value)}
-            className={`relative flex flex-col items-center gap-2.5 rounded-2xl p-4 text-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:scale-[0.97] ${
+            className={`relative flex flex-col items-center gap-2.5 rounded-2xl p-4 text-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-[0.97] ${
               selected
-                ? 'bg-indigo-50 shadow-lg shadow-indigo-500/15 ring-2 ring-indigo-500'
+                ? 'bg-primary-light shadow-lg shadow-primary-dark/15 ring-2 ring-primary'
                 : 'bg-slate-50 ring-1 ring-inset ring-slate-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-md'
             }`}
           >
             {selected ? (
-              <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-indigo-600 text-white">
+              <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-primary text-white">
                 <IconCheck size={12} />
               </span>
             ) : null}
@@ -264,8 +264,7 @@ export function TypePicker({ value, options, onChange }: TypePickerProps) {
 /* ------------------------------------------------------------------ */
 
 const LINK_BUTTON_VARIANTS = {
-  primary:
-    'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40',
+  primary: 'bg-gradient-ocean text-white shadow-lg shadow-primary-dark/30 hover:shadow-xl hover:shadow-primary-dark/40',
   secondary: 'bg-white text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:shadow-md',
 } as const;
 
@@ -281,7 +280,7 @@ export function LinkButton({ href, variant = 'primary', icon, className = '', ch
   return (
     <Link
       href={href}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.98] ${LINK_BUTTON_VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.98] ${LINK_BUTTON_VARIANTS[variant]} ${className}`}
     >
       {icon}
       {children}

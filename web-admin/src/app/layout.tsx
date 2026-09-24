@@ -5,11 +5,11 @@
 // entre autres la page de connexion, hors du groupe (app). Le vrai layout
 // du groupe authentifié reste dans app/(app)/layout.tsx, inchangé.
 import type { Metadata } from 'next';
-import { Manrope } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import { Providers } from '@/components/layout/Providers';
 import './globals.css';
 
-const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: 'Occaz Go — Transport Partagé',
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-      <body className={`${manrope.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} font-sans antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

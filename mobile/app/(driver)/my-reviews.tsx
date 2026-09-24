@@ -1,4 +1,4 @@
-// mobile/app/(customer)/my-reviews.tsx
+// mobile/app/(driver)/my-reviews.tsx
 //
 // v1 — « Mes avis » : les notations que le client a données (pas reçues),
 // une carte par avis avec la personne notée, le contexte (trajet ou envoi)
@@ -100,7 +100,7 @@ export default function MyReviewsScreen() {
                 <OceanButton
                   label="Voir mon activité"
                   variant="outline"
-                  onPress={() => router.push('/(customer)/(tabs)/trips')}
+                  onPress={() => router.push('/(driver)/(tabs)/trips')}
                   style={styles.emptyButton}
                 />
               }

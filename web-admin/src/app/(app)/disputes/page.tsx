@@ -58,7 +58,7 @@ export default function DisputesPage() {
       <DisputeMotionStyles />
 
       <header className="dispute-fade-up flex items-center gap-4">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/30">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-ocean text-white shadow-lg shadow-primary-dark/30">
           <IconGavel size={24} />
         </span>
         <div>
@@ -106,7 +106,7 @@ export default function DisputesPage() {
               setStatus('');
               setPriority('');
             }}
-            className="mt-3 px-1 text-sm font-semibold text-indigo-600 transition hover:text-indigo-800"
+            className="mt-3 px-1 text-sm font-semibold text-primary transition hover:text-primary-dark"
           >
             Réinitialiser les filtres
           </button>
@@ -125,7 +125,7 @@ export default function DisputesPage() {
         </div>
       ) : disputes.length === 0 ? (
         <div className="dispute-pop flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-12 text-center">
-          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-100 text-indigo-500">
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-primary-light text-primary">
             <IconInbox size={28} />
           </span>
           <p className="mt-4 text-base font-bold text-slate-900">Aucun litige</p>
@@ -148,7 +148,7 @@ export default function DisputesPage() {
               >
                 <Link
                   href={`/disputes/${dispute.id}`}
-                  className="group relative block h-full overflow-hidden rounded-2xl bg-white p-4 pl-6 shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.99]"
+                  className="group relative block h-full overflow-hidden rounded-2xl bg-white p-4 pl-6 shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary-dark/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.99]"
                 >
                   <span
                     className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${PRIORITY_STYLE[dispute.priority].bar}`}
@@ -161,7 +161,7 @@ export default function DisputesPage() {
                       {isShipment ? <IconPackage size={22} /> : <IconRoute size={22} />}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <h2 className="break-words text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-indigo-700">
+                      <h2 className="break-words text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-primary-dark">
                         {dispute.reason}
                       </h2>
                       <p className="mt-0.5 text-xs font-semibold text-slate-400">
@@ -170,7 +170,7 @@ export default function DisputesPage() {
                     </div>
                     <IconChevronRight
                       size={20}
-                      className="mt-1 shrink-0 text-slate-300 transition-all duration-300 group-hover:translate-x-1 group-hover:text-indigo-500"
+                      className="mt-1 shrink-0 text-slate-300 transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary"
                     />
                   </div>
 

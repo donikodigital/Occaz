@@ -1,4 +1,4 @@
-// mobile/app/(customer)/news.tsx
+// mobile/app/(driver)/news.tsx
 //
 // v1 — Actualités : liste des articles publiés par l'admin.
 
@@ -16,7 +16,7 @@ import type { Article } from '@/types/promotions.types';
 
 function ArticleCard({ article }: { article: Article }) {
   return (
-    <OceanCard onPress={() => router.push(`/(customer)/news/${article.id}`)} style={styles.card} accessibilityLabel={article.title}>
+    <OceanCard onPress={() => router.push(`/(driver)/news/${article.id}`)} style={styles.card} accessibilityLabel={article.title}>
       {article.coverImageUrl ? <Image source={{ uri: article.coverImageUrl }} style={styles.image} /> : null}
       <View style={styles.cardRow}>
         <View style={{ flex: 1 }}>

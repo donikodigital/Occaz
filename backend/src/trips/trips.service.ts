@@ -342,6 +342,30 @@ export class TripsService {
     return updated;
   }
 
+  /**
+   * Trajet publié (ou dont le chauffeur a signalé son arrivée) sans
+   * aucune réservation, dont le départ est passé depuis longtemps —
+   * appelée par TripExpiryService. Contrairement à cancel() (annulation
+   * volontaire du chauffeur), n'incrémente jamais le compteur
+   * d'annulations : aucun passager n'a été impacté, personne n'a
+   * concrètement annulé quoi que ce soit. Sans effet si une réservation
+   * a été prise entre-temps, ou si le trajet a déjà changé de statut.
+   */
+  async expireStale(id: string, reason: string): Promise<boolean> {
+    const claimed = await this.prisma.trip.updateMany({
+      where: {
+        id,
+        status: { in: [TripStatus.PUBLISHED, TripStatus.DRIVER_ARRIVED] },
+        bookings: { none: { status: { in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED] } } },
+      },
+      data: { status: TripStatus.CANCELLED },
+    });
+    if (claimed.count === 0) return false;
+
+    await this.audit.log({ actorId: null, entityType: 'Trip', entityId: id, action: 'AUTO_EXPIRE', diff: { reason } });
+    return true;
+  }
+
   async findAllForDriver(driverId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
     const where = { driverId };
     const [data, total] = await Promise.all([

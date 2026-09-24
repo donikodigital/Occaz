@@ -38,7 +38,7 @@ function ProviderCard({ provider, countryLabel, index }: ProviderCardProps) {
 
   return (
     <div className="dispute-fade-up h-full" style={{ animationDelay: `${Math.min(index, 10) * 70 + 120}ms` }}>
-      <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/20">
+      <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary-dark/20">
         <span
           className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${
             provider.isActive ? 'from-[#0b62a3] to-[#083a63]' : 'from-slate-300 to-slate-400'
@@ -47,21 +47,21 @@ function ProviderCard({ provider, countryLabel, index }: ProviderCardProps) {
 
         <Link
           href={`/payment-providers/${provider.id}`}
-          className="block flex-1 p-4 pl-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+          className="block flex-1 p-4 pl-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
         >
           <div className="flex items-start gap-3">
             <div className={`shrink-0 ${provider.isActive ? '' : 'opacity-60 grayscale'}`}>
               <ProviderIcon type={provider.type} />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="break-words text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-indigo-700">
+              <h2 className="break-words text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-primary-dark">
                 {provider.name}
               </h2>
               <p className="mt-0.5 text-xs font-semibold text-slate-400">{typeLabel}</p>
             </div>
             <IconChevronRight
               size={20}
-              className="mt-1 shrink-0 text-slate-300 transition-all duration-300 group-hover:translate-x-1 group-hover:text-indigo-500"
+              className="mt-1 shrink-0 text-slate-300 transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary"
             />
           </div>
 
@@ -114,7 +114,7 @@ export default function PaymentProvidersPage() {
 
       <header className="dispute-fade-up flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/30">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-ocean text-white shadow-lg shadow-primary-dark/30">
             <IconCreditCard size={24} />
           </span>
           <div>
@@ -143,7 +143,7 @@ export default function PaymentProvidersPage() {
         </div>
       ) : list.length === 0 ? (
         <div className="dispute-pop flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-12 text-center">
-          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-100 text-indigo-500">
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-primary-light text-primary">
             <IconCreditCard size={28} />
           </span>
           <p className="mt-4 text-base font-bold text-slate-900">Aucun moyen de paiement</p>
@@ -175,7 +175,7 @@ export default function PaymentProvidersPage() {
               className="dispute-fade-up flex items-start gap-3 rounded-2xl bg-white/70 p-4 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-200"
               style={{ animationDelay: '100ms' }}
             >
-              <IconInfoCircle size={20} className="mt-0.5 shrink-0 text-indigo-500" />
+              <IconInfoCircle size={20} className="mt-0.5 shrink-0 text-primary" />
               Un client ne peut payer que si au moins un moyen actif existe ici.
             </div>
           )}
@@ -200,9 +200,9 @@ export default function PaymentProvidersPage() {
             >
               <Link
                 href="/payment-providers/new"
-                className="group flex h-full min-h-[9rem] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-white/50 p-4 text-center text-sm font-bold text-slate-500 transition-all duration-300 hover:-translate-y-1 hover:border-indigo-400 hover:bg-white hover:text-indigo-600 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                className="group flex h-full min-h-[9rem] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-white/50 p-4 text-center text-sm font-bold text-slate-500 transition-all duration-300 hover:-translate-y-1 hover:border-primary/60 hover:bg-white hover:text-primary hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-slate-100 text-slate-400 transition-colors group-hover:bg-indigo-50 group-hover:text-indigo-500">
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-slate-100 text-slate-400 transition-colors group-hover:bg-primary-light group-hover:text-primary">
                   <IconPlus size={22} />
                 </span>
                 Ajouter un moyen de paiement

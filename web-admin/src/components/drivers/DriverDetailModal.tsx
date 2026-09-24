@@ -58,13 +58,13 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
 
       <div className="driver-sheet relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/10 sm:max-w-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 bg-white px-5 py-3.5">
-          <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">Fiche chauffeur</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-primary">Fiche chauffeur</p>
           <button
             type="button"
             autoFocus
             onClick={onClose}
             aria-label="Fermer"
-            className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95"
+            className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary active:scale-95"
           >
             <IconX size={18} />
           </button>

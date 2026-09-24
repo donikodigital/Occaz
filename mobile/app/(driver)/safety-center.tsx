@@ -1,4 +1,4 @@
-// mobile/app/(customer)/safety-center.tsx
+// mobile/app/(driver)/safety-center.tsx
 //
 // v1 — Centre de sécurité : conseils pratiques + rappel des mécanismes de
 // sécurité déjà en place dans l'app (codes de validation, notation,
@@ -75,7 +75,7 @@ export default function SafetyCenterScreen() {
       <OceanButton
         label="Voir mes litiges"
         variant="outline"
-        onPress={() => router.push('/(customer)/disputes')}
+        onPress={() => router.push('/(driver)/disputes')}
         style={styles.button}
       />
     </ScreenContainer>

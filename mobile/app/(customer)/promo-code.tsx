@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   resultCard: {
+    padding: spacing.md,
     alignItems: 'center',
     gap: 2,
     marginTop: spacing.lg,

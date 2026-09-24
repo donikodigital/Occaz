@@ -54,6 +54,7 @@ function createService(options: { shipment?: Record<string, unknown>; claimCount
     {} as never,
     eventEmitter as never,
     notifications as never,
+    {} as never,
   );
   return { service, tx, eventEmitter, notifications };
 }

@@ -93,6 +93,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   row: {
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,

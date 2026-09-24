@@ -1,4 +1,4 @@
-// mobile/app/(customer)/deals.tsx
+// mobile/app/(driver)/deals.tsx
 //
 // v1 — Bons plans : contenu éditorial géré par l'admin.
 

@@ -61,7 +61,7 @@ export function VehicleDetailRow({ vehicle, driverId, defaultOpen = true }: Vehi
       <span className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${status.bar}`} />
 
       <div className="flex items-start gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-ocean text-white shadow-md shadow-primary-dark/30">
           <IconCar size={22} />
         </span>
 

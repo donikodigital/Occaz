@@ -1,4 +1,4 @@
-// mobile/app/(customer)/about.tsx
+// mobile/app/(driver)/about.tsx
 //
 // v1 — Infos sur l'app : version (lue dynamiquement), liens vers les
 // conditions générales et la protection des données.
@@ -32,14 +32,14 @@ export default function AboutScreen() {
         </AppText>
       </View>
 
-      <OceanCard onPress={() => router.push('/(customer)/terms')} style={styles.row} accessibilityLabel="Conditions générales">
+      <OceanCard onPress={() => router.push('/(driver)/terms')} style={styles.row} accessibilityLabel="Conditions générales">
         <IconFileText size={18} color={OCEAN.base} />
         <AppText variant="sm" weight="semibold" style={{ flex: 1 }}>
           Conditions générales
         </AppText>
       </OceanCard>
 
-      <OceanCard onPress={() => router.push('/(customer)/privacy')} style={styles.row} accessibilityLabel="Protection des données">
+      <OceanCard onPress={() => router.push('/(driver)/privacy')} style={styles.row} accessibilityLabel="Protection des données">
         <IconShieldLock size={18} color={OCEAN.base} />
         <AppText variant="sm" weight="semibold" style={{ flex: 1 }}>
           Protection des données
@@ -80,4 +80,3 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 });
-

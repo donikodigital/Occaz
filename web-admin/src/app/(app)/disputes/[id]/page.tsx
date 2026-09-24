@@ -89,12 +89,12 @@ function Stat({
     <div
       className={`rounded-xl p-3 ${
         highlight
-          ? 'bg-gradient-to-br from-indigo-50 to-violet-50 ring-1 ring-inset ring-indigo-100'
+          ? 'bg-primary-light ring-1 ring-inset ring-primary-accent/40'
           : 'bg-slate-50 ring-1 ring-inset ring-slate-100'
       }`}
     >
       <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className={`mt-0.5 break-words text-sm font-bold ${highlight ? 'text-indigo-700' : 'text-slate-900'}`}>
+      <p className={`mt-0.5 break-words text-sm font-bold ${highlight ? 'text-primary-dark' : 'text-slate-900'}`}>
         {value}
       </p>
     </div>
@@ -249,9 +249,9 @@ export default function DisputeDetailPage() {
       <DisputeMotionStyles />
 
       {/* ---------- En-tête ---------- */}
-      <div className="dispute-fade-up relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-700 p-5 text-white shadow-xl shadow-indigo-500/30">
+      <div className="dispute-fade-up relative overflow-hidden rounded-3xl bg-gradient-ocean p-5 text-white shadow-xl shadow-primary-dark/30">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-12 left-10 h-32 w-32 rounded-full bg-fuchsia-400/20 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-12 left-10 h-32 w-32 rounded-full bg-[#1e9bd7]/20 blur-2xl" />
 
         <div className="relative space-y-4">
           <div className="flex items-start gap-3">
@@ -263,13 +263,13 @@ export default function DisputeDetailPage() {
               <IconArrowLeft size={20} />
             </Link>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-wider text-indigo-100">
+              <p className="text-xs font-bold uppercase tracking-wider text-sky-100">
                 Litige {disputeRef(dispute.id)}
               </p>
               <h1 className="mt-0.5 break-words text-2xl font-extrabold leading-tight tracking-tight">
                 {dispute.reason}
               </h1>
-              <p className="mt-1 text-xs font-medium text-indigo-100">
+              <p className="mt-1 text-xs font-medium text-sky-100">
                 Ouvert le {dateFormatter.format(new Date(dispute.createdAt))}
                 {openedByLabel ? ` par ${openedByLabel}` : ''}
               </p>
@@ -277,7 +277,7 @@ export default function DisputeDetailPage() {
           </div>
 
           {dispute.description ? (
-            <p className="rounded-xl bg-white/10 p-3 text-sm leading-relaxed text-indigo-50 ring-1 ring-white/15">
+            <p className="rounded-xl bg-white/10 p-3 text-sm leading-relaxed text-sky-50 ring-1 ring-white/15">
               {dispute.description}
             </p>
           ) : null}
@@ -377,7 +377,7 @@ export default function DisputeDetailPage() {
                     setPendingStatus(value);
                     updateStatus.mutate(value, { onSettled: () => setPendingStatus(null) });
                   }}
-                  className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-center text-xs font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 ${
+                  className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-center text-xs font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 ${
                     active
                       ? `bg-gradient-to-br text-white shadow-lg ${style.gradient} ${style.glow}`
                       : 'bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-md'
@@ -406,7 +406,7 @@ export default function DisputeDetailPage() {
                 <div
                   className={`max-w-[80%] break-words rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
                     isMine
-                      ? 'rounded-br-md bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-indigo-500/20'
+                      ? 'rounded-br-md bg-gradient-ocean text-white shadow-primary-dark/20'
                       : 'rounded-bl-md bg-slate-100 text-slate-900'
                   }`}
                 >
@@ -444,7 +444,7 @@ export default function DisputeDetailPage() {
               aria-label="Envoyer le message"
               onClick={handleSend}
               disabled={!draft.trim() || addMessage.isPending}
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0"
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-ocean text-white shadow-lg shadow-primary-dark/30 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary-dark/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0"
             >
               {addMessage.isPending ? <IconLoader2 size={18} className="animate-spin" /> : <IconSend size={18} />}
             </button>

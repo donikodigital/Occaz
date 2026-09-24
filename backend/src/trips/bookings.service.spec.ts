@@ -18,7 +18,7 @@ function createService(cancellationPolicy: unknown) {
     getCancellationPolicy: jest.fn().mockResolvedValue(cancellationPolicy),
   } as unknown as PricingService;
   const eventEmitter = {} as EventEmitter2;
-  return new BookingsService(prisma, pricing, eventEmitter);
+  return new BookingsService(prisma, pricing, eventEmitter, {} as never);
 }
 
 function hoursFromNow(hours: number): Date {

@@ -59,6 +59,7 @@ function createService(options: {
     wallets as never,
     { emit: jest.fn() } as never,
     notifications as never,
+    {} as never,
   );
   return { service, tx, wallets, notifications };
 }

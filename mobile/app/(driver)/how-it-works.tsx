@@ -1,14 +1,13 @@
-// mobile/app/(customer)/how-it-works.tsx
+// mobile/app/(driver)/how-it-works.tsx
 //
-// v1 — « Comment ça marche ? » : deux onglets (Trajets / Envois), chacun
-// avec ses 3 étapes réelles (celles effectivement codées côté serveur —
-// pas un texte marketing générique). Contenu à ajuster librement, c'est
-// un texte explicatif, pas un document légal.
+// v1 — « Comment ça marche ? » côté chauffeur : deux onglets (Trajets /
+// Envois), chacun avec ses 3 étapes réelles. Même structure que la
+// version client, contenu adapté au point de vue du chauffeur.
 
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconCreditCard, IconMapPin, IconPackage, IconRoute, IconSearch, IconTruckDelivery } from '@tabler/icons-react-native';
+import { IconCash, IconCheck, IconPackage, IconRoute, IconSpeakerphone, IconUpload } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
 import { OceanCard, OceanScreenHeader } from '@/components/ocean/OceanKit';
 import { radius, spacing } from '@/theme';
@@ -25,37 +24,37 @@ interface Step {
 
 const TRIP_STEPS: Step[] = [
   {
-    icon: IconSearch,
-    title: 'Recherchez un trajet',
-    text: 'Indiquez votre ville de départ, votre destination et la date : vous voyez tous les trajets publiés qui correspondent.',
+    icon: IconUpload,
+    title: 'Publiez un trajet',
+    text: 'Indiquez votre itinéraire, la date et le nombre de places — votre trajet devient visible aux passagers.',
   },
   {
-    icon: IconCreditCard,
-    title: 'Réservez et payez',
-    text: "Choisissez le nombre de places, payez en une seule fois — votre place n'est confirmée qu'une fois le paiement validé.",
+    icon: IconCheck,
+    title: 'Acceptez des réservations',
+    text: 'Chaque réservation payée réduit vos places disponibles. Le jour J, validez la montée puis la descente avec le code du passager.',
   },
   {
-    icon: IconRoute,
-    title: 'Voyagez',
-    text: "Le jour J, un code vous est envoyé : donnez-le au chauffeur pour valider votre montée, puis votre descente à l'arrivée.",
+    icon: IconCash,
+    title: 'Touchez votre gain',
+    text: 'Votre part est créditée sur votre portefeuille dès la prestation validée — retirable à tout moment.',
   },
 ];
 
 const SHIPMENT_STEPS: Step[] = [
   {
+    icon: IconSpeakerphone,
+    title: 'Recevez les demandes',
+    text: 'Dès qu\'un client publie un envoi, tous les chauffeurs validés sont prévenus — avec ou sans trajet établi.',
+  },
+  {
     icon: IconPackage,
-    title: 'Décrivez votre colis',
-    text: 'Poids, dimensions, catégorie et la période pendant laquelle il peut partir — le prix est calculé automatiquement.',
+    title: 'Acceptez en premier',
+    text: 'Le premier chauffeur à accepter s\'en charge. Vous voyez immédiatement le gain net qui vous reviendra.',
   },
   {
-    icon: IconTruckDelivery,
-    title: 'Un chauffeur accepte',
-    text: "Tous les chauffeurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s'en charge.",
-  },
-  {
-    icon: IconMapPin,
-    title: "Suivi jusqu'à la livraison",
-    text: 'Un code valide la récupération, un autre la livraison. Sans chauffeur avant la fin de la période, vous êtes remboursé à 100 %.',
+    icon: IconRoute,
+    title: 'Récupérez et livrez',
+    text: 'Un code valide la récupération, un autre la livraison. Votre gain net est crédité dès la livraison confirmée.',
   },
 ];
 
@@ -105,7 +104,7 @@ function StepCard({ step, index }: { step: Step; index: number }) {
   );
 }
 
-export default function HowItWorksScreen() {
+export default function DriverHowItWorksScreen() {
   const [segment, setSegment] = useState<Segment>('trips');
   const steps = segment === 'trips' ? TRIP_STEPS : SHIPMENT_STEPS;
 

@@ -73,7 +73,7 @@ export default function NewPaymentProviderPage() {
       <BackLink href="/payment-providers">Retour aux moyens de paiement</BackLink>
 
       <header className="dispute-fade-up flex items-center gap-4">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/30">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-ocean text-white shadow-lg shadow-primary-dark/30">
           <IconWallet size={24} />
         </span>
         <div>
