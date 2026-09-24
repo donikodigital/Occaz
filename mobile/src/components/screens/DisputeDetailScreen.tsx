@@ -109,7 +109,8 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
               value={draft}
               onChangeText={setDraft}
               placeholder="Écrire un message…"
-              style={styles.composerInput}
+              containerStyle={styles.composerInput}
+              style={styles.composerInputText}
               multiline
             />
             <Pressable
@@ -303,6 +304,8 @@ const styles = StyleSheet.create({
   },
   composerInput: {
     flex: 1,
+  },
+  composerInputText: {
     maxHeight: 100,
   },
   sendButton: {

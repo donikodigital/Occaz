@@ -106,7 +106,7 @@ export default function ReferralScreen() {
               onChangeText={(t) => setEnteredCode(t.toUpperCase())}
               placeholder="Code d'un ami"
               autoCapitalize="characters"
-              style={styles.applyInput}
+              containerStyle={styles.applyInput}
             />
             <OceanButton label="Valider" onPress={handleApply} loading={applyCode.isPending} style={styles.applyButton} />
           </View>

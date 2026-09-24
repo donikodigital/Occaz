@@ -4,7 +4,9 @@ import {
   TextInput,
   TextInputProps,
   StyleSheet,
+  StyleProp,
   View,
+  ViewStyle,
   Pressable,
 } from 'react-native';
 import { IconEye, IconEyeOff } from '@tabler/icons-react-native';
@@ -17,6 +19,13 @@ export interface TextFieldProps extends TextInputProps {
   leftIcon?: React.ReactNode;
   /** Affiche un bouton œil pour basculer la visibilité — n'a d'effet qu'avec secureTextEntry. */
   toggleableSecureEntry?: boolean;
+  /**
+   * Style du conteneur extérieur (celui qui porte le label et la
+   * bordure du champ) — `style` ne s'applique qu'au <TextInput> à
+   * l'intérieur. À utiliser pour placer le champ dans une rangée,
+   * par exemple `containerStyle={{ flex: 1 }}` à côté d'un bouton.
+   */
+  containerStyle?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -31,13 +40,14 @@ export function TextField({
   secureTextEntry,
   toggleableSecureEntry = false,
   style,
+  containerStyle,
   ...rest
 }: TextFieldProps) {
   const [isSecureVisible, setSecureVisible] = useState(false);
   const effectiveSecureEntry = secureTextEntry && !isSecureVisible;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       {label ? (
         <AppText variant="sm" weight="medium" color="textSecondary" style={styles.label}>
           {label}
@@ -82,7 +92,7 @@ export function TextField({
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    alignSelf: 'stretch',
   },
   label: {
     marginBottom: spacing.xxs,
