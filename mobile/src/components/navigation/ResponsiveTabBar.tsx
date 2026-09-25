@@ -8,7 +8,7 @@ import { colors, radius, sidebarWidth, spacing } from '@/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 
 export interface ResponsiveTabBarProps extends BottomTabBarProps {
-  /** Couleur d'accent de cet espace (indigo côté client, émeraude côté chauffeur) — distingue les deux d'un coup d'œil sur desktop. */
+  /** Couleur d'accent de cet espace (bleu océan côté client, émeraude côté chauffeur) — distingue les deux d'un coup d'œil sur desktop. */
   accentColor: string;
   /** Nom affiché en haut de la barre latérale desktop (ex: "Espace client"). */
   brandLabel: string;

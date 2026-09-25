@@ -1,18 +1,21 @@
 // mobile/src/theme/colors.ts
 /**
  * Palette de la plateforme — choisie pour un marché mobilité + paiement
- * (Guinée/zone XOF), sans fond sombre. Indigo = marque/actions
- * principales, émeraude = argent/confirmation/confiance, ambre = notes
- * et énergie. Fond blanc cassé chaud plutôt que blanc clinique ou gris
- * froid. Validée visuellement avant implémentation (maquettes de
- * l'onboarding, l'accueil et les résultats de recherche).
+ * (Guinée/zone XOF), sans fond sombre. Bleu océan (voir ./ocean.ts,
+ * source de vérité) = marque/actions principales, émeraude =
+ * argent/confirmation/confiance, ambre = notes et énergie. Fond blanc
+ * cassé chaud plutôt que blanc clinique ou gris froid. Validée
+ * visuellement avant implémentation (maquettes de l'onboarding,
+ * l'accueil et les résultats de recherche).
  */
+import { OCEAN } from './ocean';
+
 export const colors = {
-  // Marque — indigo
-  primary: '#4F46E5',
-  primaryDark: '#3730A3',
-  primaryLight: '#EEEDFE',
-  onPrimary: '#FFFFFF',
+  // Marque — bleu océan (dérivé de OCEAN pour rester toujours identique)
+  primary: OCEAN.base,
+  primaryDark: OCEAN.deep,
+  primaryLight: OCEAN.mist,
+  onPrimary: OCEAN.onDark,
 
   // Succès / argent / confirmation — émeraude
   success: '#10B981',

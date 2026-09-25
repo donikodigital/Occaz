@@ -11,10 +11,12 @@
 // sélection). Les suggestions restent affichées en ligne sous le champ,
 // sans overlay ni z-index.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import * as Location from 'expo-location';
 import {
   IconChevronRight,
+  IconCurrentLocation,
   IconHistory,
   IconMapPin,
   IconPencil,
@@ -25,6 +27,7 @@ import { AppText, TextField } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useAddressSearch } from '@/hooks/useAddressSearch';
 import { useSavedLocations } from '@/hooks/useSavedLocations';
+import { geocodingApi } from '@/services/api/geocoding.api';
 import type { GeocodingSuggestion } from '@/types/geocoding.types';
 import type { SavedLocation } from '@/types/location-picker.types';
 
@@ -104,6 +107,8 @@ export function LocationSearchField({
   const { query, setQuery, suggestions, isSearching } = useAddressSearch(countryCode);
   const showSaved = Boolean(onSelectSaved);
   const { data: saved } = useSavedLocations(showSaved ? query : '', showSaved);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | undefined>();
 
   const trimmed = query.trim();
   const hasQuery = trimmed.length > 0;
@@ -118,6 +123,29 @@ export function LocationSearchField({
   function handleSelectSaved(item: SavedLocation) {
     if (clearOnSelect) setQuery('');
     onSelectSaved?.(item);
+  }
+
+  async function handleUseCurrentLocation() {
+    setLocationError(undefined);
+    setIsLocating(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (!permission.granted) {
+        setLocationError('Autorisez la localisation pour utiliser votre position actuelle.');
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({});
+      const suggestion = await geocodingApi.reverse(position.coords.latitude, position.coords.longitude);
+      if (!suggestion) {
+        setLocationError('Aucune adresse trouvée à votre position actuelle.');
+        return;
+      }
+      handleSelect(suggestion);
+    } catch {
+      setLocationError("Impossible d'obtenir votre position pour le moment.");
+    } finally {
+      setIsLocating(false);
+    }
   }
 
   return (
@@ -145,6 +173,33 @@ export function LocationSearchField({
           </Pressable>
         ) : null}
       </View>
+
+      {!hasQuery ? (
+        <ResultGroup>
+          <Pressable
+            onPress={handleUseCurrentLocation}
+            disabled={isLocating}
+            accessibilityRole="button"
+            accessibilityLabel="Utiliser ma position actuelle"
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          >
+            <View style={[styles.rowIcon, styles.rowIconPrimary]}>
+              {isLocating ? <ActivityIndicator size="small" color={colors.primary} /> : <IconCurrentLocation size={16} color={colors.primary} />}
+            </View>
+            <View style={styles.rowText}>
+              <AppText variant="sm" weight="semibold" color="primary">
+                Utiliser ma position actuelle
+              </AppText>
+              {locationError ? (
+                <AppText variant="xs" color="danger" numberOfLines={2}>
+                  {locationError}
+                </AppText>
+              ) : null}
+            </View>
+            {!isLocating ? <IconChevronRight size={16} color={colors.textMuted} /> : null}
+          </Pressable>
+        </ResultGroup>
+      ) : null}
 
       {savedItems.length > 0 ? (
         <ResultGroup title={hasQuery ? 'Mes adresses' : 'Récentes'}>
