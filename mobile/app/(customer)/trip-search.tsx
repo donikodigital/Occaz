@@ -5,9 +5,10 @@
 // l'écran « Envois disponibles » côté chauffeur ; la date et les passagers
 // passent en sections à en-tête soulignée. Logique inchangée.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
+import * as Location from 'expo-location';
 import { IconArrowsUpDown, IconChevronRight, IconSearch, IconUsers, IconCalendarEvent } from '@tabler/icons-react-native';
 import { AppText, CalendarPicker, ScreenContainer } from '@/components/ui';
 import { OceanButton, OceanCard, OceanScreenHeader, OceanSection, OceanStepper } from '@/components/ocean/OceanKit';
@@ -15,6 +16,7 @@ import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { recentSearchesStorage } from '@/services/storage/recentSearches';
+import { locationsApi } from '@/services/api/locations.api';
 import { toDateOnly } from '@/utils/date';
 import type { City } from '@/types/geography.types';
 
@@ -70,6 +72,7 @@ export default function TripSearchScreen() {
   const selection = useCitySelectionStore((state) => state.selection);
   const consumeSelection = useCitySelectionStore((state) => state.consume);
   const openCityPicker = useCitySelectionStore((state) => state.openFor);
+  const [isDetectingOrigin, setIsDetectingOrigin] = useState(false);
 
   useEffect(() => {
     if (!selection) return;
@@ -77,6 +80,44 @@ export default function TripSearchScreen() {
     else setDestination(selection.city);
     consumeSelection();
   }, [selection, consumeSelection]);
+
+  // Détecte automatiquement la ville de départ via le GPS à l'ouverture de
+  // l'écran. Purement en confort : en cas de permission refusée, de GPS
+  // indisponible, ou de position hors zone couverte, on échoue en
+  // silence — le champ reste à saisir/choisir normalement, comme avant
+  // cette fonctionnalité. `originRef` évite d'écraser un choix que
+  // l'utilisateur aurait fait pendant que la détection était en cours.
+  const originRef = useRef(origin);
+  originRef.current = origin;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setIsDetectingOrigin(true);
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (!permission.granted || cancelled) return;
+
+        const position = await Location.getCurrentPositionAsync({});
+        if (cancelled) return;
+
+        const { city } = await locationsApi.resolveCity({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        if (city && !cancelled && !originRef.current) setOrigin(city);
+      } catch {
+        // Échec silencieux — voir commentaire ci-dessus.
+      } finally {
+        if (!cancelled) setIsDetectingOrigin(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const canSearch = Boolean(origin && destination);
 
@@ -127,7 +168,13 @@ export default function TripSearchScreen() {
           <View style={[styles.railLine, { top: firstDotTop + DOT, height: secondDotTop - firstDotTop - DOT }]} />
           <View style={[styles.railDot, styles.railDotEnd, { top: secondDotTop }]} />
 
-          <RouteRow index={0} label="Départ" value={origin?.name} placeholder="Ville de départ" onPress={() => pickCity('origin')} />
+          <RouteRow
+            index={0}
+            label="Départ"
+            value={origin?.name}
+            placeholder={isDetectingOrigin ? 'Détection de votre position…' : 'Ville de départ'}
+            onPress={() => pickCity('origin')}
+          />
           <RouteRow
             index={1}
             label="Arrivée"

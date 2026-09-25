@@ -37,6 +37,8 @@ import { ShipmentWindowField, toShipmentWindow } from '@/components/screens/Ship
 import { PromoCodeField } from '@/components/screens/PromoCodeField';
 import { useShipmentCategories } from '@/hooks/useShipmentCategories';
 import { useCreateShipment, useShipmentQuote } from '@/hooks/useShipments';
+import { useCustomerProfile } from '@/hooks/useCustomerProfile';
+import { useAuthStore } from '@/stores/authStore';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { normalizePhoneInput } from '@/utils/phone';
 import { ApiError } from '@/services/api/ApiError';
@@ -80,9 +82,27 @@ function AddressCard({
 }
 
 export default function NewShipmentScreen() {
+  const { data: profile } = useCustomerProfile();
+  const accountUser = useAuthStore((state) => state.user);
+
   const [senderName, setSenderName] = useState('');
   const [senderPhone, setSenderPhone] = useState('+224');
   const [senderLocation, setSenderLocation] = useState<TripLocation | null>(null);
+
+  // Pré-remplies dès que le profil/compte est chargé, mais seulement si le
+  // client n'a pas déjà modifié le champ lui-même (utile s'il envoie le
+  // colis pour quelqu'un d'autre) — un champ non vide n'est jamais écrasé.
+  useEffect(() => {
+    if (senderName === '' && profile) {
+      setSenderName(`${profile.firstName} ${profile.lastName}`.trim());
+    }
+  }, [profile, senderName]);
+
+  useEffect(() => {
+    if (senderPhone === '+224' && accountUser?.phone) {
+      setSenderPhone(normalizePhoneInput(accountUser.phone));
+    }
+  }, [accountUser, senderPhone]);
 
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('+224');

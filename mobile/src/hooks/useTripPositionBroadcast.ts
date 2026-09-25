@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 import { activeTripStorage } from '@/services/storage/activeTripStorage';
 import { tripsApi } from '@/services/api/trips.api';
 import { TRIP_LOCATION_TASK } from '@/tasks/tripLocationTask';
+import { OCEAN } from '@/theme/ocean';
 
 const FOREGROUND_INTERVAL_MS = 10_000;
 
@@ -55,7 +56,7 @@ export function useTripPositionBroadcast(tripId: string, isActive: boolean) {
             foregroundService: {
               notificationTitle: 'Trajet en cours',
               notificationBody: 'Votre position est partagée avec le passager.',
-              notificationColor: '#4F46E5',
+              notificationColor: OCEAN.base,
             },
           });
         }
