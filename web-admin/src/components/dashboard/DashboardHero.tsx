@@ -38,8 +38,6 @@ export function DashboardHero() {
   const window = useMemo(() => windowForPeriod(period), [period]);
   const { data: series, isLoading: seriesLoading } = useRevenueTimeSeries(window.granularity, window.from, window.to);
 
-  const trend = summary ? trendPercent(Number(summary.current.totalCommission), Number(summary.previous.totalCommission)) : null;
-
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary-dark p-5 text-white shadow-xl shadow-primary-dark/30 sm:p-6">
       <IconCoinFilled size={110} className="pointer-events-none absolute -right-4 -top-4 text-white/10" />
@@ -66,22 +64,54 @@ export function DashboardHero() {
       ) : (
         <>
           <p className="text-xs font-medium text-white/75 sm:text-sm">Commissions — {PERIOD_LABELS[period].tab.toLowerCase()} en cours</p>
-          <div className="mt-1 flex flex-wrap items-baseline gap-2">
-            <p className="text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">{formatMoney(summary.current.totalCommission)}</p>
-            {trend !== null ? (
-              <span
-                className={`flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                  trend >= 0 ? 'bg-success-light text-success-dark' : 'bg-danger-light text-danger-dark'
-                }`}
-              >
-                {trend >= 0 ? <IconArrowUpRight size={13} /> : <IconArrowDownRight size={13} />}
-                {Math.abs(trend)} %
-              </span>
-            ) : null}
+
+          {/* Une carte par devise active (GNF, XOF…), toujours côte à côte
+              même sur le plus petit mobile — jamais une somme des deux,
+              qui mélangerait des unités différentes sans signification. */}
+          <div className="mt-2 grid grid-cols-2 gap-2.5 sm:gap-3">
+            {summary.current.byCurrency.map((figures, index) => {
+              const previousFigures = summary.previous.byCurrency.find((item) => item.currencyId === figures.currencyId);
+              const trend = previousFigures
+                ? trendPercent(Number(figures.totalCommission), Number(previousFigures.totalCommission))
+                : null;
+
+              return (
+                <div
+                  key={figures.currencyId}
+                  className="animate-in rounded-xl border border-white/15 bg-white/10 p-3 opacity-0 shadow-lg shadow-primary-dark/20 backdrop-blur-sm sm:rounded-2xl sm:p-4"
+                  style={{ animationDelay: `${index * 80}ms` }}
+                >
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-white/60 sm:text-xs">{figures.isoCode}</p>
+                  <div className="mt-0.5 flex flex-wrap items-baseline gap-1.5">
+                    <p className="text-xl font-bold tracking-tight tabular-nums sm:text-2xl">
+                      {formatMoney(figures.totalCommission, figures.isoCode)}
+                    </p>
+                    {trend !== null ? (
+                      <span
+                        className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold sm:text-xs ${
+                          trend >= 0 ? 'bg-success-light text-success-dark' : 'bg-danger-light text-danger-dark'
+                        }`}
+                      >
+                        {trend >= 0 ? <IconArrowUpRight size={11} /> : <IconArrowDownRight size={11} />}
+                        {Math.abs(trend)} %
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-white/60 sm:text-xs">
+                    {formatMoney(previousFigures?.totalCommission ?? '0', figures.isoCode)} {PERIOD_LABELS[period].sublabel}
+                  </p>
+                  <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:gap-1.5">
+                    <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-medium sm:px-3 sm:py-1 sm:text-[11px]">
+                      Trajets : {formatMoney(figures.bookingCommission, figures.isoCode)}
+                    </span>
+                    <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-medium sm:px-3 sm:py-1 sm:text-[11px]">
+                      Envois : {formatMoney(figures.shipmentCommission, figures.isoCode)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <p className="text-xs text-white/60 sm:text-sm">
-            {formatMoney(summary.previous.totalCommission)} {PERIOD_LABELS[period].sublabel}
-          </p>
 
           {seriesLoading || !series ? (
             <div className="mt-3 h-6 w-1/2 animate-pulse rounded bg-white/10" />
@@ -90,15 +120,6 @@ export function DashboardHero() {
               <RevenueChart points={series} granularity={window.granularity} />
             </div>
           ) : null}
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-medium backdrop-blur-sm sm:text-xs">
-              Trajets : {formatMoney(summary.current.bookingCommission)}
-            </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-medium backdrop-blur-sm sm:text-xs">
-              Envois : {formatMoney(summary.current.shipmentCommission)}
-            </span>
-          </div>
         </>
       )}
     </div>

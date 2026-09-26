@@ -57,6 +57,22 @@ export class DashboardsController {
     );
   }
 
+  @Permissions(PERMISSIONS.DASHBOARD_ADMIN_READ)
+  @Get('admin/activity-time-series')
+  getActivityTimeSeries(@Query() query: RevenueTimeSeriesDto) {
+    return this.adminDashboard.getActivityTimeSeries(
+      query.granularity,
+      new Date(query.from),
+      new Date(query.to),
+    );
+  }
+
+  @Permissions(PERMISSIONS.DASHBOARD_ADMIN_READ)
+  @Get('admin/top-routes')
+  getTopRoutes() {
+    return this.adminDashboard.getTopRoutes();
+  }
+
   /** Commissions filtrées par période préréglée (semaine/mois/trimestre/année), avec comparaison à la période précédente. */
   @Permissions(PERMISSIONS.DASHBOARD_ADMIN_READ)
   @Get('admin/commission-summary')

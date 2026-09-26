@@ -66,7 +66,7 @@ function TripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
         </View>
         <View style={styles.priceBlock}>
           <AppText variant="lg" weight="bold" color={OCEAN.deep}>
-            {formatMoney(trip.pricePerSeat)}
+            {formatMoney(trip.customerPricePerSeat ?? trip.pricePerSeat)}
           </AppText>
           <AppText variant="xs" color="textSecondary">
             par place

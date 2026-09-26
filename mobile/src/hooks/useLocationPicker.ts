@@ -188,9 +188,15 @@ export function useLocationPicker(onPicked: (location: TripLocation) => void) {
             }
           : { geocodeTrust: 'MANUAL' as const }),
       });
-      refreshSaved();
+      // onPicked (qui déclenche router.back()) part en premier — comme dans
+      // pickSaved. refreshSaved() invalide une requête et peut donc
+      // provoquer un nouveau rendu du champ de recherche (resté monté,
+      // juste masqué) ; le faire avant la navigation a déjà produit un
+      // écran noir au retour sur Android, la transition et ce nouveau
+      // rendu se chevauchant sur un écran encore techniquement monté.
       onPicked(location);
       reset();
+      refreshSaved();
     } catch (error) {
       setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
     } finally {

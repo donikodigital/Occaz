@@ -6,10 +6,11 @@ import { BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { BookingStatus, CancellationInitiator, Prisma, ServiceType, TripStatus } from '@prisma/client';
+import { BookingStatus, CancellationInitiator, NotificationChannel, NotificationType, Prisma, ServiceType, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
 import { PromoCodesService } from '../promo-codes/promo-codes.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { BookingCancelledEvent, DOMAIN_EVENTS } from '../common/events/domain-events';
@@ -46,6 +47,7 @@ export class BookingsService {
     private readonly pricing: PricingService,
     private readonly eventEmitter: EventEmitter2,
     private readonly promoCodes: PromoCodesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findOne(id: string) {
@@ -185,7 +187,7 @@ export class BookingsService {
 
     const trip = await this.prisma.trip.findUniqueOrThrow({
       where: { id: booking.tripId },
-      include: { originCity: true },
+      include: { originCity: true, destinationCity: true, driver: true },
     });
     const refundEligiblePercentage = await this.computeCustomerRefundPercentage(trip);
 
@@ -212,6 +214,22 @@ export class BookingsService {
       DOMAIN_EVENTS.BOOKING_CANCELLED,
       new BookingCancelledEvent(id, reason, refundEligiblePercentage),
     );
+
+    // Seulement si le chauffeur avait déjà été informé de cette réservation
+    // (PAID/CONFIRMED — voir PaymentsService.handleCaptured) : une
+    // réservation encore PENDING_PAYMENT ne lui a jamais été signalée, pas
+    // la peine de le prévenir de l'annulation de quelque chose qu'il ne
+    // savait pas exister.
+    if (booking.status !== BookingStatus.PENDING_PAYMENT) {
+      await this.notifications.notify({
+        userId: trip.driver.userId,
+        type: NotificationType.STATUS_CHANGE,
+        channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+        fallbackTitle: 'Réservation annulée',
+        fallbackBody: `Une réservation de ${booking.seatsCount} place${booking.seatsCount > 1 ? 's' : ''} a été annulée sur votre trajet ${trip.originCity.name} → ${trip.destinationCity.name}.`,
+        pushData: { type: 'STATUS_CHANGE', tripId: trip.id, bookingId: id },
+      });
+    }
 
     return { ...updated, refundEligiblePercentage };
   }
@@ -248,7 +266,7 @@ export class BookingsService {
         tripId,
         status: { in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED] },
       },
-      select: { id: true },
+      select: { id: true, status: true, seatsCount: true, customer: { select: { userId: true } } },
     });
     if (affectedBookings.length === 0) return;
 
@@ -268,6 +286,31 @@ export class BookingsService {
         new BookingCancelledEvent(booking.id, reason, 100),
       );
     }
+
+    // Le passager le plus concerné de toute la plateforme : son trajet
+    // n'aura pas lieu. Averti même s'il n'avait pas encore payé
+    // (PENDING_PAYMENT) — contrairement à l'annulation d'une seule
+    // réservation par le client, ici c'est le trajet entier qui disparaît,
+    // il doit le savoir dans tous les cas pour ne pas se présenter au
+    // point de départ pour rien.
+    const trip = await this.prisma.trip.findUnique({
+      where: { id: tripId },
+      include: { originCity: true, destinationCity: true },
+    });
+    if (!trip) return;
+
+    await Promise.all(
+      affectedBookings.map((booking) =>
+        this.notifications.notify({
+          userId: booking.customer.userId,
+          type: NotificationType.STATUS_CHANGE,
+          channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],
+          fallbackTitle: 'Trajet annulé',
+          fallbackBody: `Le trajet ${trip.originCity.name} → ${trip.destinationCity.name} du ${trip.departureAt.toLocaleDateString('fr-FR')} a été annulé par le chauffeur. Vous êtes remboursé intégralement.`,
+          pushData: { type: 'STATUS_CHANGE', tripId },
+        }),
+      ),
+    );
   }
 
   /**

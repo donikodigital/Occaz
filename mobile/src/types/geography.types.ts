@@ -6,6 +6,7 @@ export interface Country {
   phoneCode: string;
   isActive: boolean;
   isCrossBorderEnabled: boolean;
+  defaultCurrencyId: string | null;
 }
 
 export interface City {

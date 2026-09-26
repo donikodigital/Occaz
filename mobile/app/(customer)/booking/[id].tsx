@@ -158,27 +158,11 @@ export default function BookingDetailScreen() {
         </OceanSection>
       ) : null}
 
-      <OceanSection icon={<IconCash size={17} color={OCEAN.base} />} title="Détail du prix">
+      <OceanSection icon={<IconCash size={17} color={OCEAN.base} />} title="Montant">
         <View style={styles.priceRows}>
-          <View style={styles.priceRow}>
-            <AppText variant="sm" color="textSecondary">
-              {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
-            </AppText>
-            <AppText variant="sm" weight="semibold">
-              {formatMoney((Number(booking.pricePerSeat) * booking.seatsCount).toString())}
-            </AppText>
-          </View>
-          <View style={styles.priceRow}>
-            <AppText variant="sm" color="textSecondary">
-              Frais de service
-            </AppText>
-            <AppText variant="sm" weight="semibold">
-              {formatMoney(booking.platformFee)}
-            </AppText>
-          </View>
           <View style={styles.totalRow}>
             <AppText variant="base" weight="bold">
-              Total
+              {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
             </AppText>
             <AppText variant="lg" weight="bold" color={OCEAN.deep}>
               {formatMoney(booking.totalAmount)}

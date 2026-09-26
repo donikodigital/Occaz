@@ -33,7 +33,10 @@ export default function NewBookingScreen() {
   }
 
   const maxSeats = Math.min(trip.availableSeats, 8);
-  const baseAmount = Number(trip.pricePerSeat) * seatsCount;
+  // Le prix client (commission incluse) — jamais le prix brut du
+  // chauffeur, qui ne regarde ni le client ni cet écran.
+  const customerPricePerSeat = Number(trip.customerPricePerSeat ?? trip.pricePerSeat);
+  const totalAmount = customerPricePerSeat * seatsCount;
 
   function adjustSeats(delta: number) {
     const next = Math.min(maxSeats, Math.max(1, seatsCount + delta));
@@ -96,7 +99,7 @@ export default function NewBookingScreen() {
           {trip.originCity.name} → {trip.destinationCity.name}
         </AppText>
         <AppText variant="base" weight="medium">
-          {trip.driver.firstName} {trip.driver.lastName[0]}. · {formatMoney(trip.pricePerSeat)} / place
+          {trip.driver.firstName} {trip.driver.lastName[0]}. · {formatMoney(String(customerPricePerSeat))} / place
         </AppText>
       </Card>
 
@@ -145,21 +148,31 @@ export default function NewBookingScreen() {
         Code promo
       </AppText>
       <View style={styles.promoField}>
-        <PromoCodeField serviceType="TRIP" amount={String(baseAmount)} appliedCode={promoCode} onChange={setPromoCode} />
+        <PromoCodeField serviceType="TRIP" amount={String(totalAmount)} appliedCode={promoCode} onChange={setPromoCode} />
       </View>
 
       <Card style={styles.priceCard}>
         <View style={styles.priceRow}>
-          <AppText variant="sm" color="textSecondary">
-            {formatMoney(trip.pricePerSeat)} × {seatsCount}
+          <AppText variant="base" weight="semibold">
+            Total à payer
           </AppText>
-          <AppText variant="sm">{formatMoney(String(baseAmount))}</AppText>
+          <AppText variant="lg" weight="bold">
+            {formatMoney(String(totalAmount))}
+          </AppText>
         </View>
-        <Divider />
-        <AppText variant="xs" color="textMuted">
-          Les frais de service sont calculés à l'étape suivante, avant paiement
-          {promoCode ? ' — votre code promo y sera appliqué' : ''}.
-        </AppText>
+        {seatsCount > 1 ? (
+          <AppText variant="xs" color="textMuted">
+            {formatMoney(String(customerPricePerSeat))} × {seatsCount} place{seatsCount > 1 ? 's' : ''}
+          </AppText>
+        ) : null}
+        {promoCode ? (
+          <>
+            <Divider />
+            <AppText variant="xs" color="textMuted">
+              Votre code promo sera appliqué à la confirmation.
+            </AppText>
+          </>
+        ) : null}
       </Card>
 
       {errorMessage ? (

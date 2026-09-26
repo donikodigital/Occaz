@@ -67,7 +67,7 @@ export default function TripDetailScreen() {
               Prix par place
             </AppText>
             <AppText variant="lg" weight="bold" color={OCEAN.deep}>
-              {formatMoney(trip.pricePerSeat)}
+              {formatMoney(trip.customerPricePerSeat ?? trip.pricePerSeat)}
             </AppText>
           </View>
           <OceanButton

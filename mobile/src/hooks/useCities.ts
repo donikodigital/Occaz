@@ -17,3 +17,12 @@ export function useCountries() {
     staleTime: 5 * 60_000,
   });
 }
+
+export function useCity(cityId: string | null) {
+  return useQuery({
+    queryKey: ['cities', cityId],
+    queryFn: () => geographyApi.getCity(cityId as string),
+    enabled: Boolean(cityId),
+    staleTime: 5 * 60_000,
+  });
+}

@@ -9,12 +9,18 @@ interface PeriodWindow {
   end: Date;
 }
 
-interface CommissionFigures {
-  from: string;
-  to: string;
+interface CommissionFiguresByCurrency {
+  currencyId: string;
+  isoCode: string;
   bookingCommission: string;
   shipmentCommission: string;
   totalCommission: string;
+}
+
+interface CommissionFigures {
+  from: string;
+  to: string;
+  byCurrency: CommissionFiguresByCurrency[];
 }
 
 export interface CommissionSummaryResult {
@@ -30,6 +36,13 @@ export interface CommissionSummaryResult {
  * ne pas modifier un service existant (convention projet). getOverview()
  * reste la source du cumul total depuis le début ; ceci ne couvre qu'une
  * fenêtre glissante.
+ *
+ * Une commission est toujours regroupée par devise, jamais additionnée
+ * entre devises différentes (1 GNF ≠ 1 XOF) — même principe que
+ * ExchangeRateService. Toutes les devises actives apparaissent dans le
+ * résultat, même à 0, pour que l'admin voie que le XOF est bien suivi
+ * dès qu'un trajet transfrontalier existe, pas seulement une fois qu'il
+ * y a du volume.
  */
 @Injectable()
 export class CommissionSummaryService {
@@ -40,24 +53,31 @@ export class CommissionSummaryService {
     const current = this.windowFor(period, now);
     const previous = this.previousWindowFor(period, current.start);
 
+    const currencies = await this.prisma.currency.findMany();
+
     const [currentFigures, previousFigures] = await Promise.all([
-      this.figuresFor(current),
-      this.figuresFor(previous),
+      this.figuresFor(current, currencies),
+      this.figuresFor(previous, currencies),
     ]);
 
     return { period, current: currentFigures, previous: previousFigures };
   }
 
-  private async figuresFor(window: PeriodWindow): Promise<CommissionFigures> {
-    const [bookingAgg, shipmentAgg] = await Promise.all([
-      this.prisma.booking.aggregate({
+  private async figuresFor(
+    window: PeriodWindow,
+    currencies: { id: string; isoCode: string }[],
+  ): Promise<CommissionFigures> {
+    const [bookingsByCurrency, shipmentsByCurrency] = await Promise.all([
+      this.prisma.booking.groupBy({
+        by: ['currencyId'],
         where: {
           status: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
           createdAt: { gte: window.start, lt: window.end },
         },
         _sum: { platformFee: true },
       }),
-      this.prisma.shipment.aggregate({
+      this.prisma.shipment.groupBy({
+        by: ['currencyId'],
         where: {
           status: { notIn: [ShipmentStatus.CREATED, ShipmentStatus.CANCELLED] },
           createdAt: { gte: window.start, lt: window.end },
@@ -66,16 +86,27 @@ export class CommissionSummaryService {
       }),
     ]);
 
-    const bookingCommission = bookingAgg._sum.platformFee ?? 0n;
-    const shipmentCommission = shipmentAgg._sum.platformFee ?? 0n;
+    type GroupedFeeRow = { currencyId: string; _sum: { platformFee: bigint | null } };
+    const bookingByCurrencyId = new Map<string, bigint>(
+      (bookingsByCurrency as GroupedFeeRow[]).map((row) => [row.currencyId, row._sum.platformFee ?? 0n]),
+    );
+    const shipmentByCurrencyId = new Map<string, bigint>(
+      (shipmentsByCurrency as GroupedFeeRow[]).map((row) => [row.currencyId, row._sum.platformFee ?? 0n]),
+    );
 
-    return {
-      from: window.start.toISOString(),
-      to: window.end.toISOString(),
-      bookingCommission: bookingCommission.toString(),
-      shipmentCommission: shipmentCommission.toString(),
-      totalCommission: (bookingCommission + shipmentCommission).toString(),
-    };
+    const byCurrency: CommissionFiguresByCurrency[] = currencies.map((currency) => {
+      const bookingCommission = bookingByCurrencyId.get(currency.id) ?? 0n;
+      const shipmentCommission = shipmentByCurrencyId.get(currency.id) ?? 0n;
+      return {
+        currencyId: currency.id,
+        isoCode: currency.isoCode,
+        bookingCommission: bookingCommission.toString(),
+        shipmentCommission: shipmentCommission.toString(),
+        totalCommission: (bookingCommission + shipmentCommission).toString(),
+      };
+    });
+
+    return { from: window.start.toISOString(), to: window.end.toISOString(), byCurrency };
   }
 
   /** Début de la période courante (minuit, heure serveur) jusqu'à maintenant. */

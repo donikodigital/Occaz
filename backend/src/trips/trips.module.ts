@@ -18,6 +18,7 @@ import { PricingModule } from '../pricing/pricing.module';
 import { OtpModule } from '../otp/otp.module';
 import { WalletsModule } from '../wallets/wallets.module';
 import { PromoCodesModule } from '../promo-codes/promo-codes.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
  * Trip, Booking et TripOtp partagent un seul module : Booking ne peut pas
@@ -35,6 +36,7 @@ import { PromoCodesModule } from '../promo-codes/promo-codes.module';
     OtpModule,
     WalletsModule,
     PromoCodesModule,
+    NotificationsModule,
   ],
   controllers: [TripsController, BookingsController],
   providers: [TripsService, BookingsService, TripOtpService, BookingExpiryService, TripExpiryService],

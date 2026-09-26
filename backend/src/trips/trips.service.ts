@@ -5,13 +5,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { BookingStatus, CancellationInitiator, Prisma, TripStatus } from '@prisma/client';
+import {
+  BookingStatus,
+  CancellationInitiator,
+  NotificationChannel,
+  NotificationType,
+  Prisma,
+  ServiceType,
+  TripStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import { LocationsService } from '../locations/locations.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { PricingService } from '../pricing/pricing.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { toMoneyBigInt } from '../common/utils/money.util';
@@ -44,6 +53,7 @@ export class TripsService {
     private readonly driverProfilesService: DriverProfilesService,
     private readonly bookingsService: BookingsService,
     private readonly pricing: PricingService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findOne(id: string) {
@@ -60,7 +70,37 @@ export class TripsService {
       },
     });
     if (!trip) throw new NotFoundException('Trajet introuvable.');
-    return trip;
+    return this.withCustomerPrice(trip);
+  }
+
+  /**
+   * Ajoute customerPricePerSeat (pricePerSeat + commission plateforme) à
+   * CÔTÉ de pricePerSeat, jamais à sa place : le client ne doit jamais
+   * voir le prix brut fixé par le chauffeur, seulement ce qu'il paiera
+   * lui-même ; le chauffeur, lui, continue de lire pricePerSeat tel
+   * quel sur ses propres écrans — c'est sa propre saisie, personne ne la
+   * lui reformule. GET /trips/:id sert les deux publics à la fois, d'où
+   * cet ajout plutôt qu'une transformation du champ existant.
+   */
+  private async withCustomerPrice<T extends { pricePerSeat: bigint; originCity: { countryId: string } }>(
+    trip: T,
+  ): Promise<T & { customerPricePerSeat: bigint }> {
+    const fee = await this.pricing.computeCommission({
+      serviceType: ServiceType.TRIP,
+      countryId: trip.originCity.countryId,
+      baseAmount: trip.pricePerSeat,
+    });
+    return { ...trip, customerPricePerSeat: trip.pricePerSeat + fee };
+  }
+
+  private async withCustomerPriceList<T extends { pricePerSeat: bigint; originCity: { countryId: string } }>(
+    trips: T[],
+  ): Promise<(T & { customerPricePerSeat: bigint })[]> {
+    const results: (T & { customerPricePerSeat: bigint })[] = [];
+    for (const trip of trips) {
+      results.push(await this.withCustomerPrice(trip));
+    }
+    return results;
   }
 
   /** Lève une exception si `driverId` n'est pas le propriétaire du trajet. */
@@ -221,10 +261,29 @@ export class TripsService {
     if (trip.status !== TripStatus.PUBLISHED) {
       throw new BadRequestException('Seul un trajet PUBLISHED peut passer à "chauffeur arrivé".');
     }
-    return this.prisma.trip.update({
+    const updated = await this.prisma.trip.update({
       where: { id },
       data: { status: TripStatus.DRIVER_ARRIVED },
     });
+
+    const activeBookings = await this.prisma.booking.findMany({
+      where: { tripId: id, status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] } },
+      select: { customer: { select: { userId: true } } },
+    });
+    await Promise.all(
+      activeBookings.map((booking) =>
+        this.notifications.notify({
+          userId: booking.customer.userId,
+          type: NotificationType.DEPARTURE_IMMINENT,
+          channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+          fallbackTitle: 'Le chauffeur est arrivé',
+          fallbackBody: `Votre chauffeur vous attend au point de départ de ${trip.originCity.name} → ${trip.destinationCity.name}.`,
+          pushData: { type: 'DEPARTURE_IMMINENT', tripId: id },
+        }),
+      ),
+    );
+
+    return updated;
   }
 
   /** Démarre le trajet — au moins un passager doit déjà avoir été pris en charge (OTP départ vérifié). */
@@ -469,7 +528,7 @@ export class TripsService {
       }),
       this.prisma.trip.count({ where }),
     ]);
-    return new PaginatedResult(data, total, dto.page, dto.limit);
+    return new PaginatedResult(await this.withCustomerPriceList(data), total, dto.page, dto.limit);
   }
 
   /**
@@ -514,7 +573,7 @@ export class TripsService {
     // requête sans LIMIT/OFFSET ; approximé ici par la taille de la page
     // courante pour éviter de doubler le coût de la requête PostGIS à
     // chaque appel. À affiner si la pagination profonde devient un besoin réel.
-    return new PaginatedResult(trips, trips.length + offset, dto.page, dto.limit);
+    return new PaginatedResult(await this.withCustomerPriceList(trips), trips.length + offset, dto.page, dto.limit);
   }
 
   private async getSearchRadiusKm(): Promise<number> {

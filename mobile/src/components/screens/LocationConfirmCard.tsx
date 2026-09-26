@@ -6,7 +6,7 @@
 // que si la détection échoue ou si l'utilisateur veut la corriger.
 
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { IconArrowLeft, IconMapPin, IconPencil } from '@tabler/icons-react-native';
 import { AppText, Button, TextField } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
@@ -139,7 +139,15 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
 
       <Button
         label="Confirmer l'adresse"
-        onPress={picker.confirm}
+        onPress={() => {
+          // Le champ « Nom du lieu » a souvent encore le focus ici (voir
+          // capture) : fermer le clavier avant l'appel réseau, plutôt que
+          // de le laisser encore ouvert/en fermeture au moment du
+          // router.back() qui suit, a déjà produit un écran noir au
+          // retour sur Android.
+          Keyboard.dismiss();
+          picker.confirm();
+        }}
         loading={picker.isSubmitting || isDetecting}
         style={styles.submit}
       />

@@ -8,3 +8,10 @@ export function useAdminDashboard() {
     queryFn: () => dashboardsApi.getAdminOverview(),
   });
 }
+
+export function useTopRoutes() {
+  return useQuery({
+    queryKey: ['dashboards', 'admin', 'top-routes'],
+    queryFn: () => dashboardsApi.getTopRoutes(),
+  });
+}

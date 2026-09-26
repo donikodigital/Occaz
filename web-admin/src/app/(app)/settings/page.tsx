@@ -47,6 +47,7 @@ const VALUE_TYPE_OPTIONS: { value: ValueType; label: string }[] = [
 const DOMAIN_LABELS: Record<string, string> = {
   trip: 'Trajets',
   shipment: 'Envois',
+  exchange_rate: 'Taux de change',
 };
 
 // ---------------------------------------------------------------------------

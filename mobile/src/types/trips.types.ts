@@ -79,6 +79,13 @@ export interface Trip {
   maxShipmentWeightKg: number | null;
   availableShipmentWeightKg: number | null;
   pricePerSeat: Money;
+  /**
+   * Prix affiché au client (pricePerSeat + commission plateforme) —
+   * présent sur les réponses côté client (recherche, détail avant
+   * réservation). Absent sur GET /trips/mine (vue chauffeur), qui doit
+   * continuer d'afficher pricePerSeat tel quel : sa propre saisie.
+   */
+  customerPricePerSeat?: Money;
   currencyId: string;
   notes: string | null;
   stops?: TripStop[];

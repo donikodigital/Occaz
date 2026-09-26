@@ -49,6 +49,7 @@ import {
   useUpdateCurrency,
 } from '@/hooks/useGeography';
 import { ApiError } from '@/services/api/ApiError';
+import { plural } from '@/utils/text';
 import type { City, Country, Currency } from '@/types/geography.types';
 
 // ---------------------------------------------------------------------------
@@ -60,10 +61,6 @@ function isoToFlagEmoji(isoCode: string): string {
   return isoCode
     .toUpperCase()
     .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
-}
-
-function plural(count: number, singular: string): string {
-  return count > 1 ? `${singular}s` : singular;
 }
 
 // Accepte ce que copie Google Maps ("9.5370, -13.6773") ainsi que les

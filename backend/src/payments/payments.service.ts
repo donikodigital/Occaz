@@ -235,7 +235,7 @@ export class PaymentsService {
     if (payment.bookingId) {
       const booking = await this.prisma.booking.findUniqueOrThrow({
         where: { id: payment.bookingId },
-        include: { trip: true, customer: true },
+        include: { trip: { include: { driver: true, originCity: true, destinationCity: true } }, customer: true },
       });
       await this.bookingsService.confirmPayment(booking.id);
       await this.wallets.holdBookingRevenue({
@@ -255,6 +255,14 @@ export class PaymentsService {
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: 'Paiement confirmé',
         fallbackBody: 'Votre paiement a été confirmé — votre réservation est validée.',
+      });
+      await this.notifications.notify({
+        userId: booking.trip.driver.userId,
+        type: NotificationType.BOOKING,
+        channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+        fallbackTitle: 'Nouvelle réservation',
+        fallbackBody: `${booking.seatsCount} place${booking.seatsCount > 1 ? 's' : ''} réservée${booking.seatsCount > 1 ? 's' : ''} sur votre trajet ${booking.trip.originCity.name} → ${booking.trip.destinationCity.name}.`,
+        pushData: { type: 'BOOKING', tripId: booking.trip.id, bookingId: booking.id },
       });
       await this.notifyReferralOfFirstPayment(booking.customer.userId);
     }

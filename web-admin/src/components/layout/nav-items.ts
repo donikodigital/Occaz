@@ -2,6 +2,7 @@
 // [22/09/2026] v+ — getQuickLinks() retiré : la barre du bas mobile a été supprimée, toute la navigation mobile passe par le tiroir de la Sidebar.
 import {
   IconAlertTriangle,
+  IconArrowsExchange,
   IconBooks,
   IconCash,
   IconCreditCard,
@@ -56,6 +57,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/payment-providers', label: 'Moyens de paiement', icon: IconCreditCard },
       { href: '/payouts', label: 'Retraits', icon: IconWallet },
       { href: '/pricing', label: 'Tarification', icon: IconCash },
+      { href: '/exchange-rates', label: 'Taux de change', icon: IconArrowsExchange },
     ],
   },
   {

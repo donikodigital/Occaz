@@ -8,4 +8,6 @@ export const geographyApi = {
 
   searchCities: (params: { countryId?: string; search?: string; page?: number; limit?: number }) =>
     api.get<Paginated<City>>('/cities', { query: params }),
+
+  getCity: (id: string) => api.get<City>(`/cities/${id}`),
 };

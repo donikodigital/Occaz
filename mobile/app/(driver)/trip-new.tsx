@@ -40,6 +40,7 @@ import { LocationAutocompleteField } from '@/components/screens/LocationAutocomp
 import { colors, radius, spacing } from '@/theme';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useCurrencies } from '@/hooks/useCurrencies';
+import { useCity, useCountries } from '@/hooks/useCities';
 import { useCreateTrip } from '@/hooks/useDriverTrips';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -87,6 +88,7 @@ export default function NewTripScreen() {
   const [totalSeats, setTotalSeats] = useState(3);
   const [pricePerSeat, setPricePerSeat] = useState('');
   const [currencyId, setCurrencyId] = useState<string | null>(null);
+  const [isCurrencyTouched, setIsCurrencyTouched] = useState(false);
   const [allowsShipments, setAllowsShipments] = useState(true);
   const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
@@ -94,6 +96,8 @@ export default function NewTripScreen() {
 
   const { data: vehicles } = useMyVehicles();
   const { data: currencies } = useCurrencies();
+  const { data: originCity } = useCity(origin?.cityId ?? null);
+  const { data: countries } = useCountries();
   const createTrip = useCreateTrip();
   const { isDesktop } = useResponsive();
 
@@ -109,8 +113,29 @@ export default function NewTripScreen() {
   }, [locationSelection, consumeLocationSelection]);
 
   React.useEffect(() => {
-    if (!currencyId && currencies && currencies.length > 0) setCurrencyId(currencies[0].id);
-  }, [currencies, currencyId]);
+    if (isCurrencyTouched || !currencies || currencies.length === 0) return;
+
+    // Devise de la ville de départ — c'est là que le passager montera et
+    // paiera, donc la devise qu'il attend. Le portefeuille du chauffeur
+    // peut être dans une autre devise (ex. chauffeur guinéen parti au
+    // Sénégal) : la conversion se fait déjà côté serveur au crédit du
+    // portefeuille (ExchangeRateService), ce champ ne fait que refléter
+    // la devise du trajet lui-même.
+    if (originCity && countries) {
+      const country = countries.find((item) => item.id === originCity.countryId);
+      const match = country?.defaultCurrencyId
+        ? currencies.find((item) => item.id === country.defaultCurrencyId)
+        : undefined;
+      if (match) {
+        setCurrencyId(match.id);
+        return;
+      }
+    }
+
+    // Repli tant que la ville de départ n'est pas encore choisie/résolue :
+    // mieux vaut une devise présélectionnée qu'un champ vide.
+    if (!currencyId) setCurrencyId(currencies[0].id);
+  }, [currencies, currencyId, originCity, countries, isCurrencyTouched]);
 
   function openLocation(field: 'trip-origin' | 'trip-destination', title: string) {
     openLocationPicker(field);
@@ -408,7 +433,10 @@ export default function NewTripScreen() {
                         return (
                           <Pressable
                             key={currency.id}
-                            onPress={() => setCurrencyId(currency.id)}
+                            onPress={() => {
+                              setIsCurrencyTouched(true);
+                              setCurrencyId(currency.id);
+                            }}
                             style={[
                               styles.currencyOption,
                               index > 0 && styles.currencyOptionDivider,

@@ -110,7 +110,36 @@ export class DisputesService {
       diff: { reason: dto.reason },
     });
 
+    await this.notifySupportOfNewDispute(dispute.id, dto.reason);
+
     return dispute;
+  }
+
+  /**
+   * Alerte tous les agents avec la permission dispute.read — pas de
+   * portée par pays ici (UserRole en porte une, mais résoudre le pays du
+   * litige ajouterait une requête supplémentaire pour un premier jet ;
+   * mieux vaut alerter un peu trop large que laisser un litige invisible).
+   * Un litige ouvert n'a pas encore d'agent assigné, donc pas de
+   * destinataire unique évident — c'est le rôle qui compte, pas la personne.
+   */
+  private async notifySupportOfNewDispute(disputeId: string, reason: string): Promise<void> {
+    const agents = await this.prisma.user.findMany({
+      where: { userRoles: { some: { role: { permissions: { some: { permission: { key: 'dispute.read' } } } } } } },
+      select: { id: true },
+    });
+    await Promise.all(
+      agents.map((agent) =>
+        this.notifications.notify({
+          userId: agent.id,
+          type: NotificationType.DISPUTE,
+          channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+          fallbackTitle: 'Nouveau litige à traiter',
+          fallbackBody: `Motif : ${reason}`,
+          pushData: { type: 'DISPUTE', disputeId },
+        }),
+      ),
+    );
   }
 
   private async assertOpenerIsParty(userId: string, dto: CreateDisputeDto): Promise<void> {
