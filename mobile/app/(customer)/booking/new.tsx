@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconArrowLeft, IconMinus, IconPlus } from '@tabler/icons-react-native';
-import { AppText, Button, Card, Divider, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, Button, Card, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { PromoCodeField } from '@/components/screens/PromoCodeField';
 import { colors, spacing } from '@/theme';
 import { useTrip } from '@/hooks/useTripSearch';
@@ -21,6 +21,7 @@ export default function NewBookingScreen() {
   const [seatsCount, setSeatsCount] = useState(1);
   const [extraPassengers, setExtraPassengers] = useState<PassengerInput[]>([]);
   const [promoCode, setPromoCode] = useState<string | undefined>();
+  const [promoDiscount, setPromoDiscount] = useState<string | undefined>();
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const createBooking = useCreateBooking();
 
@@ -37,6 +38,8 @@ export default function NewBookingScreen() {
   // chauffeur, qui ne regarde ni le client ni cet écran.
   const customerPricePerSeat = Number(trip.customerPricePerSeat ?? trip.pricePerSeat);
   const totalAmount = customerPricePerSeat * seatsCount;
+  const discountAmount = promoDiscount ? Number(promoDiscount) : 0;
+  const amountDue = Math.max(0, totalAmount - discountAmount);
 
   function adjustSeats(delta: number) {
     const next = Math.min(maxSeats, Math.max(1, seatsCount + delta));
@@ -46,6 +49,14 @@ export default function NewBookingScreen() {
       if (needed <= current.length) return current.slice(0, needed);
       return [...current, ...Array.from({ length: needed - current.length }, () => ({ fullName: '' }))];
     });
+    // Le montant de base change avec le nombre de places — une réduction
+    // déjà validée contre l'ancien montant n'est plus fiable, on la
+    // retire plutôt que d'afficher un total qui ne correspondrait plus
+    // à ce que le serveur calculera réellement à la confirmation.
+    if (promoCode) {
+      setPromoCode(undefined);
+      setPromoDiscount(undefined);
+    }
   }
 
   function updatePassengerName(index: number, fullName: string) {
@@ -148,7 +159,15 @@ export default function NewBookingScreen() {
         Code promo
       </AppText>
       <View style={styles.promoField}>
-        <PromoCodeField serviceType="TRIP" amount={String(totalAmount)} appliedCode={promoCode} onChange={setPromoCode} />
+        <PromoCodeField
+          serviceType="TRIP"
+          amount={String(totalAmount)}
+          appliedCode={promoCode}
+          onChange={(code, discount) => {
+            setPromoCode(code);
+            setPromoDiscount(discount);
+          }}
+        />
       </View>
 
       <Card style={styles.priceCard}>
@@ -157,21 +176,13 @@ export default function NewBookingScreen() {
             Total à payer
           </AppText>
           <AppText variant="lg" weight="bold">
-            {formatMoney(String(totalAmount))}
+            {formatMoney(String(amountDue))}
           </AppText>
         </View>
         {seatsCount > 1 ? (
           <AppText variant="xs" color="textMuted">
             {formatMoney(String(customerPricePerSeat))} × {seatsCount} place{seatsCount > 1 ? 's' : ''}
           </AppText>
-        ) : null}
-        {promoCode ? (
-          <>
-            <Divider />
-            <AppText variant="xs" color="textMuted">
-              Votre code promo sera appliqué à la confirmation.
-            </AppText>
-          </>
         ) : null}
       </Card>
 

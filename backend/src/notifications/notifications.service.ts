@@ -165,4 +165,24 @@ export class NotificationsService {
       data: { readAt: new Date() },
     });
   }
+
+  async remove(id: string, userId: string): Promise<void> {
+    const notification = await this.prisma.notification.findUnique({ where: { id } });
+    if (!notification || notification.userId !== userId) {
+      throw new NotFoundException('Notification introuvable.');
+    }
+    await this.prisma.notification.delete({ where: { id } });
+  }
+
+  /**
+   * Suppression groupée (sélection multiple côté client) — filtrée par
+   * userId dans la clause `where` elle-même plutôt que vérifiée id par
+   * id : un id qui n'appartient pas à l'appelant est silencieusement
+   * ignoré (ni supprimé, ni erreur), jamais une 404 qui bloquerait la
+   * suppression du reste de la sélection.
+   */
+  async removeMany(ids: string[], userId: string): Promise<void> {
+    if (ids.length === 0) return;
+    await this.prisma.notification.deleteMany({ where: { id: { in: ids }, userId } });
+  }
 }

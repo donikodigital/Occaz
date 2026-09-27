@@ -1,6 +1,7 @@
 // backend/src/integrations/email/resend-email.provider.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailProvider } from './email-provider.interface';
+import { renderNotificationEmailHtml } from './email-template';
 
 /**
  * Initialisation différée (même principe que StorageService et
@@ -43,9 +44,7 @@ export class ResendEmailProvider implements EmailProvider {
           to: toEmail,
           subject,
           text: body,
-          // Emballage minimal — préserve les retours à la ligne sans construire
-          // un système de templates HTML complet, hors scope ici.
-          html: `<p style="font-family: sans-serif; white-space: pre-line;">${escapeHtml(body)}</p>`,
+          html: renderNotificationEmailHtml({ title: subject, body }),
         }),
       });
     } catch (error) {
@@ -57,11 +56,4 @@ export class ResendEmailProvider implements EmailProvider {
       throw new Error(`Resend a répondu ${response.status}${detail ? ` : ${detail.slice(0, 300)}` : ''}.`);
     }
   }
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }

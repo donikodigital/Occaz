@@ -24,7 +24,12 @@ export interface PromoCodeFieldProps {
   amount: string | null;
   /** Code effectivement appliqué (vérifié avec succès) — undefined tant qu'aucun code n'est validé. */
   appliedCode: string | undefined;
-  onChange: (code: string | undefined) => void;
+  /**
+   * `discountAmount` en plus quand un code vient d'être validé (le
+   * parent en a besoin pour son propre total affiché — sinon lui seul
+   * sait "code appliqué" sans savoir de combien) ; absent au retrait.
+   */
+  onChange: (code: string | undefined, discountAmount?: string) => void;
 }
 
 export function PromoCodeField({ serviceType, amount, appliedCode, onChange }: PromoCodeFieldProps) {
@@ -42,7 +47,7 @@ export function PromoCodeField({ serviceType, amount, appliedCode, onChange }: P
     validatePromoCode.mutate(
       { code: input.trim().toUpperCase(), serviceType, amount },
       {
-        onSuccess: () => onChange(input.trim().toUpperCase()),
+        onSuccess: (data) => onChange(input.trim().toUpperCase(), data.discountAmount),
         onError: (error) => setErrorMessage(error instanceof ApiError ? error.message : 'Code invalide.'),
       },
     );

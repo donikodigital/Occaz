@@ -134,7 +134,8 @@ export class PricingService {
    * shipment.volumetric_divisor (5000, cm³ par kg),
    * shipment.road_distance_factor (1.3),
    * shipment.declared_value_rate_percent (1),
-   * shipment.declared_value_min_fee (0).
+   * shipment.declared_value_min_fee (0),
+   * shipment.min_distance_km (2).
    */
   async computeShipmentQuote(params: ShipmentQuoteInput): Promise<ShipmentQuote> {
     const [
@@ -146,6 +147,7 @@ export class PricingService {
       roadDistanceFactor,
       declaredValueRatePercent,
       declaredValueMinFee,
+      minDistanceKm,
     ] = await Promise.all([
       this.getNumericSetting('shipment.base_price', 2000),
       this.getNumericSetting('shipment.price_per_kg', 1000),
@@ -155,10 +157,18 @@ export class PricingService {
       this.getNumericSetting('shipment.road_distance_factor', 1.3),
       this.getNumericSetting('shipment.declared_value_rate_percent', 1),
       this.getNumericSetting('shipment.declared_value_min_fee', 0),
+      // Filet pour le seul vrai trou de la détection par ville : deux
+      // adresses saisies à la main, toutes deux dans la même ville, se
+      // rabattent sur le même point (le centre-ville) — distance à vol
+      // d'oiseau nulle, alors qu'une vraie livraison intra-ville a un
+      // coût réel. Le repli "centre de la ville" lui-même (villes
+      // différentes, ou une seule adresse non géolocalisée) reste une
+      // estimation raisonnable et n'a pas besoin de ce plancher.
+      this.getNumericSetting('shipment.min_distance_km', 2),
     ]);
 
     const straightLineKm = await this.computeDistanceKm(params.senderLocationId, params.recipientLocationId);
-    const distanceKm = straightLineKm * roadDistanceFactor;
+    const distanceKm = Math.max(straightLineKm * roadDistanceFactor, minDistanceKm);
 
     // Dimensions données par colis : le volume total est multiplié par la quantité.
     const quantity = Math.max(1, params.quantity ?? 1);

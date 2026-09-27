@@ -25,3 +25,13 @@ export function useMarkAllNotificationsRead() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', 'mine'] }),
   });
 }
+
+export function useDeleteNotifications() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // Un seul id ou plusieurs — un seul appel bulk dans les deux cas,
+    // pas besoin de distinguer suppression simple et groupée côté écran.
+    mutationFn: (ids: string[]) => notificationsApi.removeMany(ids),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', 'mine'] }),
+  });
+}

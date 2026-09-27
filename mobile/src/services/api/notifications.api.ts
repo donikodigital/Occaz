@@ -10,4 +10,8 @@ export const notificationsApi = {
   markRead: (id: string) => api.patch<void>(`/notifications/${id}/read`),
 
   markAllRead: () => api.patch<void>('/notifications/mine/read-all'),
+
+  remove: (id: string) => api.delete<void>(`/notifications/${id}`),
+
+  removeMany: (ids: string[]) => api.post<void>('/notifications/mine/delete-many', { ids }),
 };

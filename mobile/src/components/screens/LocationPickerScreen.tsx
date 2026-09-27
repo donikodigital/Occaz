@@ -10,7 +10,7 @@
 // LocationAutocompleteField).
 
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconX } from '@tabler/icons-react-native';
 import { AppText, IconButton, ScreenContainer } from '@/components/ui';
@@ -19,6 +19,35 @@ import { useLocationPicker, useSearchCountryCodes } from '@/hooks/useLocationPic
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { LocationConfirmCard } from './LocationConfirmCard';
 import { LocationSearchField } from './LocationSearchField';
+
+/**
+ * select-location s'ouvre en `presentation: 'modal'` (voir _layout.tsx) —
+ * fermer un modal pendant que le clavier est encore en train de se
+ * fermer est un cas connu d'écran noir sur Android avec react-native-
+ * screens, pire qu'un simple push/pop. Dismiss keyboard seul (voir
+ * LocationConfirmCard) a réduit le problème sans l'éliminer : selon la
+ * rapidité du réseau, `router.back()` pouvait encore arriver avant la
+ * fin réelle de l'animation de fermeture du clavier. Ici on attend la
+ * confirmation native `keyboardDidHide` — avec un filet de sécurité, au
+ * cas où le clavier était déjà fermé (ex. sélection d'une adresse
+ * enregistrée sans avoir tapé), auquel cas cet événement ne se
+ * déclenche jamais.
+ */
+function waitForKeyboardToClose(maxWaitMs = 300): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      subscription.remove();
+      resolve();
+    };
+    const timeout = setTimeout(finish, maxWaitMs);
+    const subscription = Keyboard.addListener('keyboardDidHide', finish);
+    Keyboard.dismiss();
+  });
+}
 
 export interface LocationPickerScreenProps {
   /**
@@ -38,7 +67,7 @@ export function LocationPickerScreen({ countryCode }: LocationPickerScreenProps)
 
   const picker = useLocationPicker((location) => {
     selectLocation(location);
-    router.back();
+    waitForKeyboardToClose().then(() => router.back());
   });
 
   const isSearchStep = picker.step === 'search';

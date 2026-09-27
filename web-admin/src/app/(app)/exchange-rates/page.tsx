@@ -9,13 +9,23 @@
 //
 // Une seule clé par paire est active à la fois : ExchangeRateService lit
 // d'abord "exchange_rate.a_b", sinon l'inverse de "exchange_rate.b_a".
-// Modifier le sens ici retire l'ancienne clé pour ne jamais en laisser
-// deux contradictoires.
+//
+// v2 — Une carte par SENS (GNF → XOF, et XOF → GNF séparément), pas une
+// carte par paire avec un sens secondaire en "soit environ" : chaque sens
+// mérite sa propre carte, à poids égal. Ancienne version : une bascule
+// "Sens du taux" dans la modale permettait de choisir quel sens éditer,
+// mais changer cette bascule ne recalculait pas la valeur affichée — le
+// champ gardait l'ancien chiffre, qui ne voulait plus rien dire pour le
+// nouveau sens (ex. rebasculer de "1 GNF = 0.062 XOF" vers "1 XOF = ?
+// GNF" laissait "0.062" affiché, alors que la bonne valeur est ≈16.13).
+// Plutôt que de corriger cette bascule, elle est retirée : chaque carte
+// ouvre directement la modale sur SON sens, la modale n'a donc plus
+// besoin de choisir quoi que ce soit.
 
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { IconArrowsExchange, IconEdit, IconTrash } from '@tabler/icons-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { IconArrowRight, IconArrowsExchange, IconEdit, IconTrash } from '@tabler/icons-react';
 import { Button, Modal, TextField } from '@/components/ui';
 import {
   Chip,
@@ -26,7 +36,6 @@ import {
   ListSkeleton,
   Notice,
   PageHero,
-  SegmentedControl,
 } from '@/components/admin/AdminUi';
 import { useCurrencies } from '@/hooks/useGeography';
 import { usePlatformSettings, useRemovePlatformSetting, useUpsertPlatformSetting } from '@/hooks/usePlatformSettings';
@@ -69,6 +78,12 @@ function resolveRate(pair: RatePair, rateSettings: PlatformSetting[]): ResolvedR
   return null;
 }
 
+/** La valeur pour CE sens précis — inversée si le taux est enregistré dans l'autre sens. Jamais "soit environ" : chaque carte n'a qu'un seul chiffre, le sien. */
+function valueFor(resolved: ResolvedRate | null, direction: Direction): number | null {
+  if (!resolved) return null;
+  return resolved.direction === direction ? resolved.value : 1 / resolved.value;
+}
+
 function formatRate(value: number): string {
   return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 6 }).format(value);
 }
@@ -78,12 +93,23 @@ function formatDate(iso: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Carte d'une paire de devises
+// Carte d'un sens précis (ex. GNF → XOF)
 // ---------------------------------------------------------------------------
 
-function PairCard({ pair, resolved, onEdit }: { pair: RatePair; resolved: ResolvedRate | null; onEdit: () => void }) {
-  const fromCurrency = resolved?.direction === 'b_to_a' ? pair.b : pair.a;
-  const toCurrency = resolved?.direction === 'b_to_a' ? pair.a : pair.b;
+function DirectionCard({
+  pair,
+  direction,
+  resolved,
+  onEdit,
+}: {
+  pair: RatePair;
+  direction: Direction;
+  resolved: ResolvedRate | null;
+  onEdit: () => void;
+}) {
+  const fromCurrency = direction === 'a_to_b' ? pair.a : pair.b;
+  const toCurrency = direction === 'a_to_b' ? pair.b : pair.a;
+  const value = valueFor(resolved, direction);
 
   return (
     <button
@@ -93,20 +119,17 @@ function PairCard({ pair, resolved, onEdit }: { pair: RatePair; resolved: Resolv
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Chip tone="primary">{pair.a.isoCode}</Chip>
-          <IconArrowsExchange size={16} className="shrink-0 text-text-muted" />
-          <Chip tone="primary">{pair.b.isoCode}</Chip>
+          <Chip tone="primary">{fromCurrency.isoCode}</Chip>
+          <IconArrowRight size={14} className="shrink-0 text-text-muted" />
+          <Chip tone="primary">{toCurrency.isoCode}</Chip>
         </div>
         <IconEdit size={16} className="shrink-0 text-text-muted transition-colors group-hover:text-primary" />
       </div>
 
-      {resolved ? (
+      {value !== null && resolved ? (
         <div>
           <p className="text-lg font-bold text-text-primary">
-            1 {fromCurrency.isoCode} = {formatRate(resolved.value)} {toCurrency.isoCode}
-          </p>
-          <p className="text-xs text-text-secondary">
-            soit environ 1 {toCurrency.isoCode} ≈ {formatRate(1 / resolved.value)} {fromCurrency.isoCode}
+            1 {fromCurrency.isoCode} = {formatRate(value)} {toCurrency.isoCode}
           </p>
           <p className="mt-2 text-[11px] text-text-muted">Mis à jour le {formatDate(resolved.updatedAt)}</p>
         </div>
@@ -118,37 +141,38 @@ function PairCard({ pair, resolved, onEdit }: { pair: RatePair; resolved: Resolv
 }
 
 // ---------------------------------------------------------------------------
-// Modale d'édition
+// Modale d'édition — un seul sens à la fois, celui de la carte touchée
 // ---------------------------------------------------------------------------
 
 function RateModal({
   open,
   onClose,
   pair,
+  direction,
   resolved,
 }: {
   open: boolean;
   onClose: () => void;
   pair: RatePair | null;
+  direction: Direction | null;
   resolved: ResolvedRate | null;
 }) {
   const upsert = useUpsertPlatformSetting();
   const remove = useRemovePlatformSetting();
 
-  const [direction, setDirection] = useState<Direction>('a_to_b');
   const [raw, setRaw] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
-    setDirection(resolved?.direction ?? 'a_to_b');
-    setRaw(resolved ? String(resolved.value) : '');
+    if (!open || !direction) return;
+    const value = valueFor(resolved, direction);
+    setRaw(value !== null ? String(value) : '');
     setErrorMessage(undefined);
     setConfirmingDelete(false);
-  }, [open, resolved]);
+  }, [open, direction, resolved]);
 
-  if (!pair) return null;
+  if (!pair || !direction) return null;
 
   const fromCurrency = direction === 'a_to_b' ? pair.a : pair.b;
   const toCurrency = direction === 'a_to_b' ? pair.b : pair.a;
@@ -164,8 +188,9 @@ function RateModal({
     }
 
     const newKey = rateKey(fromCurrency.isoCode, toCurrency.isoCode);
-    // Un sens différent de celui déjà enregistré : on retire l'ancienne clé
-    // pour ne jamais laisser deux taux contradictoires actifs pour la même paire.
+    // Le sens édité diffère de celui déjà enregistré (l'autre carte de la
+    // même paire) : on retire l'ancienne clé pour ne jamais laisser deux
+    // taux contradictoires actifs pour la même paire.
     const staleKey = resolved && resolved.key !== newKey ? resolved.key : null;
 
     try {
@@ -196,8 +221,8 @@ function RateModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={`${pair.a.isoCode} ↔ ${pair.b.isoCode}`}
-      description="Un seul sens à renseigner — l'autre se calcule automatiquement."
+      title={`${fromCurrency.isoCode} → ${toCurrency.isoCode}`}
+      description={`L'autre sens (${toCurrency.isoCode} → ${fromCurrency.isoCode}) se calcule automatiquement — inutile de le saisir aussi.`}
       footer={
         confirmingDelete ? (
           <div className="flex flex-1 flex-wrap items-center justify-between gap-2 rounded-2xl bg-danger-light/40 px-4 py-3">
@@ -237,24 +262,12 @@ function RateModal({
       }
     >
       <form id="rate-form" onSubmit={handleSubmit} className="space-y-5">
-        <FormSection title="Sens du taux">
-          <SegmentedControl
-            value={direction}
-            onChange={setDirection}
-            ariaLabel="Sens du taux de change"
-            options={[
-              { value: 'a_to_b', label: `1 ${pair.a.isoCode} = ? ${pair.b.isoCode}` },
-              { value: 'b_to_a', label: `1 ${pair.b.isoCode} = ? ${pair.a.isoCode}` },
-            ]}
-          />
-        </FormSection>
-
         <FormSection title="Taux">
           <TextField
             label={`1 ${fromCurrency.isoCode} =`}
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
-            placeholder={direction === 'a_to_b' ? '0.0142' : '70.4'}
+            placeholder="0.0142"
             hint={`Combien de ${toCurrency.isoCode} pour 1 ${fromCurrency.isoCode}.`}
             inputMode="decimal"
           />
@@ -274,6 +287,7 @@ export default function ExchangeRatesPage() {
   const { data: currencies, isLoading: currenciesLoading, isError: currenciesError } = useCurrencies();
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = usePlatformSettings();
   const [selectedPair, setSelectedPair] = useState<RatePair | null>(null);
+  const [selectedDirection, setSelectedDirection] = useState<Direction | null>(null);
 
   const rateSettings = useMemo(() => (settings ?? []).filter((setting) => setting.key.startsWith('exchange_rate.')), [settings]);
 
@@ -287,6 +301,16 @@ export default function ExchangeRatesPage() {
     }
     return result;
   }, [currencies]);
+
+  function openEditor(pair: RatePair, direction: Direction) {
+    setSelectedPair(pair);
+    setSelectedDirection(direction);
+  }
+
+  function closeEditor() {
+    setSelectedPair(null);
+    setSelectedDirection(null);
+  }
 
   const selectedResolved = selectedPair ? resolveRate(selectedPair, rateSettings) : null;
   const isLoading = currenciesLoading || settingsLoading;
@@ -324,18 +348,23 @@ export default function ExchangeRatesPage() {
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {pairs.map((pair) => (
-            <PairCard
-              key={`${pair.a.id}_${pair.b.id}`}
-              pair={pair}
-              resolved={resolveRate(pair, rateSettings)}
-              onEdit={() => setSelectedPair(pair)}
-            />
-          ))}
+          {pairs.flatMap((pair) => {
+            const resolved = resolveRate(pair, rateSettings);
+            const directions: Direction[] = ['a_to_b', 'b_to_a'];
+            return directions.map((direction) => (
+              <DirectionCard
+                key={`${pair.a.id}_${pair.b.id}_${direction}`}
+                pair={pair}
+                direction={direction}
+                resolved={resolved}
+                onEdit={() => openEditor(pair, direction)}
+              />
+            ));
+          })}
         </div>
       )}
 
-      <RateModal open={selectedPair !== null} onClose={() => setSelectedPair(null)} pair={selectedPair} resolved={selectedResolved} />
+      <RateModal open={selectedPair !== null} onClose={closeEditor} pair={selectedPair} direction={selectedDirection} resolved={selectedResolved} />
     </div>
   );
 }

@@ -15,11 +15,11 @@ function ArticleCard({ article }: { article: Article }) {
   return (
     <Link
       href={`/articles/${article.id}`}
-      className={`group flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 shadow-md transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg ${
+      className={`group flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-surface p-4 shadow-md transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg ${
         article.isActive ? '' : 'opacity-70'
       }`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex min-w-0 items-start gap-3">
         {article.coverImageUrl ? (
           <img src={article.coverImageUrl} alt="" className="h-12 w-12 shrink-0 rounded-2xl object-cover" />
         ) : (
@@ -110,7 +110,7 @@ export default function ArticlesPage() {
           action={<LinkButton href="/articles/new" icon={<IconPlus size={16} />}>Ajouter un article</LinkButton>}
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((article) => (
             <ArticleCard key={article.id} article={article} />
           ))}
