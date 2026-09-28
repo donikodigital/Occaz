@@ -1,10 +1,11 @@
 // mobile/app/(driver)/shipment/[id].tsx
 // [21/09/2026] v2 — gain net et période affichés, téléphones appelables, annulation avant récupération seulement ; l'attribution se fait depuis la liste.
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconCalendarEvent, IconMapPin, IconMessageCircle, IconPhone } from '@tabler/icons-react-native';
+import { IconArrowLeft, IconCalendarEvent, IconMapPin, IconMessageCircle } from '@tabler/icons-react-native';
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { ContactRow } from '@/components/screens/ContactRow';
 import { colors, spacing } from '@/theme';
 import { useShipment, useCancelShipment } from '@/hooks/useShipments';
 import {
@@ -21,23 +22,6 @@ import { driverNetAmount, formatWindow } from '@/utils/shipmentDisplay';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_TONE } from '@/utils/tripStatusLabels';
 import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { ApiError } from '@/services/api/ApiError';
-
-/** Numéro appelable d'un geste : le chauffeur doit joindre l'expéditeur et le destinataire pour la remise. */
-function PhoneRow({ phone }: { phone: string }) {
-  return (
-    <Pressable
-      onPress={() => Linking.openURL(`tel:${phone}`)}
-      accessibilityRole="link"
-      accessibilityLabel={`Appeler le ${phone}`}
-      style={styles.metaRow}
-    >
-      <IconPhone size={12} color={colors.primary} />
-      <AppText variant="xs" color={colors.primary} weight="medium">
-        {phone}
-      </AppText>
-    </Pressable>
-  );
-}
 
 function OtpSection({
   title,
@@ -191,7 +175,7 @@ export default function DriverShipmentDetailScreen() {
           <AppText variant="sm" weight="medium">
             {shipment.senderName}
           </AppText>
-          <PhoneRow phone={shipment.senderPhone} />
+          <ContactRow phone={shipment.senderPhone} />
           <View style={styles.metaRow}>
             <IconMapPin size={12} color={colors.textSecondary} />
             <AppText variant="xs" color="textSecondary" style={{ flex: 1 }}>
@@ -207,7 +191,7 @@ export default function DriverShipmentDetailScreen() {
           <AppText variant="sm" weight="medium">
             {shipment.recipientName}
           </AppText>
-          <PhoneRow phone={shipment.recipientPhone} />
+          <ContactRow phone={shipment.recipientPhone} />
           <View style={styles.metaRow}>
             <IconMapPin size={12} color={colors.textSecondary} />
             <AppText variant="xs" color="textSecondary" style={{ flex: 1 }}>

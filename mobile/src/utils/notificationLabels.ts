@@ -25,4 +25,5 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   SUPPORT_MESSAGE: 'Message du support',
   SHIPMENT_REQUEST: "Nouvelle demande d'envoi",
   SHIPMENT_EXTENSION: 'Prolonger votre envoi',
+  CONVERSATION_MESSAGE: 'Nouveau message',
 };

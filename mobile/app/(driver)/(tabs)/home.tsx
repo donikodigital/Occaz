@@ -53,7 +53,8 @@ import { OCEAN } from '@/theme/ocean';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useMyTrips } from '@/hooks/useDriverTrips';
-import { useMyNotifications } from '@/hooks/useNotifications';
+import { useLatestMessageAlert, useMarkNotificationRead, useMyNotifications } from '@/hooks/useNotifications';
+import { MessageAlertCard } from '@/components/screens/MessageAlertCard';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { getTripMilestoneProgress } from '@/utils/milestones';
 import { formatSeatsAvailability } from '@/utils/seats';
@@ -74,6 +75,8 @@ export default function DriverHomeScreen() {
   // page de notifications (30 les plus récentes). Sous-compte si plus de
   // 30 non lues d'un coup, cas limite acceptable pour un badge d'accueil.
   const { data: notificationsPage } = useMyNotifications(1);
+  const messageAlert = useLatestMessageAlert();
+  const markNotificationRead = useMarkNotificationRead();
 
   const nextTrip = tripsPage?.data.find((trip) => UPCOMING_STATUSES.has(trip.status));
   const unreadCount = notificationsPage?.data.filter((n) => !n.readAt).length ?? 0;
@@ -97,6 +100,24 @@ export default function DriverHomeScreen() {
           onPressNotifications={() => router.push('/(driver)/notifications')}
         />
       </View>
+
+      {messageAlert ? (
+        <View style={styles.alertWrap}>
+          <MessageAlertCard
+            senderName={messageAlert.title ?? 'Nouveau message'}
+            preview={messageAlert.body ?? ''}
+            onPress={() => {
+              markNotificationRead.mutate(messageAlert.id);
+              const conversationId = messageAlert.payload?.conversationId;
+              if (typeof conversationId === 'string') {
+                router.push(`/(driver)/conversation/${conversationId}`);
+              } else {
+                router.push('/(driver)/(tabs)/messages');
+              }
+            }}
+          />
+        </View>
+      ) : null}
 
       {profile && profile.status !== 'VALIDATED' ? (
         <Card style={styles.statusBanner}>
@@ -233,6 +254,9 @@ export default function DriverHomeScreen() {
 const styles = StyleSheet.create({
   header: {
     marginBottom: spacing.lg,
+  },
+  alertWrap: {
+    marginBottom: spacing.md,
   },
   statusBanner: {
     flexDirection: 'row',

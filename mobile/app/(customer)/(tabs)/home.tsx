@@ -30,7 +30,8 @@ import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useAuthStore } from '@/stores/authStore';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
-import { useMyNotifications } from '@/hooks/useNotifications';
+import { useLatestMessageAlert, useMarkNotificationRead, useMyNotifications } from '@/hooks/useNotifications';
+import { MessageAlertCard } from '@/components/screens/MessageAlertCard';
 import { recentSearchesStorage, RecentSearch } from '@/services/storage/recentSearches';
 import { formatDateShort } from '@/utils/date';
 
@@ -46,6 +47,8 @@ export default function CustomerHomeScreen() {
   // Pas d'endpoint compteur dédié — approximation à partir de la première
   // page de notifications, comme sur l'accueil chauffeur.
   const { data: notificationsPage } = useMyNotifications(1);
+  const messageAlert = useLatestMessageAlert();
+  const markNotificationRead = useMarkNotificationRead();
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
 
   // useFocusEffect plutôt qu'un simple useEffect : une recherche faite
@@ -93,6 +96,24 @@ export default function CustomerHomeScreen() {
           onPressNotifications={() => router.push('/(customer)/notifications')}
         />
       </View>
+
+      {messageAlert ? (
+        <View style={styles.alertWrap}>
+          <MessageAlertCard
+            senderName={messageAlert.title ?? 'Nouveau message'}
+            preview={messageAlert.body ?? ''}
+            onPress={() => {
+              markNotificationRead.mutate(messageAlert.id);
+              const conversationId = messageAlert.payload?.conversationId;
+              if (typeof conversationId === 'string') {
+                router.push(`/(customer)/conversation/${conversationId}`);
+              } else {
+                router.push('/(customer)/(tabs)/messages');
+              }
+            }}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.tileRow}>
         <Pressable onPress={openSearch} style={[styles.tile, { backgroundColor: OCEAN.base }]}>
@@ -204,6 +225,9 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: spacing.lg,
+  },
+  alertWrap: {
+    marginBottom: spacing.md,
   },
   tileRow: {
     flexDirection: 'row',

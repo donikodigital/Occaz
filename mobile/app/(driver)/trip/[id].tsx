@@ -34,6 +34,7 @@ import {
   IconUsers,
 } from '@tabler/icons-react-native';
 import { AppText, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { ContactRow } from '@/components/screens/ContactRow';
 import { OceanButton, OceanCard, OceanPill, OceanScreenHeader, OceanSection, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -363,6 +364,8 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
           }
         />
       </View>
+
+      {booking.customerPhone ? <ContactRow phone={booking.customerPhone} style={styles.contactRow} /> : null}
 
       {phase !== 'none' ? (
         <View style={styles.otpPanel}>
@@ -920,6 +923,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  contactRow: {
+    marginTop: spacing.sm,
   },
   avatar: {
     width: 40,

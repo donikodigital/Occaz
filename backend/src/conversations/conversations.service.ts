@@ -1,9 +1,11 @@
 // backend/src/conversations/conversations.service.ts
 // [21/09/2026] v2 — conversation d'un envoi via Shipment.driverId (chauffeur avec ou sans trajet).
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { NotificationChannel, NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /**
  * Section 23 : chat Client <-> Chauffeur, avec possibilité d'intervention
@@ -18,7 +20,10 @@ import { PaginatedResult } from '../common/dto/pagination-response.dto';
  */
 @Injectable()
 export class ConversationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async getOrCreateForBooking(bookingId: string, requesterUserId: string) {
     const booking = await this.prisma.booking.findUnique({
@@ -161,7 +166,7 @@ export class ConversationsService {
       throw new ForbiddenException("Vous n'êtes pas partie à cette conversation.");
     }
 
-    return this.prisma.message.create({
+    const message = await this.prisma.message.create({
       data: {
         conversationId,
         senderId: sender.id,
@@ -169,6 +174,64 @@ export class ConversationsService {
         isSupportIntervention,
       },
     });
+
+    await this.notifyOtherParty(conversation, sender.id, content);
+
+    return message;
+  }
+
+  /**
+   * Alerte push l'autre partie — jamais l'expéditeur lui-même. En push
+   * uniquement (jamais SMS/email) : c'est un message de conversation
+   * ordinaire, pas un événement métier critique — le push suffit pour
+   * l'alerte "à l'écran d'accueil, avec son" demandée côté client. Une
+   * intervention support (l'expéditeur n'est ni le client ni le
+   * chauffeur) prévient les deux parties à la fois.
+   */
+  private async notifyOtherParty(
+    conversation: {
+      id: string;
+      customer: { userId: string; firstName: string };
+      driver: { userId: string; firstName: string };
+    },
+    senderId: string,
+    content: string,
+  ): Promise<void> {
+    const isCustomerSender = senderId === conversation.customer.userId;
+    const isDriverSender = senderId === conversation.driver.userId;
+
+    const recipientUserIds = isCustomerSender
+      ? [conversation.driver.userId]
+      : isDriverSender
+        ? [conversation.customer.userId]
+        : [conversation.customer.userId, conversation.driver.userId];
+
+    const senderName = isCustomerSender
+      ? conversation.customer.firstName
+      : isDriverSender
+        ? conversation.driver.firstName
+        : 'Le support';
+
+    const body = content.length > 140 ? `${content.slice(0, 140)}…` : content;
+
+    await Promise.all(
+      recipientUserIds.map((userId) =>
+        this.notifications.notify({
+          userId,
+          type: NotificationType.CONVERSATION_MESSAGE,
+          channels: [NotificationChannel.PUSH],
+          fallbackTitle: senderName,
+          fallbackBody: body,
+          pushData: { type: 'CONVERSATION_MESSAGE', conversationId: conversation.id },
+          // `pushData` n'est transmis qu'au moment de l'envoi push, jamais
+          // conservé sur la ligne Notification — sans `payload` ici,
+          // l'écran d'accueil (qui interroge GET /notifications/mine plus
+          // tard) n'aurait aucun moyen de savoir vers quelle conversation
+          // ouvrir la carte d'alerte.
+          payload: { conversationId: conversation.id },
+        }),
+      ),
+    );
   }
 
   async findMessages(

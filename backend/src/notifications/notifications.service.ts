@@ -137,17 +137,40 @@ export class NotificationsService {
   // Boîte de réception
   // ---------------------------------------------------------------------
 
+  /**
+   * notify() enregistre une ligne par CANAL (push/email/sms) pour un même
+   * événement (voir dispatchOne ci-dessous) — utile pour suivre l'envoi
+   * de chacun séparément, mais ça faisait apparaître "Chauffeur trouvé"
+   * ou "Paiement confirmé" deux fois dans la liste du client, comme deux
+   * événements distincts. On ne garde que la première ligne par (type,
+   * title, body) créée à quelques secondes d'écart : assez large pour
+   * regrouper les canaux d'un même envoi (partis dans le même
+   * Promise.all), jamais assez pour fusionner deux événements réellement
+   * différents. Pagination faite en mémoire après déduplication plutôt
+   * qu'en base : le volume par utilisateur reste modeste, pas la peine
+   * d'ajouter une colonne de regroupement en base pour l'instant.
+   */
   async findMine(userId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
-    const where = { userId };
-    const [data, total] = await Promise.all([
-      this.prisma.notification.findMany({
-        where,
-        skip: query.skip,
-        take: query.take,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.notification.count({ where }),
-    ]);
+    const rows = await this.prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const DEDUPE_WINDOW_MS = 5_000;
+    const deduped: typeof rows = [];
+    for (const row of rows) {
+      const isDuplicate = deduped.some(
+        (kept) =>
+          kept.type === row.type &&
+          kept.title === row.title &&
+          kept.body === row.body &&
+          Math.abs(kept.createdAt.getTime() - row.createdAt.getTime()) < DEDUPE_WINDOW_MS,
+      );
+      if (!isDuplicate) deduped.push(row);
+    }
+
+    const total = deduped.length;
+    const data = deduped.slice(query.skip, query.skip + query.take);
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 

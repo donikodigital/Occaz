@@ -33,6 +33,41 @@ const TRIP_INCLUDE_FOR_BOOKING = {
 } as const;
 
 /**
+ * Variante de TRIP_INCLUDE_FOR_BOOKING qui charge aussi le téléphone du
+ * chauffeur (via User, DriverProfile n'a pas son propre champ phone) —
+ * seulement là où un numéro peut être révélé (findOne, findAllForTrip),
+ * jamais dans les listes génériques (findAll, admin) qui n'en ont pas
+ * besoin.
+ */
+const TRIP_INCLUDE_WITH_DRIVER_PHONE = {
+  ...TRIP_INCLUDE_FOR_BOOKING,
+  driver: { include: { user: { select: { phone: true } } } },
+} as const;
+
+/**
+ * Le numéro du client et celui du chauffeur ne sont révélés qu'une fois
+ * la relation établie par le paiement — CONFIRMED ou COMPLETED, jamais
+ * avant (demande explicite : permettre un contact direct par SMS/appel
+ * uniquement "une fois le paiement effectué", à l'image d'Uber). Calculé
+ * ici, jamais laissé au client de décider quoi afficher : la donnée ne
+ * doit pas quitter le serveur trop tôt.
+ */
+function withContactPhones<
+  T extends {
+    status: BookingStatus;
+    trip: { driver: { user: { phone: string } } };
+    customer: { user: { phone: string } };
+  },
+>(booking: T): T & { driverPhone: string | null; customerPhone: string | null } {
+  const isRevealed = booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.COMPLETED;
+  return {
+    ...booking,
+    driverPhone: isRevealed ? booking.trip.driver.user.phone : null,
+    customerPhone: isRevealed ? booking.customer.user.phone : null,
+  };
+}
+
+/**
  * Volontairement indépendant de TripsService (pas d'injection croisée) —
  * TripsService dépend déjà de BookingsService pour la cascade
  * d'annulation ; une dépendance dans l'autre sens créerait un cycle.
@@ -53,10 +88,14 @@ export class BookingsService {
   async findOne(id: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
-      include: { trip: { include: TRIP_INCLUDE_FOR_BOOKING }, passengers: true },
+      include: {
+        trip: { include: TRIP_INCLUDE_WITH_DRIVER_PHONE },
+        passengers: true,
+        customer: { include: { user: { select: { phone: true } } } },
+      },
     });
     if (!booking) throw new NotFoundException('Réservation introuvable.');
-    return booking;
+    return withContactPhones(booking);
   }
 
   /**
@@ -387,12 +426,17 @@ export class BookingsService {
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 
-  findAllForTrip(tripId: string) {
-    return this.prisma.booking.findMany({
+  async findAllForTrip(tripId: string) {
+    const bookings = await this.prisma.booking.findMany({
       where: { tripId },
-      include: { passengers: true },
+      include: {
+        passengers: true,
+        trip: { include: TRIP_INCLUDE_WITH_DRIVER_PHONE },
+        customer: { include: { user: { select: { phone: true } } } },
+      },
       orderBy: { createdAt: 'asc' },
     });
+    return bookings.map(withContactPhones);
   }
 
   async findAll(

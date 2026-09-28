@@ -111,6 +111,30 @@ export class ShipmentOtpService {
     );
   }
 
+  /**
+   * Même code, déclenché cette fois par l'expéditeur lui-même (pas le
+   * chauffeur) — pour le retrouver dans l'app sans avoir à rouvrir le
+   * SMS. Un nouveau code est régénéré à chaque appel (le précédent
+   * devient caduc) : c'est le même mécanisme que requestPickupOtp,
+   * seul l'appelant et le fait de renvoyer le code en clair changent.
+   */
+  async requestPickupOtpForCustomer(shipmentId: string, customerId: string) {
+    const shipment = await this.getShipmentWithContext(shipmentId);
+    if (shipment.customerId !== customerId) {
+      throw new ForbiddenException('Cet envoi ne vous appartient pas.');
+    }
+    if (shipment.status !== ShipmentStatus.PICKUP_PENDING) {
+      throw new BadRequestException(
+        "Ce code n'est disponible que lorsque le chauffeur est en route pour récupérer le colis.",
+      );
+    }
+    return this.otpService.generateAndSend(
+      { purpose: OtpPurpose.SHIPMENT_PICKUP, phone: shipment.senderPhone, shipmentId },
+      'Communiquez ce code au chauffeur pour confirmer la remise du colis :',
+      { revealCodeToCaller: true },
+    );
+  }
+
   async verifyPickupOtp(shipmentId: string, driverId: string, code: string) {
     const shipment = await this.getShipmentWithContext(shipmentId);
     this.assertDriverOwnsShipment(shipment, driverId);

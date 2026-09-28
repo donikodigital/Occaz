@@ -40,6 +40,9 @@ export interface Booking {
   passengers?: TripPassenger[];
   createdAt: string;
   updatedAt: string;
+  /** Révélés par le serveur uniquement une fois la réservation CONFIRMED/COMPLETED — null avant, jamais calculé côté client. */
+  driverPhone: string | null;
+  customerPhone: string | null;
 }
 
 export interface PassengerInput {

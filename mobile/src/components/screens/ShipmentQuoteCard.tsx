@@ -24,9 +24,18 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  * valeur déclarée, urgence. Un seul montant à payer. `payload` est `null`
  * tant que le formulaire est incomplet.
  */
-export function ShipmentQuoteCard({ payload }: { payload: QuoteShipmentPayload | null }) {
+export function ShipmentQuoteCard({
+  payload,
+  discountAmount,
+}: {
+  payload: QuoteShipmentPayload | null;
+  /** Réduction d'un code promo déjà validé (PromoCodeField) — déduite du prix affiché, jamais un montant à part que le client doit calculer lui-même. */
+  discountAmount?: string;
+}) {
   const debouncedPayload = useDebouncedValue(payload, 500);
   const { data: quote, isFetching, error } = useShipmentQuote(debouncedPayload);
+
+  const amountDue = quote ? Math.max(0, Number(quote.totalAmount) - Number(discountAmount ?? 0)) : 0;
 
   return (
     <View style={styles.card}>
@@ -52,7 +61,7 @@ export function ShipmentQuoteCard({ payload }: { payload: QuoteShipmentPayload |
       ) : (
         <>
           <AppText variant="display" weight="bold">
-            {formatMoney(quote.totalAmount, quote.currencyCode ?? undefined)}
+            {formatMoney(String(amountDue), quote.currencyCode ?? undefined)}
           </AppText>
           <AppText variant="xs" color="textSecondary">
             Distance retenue : {quote.distanceKm} km

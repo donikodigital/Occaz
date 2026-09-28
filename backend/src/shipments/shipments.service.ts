@@ -114,7 +114,7 @@ export class ShipmentsService {
       where: { id },
       include: {
         trip: { include: { driver: { select: PUBLIC_DRIVER_SELECT } } },
-        driver: { select: PUBLIC_DRIVER_SELECT },
+        driver: { select: { ...PUBLIC_DRIVER_SELECT, user: { select: { phone: true } } } },
         category: true,
         currency: CURRENCY_SELECT,
         senderLocation: true,
@@ -124,7 +124,10 @@ export class ShipmentsService {
       },
     });
     if (!shipment) throw new NotFoundException('Envoi introuvable.');
-    return shipment;
+    // Le numéro n'est révélé qu'une fois un chauffeur assigné — même
+    // seuil que "nom/téléphone communiqués dès que vous acceptez" déjà
+    // annoncé au chauffeur côté acceptation d'un envoi.
+    return { ...shipment, driverPhone: shipment.driver?.user.phone ?? null };
   }
 
   // -----------------------------------------------------------------------

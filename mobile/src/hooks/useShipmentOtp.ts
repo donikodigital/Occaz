@@ -30,6 +30,11 @@ export function useRequestShipmentPickupOtp(shipmentId: string) {
   return useMutation({ mutationFn: () => shipmentsApi.requestPickupOtp(shipmentId) });
 }
 
+/** Pour l'expéditeur : revoir son propre code de récupération dans l'app. */
+export function useRevealShipmentPickupOtpForSender(shipmentId: string) {
+  return useMutation({ mutationFn: () => shipmentsApi.revealPickupOtpForSender(shipmentId) });
+}
+
 export function useVerifyShipmentPickupOtp(shipmentId: string) {
   const queryClient = useQueryClient();
   return useMutation({

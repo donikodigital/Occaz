@@ -17,7 +17,7 @@ import { useMyWallet, useMyWalletTransactions } from '@/hooks/useWallet';
 import { useMyPayouts } from '@/hooks/usePayouts';
 import { formatMoney } from '@/utils/money';
 import { formatDateShort } from '@/utils/date';
-import type { WalletTransaction, WalletTransactionType } from '@/types/wallets.types';
+import type { WalletTransaction, WalletTransactionStatus, WalletTransactionType } from '@/types/wallets.types';
 import type { PayoutStatus } from '@/types/payouts.types';
 
 const TX_LABELS: Record<WalletTransactionType, string> = {
@@ -46,6 +46,24 @@ const PAYOUT_STATUS_TONE: Record<PayoutStatus, OceanPillTone> = {
   CANCELLED: 'danger',
 };
 
+/**
+ * "En cours" tant que la somme est encore dans pendingBalance (le
+ * chauffeur ne peut pas encore la retirer) — "Payé" une fois basculée
+ * dans balance (voir releaseHeldFunds côté backend). REVERSED reste
+ * rare (annulation après coup) mais ne doit jamais planter l'affichage.
+ */
+const TX_STATUS_LABELS: Record<WalletTransactionStatus, string> = {
+  PENDING: 'En cours',
+  COMPLETED: 'Payé',
+  REVERSED: 'Annulé',
+};
+
+const TX_STATUS_TONE: Record<WalletTransactionStatus, OceanPillTone> = {
+  PENDING: 'ocean',
+  COMPLETED: 'success',
+  REVERSED: 'danger',
+};
+
 function TransactionRow({ tx, currencyCode }: { tx: WalletTransaction; currencyCode: string }) {
   const isCredit = Number(tx.amount) >= 0;
   return (
@@ -65,10 +83,13 @@ function TransactionRow({ tx, currencyCode }: { tx: WalletTransaction; currencyC
           {formatDateShort(tx.createdAt)}
         </AppText>
       </View>
-      <AppText variant="sm" weight="semibold" color={isCredit ? 'success' : 'danger'}>
-        {isCredit ? '+' : ''}
-        {formatMoney(tx.amount, currencyCode)}
-      </AppText>
+      <View style={styles.txAmountBlock}>
+        <AppText variant="sm" weight="semibold" color={isCredit ? 'success' : 'danger'}>
+          {isCredit ? '+' : ''}
+          {formatMoney(tx.amount, currencyCode)}
+        </AppText>
+        <OceanPill label={TX_STATUS_LABELS[tx.status]} tone={TX_STATUS_TONE[tx.status]} />
+      </View>
     </Card>
   );
 }
@@ -204,6 +225,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   sectionTitle: { marginBottom: spacing.sm },
   txRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  txAmountBlock: { alignItems: 'flex-end', gap: 4 },
   txIcon: {
     width: 34,
     height: 34,

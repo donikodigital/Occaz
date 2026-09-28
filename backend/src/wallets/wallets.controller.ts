@@ -32,7 +32,7 @@ export class WalletsController {
   ) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
     const wallet = await this.walletsService.findByDriverId(driverId);
-    return this.walletsService.getTransactions(wallet.id, query);
+    return this.walletsService.getTransactionsForDriverView(wallet.id, query);
   }
 
   @Permissions(PERMISSIONS.WALLET_READ)

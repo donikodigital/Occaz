@@ -10,6 +10,16 @@ export function useMyNotifications(page = 1) {
   });
 }
 
+/**
+ * Pour la carte d'alerte de l'écran d'accueil — réutilise le flux
+ * notifications déjà interrogé toutes les 30 s plutôt que de construire
+ * un suivi "non lu" séparé côté conversations.
+ */
+export function useLatestMessageAlert() {
+  const { data } = useMyNotifications(1);
+  return data?.data.find((n) => n.type === 'CONVERSATION_MESSAGE' && !n.readAt) ?? null;
+}
+
 export function useMarkNotificationRead() {
   const queryClient = useQueryClient();
   return useMutation({

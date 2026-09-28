@@ -147,6 +147,13 @@ export class ShipmentsController {
     return this.shipmentOtpService.requestPickupOtp(id, driverId);
   }
 
+  /** Pour l'expéditeur : revoir son propre code dans l'app plutôt que de rouvrir le SMS. */
+  @Post(':id/otp/pickup/reveal-for-sender')
+  async revealPickupOtpForSender(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const customer = await this.customerProfilesService.findByUserId(user.id);
+    return this.shipmentOtpService.requestPickupOtpForCustomer(id, customer.id);
+  }
+
   @Post(':id/otp/pickup/verify')
   async verifyPickupOtp(
     @Param('id') id: string,

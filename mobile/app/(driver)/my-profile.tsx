@@ -261,6 +261,8 @@ export default function MyDriverProfileScreen() {
               {user?.isPhoneVerified ? <Badge label="Vérifié" tone="success" /> : null}
             </View>
           </View>
+
+          <Field label="Email" value={user?.email ?? 'Non renseigné'} />
         </View>
 
         {/* Véhicules */}

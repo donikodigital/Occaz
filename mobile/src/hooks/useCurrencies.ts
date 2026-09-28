@@ -9,3 +9,5 @@ export function useCurrencies() {
     staleTime: 10 * 60_000,
   });
 }
+
+

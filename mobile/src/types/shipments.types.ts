@@ -77,6 +77,8 @@ export interface Shipment {
   /** Chauffeur qui a accepté l'envoi (avec ou sans trajet). */
   driverId: string | null;
   driver?: ShipmentDriverSummary | null;
+  /** Révélé par le serveur uniquement une fois un chauffeur assigné — null avant, jamais calculé côté client. */
+  driverPhone: string | null;
   customerId: string;
   categoryId: string;
   category?: ShipmentCategory;

@@ -52,7 +52,22 @@ export class OtpService {
    * verify()). L'échec remonte comme une 503 explicite (dépendance
    * externe indisponible), jamais un crash 500 générique.
    */
-  async generateAndSend(params: GenerateOtpParams, message: string): Promise<{ expiresInSeconds: number }> {
+  /**
+   * `revealCodeToCaller` renvoie le code en clair dans la réponse, en plus
+   * du SMS — jamais pour le chauffeur (qui doit toujours le recevoir
+   * verbalement du bénéficiaire, règle d'or de ce service), seulement
+   * pour un endpoint où l'appelant authentifié EST le bénéficiaire
+   * lui-même consultant son propre code (ex. l'expéditeur qui veut le
+   * revoir dans l'app sans rouvrir le SMS). Le code n'est de toute façon
+   * jamais stocké en clair : haché avant persistance comme avant, cette
+   * option ne change que ce qui est renvoyé dans la réponse HTTP, pas ce
+   * qui est écrit en base.
+   */
+  async generateAndSend(
+    params: GenerateOtpParams,
+    message: string,
+    options?: { revealCodeToCaller?: boolean },
+  ): Promise<{ expiresInSeconds: number; code?: string }> {
     const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
     const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;
     const code = generateOtpCode();
@@ -78,7 +93,7 @@ export class OtpService {
       },
     });
 
-    return { expiresInSeconds: expirySeconds };
+    return { expiresInSeconds: expirySeconds, code: options?.revealCodeToCaller ? code : undefined };
   }
 
   /**

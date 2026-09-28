@@ -48,6 +48,10 @@ export const shipmentsApi = {
 
   requestPickupOtp: (id: string) => api.post<{ expiresInSeconds: number }>(`/shipments/${id}/otp/pickup/request`),
 
+  /** Pour l'expéditeur : revoir son propre code dans l'app (renvoie le code en clair, contrairement à requestPickupOtp destiné au chauffeur). */
+  revealPickupOtpForSender: (id: string) =>
+    api.post<{ expiresInSeconds: number; code?: string }>(`/shipments/${id}/otp/pickup/reveal-for-sender`),
+
   verifyPickupOtp: (id: string, code: string) =>
     api.post<Shipment>(`/shipments/${id}/otp/pickup/verify`, { code }),
 

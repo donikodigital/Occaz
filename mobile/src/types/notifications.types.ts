@@ -15,7 +15,8 @@ export type NotificationType =
   | 'STATUS_CHANGE'
   | 'SUPPORT_MESSAGE'
   | 'SHIPMENT_REQUEST'
-  | 'SHIPMENT_EXTENSION';
+  | 'SHIPMENT_EXTENSION'
+  | 'CONVERSATION_MESSAGE';
 
 export type NotificationChannel = 'PUSH' | 'SMS' | 'EMAIL';
 
@@ -26,6 +27,8 @@ export interface AppNotification {
   /** null pour les notifications envoyées avant cette migration — voir NotificationsInboxScreen pour le repli sur NOTIFICATION_TYPE_LABELS. */
   title: string | null;
   body: string | null;
+  /** Ex. { conversationId } pour CONVERSATION_MESSAGE — sert au lien direct, jamais utilisé pour rendre le texte (title/body suffisent déjà). */
+  payload: Record<string, unknown> | null;
   readAt: string | null;
   sentAt: string | null;
   failedReason: string | null;

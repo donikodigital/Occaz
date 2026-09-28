@@ -28,6 +28,7 @@ import {
   OceanSection,
 } from '@/components/ocean/OceanKit';
 import { ShipmentExtensionCard } from '@/components/screens/ShipmentExtensionCard';
+import { ContactRow } from '@/components/screens/ContactRow';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCancelShipment, useExtendShipment, useShipment } from '@/hooks/useShipments';
@@ -196,6 +197,12 @@ export default function ShipmentDetailScreen() {
           isRefunding={cancelShipment.isPending}
           errorMessage={extensionError}
         />
+      ) : null}
+
+      {shipment.driver && shipment.driverPhone ? (
+        <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title="Votre chauffeur">
+          <ContactRow phone={shipment.driverPhone} name={`${shipment.driver.firstName} ${shipment.driver.lastName[0]}.`} />
+        </OceanSection>
       ) : null}
 
       {shipment.status === 'SEARCHING_DRIVER' && !needsExtensionAnswer ? (

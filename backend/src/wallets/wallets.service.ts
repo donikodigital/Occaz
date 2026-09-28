@@ -61,6 +61,80 @@ export class WalletsService {
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 
+  /**
+   * Vue "chauffeur" de son propre historique — jamais le montant brut
+   * payé par le client ni la commission plateforme comme deux lignes
+   * séparées (demande explicite : le chauffeur ne doit voir que sa
+   * part). BOOKING_REVENUE/SHIPMENT_REVENUE et le COMMISSION qui
+   * l'accompagne (même bookingId/shipmentId, posés ensemble par
+   * holdBookingRevenue/holdShipmentRevenue) sont fusionnés en une seule
+   * ligne au montant net, avec un statut unique — les deux lignes
+   * source partagent toujours le même statut au même instant
+   * (releaseHeldFunds les bascule ensemble). REFUND/PAYOUT/ADJUSTMENT/
+   * CANCELLATION_FEE n'ont pas de commission jumelle : ils passent tels
+   * quels. N'affecte que cette vue — le registre comptable réel
+   * (getTransactions, utilisé aussi par l'admin) n'est pas modifié.
+   */
+  async getTransactionsForDriverView(
+    walletId: string,
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResult<unknown>> {
+    const rows = await this.prisma.walletTransaction.findMany({
+      where: { walletId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    type Row = (typeof rows)[number];
+    // Annotation explicite : sans elle, TypeScript infère
+    // Set<BOOKING_REVENUE | SHIPMENT_REVENUE> (les deux littéraux
+    // passés au constructeur) plutôt que Set<WalletTransactionType> —
+    // .has(row.type) refuse alors tout WalletTransactionType plus
+    // large, dont COMMISSION. Invisible dans mon propre bac à sable
+    // (Prisma non généré là-bas, donc pas de vérification de type sur
+    // WalletTransactionType), d'où l'erreur découverte seulement à la
+    // compilation réelle.
+    const REVENUE_TYPES = new Set<WalletTransactionType>([
+      WalletTransactionType.BOOKING_REVENUE,
+      WalletTransactionType.SHIPMENT_REVENUE,
+    ]);
+    const byGroupKey = new Map<string, Row[]>();
+    const standalone: Row[] = [];
+
+    for (const row of rows) {
+      const groupKey = row.bookingId ? `booking:${row.bookingId}` : row.shipmentId ? `shipment:${row.shipmentId}` : null;
+      const isGroupable = groupKey && (REVENUE_TYPES.has(row.type) || row.type === WalletTransactionType.COMMISSION);
+      if (isGroupable) {
+        const group = byGroupKey.get(groupKey!) ?? [];
+        group.push(row);
+        byGroupKey.set(groupKey!, group);
+      } else {
+        standalone.push(row);
+      }
+    }
+
+    const merged = Array.from(byGroupKey.values()).map((group) => {
+      const revenue = group.find((r) => REVENUE_TYPES.has(r.type)) ?? group[0];
+      const netAmount = group.reduce((sum, r) => sum + r.amount, 0n);
+      const latest = group.reduce((a, b) => (a.createdAt > b.createdAt ? a : b));
+      return {
+        id: `net:${revenue.bookingId ?? revenue.shipmentId}`,
+        type: revenue.type,
+        status: latest.status,
+        amount: netAmount,
+        currencyId: latest.currencyId,
+        bookingId: revenue.bookingId,
+        shipmentId: revenue.shipmentId,
+        createdAt: latest.createdAt,
+      };
+    });
+
+    const allRows = [...merged, ...standalone].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+
+    const total = allRows.length;
+    const data = allRows.slice(query.skip, query.skip + query.take);
+    return new PaginatedResult(data, total, query.page, query.limit);
+  }
+
   private async applyDelta(
     walletId: string,
     field: BalanceField,

@@ -18,6 +18,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconCash, IconMessageCircle, IconRoute, IconTicket, IconUsers } from '@tabler/icons-react-native';
 import { AppText, ConfirmDialog, DriverPositionCard, ScreenContainer } from '@/components/ui';
+import { ContactRow } from '@/components/screens/ContactRow';
 import { OceanButton, OceanHeroCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -139,6 +140,9 @@ export default function BookingDetailScreen() {
             <AppText variant="sm" color="textSecondary">
               {trip.driver.firstName} {trip.driver.lastName[0]}. · {trip.vehicle.brand} {trip.vehicle.model}
             </AppText>
+            {booking.driverPhone ? (
+              <ContactRow phone={booking.driverPhone} style={styles.contactRow} />
+            ) : null}
           </View>
         </OceanSection>
       ) : null}
@@ -273,6 +277,9 @@ const styles = StyleSheet.create({
   },
   tripBlock: {
     gap: 3,
+  },
+  contactRow: {
+    marginTop: spacing.xs,
   },
   passengers: {
     gap: spacing.xs,

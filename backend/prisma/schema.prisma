@@ -266,6 +266,8 @@ enum NotificationType {
   SUPPORT_MESSAGE
   SHIPMENT_REQUEST
   SHIPMENT_EXTENSION
+  // Nouveau message dans une conversation client <-> chauffeur (hors litige, qui reste SUPPORT_MESSAGE).
+  CONVERSATION_MESSAGE
 }
 
 enum RatingRole {
