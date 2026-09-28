@@ -38,13 +38,14 @@ import {
 import type { RouteInfo, RouteMapPoint, TimeValue } from '@/components/ui';
 import { LocationAutocompleteField } from '@/components/screens/LocationAutocompleteField';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { useCity, useCountries } from '@/hooks/useCities';
 import { useCreateTrip } from '@/hooks/useDriverTrips';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { useResponsive } from '@/hooks/useResponsive';
-import { formatDateShort, formatTime, upcomingDays } from '@/utils/date';
+import { formatDateLong, formatTime, upcomingDays } from '@/utils/date';
 import { formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
 import type { TripLocation } from '@/types/trips.types';
@@ -76,6 +77,100 @@ function SectionCard({
       </View>
       {children}
     </Card>
+  );
+}
+
+const HERO_MUTED = OCEAN.sky;
+
+function capitalize(value: string): string {
+  return value.length > 0 ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+function PreviewStop({ eyebrow, label }: { eyebrow: string; label?: string }) {
+  return (
+    <View style={styles.previewStop}>
+      <AppText variant="xs" color={HERO_MUTED}>
+        {eyebrow}
+      </AppText>
+      <AppText variant="lg" weight="bold" color={label ? colors.onPrimary : HERO_MUTED} numberOfLines={1}>
+        {label ?? 'À choisir'}
+      </AppText>
+    </View>
+  );
+}
+
+/**
+ * Même langage visuel que le billet de l'écran "Détail du trajet"
+ * (bandeau bleu, cercles décoratifs, rail départ/arrivée) — mais ici un
+ * aperçu qui se construit en direct pendant que le formulaire se
+ * remplit, jamais un vrai billet (pas de perforation/coupon détachable,
+ * qui suggérerait un trajet déjà publié).
+ */
+function LivePreviewHero({
+  origin,
+  destination,
+  departureAt,
+  totalSeats,
+  priceLabel,
+}: {
+  origin: TripLocation | null;
+  destination: TripLocation | null;
+  departureAt: Date;
+  totalSeats: number;
+  priceLabel: string | null;
+}) {
+  return (
+    <View style={styles.previewCard}>
+      <View style={styles.previewDecoLarge} />
+      <View style={styles.previewDecoSmall} />
+
+      <View style={styles.previewPill}>
+        <AppText variant="xs" weight="semibold" color={colors.onPrimary}>
+          Aperçu du trajet
+        </AppText>
+      </View>
+
+      <View style={styles.previewWhen}>
+        <AppText variant="sm" color={HERO_MUTED}>
+          {capitalize(formatDateLong(departureAt.toISOString()))}
+        </AppText>
+        <AppText variant="xxl" weight="bold" color={colors.onPrimary}>
+          {formatTime(departureAt.toISOString())}
+        </AppText>
+      </View>
+
+      <View style={styles.previewRoute}>
+        <View style={styles.previewRail}>
+          <View style={styles.previewRailDotOrigin} />
+          <View style={styles.previewRailLine} />
+          <View style={styles.previewRailDotDestination} />
+        </View>
+        <View style={styles.previewStops}>
+          <PreviewStop eyebrow="Départ" label={origin?.label} />
+          <PreviewStop eyebrow="Arrivée" label={destination?.label} />
+        </View>
+      </View>
+
+      <View style={styles.previewFooterRow}>
+        <View>
+          <AppText variant="xs" color={HERO_MUTED}>
+            Places
+          </AppText>
+          <AppText variant="md" weight="bold" color={colors.onPrimary}>
+            {totalSeats}
+          </AppText>
+        </View>
+        <View style={styles.previewFooterDivider} />
+        <View>
+          <AppText variant="xs" color={HERO_MUTED}>
+            Prix par place
+          </AppText>
+          <AppText variant="md" weight="bold" color={colors.onPrimary}>
+            {priceLabel ?? '—'}
+          </AppText>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -217,20 +312,10 @@ export default function NewTripScreen() {
               {errorMessage}
             </AppText>
           ) : null}
-          {showRecap ? (
+          {showRecap && selectedVehicle ? (
             <View style={styles.recapCard}>
               <AppText variant="xs" weight="semibold" color="textSecondary" style={styles.recapEyebrow}>
-                Récapitulatif
-              </AppText>
-              <AppText variant="base" weight="semibold" numberOfLines={1}>
-                {origin!.label} → {destination!.label}
-              </AppText>
-              <AppText variant="sm" color="textSecondary">
-                {formatDateShort(departureAt.toISOString())} à {formatTime(departureAt.toISOString())}
-                {selectedVehicle ? ` · ${selectedVehicle.brand} ${selectedVehicle.model}` : ''}
-              </AppText>
-              <AppText variant="sm" color="textSecondary">
-                {totalSeats} place{totalSeats > 1 ? 's' : ''} · {formatMoney(Math.round(priceNumber))} / place
+                {selectedVehicle.brand} {selectedVehicle.model}
                 {routeInfo ? ` · ${routeInfo.distanceKm} km` : ''}
               </AppText>
             </View>
@@ -249,6 +334,16 @@ export default function NewTripScreen() {
           Créer un trajet
         </AppText>
         <View style={{ width: 38 }} />
+      </View>
+
+      <View style={styles.previewWrap}>
+        <LivePreviewHero
+          origin={origin}
+          destination={destination}
+          departureAt={departureAt}
+          totalSeats={totalSeats}
+          priceLabel={hasValidPrice ? formatMoney(Math.round(priceNumber)) : null}
+        />
       </View>
 
       <View style={[styles.layout, isDesktop && styles.layoutDesktop]}>
@@ -490,6 +585,94 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: spacing.sm,
     marginBottom: spacing.lg,
+  },
+  previewWrap: {
+    marginBottom: spacing.lg,
+  },
+  previewCard: {
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: OCEAN.deep,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  previewDecoLarge: {
+    position: 'absolute',
+    top: -70,
+    right: -50,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  previewDecoSmall: {
+    position: 'absolute',
+    bottom: -40,
+    left: -30,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  previewPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: radius.pill,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  previewWhen: {
+    gap: 2,
+  },
+  previewRoute: {
+    flexDirection: 'row',
+    gap: spacing.sm + 2,
+  },
+  previewRail: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  previewRailDotOrigin: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.onPrimary,
+  },
+  previewRailLine: {
+    flex: 1,
+    width: 2,
+    minHeight: 24,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    marginVertical: 4,
+  },
+  previewRailDotDestination: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.onPrimary,
+  },
+  previewStops: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  previewStop: {
+    gap: 1,
+  },
+  previewFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.15)',
+  },
+  previewFooterDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   layout: {
     width: '100%',
