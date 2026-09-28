@@ -277,7 +277,7 @@ export class TripsService {
           type: NotificationType.DEPARTURE_IMMINENT,
           channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
           fallbackTitle: 'Le chauffeur est arrivé',
-          fallbackBody: `Votre chauffeur vous attend au point de départ de ${trip.originCity.name} → ${trip.destinationCity.name}.`,
+          fallbackBody: `Votre chauffeur vous attend au point de départ de ${trip.originCity.name} → ${trip.destinationCity.name}. Tenez votre code de prise en charge prêt à lui communiquer.`,
           pushData: { type: 'DEPARTURE_IMMINENT', tripId: id },
         }),
       ),

@@ -31,6 +31,12 @@ const TONE_CLASSES: Record<
  */
 export function StatCard({ label, value, icon: Icon, sublabel, tone = 'primary', index = 0 }: StatCardProps) {
   const { icon, iconGlow, bar } = TONE_CLASSES[tone];
+  // Un grand montant ("1 044 089 GNF") ne tient pas à la même taille
+  // qu'un simple compteur ("4") sur une carte aussi étroite — plutôt
+  // qu'une taille fixe qui les fait passer à la ligne (le montant se
+  // coupait juste avant la devise), la police se réduit un cran quand
+  // le texte dépasse une longueur raisonnable.
+  const isLongValue = value.length > 9;
   return (
     <Card
       padded={false}
@@ -53,7 +59,11 @@ export function StatCard({ label, value, icon: Icon, sublabel, tone = 'primary',
         <p className="line-clamp-2 min-h-[24px] text-[10px] leading-tight text-text-secondary sm:min-h-[34px] sm:text-sm">
           {label}
         </p>
-        <p className="text-lg font-bold leading-tight tracking-tight text-text-primary tabular-nums transition-transform duration-300 group-hover:scale-[1.04] sm:text-[28px]">
+        <p
+          className={`whitespace-nowrap font-bold leading-tight tracking-tight text-text-primary tabular-nums transition-transform duration-300 group-hover:scale-[1.04] ${
+            isLongValue ? 'text-base sm:text-xl' : 'text-lg sm:text-[28px]'
+          }`}
+        >
           {value}
         </p>
         {sublabel ? <p className="truncate text-[9px] leading-tight text-text-muted sm:text-xs">{sublabel}</p> : null}

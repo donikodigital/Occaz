@@ -78,3 +78,13 @@ export function useVerifyDropoffOtp(bookingId: string, tripId: string) {
     },
   });
 }
+
+// --- Côté client : revoir son propre code dans l'app ---
+
+export function useRevealPickupOtpForCustomer(bookingId: string) {
+  return useMutation({ mutationFn: () => bookingsApi.revealPickupOtpForCustomer(bookingId) });
+}
+
+export function useRevealDropoffOtpForCustomer(bookingId: string) {
+  return useMutation({ mutationFn: () => bookingsApi.revealDropoffOtpForCustomer(bookingId) });
+}

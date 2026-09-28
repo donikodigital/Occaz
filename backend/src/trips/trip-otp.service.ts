@@ -57,6 +57,37 @@ export class TripOtpService {
     );
   }
 
+  /**
+   * Même code, déclenché cette fois par le passager lui-même (pas le
+   * chauffeur) — pour le retrouver dans l'app sans avoir à rouvrir le
+   * SMS. Mêmes conditions que requestPickupOtp (réservation confirmée,
+   * chauffeur déjà arrivé) : le code n'a de sens qu'à ce moment-là.
+   */
+  async revealPickupOtpForCustomer(bookingId: string, customerId: string) {
+    const booking = await this.getBookingWithContext(bookingId);
+    if (booking.customerId !== customerId) {
+      throw new ForbiddenException('Cette réservation ne vous appartient pas.');
+    }
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException(
+        'Cette réservation doit être confirmée (paiement validé) avant la prise en charge.',
+      );
+    }
+    if (
+      booking.trip.status !== TripStatus.DRIVER_ARRIVED &&
+      booking.trip.status !== TripStatus.PASSENGER_PICKED_UP
+    ) {
+      throw new BadRequestException(
+        "Ce code n'est disponible que lorsque le chauffeur est arrivé au point de départ.",
+      );
+    }
+    return this.otpService.generateAndSend(
+      { purpose: OtpPurpose.TRIP_PICKUP, phone: booking.customer.user.phone, bookingId },
+      'Communiquez ce code à votre chauffeur pour confirmer votre prise en charge :',
+      { revealCodeToCaller: true },
+    );
+  }
+
   async verifyPickupOtp(bookingId: string, driverId: string, code: string) {
     const booking = await this.getBookingWithContext(bookingId);
     this.assertDriverOwnsTrip(booking, driverId);
@@ -91,6 +122,22 @@ export class TripOtpService {
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.TRIP_DROPOFF, phone: booking.customer.user.phone, bookingId },
       'Communiquez ce code à votre chauffeur pour confirmer la fin de votre trajet :',
+    );
+  }
+
+  /** Même principe que revealPickupOtpForCustomer, pour le code de dépose. */
+  async revealDropoffOtpForCustomer(bookingId: string, customerId: string) {
+    const booking = await this.getBookingWithContext(bookingId);
+    if (booking.customerId !== customerId) {
+      throw new ForbiddenException('Cette réservation ne vous appartient pas.');
+    }
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException('Cette réservation ne peut pas être clôturée dans son état actuel.');
+    }
+    return this.otpService.generateAndSend(
+      { purpose: OtpPurpose.TRIP_DROPOFF, phone: booking.customer.user.phone, bookingId },
+      'Communiquez ce code à votre chauffeur pour confirmer la fin de votre trajet :',
+      { revealCodeToCaller: true },
     );
   }
 

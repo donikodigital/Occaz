@@ -23,4 +23,12 @@ export const bookingsApi = {
   requestDropoffOtp: (id: string) => api.post<{ expiresInSeconds: number }>(`/bookings/${id}/otp/dropoff/request`),
 
   verifyDropoffOtp: (id: string, code: string) => api.post<void>(`/bookings/${id}/otp/dropoff/verify`, { code }),
+
+  // --- Côté client : revoir son propre code dans l'app (renvoie le code en clair, contrairement aux endpoints ci-dessus destinés au chauffeur) ---
+
+  revealPickupOtpForCustomer: (id: string) =>
+    api.post<{ expiresInSeconds: number; code?: string }>(`/bookings/${id}/otp/pickup/reveal-for-customer`),
+
+  revealDropoffOtpForCustomer: (id: string) =>
+    api.post<{ expiresInSeconds: number; code?: string }>(`/bookings/${id}/otp/dropoff/reveal-for-customer`),
 };

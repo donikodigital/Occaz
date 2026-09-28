@@ -81,6 +81,13 @@ export class BookingsController {
     return this.tripOtpService.requestPickupOtp(id, driverId);
   }
 
+  /** Pour le passager : revoir son propre code de prise en charge dans l'app plutôt que de rouvrir le SMS. */
+  @Post(':id/otp/pickup/reveal-for-customer')
+  async revealPickupOtpForCustomer(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const customer = await this.customerProfilesService.findByUserId(user.id);
+    return this.tripOtpService.revealPickupOtpForCustomer(id, customer.id);
+  }
+
   @Post(':id/otp/pickup/verify')
   async verifyPickupOtp(
     @Param('id') id: string,
@@ -95,6 +102,13 @@ export class BookingsController {
   async requestDropoffOtp(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
     return this.tripOtpService.requestDropoffOtp(id, driverId);
+  }
+
+  /** Pour le passager : revoir son propre code de dépose dans l'app plutôt que de rouvrir le SMS. */
+  @Post(':id/otp/dropoff/reveal-for-customer')
+  async revealDropoffOtpForCustomer(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const customer = await this.customerProfilesService.findByUserId(user.id);
+    return this.tripOtpService.revealDropoffOtpForCustomer(id, customer.id);
   }
 
   @Post(':id/otp/dropoff/verify')
