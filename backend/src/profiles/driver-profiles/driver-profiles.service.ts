@@ -150,14 +150,40 @@ export class DriverProfilesService {
     return profile;
   }
 
+  /**
+   * `email` n'existe pas sur DriverProfile (il vit sur User, comme à la
+   * création — voir create() ci-dessus) : un `...dto` en avait
+   * silencieusement omis la prise en charge jusqu'ici, ce qui aurait
+   * fait échouer toute mise à jour incluant un email (Prisma refuse un
+   * champ inconnu sur driverProfile.update). Liste explicite désormais,
+   * plutôt qu'un spread, pour ne pas reproduire ce risque si le DTO
+   * gagne un jour un autre champ qui ne vit pas sur DriverProfile.
+   */
   async updateForUser(userId: string, dto: UpdateDriverProfileDto) {
     const profile = await this.findByUserId(userId);
-    return this.prisma.driverProfile.update({
-      where: { id: profile.id },
-      data: {
-        ...dto,
-        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
-      },
+
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      if (dto.email) {
+        try {
+          await tx.user.update({ where: { id: userId }, data: { email: dto.email } });
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            throw new ConflictException('Cette adresse email est déjà utilisée par un autre compte.');
+          }
+          throw error;
+        }
+      }
+
+      return tx.driverProfile.update({
+        where: { id: profile.id },
+        data: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          photoUrl: dto.photoUrl,
+          dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+          mobileMoneyNumber: dto.mobileMoneyNumber,
+        },
+      });
     });
   }
 

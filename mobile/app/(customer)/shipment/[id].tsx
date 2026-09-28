@@ -11,6 +11,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import {
   IconCalendarEvent,
   IconCash,
+  IconLock,
   IconMapPin,
   IconMessageCircle,
   IconPackage,
@@ -32,6 +33,7 @@ import { ContactRow } from '@/components/screens/ContactRow';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCancelShipment, useExtendShipment, useShipment } from '@/hooks/useShipments';
+import { useRevealShipmentPickupOtpForSender } from '@/hooks/useShipmentOtp';
 import { useShipmentRatings } from '@/hooks/useRatings';
 import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
@@ -63,6 +65,45 @@ function heroColorFor(status: ShipmentStatus): string {
   if (status === 'CANCELLED' || status === 'REFUNDED') return colors.textSecondary;
   if (status === 'DISPUTED') return colors.danger;
   return OCEAN.deep;
+}
+
+/**
+ * Le code est toujours envoyé par SMS (jamais par email) — cette carte
+ * ne fait qu'en montrer une copie dans l'app, pour l'expéditeur qui ne
+ * reçoit pas le SMS (réseau, numéro mal saisi...) ou qui préfère ne
+ * pas rouvrir ses messages. Chaque appui régénère un nouveau code (le
+ * précédent devient caduc), un SMS repart à chaque fois.
+ */
+function PickupCodeCard({ shipmentId }: { shipmentId: string }) {
+  const reveal = useRevealShipmentPickupOtpForSender(shipmentId);
+
+  return (
+    <OceanSection icon={<IconLock size={17} color={OCEAN.base} />} title="Code de récupération">
+      <AppText variant="xs" color="textSecondary">
+        Communiquez-le au chauffeur pour confirmer la remise du colis — envoyé par SMS, et affiché ici si besoin de
+        le revoir.
+      </AppText>
+
+      {reveal.data?.code ? (
+        <AppText variant="display" weight="bold" color={OCEAN.deep} style={styles.codeValue}>
+          {reveal.data.code}
+        </AppText>
+      ) : null}
+
+      <OceanButton
+        label={reveal.data?.code ? 'Recevoir un nouveau code' : 'Voir mon code'}
+        variant="soft"
+        onPress={() => reveal.mutate()}
+        loading={reveal.isPending}
+      />
+
+      {reveal.isError ? (
+        <AppText variant="xs" color="danger">
+          {reveal.error instanceof ApiError ? reveal.error.message : 'Impossible de récupérer le code pour le moment.'}
+        </AppText>
+      ) : null}
+    </OceanSection>
+  );
 }
 
 export default function ShipmentDetailScreen() {
@@ -204,6 +245,8 @@ export default function ShipmentDetailScreen() {
           <ContactRow phone={shipment.driverPhone} name={`${shipment.driver.firstName} ${shipment.driver.lastName[0]}.`} />
         </OceanSection>
       ) : null}
+
+      {shipment.status === 'PICKUP_PENDING' ? <PickupCodeCard shipmentId={shipment.id} /> : null}
 
       {shipment.status === 'SEARCHING_DRIVER' && !needsExtensionAnswer ? (
         <OceanCard style={styles.infoCard}>
@@ -379,6 +422,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: 4,
     marginBottom: spacing.md,
+  },
+  codeValue: {
+    textAlign: 'center',
+    letterSpacing: 4,
+    marginVertical: spacing.xs,
   },
   trackingRow: {
     flexDirection: 'row',

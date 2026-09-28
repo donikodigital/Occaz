@@ -396,7 +396,10 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
                   keyboardType="number-pad"
                   placeholder="Code à 6 chiffres"
                   maxLength={6}
-                  style={styles.codeInput}
+                  // `style` ne touche que le <TextInput> interne, jamais
+                  // son conteneur — d'où le champ resté étroit malgré
+                  // codeInput (flex: 1).
+                  containerStyle={styles.codeInput}
                 />
                 <OceanButton label="Vérifier" onPress={handleVerify} loading={isVerifying} disabled={code.length !== 6} />
               </View>

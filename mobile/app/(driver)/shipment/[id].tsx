@@ -62,7 +62,11 @@ function OtpSection({
             keyboardType="number-pad"
             placeholder="Code à 6 chiffres"
             maxLength={6}
-            style={styles.codeInput}
+            // `style` ne touche que le <TextInput> interne, jamais son
+            // conteneur — d'où le champ resté étroit malgré codeInput
+            // (flex: 1) : ce flex n'atteignait jamais l'élément qui
+            // partage réellement la rangée avec le bouton "Vérifier".
+            containerStyle={styles.codeInput}
           />
           <Button
             label="Vérifier"

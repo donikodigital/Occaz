@@ -11,12 +11,18 @@ import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useDriverProfile, useUpdateDriverProfile } from '@/hooks/useDriverProfile';
 import { useDriverPhotoUpload } from '@/hooks/useDriverPhotoUpload';
+import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/services/api/ApiError';
 
 export default function DriverEditProfileScreen() {
   const { data: profile } = useDriverProfile();
+  // email vit sur User, pas sur DriverProfile (comme à l'inscription,
+  // voir complete-profile.tsx) — sa valeur actuelle vient donc du store
+  // d'authentification, pas de `profile`.
+  const authUser = useAuthStore((state) => state.user);
   const [firstName, setFirstName] = useState(profile?.firstName ?? '');
   const [lastName, setLastName] = useState(profile?.lastName ?? '');
+  const [email, setEmail] = useState(authUser?.email ?? '');
   const [mobileMoneyNumber, setMobileMoneyNumber] = useState(profile?.mobileMoneyNumber ?? '');
   const [photoUrl, setPhotoUrl] = useState(profile?.photoUrl ?? null);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
@@ -29,15 +35,29 @@ export default function DriverEditProfileScreen() {
       setErrorMessage('Renseignez votre prénom et votre nom.');
       return;
     }
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setErrorMessage('Adresse email invalide.');
+      return;
+    }
 
     updateProfile.mutate(
       {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        email: trimmedEmail || undefined,
         mobileMoneyNumber: mobileMoneyNumber.trim() || undefined,
       },
       {
-        onSuccess: () => router.back(),
+        onSuccess: () => {
+          // Le profil chauffeur invalidé par le hook ne contient pas
+          // l'email (voir plus haut) — sans ça, l'écran continuerait
+          // d'afficher l'ancienne adresse jusqu'à la prochaine connexion.
+          if (trimmedEmail && authUser) {
+            useAuthStore.setState({ user: { ...authUser, email: trimmedEmail } });
+          }
+          router.back();
+        },
         onError: (error) => {
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },
@@ -62,6 +82,14 @@ export default function DriverEditProfileScreen() {
       <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title="Identité">
         <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Mamadou" />
         <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Barry" />
+        <TextField
+          label="Email (optionnel)"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="vous@exemple.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
         <TextField
           label="Numéro Mobile Money"
           value={mobileMoneyNumber}
