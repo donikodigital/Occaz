@@ -18,9 +18,13 @@ export type DisputeResolutionType =
   | 'CANCELLATION'
   | 'SANCTION'
   | 'SUSPENSION'
-  | 'NO_ACTION';
+  | 'NO_ACTION'
+  | 'OTP_MANUAL_VALIDATION';
 
 export type DisputeSubjectType = 'TRIP' | 'SHIPMENT';
+
+/** Étape OTP concernée par une résolution OTP_MANUAL_VALIDATION. */
+export type OtpPurpose = 'TRIP_PICKUP' | 'TRIP_DROPOFF' | 'SHIPMENT_PICKUP' | 'SHIPMENT_DELIVERY';
 
 export interface DisputeMessage {
   id: string;
@@ -36,6 +40,7 @@ export interface DisputeResolution {
   type: DisputeResolutionType;
   refundAmount: string | null;
   currencyId: string | null;
+  otpPurpose: OtpPurpose | null;
   notes: string | null;
   createdAt: string;
 }
@@ -71,5 +76,6 @@ export interface ResolveDisputePayload {
   type: DisputeResolutionType;
   refundAmount?: string;
   targetUserId?: string;
+  otpPurpose?: OtpPurpose;
   notes?: string;
 }

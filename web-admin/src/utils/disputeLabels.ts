@@ -1,5 +1,5 @@
 // web-admin/src/utils/disputeLabels.ts
-import type { DisputePriority, DisputeResolutionType, DisputeStatus } from '@/types/disputes.types';
+import type { DisputePriority, DisputeResolutionType, DisputeStatus, OtpPurpose } from '@/types/disputes.types';
 
 export const DISPUTE_STATUS_LABELS: Record<DisputeStatus, string> = {
   OPENED: 'Ouvert',
@@ -44,4 +44,18 @@ export const DISPUTE_RESOLUTION_TYPE_LABELS: Record<DisputeResolutionType, strin
   SANCTION: 'Sanction',
   SUSPENSION: 'Suspension de compte',
   NO_ACTION: 'Aucune action',
+  OTP_MANUAL_VALIDATION: 'Validation manuelle du code',
+};
+
+export const OTP_PURPOSE_LABELS: Record<OtpPurpose, string> = {
+  TRIP_PICKUP: 'Prise en charge (trajet)',
+  TRIP_DROPOFF: 'Dépose (trajet)',
+  SHIPMENT_PICKUP: 'Récupération du colis',
+  SHIPMENT_DELIVERY: 'Livraison du colis',
+};
+
+/** Étapes valides selon le type de litige — pour filtrer le sélecteur. */
+export const OTP_PURPOSES_BY_SUBJECT: Record<'TRIP' | 'SHIPMENT', OtpPurpose[]> = {
+  TRIP: ['TRIP_PICKUP', 'TRIP_DROPOFF'],
+  SHIPMENT: ['SHIPMENT_PICKUP', 'SHIPMENT_DELIVERY'],
 };

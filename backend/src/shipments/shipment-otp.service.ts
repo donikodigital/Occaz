@@ -140,13 +140,30 @@ export class ShipmentOtpService {
     this.assertDriverOwnsShipment(shipment, driverId);
 
     await this.otpService.verify({ purpose: OtpPurpose.SHIPMENT_PICKUP, shipmentId, code });
+    return this.markPickedUp(shipmentId);
+  }
 
+  /**
+   * Validation manuelle par le support (jamais par le chauffeur) — même
+   * transition d'état que verifyPickupOtp, sans code : réservée aux
+   * litiges où l'expéditeur reste injoignable ou refuse de communiquer
+   * son code. Déclenchée uniquement via DisputesService.resolve (type
+   * OTP_MANUAL_VALIDATION), jamais exposée directement au chauffeur.
+   */
+  async manuallyValidatePickup(shipmentId: string) {
+    const shipment = await this.getShipmentWithContext(shipmentId);
+    if (shipment.status !== ShipmentStatus.PICKUP_PENDING) {
+      throw new BadRequestException("L'envoi doit être en attente de récupération pour valider cette étape.");
+    }
+    return this.markPickedUp(shipmentId);
+  }
+
+  private async markPickedUp(shipmentId: string) {
     const updated = await this.prisma.shipment.update({
       where: { id: shipmentId },
       data: { status: ShipmentStatus.PICKED_UP },
     });
     await this.recordTracking(shipmentId, ShipmentStatus.PICKED_UP);
-
     return updated;
   }
 
@@ -176,21 +193,46 @@ export class ShipmentOtpService {
     this.assertDriverOwnsShipment(shipment, driverId);
 
     await this.otpService.verify({ purpose: OtpPurpose.SHIPMENT_DELIVERY, shipmentId, code });
+    return this.markDelivered(shipment);
+  }
 
+  /**
+   * Validation manuelle par le support (jamais par le chauffeur) — même
+   * transition d'état que verifyDeliveryOtp, sans code. C'est le cas
+   * d'usage principal de cette fonctionnalité : contrairement à
+   * l'expéditeur, le destinataire n'a pas de compte dans l'app pour
+   * revoir son code lui-même — s'il reste injoignable ou refuse de le
+   * communiquer par mauvaise foi, seul un litige validé par le support
+   * peut clôturer la livraison. Jamais exposée directement au chauffeur.
+   */
+  async manuallyValidateDelivery(shipmentId: string) {
+    const shipment = await this.getShipmentWithContext(shipmentId);
+    if (shipment.status !== ShipmentStatus.DELIVERY_PENDING) {
+      throw new BadRequestException("L'envoi doit être en attente de livraison pour valider cette étape.");
+    }
+    return this.markDelivered(shipment);
+  }
+
+  private async markDelivered(
+    shipment: Awaited<ReturnType<ShipmentOtpService['getShipmentWithContext']>>,
+  ) {
     await this.prisma.shipment.update({
-      where: { id: shipmentId },
+      where: { id: shipment.id },
       data: { status: ShipmentStatus.DELIVERED },
     });
-    await this.recordTracking(shipmentId, ShipmentStatus.DELIVERED);
+    await this.recordTracking(shipment.id, ShipmentStatus.DELIVERED);
 
     const completed = await this.prisma.shipment.update({
-      where: { id: shipmentId },
+      where: { id: shipment.id },
       data: { status: ShipmentStatus.COMPLETED },
     });
-    await this.recordTracking(shipmentId, ShipmentStatus.COMPLETED);
+    await this.recordTracking(shipment.id, ShipmentStatus.COMPLETED);
 
-    await this.wallets.releaseHeldFunds({ driverId, shipmentId });
-    await this.driverProfiles.incrementCompletedShipments(driverId);
+    const driverId = shipment.driverId ?? shipment.trip?.driverId;
+    if (driverId) {
+      await this.wallets.releaseHeldFunds({ driverId, shipmentId: shipment.id });
+      await this.driverProfiles.incrementCompletedShipments(driverId);
+    }
 
     const customer = await this.prisma.customerProfile.findUnique({
       where: { id: shipment.customerId },

@@ -1,9 +1,15 @@
 // mobile/app/(driver)/shipment/[id].tsx
 // [21/09/2026] v2 — gain net et période affichés, téléphones appelables, annulation avant récupération seulement ; l'attribution se fait depuis la liste.
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft, IconCalendarEvent, IconMapPin, IconMessageCircle } from '@tabler/icons-react-native';
+import {
+  IconArrowLeft,
+  IconCalendarEvent,
+  IconLifebuoy,
+  IconMapPin,
+  IconMessageCircle,
+} from '@tabler/icons-react-native';
 import { AppText, Badge, Button, Card, Divider, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
 import { colors, spacing } from '@/theme';
@@ -29,12 +35,17 @@ function OtpSection({
   onVerify,
   isRequesting,
   isVerifying,
+  supportPrompt,
+  onContactSupport,
 }: {
   title: string;
   onRequest: () => void;
   onVerify: (code: string) => void;
   isRequesting: boolean;
   isVerifying: boolean;
+  /** Texte du bouton contextuel affiché une fois le code demandé (ex. « Expéditeur injoignable ? »). */
+  supportPrompt: string;
+  onContactSupport: () => void;
 }) {
   const [codeVisible, setCodeVisible] = useState(false);
   const [code, setCode] = useState('');
@@ -55,27 +66,39 @@ function OtpSection({
           loading={isRequesting}
         />
       ) : (
-        <View style={styles.codeRow}>
-          <TextField
-            value={code}
-            onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
-            keyboardType="number-pad"
-            placeholder="Code à 6 chiffres"
-            maxLength={6}
-            // `style` ne touche que le <TextInput> interne, jamais son
-            // conteneur — d'où le champ resté étroit malgré codeInput
-            // (flex: 1) : ce flex n'atteignait jamais l'élément qui
-            // partage réellement la rangée avec le bouton "Vérifier".
-            containerStyle={styles.codeInput}
-          />
-          <Button
-            label="Vérifier"
-            fullWidth={false}
-            onPress={() => onVerify(code)}
-            loading={isVerifying}
-            disabled={code.length !== 6}
-          />
-        </View>
+        <>
+          <View style={styles.codeRow}>
+            <TextField
+              value={code}
+              onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              placeholder="Code à 6 chiffres"
+              maxLength={6}
+              // `style` ne touche que le <TextInput> interne, jamais son
+              // conteneur — d'où le champ resté étroit malgré codeInput
+              // (flex: 1) : ce flex n'atteignait jamais l'élément qui
+              // partage réellement la rangée avec le bouton "Vérifier".
+              containerStyle={styles.codeInput}
+            />
+            <Button
+              label="Vérifier"
+              fullWidth={false}
+              onPress={() => onVerify(code)}
+              loading={isVerifying}
+              disabled={code.length !== 6}
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onContactSupport}
+            style={({ pressed }) => [styles.supportLink, pressed && styles.pressed]}
+          >
+            <IconLifebuoy size={14} color={colors.accent} />
+            <AppText variant="xs" color={colors.accent} weight="semibold">
+              {supportPrompt}
+            </AppText>
+          </Pressable>
+        </>
       )}
     </Card>
   );
@@ -217,7 +240,18 @@ export default function DriverShipmentDetailScreen() {
       {shipment.status === 'PICKUP_PENDING' ? (
         <OtpSection
           title="Code de récupération"
-          onRequest={() => requestPickupOtp.mutate()}
+          onRequest={() =>
+            requestPickupOtp.mutate(undefined, {
+              onSuccess: (result) => {
+                if (!result.smsSent) {
+                  Alert.alert(
+                    'Code généré',
+                    "Le SMS n'a pas pu être envoyé à l'expéditeur — demandez-lui de consulter son code directement dans l'application.",
+                  );
+                }
+              },
+            })
+          }
           onVerify={(code) =>
             verifyPickupOtp.mutate(code, {
               onError: (error) =>
@@ -226,6 +260,18 @@ export default function DriverShipmentDetailScreen() {
           }
           isRequesting={requestPickupOtp.isPending}
           isVerifying={verifyPickupOtp.isPending}
+          supportPrompt="Expéditeur injoignable ou refuse le code ? Contacter le support"
+          onContactSupport={() =>
+            router.push({
+              pathname: '/(driver)/dispute-new',
+              params: {
+                subjectType: 'SHIPMENT',
+                shipmentId: shipment.id,
+                reason: 'Expéditeur injoignable ou refuse de communiquer le code de récupération',
+                description: `Colis pour ${shipment.recipientName}.`,
+              },
+            })
+          }
         />
       ) : null}
 
@@ -250,7 +296,18 @@ export default function DriverShipmentDetailScreen() {
       {shipment.status === 'DELIVERY_PENDING' ? (
         <OtpSection
           title="Code de livraison"
-          onRequest={() => requestDeliveryOtp.mutate()}
+          onRequest={() =>
+            requestDeliveryOtp.mutate(undefined, {
+              onSuccess: (result) => {
+                if (!result.smsSent) {
+                  Alert.alert(
+                    'Code généré',
+                    "Le SMS n'a pas pu être envoyé au destinataire — contrairement à l'expéditeur, il n'a pas de compte dans l'application pour le consulter autrement. Réessayez ou contactez-le directement.",
+                  );
+                }
+              },
+            })
+          }
           onVerify={(code) =>
             verifyDeliveryOtp.mutate(code, {
               onError: (error) =>
@@ -259,6 +316,18 @@ export default function DriverShipmentDetailScreen() {
           }
           isRequesting={requestDeliveryOtp.isPending}
           isVerifying={verifyDeliveryOtp.isPending}
+          supportPrompt="Destinataire injoignable ou refuse le code ? Contacter le support"
+          onContactSupport={() =>
+            router.push({
+              pathname: '/(driver)/dispute-new',
+              params: {
+                subjectType: 'SHIPMENT',
+                shipmentId: shipment.id,
+                reason: 'Destinataire injoignable ou refuse de communiquer le code de livraison',
+                description: `Colis de ${shipment.senderName} pour ${shipment.recipientName}.`,
+              },
+            })
+          }
         />
       ) : null}
 
@@ -325,6 +394,16 @@ const styles = StyleSheet.create({
   },
   codeInput: {
     flex: 1,
+  },
+  supportLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   actionButton: {
     marginBottom: spacing.md,

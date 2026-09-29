@@ -98,9 +98,31 @@ export class TripOtpService {
     }
 
     await this.otpService.verify({ purpose: OtpPurpose.TRIP_PICKUP, bookingId, code });
+    await this.markPickedUp(booking);
+  }
 
+  /**
+   * Validation manuelle par le support (jamais par le chauffeur) — même
+   * transition d'état que verifyPickupOtp, sans code : réservée aux
+   * litiges où le passager reste injoignable ou refuse de communiquer
+   * son code. Déclenchée uniquement via DisputesService.resolve (type
+   * OTP_MANUAL_VALIDATION), jamais exposée directement au chauffeur.
+   */
+  async manuallyValidatePickup(bookingId: string) {
+    const booking = await this.getBookingWithContext(bookingId);
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException(
+        'Cette réservation doit être confirmée (paiement validé) avant la prise en charge.',
+      );
+    }
+    await this.markPickedUp(booking);
+  }
+
+  private async markPickedUp(
+    booking: Awaited<ReturnType<TripOtpService['getBookingWithContext']>>,
+  ): Promise<void> {
     await this.prisma.tripPassenger.updateMany({
-      where: { bookingId },
+      where: { bookingId: booking.id },
       data: { pickedUpAt: new Date() },
     });
 
@@ -113,7 +135,7 @@ export class TripOtpService {
 
     // Le code de dépose est généré tout de suite : le client le reçoit dès
     // la prise en charge et l'a déjà en main au moment de la dépose.
-    await this.requestDropoffOtp(bookingId, driverId);
+    await this.requestDropoffOtp(booking.id, booking.trip.driverId);
   }
 
   async requestDropoffOtp(bookingId: string, driverId: string) {
@@ -157,16 +179,33 @@ export class TripOtpService {
     }
 
     await this.otpService.verify({ purpose: OtpPurpose.TRIP_DROPOFF, bookingId, code });
+    await this.markDroppedOff(booking);
+  }
 
+  /**
+   * Même principe que manuallyValidatePickup, pour la dépose : réservée
+   * au support via un litige, jamais accessible au chauffeur directement.
+   */
+  async manuallyValidateDropoff(bookingId: string) {
+    const booking = await this.getBookingWithContext(bookingId);
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException('Cette réservation ne peut pas être clôturée dans son état actuel.');
+    }
+    await this.markDroppedOff(booking);
+  }
+
+  private async markDroppedOff(
+    booking: Awaited<ReturnType<TripOtpService['getBookingWithContext']>>,
+  ): Promise<void> {
     await this.prisma.tripPassenger.updateMany({
-      where: { bookingId },
+      where: { bookingId: booking.id },
       data: { droppedOffAt: new Date() },
     });
     await this.prisma.booking.update({
-      where: { id: bookingId },
+      where: { id: booking.id },
       data: { status: BookingStatus.COMPLETED },
     });
 
-    await this.wallets.releaseHeldFunds({ driverId, bookingId });
+    await this.wallets.releaseHeldFunds({ driverId: booking.trip.driverId, bookingId: booking.id });
   }
 }

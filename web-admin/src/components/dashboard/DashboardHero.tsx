@@ -65,10 +65,13 @@ export function DashboardHero() {
         <>
           <p className="text-xs font-medium text-white/75 sm:text-sm">Commissions — {PERIOD_LABELS[period].tab.toLowerCase()} en cours</p>
 
-          {/* Une carte par devise active (GNF, XOF…), toujours côte à côte
-              même sur le plus petit mobile — jamais une somme des deux,
-              qui mélangerait des unités différentes sans signification. */}
-          <div className="mt-2 grid grid-cols-2 gap-2.5 sm:gap-3">
+          {/* Une carte par devise active (GNF, XOF…) — empilées sur mobile
+              (plus de place pour les sous-libellés, et ça comble une
+              bonne partie du vide sous le graphique), côte à côte à
+              partir de sm: où la largeur ne manque plus. Jamais une
+              somme des deux, qui mélangerait des unités différentes
+              sans signification. */}
+          <div className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
             {summary.current.byCurrency.map((figures, index) => {
               const previousFigures = summary.previous.byCurrency.find((item) => item.currencyId === figures.currencyId);
               const trend = previousFigures
@@ -83,7 +86,7 @@ export function DashboardHero() {
                 >
                   <p className="text-[11px] font-bold uppercase tracking-wide text-white/60 sm:text-xs">{figures.isoCode}</p>
                   <div className="mt-0.5 flex flex-wrap items-baseline gap-1.5">
-                    <p className="text-xl font-bold tracking-tight tabular-nums sm:text-2xl">
+                    <p className="whitespace-nowrap text-lg font-bold tracking-tight tabular-nums sm:text-2xl">
                       {formatMoney(figures.totalCommission, figures.isoCode)}
                     </p>
                     {trend !== null ? (

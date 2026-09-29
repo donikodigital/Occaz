@@ -16,9 +16,10 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconCash, IconLock, IconMessageCircle, IconRoute, IconTicket, IconUsers } from '@tabler/icons-react-native';
+import { IconCash, IconMessageCircle, IconRoute, IconTicket, IconUsers } from '@tabler/icons-react-native';
 import { AppText, ConfirmDialog, DriverPositionCard, ScreenContainer } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
+import { OtpCodeCard } from '@/components/screens/OtpCodeCard';
 import { OceanButton, OceanHeroCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -32,7 +33,6 @@ import { useBookingRatings } from '@/hooks/useRatings';
 import { useGetOrCreateConversationForBooking } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
-import { ApiError } from '@/services/api/ApiError';
 import type { BookingStatus } from '@/types/bookings.types';
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
@@ -49,72 +49,41 @@ const CANCELLABLE_STATUSES: BookingStatus[] = ['PENDING_PAYMENT', 'PAID', 'CONFI
 
 /** La couleur du bandeau raconte l'état de la réservation au premier coup d'œil. */
 function heroColorFor(status: BookingStatus): string {
-  if (status === 'CONFIRMED' || status === 'COMPLETED') return colors.success;
+  if (status === 'CONFIRMED' || status === 'COMPLETED') return colors.successDeep;
   if (status === 'CANCELLED' || status === 'REFUNDED') return colors.textSecondary;
   if (status === 'DISPUTED') return colors.danger;
   return OCEAN.deep;
 }
 
-/**
- * Le code (prise en charge ou dépose) est toujours envoyé par SMS —
- * cette carte ne fait qu'en montrer une copie dans l'app, pour le
- * passager qui ne reçoit pas le SMS ou préfère ne pas rouvrir ses
- * messages. Chaque appui régénère un nouveau code (le précédent devient
- * caduc), un SMS repart à chaque fois.
- */
 function PickupCodeCard({ bookingId }: { bookingId: string }) {
   const reveal = useRevealPickupOtpForCustomer(bookingId);
   return (
-    <OceanSection icon={<IconLock size={17} color={OCEAN.base} />} title="Code de prise en charge">
-      <AppText variant="xs" color="textSecondary">
-        Communiquez-le à votre chauffeur pour confirmer votre prise en charge — envoyé par SMS, et affiché ici si
-        besoin de le revoir.
-      </AppText>
-      {reveal.data?.code ? (
-        <AppText variant="display" weight="bold" color={OCEAN.deep} style={styles.codeValue}>
-          {reveal.data.code}
-        </AppText>
-      ) : null}
-      <OceanButton
-        label={reveal.data?.code ? 'Recevoir un nouveau code' : 'Voir mon code'}
-        variant="soft"
-        onPress={() => reveal.mutate()}
-        loading={reveal.isPending}
-      />
-      {reveal.isError ? (
-        <AppText variant="xs" color="danger">
-          {reveal.error instanceof ApiError ? reveal.error.message : 'Impossible de récupérer le code pour le moment.'}
-        </AppText>
-      ) : null}
-    </OceanSection>
+    <OtpCodeCard
+      title="Code de prise en charge"
+      description="Communiquez-le à votre chauffeur pour confirmer votre prise en charge — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
+      code={reveal.data?.code}
+      smsSent={reveal.data?.smsSent}
+      isPending={reveal.isPending}
+      isError={reveal.isError}
+      error={reveal.error}
+      onRequest={() => reveal.mutate()}
+    />
   );
 }
 
 function DropoffCodeCard({ bookingId }: { bookingId: string }) {
   const reveal = useRevealDropoffOtpForCustomer(bookingId);
   return (
-    <OceanSection icon={<IconLock size={17} color={OCEAN.base} />} title="Code de dépose">
-      <AppText variant="xs" color="textSecondary">
-        Communiquez-le à votre chauffeur pour confirmer la fin de votre trajet — envoyé par SMS, et affiché ici si
-        besoin de le revoir.
-      </AppText>
-      {reveal.data?.code ? (
-        <AppText variant="display" weight="bold" color={OCEAN.deep} style={styles.codeValue}>
-          {reveal.data.code}
-        </AppText>
-      ) : null}
-      <OceanButton
-        label={reveal.data?.code ? 'Recevoir un nouveau code' : 'Voir mon code'}
-        variant="soft"
-        onPress={() => reveal.mutate()}
-        loading={reveal.isPending}
-      />
-      {reveal.isError ? (
-        <AppText variant="xs" color="danger">
-          {reveal.error instanceof ApiError ? reveal.error.message : 'Impossible de récupérer le code pour le moment.'}
-        </AppText>
-      ) : null}
-    </OceanSection>
+    <OtpCodeCard
+      title="Code de dépose"
+      description="Communiquez-le à votre chauffeur pour confirmer la fin de votre trajet — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
+      code={reveal.data?.code}
+      smsSent={reveal.data?.smsSent}
+      isPending={reveal.isPending}
+      isError={reveal.isError}
+      error={reveal.error}
+      onRequest={() => reveal.mutate()}
+    />
   );
 }
 
@@ -354,11 +323,6 @@ const styles = StyleSheet.create({
   },
   tripBlock: {
     gap: 3,
-  },
-  codeValue: {
-    textAlign: 'center',
-    letterSpacing: 4,
-    marginVertical: spacing.xs,
   },
   contactRow: {
     marginTop: spacing.xs,

@@ -34,8 +34,12 @@ export function StatCard({ label, value, icon: Icon, sublabel, tone = 'primary',
   // Un grand montant ("1 044 089 GNF") ne tient pas à la même taille
   // qu'un simple compteur ("4") sur une carte aussi étroite — plutôt
   // qu'une taille fixe qui les fait passer à la ligne (le montant se
-  // coupait juste avant la devise), la police se réduit un cran quand
-  // le texte dépasse une longueur raisonnable.
+  // coupait juste avant la devise), la police se réduit par paliers
+  // quand le texte dépasse une longueur raisonnable. Un seul palier ne
+  // suffisait pas pour les montants à 7 chiffres : encore tronqués par
+  // le overflow-hidden de la carte (silencieusement, sans wrap grâce à
+  // whitespace-nowrap — d'où le "GN" au lieu de "GNF").
+  const isVeryLongValue = value.length > 12;
   const isLongValue = value.length > 9;
   return (
     <Card
@@ -60,8 +64,12 @@ export function StatCard({ label, value, icon: Icon, sublabel, tone = 'primary',
           {label}
         </p>
         <p
-          className={`whitespace-nowrap font-bold leading-tight tracking-tight text-text-primary tabular-nums transition-transform duration-300 group-hover:scale-[1.04] ${
-            isLongValue ? 'text-base sm:text-xl' : 'text-lg sm:text-[28px]'
+          className={`whitespace-nowrap font-semibold leading-tight tracking-tight text-text-primary tabular-nums transition-transform duration-300 group-hover:scale-[1.04] ${
+            isVeryLongValue
+              ? 'text-[11px] sm:text-sm'
+              : isLongValue
+                ? 'text-base sm:text-xl'
+                : 'text-lg sm:text-[28px]'
           }`}
         >
           {value}

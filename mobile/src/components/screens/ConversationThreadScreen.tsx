@@ -6,7 +6,7 @@
 // doré, zone de saisie arrondie avec un bouton d'envoi bleu. Logique
 // inchangée.
 import React, { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { IconArrowLeft, IconPackage, IconRoute, IconSend } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
@@ -182,13 +182,19 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
         ListEmptyComponent={
           !isLoading
             ? () => (
-                <AppText variant="sm" color="textMuted" style={styles.empty}>
-                  Aucun message pour le moment — écrivez le premier.
-                </AppText>
+                <View style={styles.invertedItem}>
+                  <AppText variant="sm" color="textMuted" style={styles.empty}>
+                    Aucun message pour le moment — écrivez le premier.
+                  </AppText>
+                </View>
               )
             : undefined
         }
-        renderItem={({ item }) => <MessageBubble message={item} isMine={item.senderId === currentUserId} />}
+        renderItem={({ item }) => (
+          <View style={styles.invertedItem}>
+            <MessageBubble message={item} isMine={item.senderId === currentUserId} />
+          </View>
+        )}
       />
     </ScreenContainer>
   );
@@ -242,6 +248,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.xs,
   },
+  // Sur natif, `inverted` retourne tout le contenu de la liste
+  // (scaleY: -1), pas seulement l'ordre de défilement — sans ce
+  // contre-retournement sur chaque élément rendu, messages et état vide
+  // s'affichent la tête en bas. Sur le web, react-native-web inverse
+  // l'ordre autrement (flex-direction: column-reverse, sans rotation) :
+  // appliquer ce même contre-retournement y retournerait un contenu qui
+  // n'avait jamais été retourné.
+  invertedItem: Platform.select({
+    web: {},
+    default: { transform: [{ scaleY: -1 }] },
+  }),
   bubbleRow: {
     maxWidth: '78%',
   },

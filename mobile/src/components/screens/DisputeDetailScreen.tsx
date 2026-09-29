@@ -6,7 +6,7 @@
 // message du support en doré, saisie arrondie avec bouton d'envoi bleu.
 // Logique inchangée.
 import React, { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconArrowLeft, IconCircleCheck, IconSend } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
@@ -178,16 +178,20 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
         inverted
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <AppText variant="sm" color="textMuted" style={styles.empty}>
-            Aucun message pour le moment.
-          </AppText>
+          <View style={styles.invertedItem}>
+            <AppText variant="sm" color="textMuted" style={styles.empty}>
+              Aucun message pour le moment.
+            </AppText>
+          </View>
         }
         renderItem={({ item }) => (
-          <DisputeMessageBubble
-            message={item}
-            isMine={item.authorId === currentUserId}
-            isFromAgent={Boolean(dispute.assignedAgentId) && item.authorId === dispute.assignedAgentId}
-          />
+          <View style={styles.invertedItem}>
+            <DisputeMessageBubble
+              message={item}
+              isMine={item.authorId === currentUserId}
+              isFromAgent={Boolean(dispute.assignedAgentId) && item.authorId === dispute.assignedAgentId}
+            />
+          </View>
         )}
       />
     </ScreenContainer>
@@ -247,6 +251,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.xs,
   },
+  // Même cause que ConversationThreadScreen : `inverted` retourne tout
+  // le contenu de la liste sur natif, pas seulement l'ordre de
+  // défilement — mais react-native-web inverse l'ordre autrement (sans
+  // rotation), d'où le repli vide spécifique au web.
+  invertedItem: Platform.select({
+    web: {},
+    default: { transform: [{ scaleY: -1 }] },
+  }),
   empty: {
     textAlign: 'center',
     paddingVertical: spacing.xl,

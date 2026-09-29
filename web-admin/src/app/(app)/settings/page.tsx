@@ -16,7 +16,8 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { IconAdjustments, IconChevronRight, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
+import { IconAdjustments, IconArrowRight, IconChevronRight, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
 import { Button, Modal, TextArea, TextField } from '@/components/ui';
 import {
   Chip,
@@ -33,6 +34,14 @@ import { usePlatformSettings, useRemovePlatformSetting, useUpsertPlatformSetting
 import { ApiError } from '@/services/api/ApiError';
 
 type SettingItem = NonNullable<ReturnType<typeof usePlatformSettings>['data']>[number];
+/**
+ * Une paire de taux de change n'a qu'un seul sens réellement enregistré
+ * (voir ExchangeRateService) — `computed: true` marque une carte
+ * synthétisée pour l'affichage (l'inverse calculé), jamais une vraie
+ * ligne PlatformSetting : elle ne s'ouvre pas dans la modale d'édition
+ * générique, qui écrirait une clé qui n'a pas lieu d'exister.
+ */
+type DisplayItem = SettingItem & { computed?: boolean };
 type ValueType = 'number' | 'text' | 'boolean' | 'json';
 
 const KEY_PATTERN = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/;
@@ -123,22 +132,36 @@ function SettingValue({ value }: { value: unknown }) {
 // Carte
 // ---------------------------------------------------------------------------
 
-function SettingCard({ setting, onClick }: { setting: SettingItem; onClick: () => void }) {
+function SettingCard({ setting, onClick }: { setting: DisplayItem; onClick: () => void }) {
   const title = setting.description?.trim() || humanize(paramOf(setting.key));
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full flex-col gap-3 rounded-2xl border border-border bg-surface p-4 text-left shadow-md transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
+      className={`group flex w-full flex-col gap-3 rounded-2xl border p-4 text-left shadow-md transition hover:-translate-y-0.5 hover:shadow-lg ${
+        setting.computed
+          ? 'border-dashed border-border bg-primary-light/20 hover:border-primary/40'
+          : 'border-border bg-surface hover:border-primary/40'
+      }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold text-text-primary">{title}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="font-semibold text-text-primary">{title}</p>
+            {setting.computed ? <Chip tone="neutral">Calculé</Chip> : null}
+          </div>
           <p className="mt-1 break-all font-mono text-[11px] text-text-muted">{setting.key}</p>
         </div>
-        <IconChevronRight size={18} className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5" />
+        {setting.computed ? (
+          <IconArrowRight size={18} className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5" />
+        ) : (
+          <IconChevronRight size={18} className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5" />
+        )}
       </div>
       <SettingValue value={setting.value} />
+      {setting.computed ? (
+        <p className="text-xs text-text-muted">Déduit automatiquement de l&apos;autre sens — modifiable sur Taux de change.</p>
+      ) : null}
     </button>
   );
 }
@@ -147,7 +170,7 @@ function SettingCard({ setting, onClick }: { setting: SettingItem; onClick: () =
 // Modale d'ajout / modification
 // ---------------------------------------------------------------------------
 
-function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () => void; setting: SettingItem | null }) {
+function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () => void; setting: DisplayItem | null }) {
   const upsert = useUpsertPlatformSetting();
   const remove = useRemovePlatformSetting();
 
@@ -319,9 +342,46 @@ function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () =
 // Un générique multi-lignes passé directement à useState<...> commençant par
 // une accolade sur une nouvelle ligne fait planter le parseur SWC/Next.js en
 // .tsx — d'où cet alias nommé sur une seule ligne.
-type ModalState = { setting: SettingItem | null } | null;
+type ModalState = { setting: DisplayItem | null } | null;
+
+/**
+ * Synthétise l'entrée inverse d'une paire exchange_rate.<a>_<b> pour
+ * l'affichage — jamais si l'inverse existe déjà réellement en base (cas
+ * where l'admin l'aurait entré à la main dans les deux sens) et jamais
+ * pour une valeur non numérique (donnée corrompue : mieux vaut ne rien
+ * afficher qu'un calcul faux).
+ */
+function withComputedReverseRates(items: SettingItem[]): DisplayItem[] {
+  const byKey = new Map(items.map((item) => [item.key, item]));
+  const extra: DisplayItem[] = [];
+
+  for (const item of items) {
+    const match = /^exchange_rate\.([a-z0-9]+)_([a-z0-9]+)$/.exec(item.key);
+    if (!match) continue;
+    const [, from, to] = match;
+    const reverseKey = `exchange_rate.${to}_${from}`;
+    if (byKey.has(reverseKey)) continue;
+    if (typeof item.value !== 'number' || item.value === 0) continue;
+
+    // Arrondi à 8 décimales — sans ça, la division flottante affiche
+    // souvent un bruit du type 0.06199999999999999 (SettingValue montre
+    // le nombre brut, contrairement à la page Taux de change qui passe
+    // par Intl.NumberFormat).
+    extra.push({
+      key: reverseKey,
+      value: Math.round((1 / item.value) * 1e8) / 1e8,
+      description: `Taux de change ${to.toUpperCase()} → ${from.toUpperCase()}`,
+      updatedAt: item.updatedAt,
+      updatedById: null,
+      computed: true,
+    });
+  }
+
+  return [...items, ...extra];
+}
 
 export default function PlatformSettingsPage() {
+  const router = useRouter();
   const { data: settings, isLoading, isError } = usePlatformSettings();
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<ModalState>(null);
@@ -330,13 +390,13 @@ export default function PlatformSettingsPage() {
 
   const groups = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const filtered = all.filter(
+    const filtered = withComputedReverseRates(all).filter(
       (setting) =>
         !query ||
         setting.key.toLowerCase().includes(query) ||
         (setting.description ?? '').toLowerCase().includes(query),
     );
-    const byDomain = new Map<string, SettingItem[]>();
+    const byDomain = new Map<string, DisplayItem[]>();
     for (const setting of filtered) {
       const domain = domainOf(setting.key);
       byDomain.set(domain, [...(byDomain.get(domain) ?? []), setting]);
@@ -416,7 +476,11 @@ export default function PlatformSettingsPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {group.items.map((setting) => (
-                  <SettingCard key={setting.key} setting={setting} onClick={() => setModal({ setting })} />
+                  <SettingCard
+                    key={setting.key}
+                    setting={setting}
+                    onClick={() => (setting.computed ? router.push('/exchange-rates') : setModal({ setting }))}
+                  />
                 ))}
               </div>
             </section>

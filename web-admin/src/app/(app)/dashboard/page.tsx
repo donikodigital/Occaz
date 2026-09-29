@@ -18,7 +18,7 @@ import { DashboardShortcuts } from '@/components/dashboard/DashboardShortcuts';
 import { ActivityChart } from '@/components/dashboard/ActivityChart';
 import { useAdminDashboard, useTopRoutes } from '@/hooks/useAdminDashboard';
 import { useActivityTimeSeries } from '@/hooks/useActivityTimeSeries';
-import { formatMoney, formatNumber } from '@/utils/money';
+import { formatMoney, formatNumber, sumMoney } from '@/utils/money';
 import { plural } from '@/utils/text';
 
 const ACTIVITY_WEEKS = 8;
@@ -70,7 +70,7 @@ export default function DashboardPage() {
 
       <div>
         <SectionTitle>Aperçu</SectionTitle>
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:gap-4">
           <StatCard
             index={0}
             label="Utilisateurs"
@@ -126,14 +126,16 @@ export default function DashboardPage() {
       <div>
         <SectionTitle tone="accent">Finances</SectionTitle>
         {/* Une devise ne s'additionne jamais à une autre (1 GNF ≠ 1 XOF) —
-            un bloc de 3 cartes par devise active, jamais un seul total mélangé. */}
+            un bloc de 4 cartes par devise active, jamais un seul total
+            mélangé. La 4e (Commission totale) comble aussi le trou que
+            laissait Remboursé seul sur sa ligne en grille à 2 colonnes. */}
         <div className="space-y-4">
           {data.finance.map((figures) => (
             <div key={figures.currencyId}>
               {data.finance.length > 1 ? (
                 <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-text-muted">{figures.isoCode}</p>
               ) : null}
-              <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:gap-4">
                 <StatCard
                   index={0}
                   label="Revenu brut trajets"
@@ -155,6 +157,14 @@ export default function DashboardPage() {
                   icon={IconCash}
                   tone="danger"
                   sublabel={`${formatNumber(figures.refundedCount)} ${plural(figures.refundedCount, 'remboursement')}`}
+                />
+                <StatCard
+                  index={3}
+                  label="Commission totale"
+                  value={formatMoney(sumMoney(figures.bookingCommission, figures.shipmentCommission), figures.isoCode)}
+                  icon={IconCash}
+                  tone="success"
+                  sublabel="Trajets + envois"
                 />
               </div>
             </div>

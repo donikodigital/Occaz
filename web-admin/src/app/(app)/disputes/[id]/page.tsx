@@ -15,6 +15,7 @@ import {
   IconPackage,
   IconRoute,
   IconSend,
+  IconShieldLock,
   IconUserCheck,
   IconUserOff,
   IconUserPlus,
@@ -35,6 +36,8 @@ import {
   DISPUTE_PRIORITY_LABELS,
   DISPUTE_RESOLUTION_TYPE_LABELS,
   DISPUTE_STATUS_LABELS,
+  OTP_PURPOSE_LABELS,
+  OTP_PURPOSES_BY_SUBJECT,
 } from '@/utils/disputeLabels';
 import { formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
@@ -54,7 +57,7 @@ import {
   disputeRef,
   initialOf,
 } from '@/components/disputes/disputeUi';
-import type { DisputePriority, DisputeResolutionType, DisputeStatus } from '@/types/disputes.types';
+import type { DisputePriority, DisputeResolutionType, DisputeStatus, OtpPurpose } from '@/types/disputes.types';
 
 const REVIEWABLE_STATUSES: DisputeStatus[] = [
   'UNDER_REVIEW',
@@ -178,6 +181,7 @@ export default function DisputeDetailPage() {
   const [resolutionType, setResolutionType] = useState<DisputeResolutionType>('NO_ACTION');
   const [refundAmount, setRefundAmount] = useState('');
   const [targetUserId, setTargetUserId] = useState('');
+  const [otpPurpose, setOtpPurpose] = useState<OtpPurpose | ''>('');
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [resolutionError, setResolutionError] = useState<string | undefined>();
 
@@ -211,7 +215,9 @@ export default function DisputeDetailPage() {
   const isClosed = dispute.status === 'CLOSED';
   const needsRefundAmount = resolutionType === 'PARTIAL_REFUND' || resolutionType === 'SHARED_RESPONSIBILITY';
   const needsTargetUser = resolutionType === 'SUSPENSION';
+  const needsOtpPurpose = resolutionType === 'OTP_MANUAL_VALIDATION';
   const isShipment = dispute.subjectType === 'SHIPMENT';
+  const availableOtpPurposes = OTP_PURPOSES_BY_SUBJECT[dispute.subjectType];
   const openedByLabel = dispute.openedBy?.email ?? dispute.openedBy?.phone;
   const assignedLabel = dispute.assignedAgent?.email ?? dispute.assignedAgent?.phone;
 
@@ -232,11 +238,22 @@ export default function DisputeDetailPage() {
       setResolutionError("Indiquez l'identifiant de l'utilisateur visé par la suspension.");
       return;
     }
+    if (needsOtpPurpose && !otpPurpose) {
+      setResolutionError('Choisissez quelle étape valider.');
+      return;
+    }
+    if (needsOtpPurpose && resolutionNotes.trim().length < 10) {
+      setResolutionError(
+        'Une justification détaillée (10 caractères minimum) est requise pour valider un code manuellement.',
+      );
+      return;
+    }
     try {
       await resolveDispute.mutateAsync({
         type: resolutionType,
         refundAmount: needsRefundAmount ? refundAmount.trim() : undefined,
         targetUserId: needsTargetUser ? targetUserId.trim() : undefined,
+        otpPurpose: needsOtpPurpose ? (otpPurpose as OtpPurpose) : undefined,
         notes: resolutionNotes.trim() || undefined,
       });
     } catch (error) {
@@ -479,6 +496,15 @@ export default function DisputeDetailPage() {
             </div>
           ) : null}
 
+          {dispute.resolution.otpPurpose ? (
+            <div className="mt-4 rounded-xl bg-white p-3 ring-1 ring-inset ring-emerald-100">
+              <p className="text-xs font-medium text-slate-500">Étape validée manuellement</p>
+              <p className="mt-0.5 text-sm font-bold text-emerald-700">
+                {OTP_PURPOSE_LABELS[dispute.resolution.otpPurpose]}
+              </p>
+            </div>
+          ) : null}
+
           {dispute.resolution.notes ? (
             <p className="mt-3 text-sm leading-relaxed text-slate-600">{dispute.resolution.notes}</p>
           ) : null}
@@ -525,8 +551,33 @@ export default function DisputeDetailPage() {
               />
             ) : null}
 
+            {needsOtpPurpose ? (
+              <div className="space-y-3 rounded-xl bg-amber-50 p-3 ring-1 ring-inset ring-amber-100">
+                <div className="flex items-start gap-2 text-xs font-medium text-amber-800">
+                  <IconShieldLock size={16} className="mt-0.5 shrink-0" />
+                  <p>
+                    Cette action valide l&apos;étape sans code — à réserver aux cas où le passager/destinataire
+                    reste injoignable ou refuse de le communiquer. Idéalement après l&apos;avoir contacté
+                    vous-même pour confirmer.
+                  </p>
+                </div>
+                <SelectField
+                  label="Étape à valider"
+                  value={otpPurpose}
+                  onChange={(e) => setOtpPurpose(e.target.value as OtpPurpose)}
+                >
+                  <option value="">Choisir…</option>
+                  {availableOtpPurposes.map((value) => (
+                    <option key={value} value={value}>
+                      {OTP_PURPOSE_LABELS[value]}
+                    </option>
+                  ))}
+                </SelectField>
+              </div>
+            ) : null}
+
             <TextAreaField
-              label="Notes (optionnel)"
+              label={needsOtpPurpose ? 'Justification (obligatoire, 10 caractères min.)' : 'Notes (optionnel)'}
               value={resolutionNotes}
               onChange={(e) => setResolutionNotes(e.target.value)}
               rows={3}

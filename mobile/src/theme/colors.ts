@@ -22,6 +22,8 @@ export const colors = {
   successDark: '#047857',
   successLight: '#E1F5EE',
   onSuccess: '#FFFFFF',
+  /** Vert profond tendant vers le noir — bandeaux de statut « Confirmée/Terminé/Livré » (OceanHeroCard), plus sobre que `success`. */
+  successDeep: '#0E3B2E',
 
   // Accent / énergie / notes — ambre
   accent: '#F59E0B',

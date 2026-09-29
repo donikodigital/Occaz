@@ -46,11 +46,18 @@ export const shipmentsApi = {
 
   markPickupPending: (id: string) => api.post<Shipment>(`/shipments/${id}/pickup-pending`),
 
-  requestPickupOtp: (id: string) => api.post<{ expiresInSeconds: number }>(`/shipments/${id}/otp/pickup/request`),
+  // smsSent indique si le SMS est bien parti — le code est de toute
+  // façon toujours généré et consultable (par l'expéditeur, côté
+  // récupération) dans l'app, le SMS n'est qu'un canal best-effort.
+
+  requestPickupOtp: (id: string) =>
+    api.post<{ expiresInSeconds: number; smsSent: boolean }>(`/shipments/${id}/otp/pickup/request`),
 
   /** Pour l'expéditeur : revoir son propre code dans l'app (renvoie le code en clair, contrairement à requestPickupOtp destiné au chauffeur). */
   revealPickupOtpForSender: (id: string) =>
-    api.post<{ expiresInSeconds: number; code?: string }>(`/shipments/${id}/otp/pickup/reveal-for-sender`),
+    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean }>(
+      `/shipments/${id}/otp/pickup/reveal-for-sender`,
+    ),
 
   verifyPickupOtp: (id: string, code: string) =>
     api.post<Shipment>(`/shipments/${id}/otp/pickup/verify`, { code }),
@@ -59,8 +66,12 @@ export const shipmentsApi = {
 
   markDeliveryPending: (id: string) => api.post<Shipment>(`/shipments/${id}/delivery-pending`),
 
+  // Le destinataire n'a pas de compte dans l'app (contrairement à
+  // l'expéditeur) : il n'existe pas de reveal-for-recipient, ce code
+  // dépend donc entièrement de ce SMS — voir le message à l'utilisateur
+  // à ce sujet.
   requestDeliveryOtp: (id: string) =>
-    api.post<{ expiresInSeconds: number }>(`/shipments/${id}/otp/delivery/request`),
+    api.post<{ expiresInSeconds: number; smsSent: boolean }>(`/shipments/${id}/otp/delivery/request`),
 
   verifyDeliveryOtp: (id: string, code: string) =>
     api.post<Shipment>(`/shipments/${id}/otp/delivery/verify`, { code }),

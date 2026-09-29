@@ -1,5 +1,5 @@
 // backend/src/otp/otp.service.ts
-import { Inject, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OtpPurpose, OtpStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -37,6 +37,8 @@ export interface VerifyOtpParams {
  */
 @Injectable()
 export class OtpService {
+  private readonly logger = new Logger('OTP');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
@@ -44,13 +46,16 @@ export class OtpService {
   ) {}
 
   /**
-   * Le code est envoyé AVANT d'être persisté : si l'envoi SMS échoue
-   * (panne du prestataire, clé manquante, réseau...), aucune ligne
-   * OtpCode n'est créée — plutôt qu'un code en base jamais communiqué au
-   * bénéficiaire (qui aurait bloqué silencieusement toute tentative de
-   * vérification ultérieure, et pollué "le plus récent" consulté par
-   * verify()). L'échec remonte comme une 503 explicite (dépendance
-   * externe indisponible), jamais un crash 500 générique.
+   * Le code est désormais toujours généré et persisté, que le SMS parte
+   * ou non : il doit rester consultable/copiable dans l'application
+   * (carte de code) indépendamment de la fiabilité du SMS (carte SIM
+   * hors service, téléphone-passerelle déchargé...) — le bénéficiaire
+   * peut se reconnecter depuis n'importe quel appareil pour le
+   * récupérer. Le SMS reste envoyé, mais en canal best-effort, en
+   * parallèle : son échec est journalisé, jamais bloquant. (Avant :
+   * l'échec SMS empêchait toute persistance et remontait en 503 — donc
+   * bloquait aussi l'affichage in-app, ce qui allait à l'encontre de
+   * l'objectif même de cette carte "je n'ai pas reçu le SMS".)
    */
   /**
    * `revealCodeToCaller` renvoie le code en clair dans la réponse, en plus
@@ -67,18 +72,10 @@ export class OtpService {
     params: GenerateOtpParams,
     message: string,
     options?: { revealCodeToCaller?: boolean },
-  ): Promise<{ expiresInSeconds: number; code?: string }> {
+  ): Promise<{ expiresInSeconds: number; code?: string; smsSent: boolean }> {
     const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
     const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;
     const code = generateOtpCode();
-
-    try {
-      await this.smsProvider.send(params.phone, `${message} ${code}`);
-    } catch (error) {
-      throw new ServiceUnavailableException(
-        `Impossible d'envoyer le code par SMS pour le moment — réessayez dans quelques instants. (${(error as Error).message})`,
-      );
-    }
 
     await this.prisma.otpCode.create({
       data: {
@@ -93,7 +90,17 @@ export class OtpService {
       },
     });
 
-    return { expiresInSeconds: expirySeconds, code: options?.revealCodeToCaller ? code : undefined };
+    let smsSent = true;
+    try {
+      await this.smsProvider.send(params.phone, `${message} ${code}`);
+    } catch (error) {
+      smsSent = false;
+      this.logger.warn(
+        `SMS OTP non envoyé (${params.purpose}${params.bookingId ? `, booking ${params.bookingId}` : ''}${params.shipmentId ? `, shipment ${params.shipmentId}` : ''}) — code néanmoins généré et disponible dans l'application : ${(error as Error).message}`,
+      );
+    }
+
+    return { expiresInSeconds: expirySeconds, code: options?.revealCodeToCaller ? code : undefined, smsSent };
   }
 
   /**

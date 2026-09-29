@@ -242,6 +242,8 @@ enum DisputeResolutionType {
   SANCTION
   SUSPENSION
   NO_ACTION
+  /// Valide manuellement une étape OTP bloquée (prise en charge/dépose/récupération/livraison) sans code — support/superadmin uniquement, jamais le chauffeur. Voir ResolveDisputeDto.otpPurpose.
+  OTP_MANUAL_VALIDATION
 }
 
 enum NotificationChannel {
@@ -1397,6 +1399,8 @@ model DisputeResolution {
   refundAmount BigInt?
   currencyId   String?
   currency     Currency?             @relation(fields: [currencyId], references: [id])
+  /// Étape validée manuellement — renseigné uniquement pour type = OTP_MANUAL_VALIDATION.
+  otpPurpose   OtpPurpose?
   decidedById  String
   decidedBy    User                  @relation(fields: [decidedById], references: [id])
   notes        String?

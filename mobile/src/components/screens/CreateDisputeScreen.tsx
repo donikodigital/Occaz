@@ -19,15 +19,29 @@ export interface CreateDisputeScreenProps {
   basePath: '/(customer)' | '/(driver)';
 }
 
-/** Toujours ouvert depuis le détail d'une réservation ou d'un envoi — jamais de sélection de contexte ici, elle est déjà faite par l'écran appelant. */
+/**
+ * Toujours ouvert depuis le détail d'une réservation ou d'un envoi —
+ * jamais de sélection de contexte ici, elle est déjà faite par l'écran
+ * appelant. `reason`/`description` peuvent arriver pré-remplis (ex. le
+ * bouton contextuel « passager/destinataire injoignable » sur la carte
+ * de code) : l'utilisateur reste libre de les modifier avant l'envoi.
+ */
 export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
-  const { subjectType, bookingId, shipmentId } = useLocalSearchParams<{
+  const {
+    subjectType,
+    bookingId,
+    shipmentId,
+    reason: prefillReason,
+    description: prefillDescription,
+  } = useLocalSearchParams<{
     subjectType: DisputeSubjectType;
     bookingId?: string;
     shipmentId?: string;
+    reason?: string;
+    description?: string;
   }>();
-  const [reason, setReason] = useState('');
-  const [description, setDescription] = useState('');
+  const [reason, setReason] = useState(prefillReason ?? '');
+  const [description, setDescription] = useState(prefillDescription ?? '');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const createDispute = useCreateDispute();
 
@@ -69,6 +83,11 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
       </OceanCard>
 
       <OceanSection icon={<IconAlertTriangle size={17} color={OCEAN.base} />} title="Votre signalement">
+        {prefillReason ? (
+          <AppText variant="xs" color="textMuted">
+            Motif pré-rempli à partir de votre situation — modifiez-le si besoin.
+          </AppText>
+        ) : null}
         <TextField
           label="Motif"
           value={reason}

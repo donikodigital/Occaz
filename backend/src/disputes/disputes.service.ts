@@ -14,6 +14,7 @@ import {
   DocumentOwnerType,
   NotificationChannel,
   NotificationType,
+  OtpPurpose,
   PaymentStatus,
   Prisma,
   ServiceType,
@@ -26,6 +27,8 @@ import { PaymentsService } from '../payments/payments.service';
 import { WalletsService } from '../wallets/wallets.service';
 import { UsersService } from '../users/users.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TripOtpService } from '../trips/trip-otp.service';
+import { ShipmentOtpService } from '../shipments/shipment-otp.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { toMoneyBigInt } from '../common/utils/money.util';
@@ -57,6 +60,8 @@ export class DisputesService {
     private readonly wallets: WalletsService,
     private readonly usersService: UsersService,
     private readonly notifications: NotificationsService,
+    private readonly tripOtpService: TripOtpService,
+    private readonly shipmentOtpService: ShipmentOtpService,
   ) {}
 
   async findOne(id: string) {
@@ -367,6 +372,7 @@ export class DisputesService {
         type: dto.type,
         refundAmount,
         currencyId,
+        otpPurpose: dto.type === DisputeResolutionType.OTP_MANUAL_VALIDATION ? dto.otpPurpose : undefined,
         decidedById: actorId,
         notes: dto.notes,
       },
@@ -381,7 +387,7 @@ export class DisputesService {
       entityType: 'Dispute',
       entityId: disputeId,
       action: 'RESOLVE',
-      diff: { type: dto.type, notes: dto.notes },
+      diff: { type: dto.type, otpPurpose: dto.otpPurpose, notes: dto.notes },
     });
 
     return resolution;
@@ -473,6 +479,44 @@ export class DisputesService {
           throw new BadRequestException('targetUserId est requis pour une SUSPENSION.');
         }
         await this.usersService.suspend(dto.targetUserId, dto.notes ?? 'Suspendu suite à résolution de litige.', actorId);
+        return {};
+      }
+
+      case DisputeResolutionType.OTP_MANUAL_VALIDATION: {
+        if (!dto.otpPurpose) {
+          throw new BadRequestException(
+            "otpPurpose est requis pour ce type de résolution (quelle étape valider : TRIP_PICKUP, TRIP_DROPOFF, SHIPMENT_PICKUP ou SHIPMENT_DELIVERY).",
+          );
+        }
+        if (!dto.notes || dto.notes.trim().length < 10) {
+          throw new BadRequestException(
+            'Une justification détaillée (10 caractères minimum) est requise pour valider un code manuellement — elle reste tracée dans le litige.',
+          );
+        }
+
+        const tripPurposes: OtpPurpose[] = [OtpPurpose.TRIP_PICKUP, OtpPurpose.TRIP_DROPOFF];
+        const shipmentPurposes: OtpPurpose[] = [OtpPurpose.SHIPMENT_PICKUP, OtpPurpose.SHIPMENT_DELIVERY];
+        const purposeMatchesService =
+          (serviceType === ServiceType.TRIP && tripPurposes.includes(dto.otpPurpose)) ||
+          (serviceType === ServiceType.SHIPMENT && shipmentPurposes.includes(dto.otpPurpose));
+        if (!purposeMatchesService) {
+          throw new BadRequestException('Cette étape ne correspond pas au type de ce litige (trajet/envoi).');
+        }
+
+        switch (dto.otpPurpose) {
+          case OtpPurpose.TRIP_PICKUP:
+            await this.tripOtpService.manuallyValidatePickup(targetId);
+            break;
+          case OtpPurpose.TRIP_DROPOFF:
+            await this.tripOtpService.manuallyValidateDropoff(targetId);
+            break;
+          case OtpPurpose.SHIPMENT_PICKUP:
+            await this.shipmentOtpService.manuallyValidatePickup(targetId);
+            break;
+          case OtpPurpose.SHIPMENT_DELIVERY:
+            await this.shipmentOtpService.manuallyValidateDelivery(targetId);
+            break;
+        }
         return {};
       }
 

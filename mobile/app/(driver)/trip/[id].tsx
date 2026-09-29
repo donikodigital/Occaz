@@ -26,6 +26,7 @@ import {
   IconCircleCheck,
   IconFlag,
   IconInfoCircle,
+  IconLifebuoy,
   IconLuggage,
   IconMessageCircle,
   IconNotes,
@@ -103,7 +104,7 @@ function formatKg(value: number): string {
 function heroColorFor(status: TripStatus): string {
   switch (status) {
     case 'COMPLETED':
-      return colors.success;
+      return colors.successDeep;
     case 'CANCELLED':
     case 'REFUNDED':
       return colors.textSecondary;
@@ -307,8 +308,20 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
   function handleRequest() {
     const mutation = phase === 'pickup' ? requestPickup : requestDropoff;
     mutation.mutate(undefined, {
-      onSuccess: () => setCodeVisible(true),
-      onError: () => Alert.alert('Erreur', "L'envoi du code a échoué — réessayez."),
+      onSuccess: (result) => {
+        setCodeVisible(true);
+        // Le code est désormais toujours généré même si le SMS échoue
+        // (canal best-effort) — le passager peut alors le consulter
+        // directement dans son app plutôt que d'attendre un SMS qui
+        // n'arrivera pas.
+        if (!result.smsSent) {
+          Alert.alert(
+            'Code généré',
+            "Le SMS n'a pas pu être envoyé au passager — demandez-lui de consulter son code directement dans l'application (bouton « Voir mon code » sur sa réservation).",
+          );
+        }
+      },
+      onError: () => Alert.alert('Erreur', 'La demande de code a échoué — réessayez.'),
     });
   }
 
@@ -403,6 +416,29 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
                 />
                 <OceanButton label="Vérifier" onPress={handleVerify} loading={isVerifying} disabled={code.length !== 6} />
               </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({
+                    pathname: '/(driver)/dispute-new',
+                    params: {
+                      subjectType: 'TRIP',
+                      bookingId: booking.id,
+                      reason:
+                        phase === 'pickup'
+                          ? 'Passager injoignable ou refuse de communiquer le code de prise en charge'
+                          : 'Passager injoignable ou refuse de communiquer le code de dépose',
+                      description: `Réservation de ${passengerNames}.`,
+                    },
+                  })
+                }
+                style={({ pressed }) => [styles.supportLink, pressed && styles.pressed]}
+              >
+                <IconLifebuoy size={14} color={OCEAN.base} />
+                <AppText variant="xs" color={OCEAN.base} weight="semibold">
+                  Passager injoignable ou refuse le code ? Contacter le support
+                </AppText>
+              </Pressable>
             </>
           )}
         </View>
@@ -940,6 +976,7 @@ const styles = StyleSheet.create({
   },
   bookingText: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   bookingMeta: {
@@ -966,6 +1003,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     alignSelf: 'flex-start',
+  },
+  supportLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
   },
   emptyBookings: {
     alignItems: 'center',
@@ -1007,6 +1051,7 @@ const styles = StyleSheet.create({
   },
   vehicleText: {
     flex: 1,
+    minWidth: 0,
     gap: 1,
   },
   plate: {
