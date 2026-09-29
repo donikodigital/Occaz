@@ -26,9 +26,19 @@ function trendPercent(current: number, previous: number): number | null {
 
 /**
  * Carte de mise en avant — total de commissions de la période + variation,
- * graphique en dessous. Quand la période n'a aucune donnée (series vide),
- * on n'affiche plus la grande zone de graphique vide : juste une ligne de
- * texte compacte, pour ne pas gonfler la carte avec de l'espace mort.
+ * graphique en dessous. Quand la période n'a aucune donnée (series vide,
+ * ou uniquement des points à 0), on n'affiche plus la grande zone de
+ * graphique vide : juste une ligne de texte compacte, pour ne pas gonfler
+ * la carte avec de l'espace mort. RevenueChart affiche lui-même un état
+ * vide interne, mais celui-ci reste peu visible sur ce fond ; on évite
+ * donc de monter le graphique du tout dans ce cas plutôt que de compter
+ * sur son message interne.
+ *
+ * from/to de la fenêtre sont aussi transmis à RevenueChart : l'API ne
+ * renvoie un point que pour les jours/semaines/mois ayant une commission
+ * réelle, donc sans ces bornes un mois calme avec une seule journée
+ * d'activité afficherait une unique barre occupant tout le graphique
+ * plutôt qu'une barre isolée au milieu d'une ligne à plat.
  */
 export function DashboardHero() {
   const [period, setPeriod] = useState<CommissionSummaryPeriod>('month');
@@ -37,6 +47,8 @@ export function DashboardHero() {
 
   const window = useMemo(() => windowForPeriod(period), [period]);
   const { data: series, isLoading: seriesLoading } = useRevenueTimeSeries(window.granularity, window.from, window.to);
+
+  const hasSeriesData = !!series && series.some((point) => Number(point.commission) > 0);
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary-dark p-5 text-white shadow-xl shadow-primary-dark/30 sm:p-6">
@@ -118,9 +130,9 @@ export function DashboardHero() {
 
           {seriesLoading || !series ? (
             <div className="mt-3 h-6 w-1/2 animate-pulse rounded bg-white/10" />
-          ) : series.length > 0 ? (
+          ) : hasSeriesData ? (
             <div className="mt-3">
-              <RevenueChart points={series} granularity={window.granularity} />
+              <RevenueChart points={series} granularity={window.granularity} from={window.from} to={window.to} />
             </div>
           ) : null}
         </>
