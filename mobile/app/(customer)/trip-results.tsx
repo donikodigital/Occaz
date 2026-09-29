@@ -49,7 +49,11 @@ function TripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
             <AppText variant="base" weight="semibold" numberOfLines={1} style={styles.nameText}>
               {trip.driver.firstName} {trip.driver.lastName[0]}.
             </AppText>
-            {trip.driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={16} color={OCEAN.base} /> : null}
+            {trip.driver.isVerifiedBadge ? (
+              <IconRosetteDiscountCheck size={16} color={OCEAN.base} />
+            ) : (
+              <OceanPill label="Non vérifié" tone="neutral" />
+            )}
           </View>
           {trip.driver.averageRating ? (
             <View style={styles.ratingRow}>

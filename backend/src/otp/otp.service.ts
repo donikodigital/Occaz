@@ -104,12 +104,20 @@ export class OtpService {
   }
 
   /**
-   * Vérifie le code le plus récent pour ce (purpose, booking|shipment).
+   * Vérifie le code parmi les quelques plus récents pour ce (purpose,
+   * booking|shipment) — pas seulement le tout dernier. Le bénéficiaire
+   * (passager, expéditeur) peut à tout moment régénérer son code via
+   * "Voir mon code" dans l'app, indépendamment d'une demande déjà faite
+   * par le chauffeur : sans cette petite fenêtre de tolérance, le code
+   * que le chauffeur vient de recevoir verbalement (ou par SMS) devient
+   * invalide dès que l'autre partie régénère le sien, sans qu'aucune des
+   * deux ne le sache — exactement le bug "Code invalide" alors que le
+   * passager donne un code qu'il voit bien, valide, à l'écran.
    * Lève une exception explicite dans chaque cas d'échec — jamais de
    * validation implicite côté appelant.
    */
   async verify(params: VerifyOtpParams): Promise<void> {
-    const otp = await this.prisma.otpCode.findFirst({
+    const candidates = await this.prisma.otpCode.findMany({
       where: {
         purpose: params.purpose,
         bookingId: params.bookingId,
@@ -117,25 +125,38 @@ export class OtpService {
         status: OtpStatus.PENDING,
       },
       orderBy: { createdAt: 'desc' },
+      take: 3,
     });
 
-    if (!otp || otp.expiresAt < new Date()) {
+    const latest = candidates[0];
+    if (!latest || latest.expiresAt < new Date()) {
       throw new UnauthorizedException('Code expiré ou introuvable — demandez-en un nouveau.');
     }
-    if (otp.attempts >= otp.maxAttempts) {
-      await this.prisma.otpCode.update({ where: { id: otp.id }, data: { status: OtpStatus.FAILED } });
+    if (latest.attempts >= latest.maxAttempts) {
+      await this.prisma.otpCode.update({ where: { id: latest.id }, data: { status: OtpStatus.FAILED } });
       throw new UnauthorizedException('Trop de tentatives — demandez un nouveau code.');
     }
-    if (!verifyOtpCode(params.code, otp.code)) {
+
+    const now = new Date();
+    const match = candidates.find((candidate) => candidate.expiresAt >= now && verifyOtpCode(params.code, candidate.code));
+
+    if (!match) {
       await this.prisma.otpCode.update({
-        where: { id: otp.id },
+        where: { id: latest.id },
         data: { attempts: { increment: 1 } },
       });
       throw new UnauthorizedException('Code invalide.');
     }
 
+    // On invalide tout le lot (y compris les autres candidats non
+    // utilisés) : une fois un code de ce lot vérifié, les éventuels
+    // codes générés entre-temps ne doivent plus pouvoir resservir.
+    await this.prisma.otpCode.updateMany({
+      where: { id: { in: candidates.map((candidate) => candidate.id) }, status: OtpStatus.PENDING },
+      data: { status: OtpStatus.EXPIRED },
+    });
     await this.prisma.otpCode.update({
-      where: { id: otp.id },
+      where: { id: match.id },
       data: { status: OtpStatus.VERIFIED, verifiedAt: new Date() },
     });
   }

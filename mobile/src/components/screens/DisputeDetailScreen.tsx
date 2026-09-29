@@ -6,7 +6,7 @@
 // message du support en doré, saisie arrondie avec bouton d'envoi bleu.
 // Logique inchangée.
 import React, { useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconArrowLeft, IconCircleCheck, IconSend } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
@@ -67,7 +67,15 @@ function DisputeMessageBubble({
   );
 }
 
-/** Interrogation périodique (15s) — même limite backend que la messagerie du Lot 7 (aucun canal temps réel). */
+/**
+ * Interrogation périodique (15s) — même limite backend que la messagerie du Lot 7 (aucun canal temps réel).
+ *
+ * NOTE : la liste utilise `inverted`. React Native retourne déjà lui-même
+ * chaque cellule (et le composant « liste vide ») pour qu'ils restent à
+ * l'endroit. Ne surtout pas ajouter de contre-retournement manuel
+ * (`scaleY: -1`) sur les éléments : ce serait un double retournement et
+ * le texte s'afficherait la tête en bas.
+ */
 export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
   const [draft, setDraft] = useState('');
   const currentUserId = useAuthStore((state) => state.user?.id);
@@ -178,20 +186,16 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
         inverted
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <View style={styles.invertedItem}>
-            <AppText variant="sm" color="textMuted" style={styles.empty}>
-              Aucun message pour le moment.
-            </AppText>
-          </View>
+          <AppText variant="sm" color="textMuted" style={styles.empty}>
+            Aucun message pour le moment.
+          </AppText>
         }
         renderItem={({ item }) => (
-          <View style={styles.invertedItem}>
-            <DisputeMessageBubble
-              message={item}
-              isMine={item.authorId === currentUserId}
-              isFromAgent={Boolean(dispute.assignedAgentId) && item.authorId === dispute.assignedAgentId}
-            />
-          </View>
+          <DisputeMessageBubble
+            message={item}
+            isMine={item.authorId === currentUserId}
+            isFromAgent={Boolean(dispute.assignedAgentId) && item.authorId === dispute.assignedAgentId}
+          />
         )}
       />
     </ScreenContainer>
@@ -251,14 +255,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.xs,
   },
-  // Même cause que ConversationThreadScreen : `inverted` retourne tout
-  // le contenu de la liste sur natif, pas seulement l'ordre de
-  // défilement — mais react-native-web inverse l'ordre autrement (sans
-  // rotation), d'où le repli vide spécifique au web.
-  invertedItem: Platform.select({
-    web: {},
-    default: { transform: [{ scaleY: -1 }] },
-  }),
   empty: {
     textAlign: 'center',
     paddingVertical: spacing.xl,

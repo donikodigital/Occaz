@@ -146,7 +146,11 @@ export default function TripDetailScreen() {
               <AppText variant="lg" weight="bold" numberOfLines={1} style={styles.nameText}>
                 {trip.driver.firstName} {trip.driver.lastName}
               </AppText>
-              {trip.driver.isVerifiedBadge ? <IconRosetteDiscountCheck size={17} color={OCEAN.base} /> : null}
+              {trip.driver.isVerifiedBadge ? (
+                <IconRosetteDiscountCheck size={17} color={OCEAN.base} />
+              ) : (
+                <OceanPill label="Non vérifié" tone="neutral" />
+              )}
             </View>
             {trip.driver.averageRating ? (
               <View style={styles.ratingRow}>

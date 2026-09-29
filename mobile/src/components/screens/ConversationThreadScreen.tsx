@@ -6,7 +6,7 @@
 // doré, zone de saisie arrondie avec un bouton d'envoi bleu. Logique
 // inchangée.
 import React, { useCallback, useState } from 'react';
-import { FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { IconArrowLeft, IconPackage, IconRoute, IconSend } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
@@ -90,6 +90,12 @@ function useThreadHeader(detail: ConversationDetail | undefined, currentUserId: 
  * plus anciens n'existe encore dans cet écran. Hors du périmètre de
  * cette correction (qui visait le manque de contexte affiché), à
  * traiter séparément si une conversation dépasse 30 messages en usage réel.
+ *
+ * NOTE : la liste utilise `inverted`. React Native retourne déjà lui-même
+ * chaque cellule (et le composant « liste vide ») pour qu'ils restent à
+ * l'endroit. Ne surtout pas ajouter de contre-retournement manuel
+ * (`scaleY: -1`) sur les éléments : ce serait un double retournement et
+ * le texte s'afficherait la tête en bas.
  */
 export function ConversationThreadScreen({ conversationId }: ConversationThreadScreenProps) {
   const [draft, setDraft] = useState('');
@@ -182,19 +188,13 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
         ListEmptyComponent={
           !isLoading
             ? () => (
-                <View style={styles.invertedItem}>
-                  <AppText variant="sm" color="textMuted" style={styles.empty}>
-                    Aucun message pour le moment — écrivez le premier.
-                  </AppText>
-                </View>
+                <AppText variant="sm" color="textMuted" style={styles.empty}>
+                  Aucun message pour le moment — écrivez le premier.
+                </AppText>
               )
             : undefined
         }
-        renderItem={({ item }) => (
-          <View style={styles.invertedItem}>
-            <MessageBubble message={item} isMine={item.senderId === currentUserId} />
-          </View>
-        )}
+        renderItem={({ item }) => <MessageBubble message={item} isMine={item.senderId === currentUserId} />}
       />
     </ScreenContainer>
   );
@@ -248,17 +248,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.xs,
   },
-  // Sur natif, `inverted` retourne tout le contenu de la liste
-  // (scaleY: -1), pas seulement l'ordre de défilement — sans ce
-  // contre-retournement sur chaque élément rendu, messages et état vide
-  // s'affichent la tête en bas. Sur le web, react-native-web inverse
-  // l'ordre autrement (flex-direction: column-reverse, sans rotation) :
-  // appliquer ce même contre-retournement y retournerait un contenu qui
-  // n'avait jamais été retourné.
-  invertedItem: Platform.select({
-    web: {},
-    default: { transform: [{ scaleY: -1 }] },
-  }),
   bubbleRow: {
     maxWidth: '78%',
   },
