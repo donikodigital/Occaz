@@ -32,6 +32,8 @@ import { BookingsService } from './bookings.service';
 
 const DEFAULT_SEARCH_RADIUS_KM = 5;
 const SEARCH_RADIUS_SETTING_KEY = 'trip.search_radius_km';
+/** Devise à joindre aux listes pour que les écrans affichent les montants dans la bonne monnaie (même pattern que shipments.service.ts). */
+const CURRENCY_SELECT = { select: { id: true, isoCode: true, symbol: true } } as const;
 /**
  * NB sur le cycle de vie (section 20) : ce Lot implémente les transitions
  * DRAFT -> PUBLISHED et -> CANCELLED, entièrement sous le contrôle du
@@ -67,6 +69,7 @@ export class TripsService {
         destinationCity: true,
         destinationLocation: true,
         stops: { orderBy: { sequence: 'asc' }, include: { location: true } },
+        currency: CURRENCY_SELECT,
       },
     });
     if (!trip) throw new NotFoundException('Trajet introuvable.');
@@ -451,7 +454,7 @@ export class TripsService {
         skip: query.skip,
         take: query.take,
         orderBy: { departureAt: 'desc' },
-        include: { driver: true, originCity: true, destinationCity: true },
+        include: { driver: true, originCity: true, destinationCity: true, currency: CURRENCY_SELECT },
       }),
       this.prisma.trip.count({ where }),
     ]);
