@@ -114,7 +114,7 @@ export class CustomerProfilesService {
       userId,
       type: NotificationType.STATUS_CHANGE,
       channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
-      fallbackTitle: 'Bienvenue chez Transport Partagé',
+      fallbackTitle: "Bienvenue chez Occa'Z",
       fallbackBody: `Bienvenue ${dto.firstName} ! Votre compte est prêt.`,
     });
 

@@ -77,7 +77,7 @@ export function renderNotificationEmailHtml({ title, body, actionUrl, actionLabe
               <td style="background-color: ${OCEAN.base}; background: linear-gradient(135deg, ${OCEAN.bright} 0%, ${OCEAN.base} 55%, ${OCEAN.deep} 100%); padding: 22px 28px;">
                 <span style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px; color: #ffffff;">OCCAZ</span>
                 <br />
-                <span style="font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.75);">Transport Partagé</span>
+                <span style="font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.75);">Occa'Z</span>
               </td>
             </tr>
             <tr>

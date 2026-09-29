@@ -1,5 +1,5 @@
 // mobile/app/_layout.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -17,6 +17,7 @@ import { queryClient } from '@/services/queryClient';
 import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/theme';
 import { usePushNotificationRegistration } from '@/hooks/usePushNotifications';
+import { AnimatedSplash } from '@/components/screens/AnimatedSplash';
 import '@/tasks/tripLocationTask';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -32,6 +33,13 @@ export default function RootLayout() {
   const isHydrating = useAuthStore((state) => state.isHydrating);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   usePushNotificationRegistration(isAuthenticated);
+  // Le splash natif (SplashScreen) est une image statique — aucune
+  // animation n'y est possible, c'est une contrainte système, pas un
+  // choix. Dès qu'il disparaît, cette intro JS prend le relais pendant
+  // ~2s (gouttes, pin qui atterrit, vagues) avant de révéler l'app,
+  // déjà montée en dessous — la vraie app n'attend donc pas la fin de
+  // l'animation pour charger.
+  const [showIntro, setShowIntro] = useState(true);
 
   useEffect(() => {
     hydrate();
@@ -53,10 +61,9 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <StatusBar style="dark" />
           <Slot />
+          {showIntro ? <AnimatedSplash onFinish={() => setShowIntro(false)} /> : null}
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
-
-

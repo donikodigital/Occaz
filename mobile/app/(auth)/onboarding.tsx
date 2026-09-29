@@ -4,14 +4,17 @@
 // indigo, cartes de rôle arrondies avec ombre douce, typographie plus
 // généreuse. Logique inchangée.
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, ImageBackground, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowRight, IconRoute, IconSteeringWheel, IconUser } from '@tabler/icons-react-native';
+import { IconArrowRight, IconSteeringWheel, IconUser } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
 import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import type { AccountType } from '@/types/auth.types';
+
+const SKY_BACKGROUND = require('../../assets/images/onboarding-sky.jpg');
+const LOGO_SOURCE = require('../../assets/images/pin-glyph.png');
 
 interface RoleOptionProps {
   title: string;
@@ -53,49 +56,66 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <ScreenContainer style={styles.container} maxWidth="form">
-      <View style={styles.hero}>
-        <AuthIllustration icon={<IconRoute size={28} color={OCEAN.onDark} />} />
-        <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>
-          Bienvenue
-        </AppText>
-        <AppText variant="base" color="textSecondary" align="center" style={styles.tagline}>
-          Trajets partagés et envois de colis,{'\n'}partout où vous allez.
-        </AppText>
-      </View>
-
-      <View style={styles.options}>
-        <RoleOption
-          title="Je suis client"
-          subtitle="Réserver un trajet ou un envoi"
-          icon={<IconUser size={19} color={OCEAN.onDark} />}
-          iconBackground="rgba(255,255,255,0.16)"
-          tone="ocean"
-          onPress={() => selectRole('CUSTOMER')}
-        />
-        <RoleOption
-          title="Je suis chauffeur"
-          subtitle="Rentabiliser mes trajets"
-          icon={<IconSteeringWheel size={19} color={colors.successDark} />}
-          iconBackground={colors.successLight}
-          tone="surface"
-          onPress={() => selectRole('DRIVER')}
-        />
-      </View>
-
-      <Pressable onPress={() => router.push({ pathname: '/(auth)/login' })} style={styles.loginLink}>
-        <AppText variant="sm" color="textSecondary" align="center">
-          Déjà inscrit ?{' '}
-          <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-            Se connecter
+    <ImageBackground source={SKY_BACKGROUND} resizeMode="cover" style={styles.background}>
+      <View style={styles.scrim} />
+      <ScreenContainer transparent style={styles.container} maxWidth="form">
+        <View style={styles.hero}>
+          <AuthIllustration icon={<Image source={LOGO_SOURCE} resizeMode="contain" style={styles.logo} />} />
+          <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>
+            Bienvenue
           </AppText>
-        </AppText>
-      </Pressable>
-    </ScreenContainer>
+          <AppText variant="base" color="textSecondary" align="center" style={styles.tagline}>
+            Trajets partagés et envois de colis,{'\n'}partout où vous allez.
+          </AppText>
+        </View>
+
+        <View style={styles.options}>
+          <RoleOption
+            title="Je suis client"
+            subtitle="Réserver un trajet ou un envoi"
+            icon={<IconUser size={19} color={OCEAN.onDark} />}
+            iconBackground="rgba(255,255,255,0.16)"
+            tone="ocean"
+            onPress={() => selectRole('CUSTOMER')}
+          />
+          <RoleOption
+            title="Je suis chauffeur"
+            subtitle="Rentabiliser mes trajets"
+            icon={<IconSteeringWheel size={19} color={colors.successDark} />}
+            iconBackground={colors.successLight}
+            tone="surface"
+            onPress={() => selectRole('DRIVER')}
+          />
+        </View>
+
+        <Pressable onPress={() => router.push({ pathname: '/(auth)/login' })} style={styles.loginLink}>
+          <AppText variant="sm" color="textSecondary" align="center">
+            Déjà inscrit ?{' '}
+            <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+              Se connecter
+            </AppText>
+          </AppText>
+        </Pressable>
+      </ScreenContainer>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+  },
+  // Voile clair semi-transparent entre la photo et le contenu : le ciel
+  // reste visible en fond mais le texte (sans carte derrière) garde un
+  // contraste suffisant quel que soit l'endroit où tombent nuages/oiseau.
+  scrim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+  },
+  logo: {
+    width: 32,
+    height: 41,
+  },
   container: {
     flex: 1,
     justifyContent: 'center',

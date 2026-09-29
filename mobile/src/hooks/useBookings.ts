@@ -10,11 +10,27 @@ export function useMyBookings(page = 1) {
   });
 }
 
+/**
+ * Tant que la réservation est active, l'écran se met à jour tout seul :
+ * chauffeur arrivé, pris en charge, dépose… (même principe que
+ * useShipment). Sans ce polling, `trip.status` reste figé à sa valeur
+ * du chargement de l'écran — la carte "Code de dépose" par exemple ne
+ * peut jamais apparaître pour un client qui a ouvert l'écran avant que
+ * le chauffeur valide la prise en charge, même après un rafraîchissement
+ * manuel classique (pull-to-refresh), tant que l'écran n'est pas
+ * réellement rechargé.
+ */
+const LIVE_BOOKING_STATUSES = ['PENDING_PAYMENT', 'PAID', 'CONFIRMED', 'DISPUTED'];
+
 export function useBooking(id: string | undefined) {
   return useQuery({
     queryKey: ['bookings', id],
     queryFn: () => bookingsApi.getOne(id!),
     enabled: Boolean(id),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && LIVE_BOOKING_STATUSES.includes(status) ? 15_000 : false;
+    },
   });
 }
 

@@ -12,7 +12,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'Occaz Go — Transport Partagé',
+  title: "Occa'Z",
   description: 'Administration de la plateforme régionale de transport partagé.',
 };
 

@@ -86,7 +86,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </span>
             <div className="min-w-0">
               <p className="truncate text-base font-bold leading-tight text-text-primary">Back-office</p>
-              <p className="truncate text-xs font-medium text-text-secondary">Transport Partagé</p>
+              <p className="truncate text-xs font-medium text-text-secondary">Occa'Z</p>
             </div>
           </div>
           <button

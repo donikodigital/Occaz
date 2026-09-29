@@ -203,7 +203,7 @@ export default function LoginPage() {
             </div>
             <div>
               <p className="text-xl font-extrabold tracking-tight text-white">OCCAZ</p>
-              <p className="text-xs font-medium text-white/70">Transport Partagé</p>
+              <p className="text-xs font-medium text-white/70">Occa'Z</p>
             </div>
           </div>
         </div>
@@ -227,7 +227,7 @@ export default function LoginPage() {
             </div>
             <div>
               <p className="text-xl font-extrabold tracking-tight text-text-primary">OCCAZ</p>
-              <p className="text-xs font-medium text-text-secondary">Transport Partagé</p>
+              <p className="text-xs font-medium text-text-secondary">Occa'Z</p>
             </div>
           </div>
 

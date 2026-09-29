@@ -51,7 +51,7 @@ export function MobileTopBar({ onOpenMenu }: MobileTopBarProps) {
         <p className="truncate text-base font-bold leading-tight text-text-primary">
           {activeItem?.label ?? 'Back-office'}
         </p>
-        <p className="truncate text-xs font-medium text-text-secondary">Transport Partagé</p>
+        <p className="truncate text-xs font-medium text-text-secondary">Occa'Z</p>
       </div>
 
       <button

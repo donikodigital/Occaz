@@ -24,6 +24,8 @@ export interface ScreenContainerProps extends ViewProps {
    * qui reste visible pendant qu'on parcourt le détail d'un trajet).
    */
   footer?: React.ReactNode;
+  /** Fond transparent plutôt que colors.background — pour poser l'écran sur un fond personnalisé (ex. ImageBackground). */
+  transparent?: boolean;
 }
 
 /**
@@ -38,6 +40,7 @@ export function ScreenContainer({
   edges = ['top', 'bottom'],
   maxWidth = 'content',
   footer,
+  transparent = false,
   style,
   children,
   ...rest
@@ -46,7 +49,7 @@ export function ScreenContainer({
   const widthConstraint = isTablet ? { maxWidth: maxContentWidth[maxWidth], alignSelf: 'center' as const } : null;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={edges}>
+    <SafeAreaView style={[styles.safeArea, transparent && styles.safeAreaTransparent]} edges={edges}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.flex, widthConstraint, styles.fullWidth]}>
           {scroll ? (
@@ -77,6 +80,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  safeAreaTransparent: {
+    backgroundColor: 'transparent',
   },
   flex: {
     flex: 1,
