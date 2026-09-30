@@ -1,5 +1,14 @@
 // mobile/app/(driver)/trip/[id].tsx
 //
+// v5 — stageCard et bookingCard n'avaient aucun padding défini dans leur
+// style (seulement gap/marginBottom), contrairement aux autres cartes de
+// l'app (ex. infoCard dans shipment/[id].tsx, qui pose explicitement
+// padding: spacing.md) — OceanCard n'ajoute pas de padding par défaut,
+// c'est à chaque écran de le fournir. Résultat : le texte ("Prise en
+// charge", "Fatoumata DIALLO") et l'icône de "Signaler un problème"
+// touchaient les bords arrondis de la carte. padding: spacing.md ajouté
+// aux deux.
+//
 // v4 — Corrige un vrai blocage : un trajet DRIVER_ARRIVED sans aucun
 // passager (0 réservation) affichait « Demandez le code de chaque
 // passager » — un texte qui n'a pas de sens sans passager — et le
@@ -919,6 +928,7 @@ const styles = StyleSheet.create({
 
   // Étape suivante
   stageCard: {
+    padding: spacing.md,
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
@@ -956,6 +966,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   bookingCard: {
+    padding: spacing.md,
     gap: spacing.sm,
   },
   bookingHeader: {
