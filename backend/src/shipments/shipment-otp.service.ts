@@ -1,4 +1,5 @@
 // backend/src/shipments/shipment-otp.service.ts
+// [30/09/2026] v3 — requestDeliveryOtpForCustomer : l'expéditeur peut désormais revoir le code de livraison dans l'app, sur le modèle de requestPickupOtpForCustomer. Le destinataire continue de le recevoir par SMS.
 // [21/09/2026] v2 — propriété de l'envoi via Shipment.driverId.
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationChannel, NotificationType, OtpPurpose, ShipmentStatus } from '@prisma/client';
@@ -184,6 +185,33 @@ export class ShipmentOtpService {
   }
 
   /**
+   * Même code, mais renvoyé en clair à l'expéditeur (le client, qui a un
+   * compte dans l'app) plutôt qu'au chauffeur — même mécanisme que
+   * requestPickupOtpForCustomer. Le SMS continue de partir sur le
+   * téléphone du DESTINATAIRE (shipment.recipientPhone) : c'est bien lui
+   * qui doit communiquer le code au chauffeur à la livraison. Ceci ne
+   * fait qu'ajouter un second endroit où le même code est consultable,
+   * pour que l'expéditeur puisse le retrouver ou le retransmettre au
+   * destinataire si le SMS ne lui est pas parvenu.
+   */
+  async requestDeliveryOtpForCustomer(shipmentId: string, customerId: string) {
+    const shipment = await this.getShipmentWithContext(shipmentId);
+    if (shipment.customerId !== customerId) {
+      throw new ForbiddenException('Cet envoi ne vous appartient pas.');
+    }
+    if (shipment.status !== ShipmentStatus.DELIVERY_PENDING) {
+      throw new BadRequestException(
+        "Ce code n'est disponible que lorsque le chauffeur est en route pour livrer le colis.",
+      );
+    }
+    return this.otpService.generateAndSend(
+      { purpose: OtpPurpose.SHIPMENT_DELIVERY, phone: shipment.recipientPhone, shipmentId },
+      'Communiquez ce code au chauffeur pour confirmer la réception du colis :',
+      { revealCodeToCaller: true },
+    );
+  }
+
+  /**
    * Clôture directement l'envoi (DELIVERED -> COMPLETED) : contrairement
    * à un trajet à plusieurs réservations, un envoi n'a qu'un seul
    * destinataire — rien à attendre d'autre pour le considérer terminé.
@@ -198,12 +226,11 @@ export class ShipmentOtpService {
 
   /**
    * Validation manuelle par le support (jamais par le chauffeur) — même
-   * transition d'état que verifyDeliveryOtp, sans code. C'est le cas
-   * d'usage principal de cette fonctionnalité : contrairement à
-   * l'expéditeur, le destinataire n'a pas de compte dans l'app pour
-   * revoir son code lui-même — s'il reste injoignable ou refuse de le
-   * communiquer par mauvaise foi, seul un litige validé par le support
-   * peut clôturer la livraison. Jamais exposée directement au chauffeur.
+   * transition d'état que verifyDeliveryOtp, sans code. Reste utile même
+   * maintenant que l'expéditeur peut revoir le code : si le destinataire
+   * refuse de le communiquer par mauvaise foi malgré tout, seul un litige
+   * validé par le support peut clôturer la livraison. Jamais exposée
+   * directement au chauffeur.
    */
   async manuallyValidateDelivery(shipmentId: string) {
     const shipment = await this.getShipmentWithContext(shipmentId);

@@ -12,6 +12,14 @@
 // un message d'erreur en ligne pour l'échec d'annulation — même souci
 // sur le second Alert.alert (celui d'erreur), corrigé par la même
 // occasion plutôt que de laisser un piège identique juste après.
+//
+// v4 — Le code de dépose disparaissait exactement au moment de l'arrivée :
+// TripOtpService.markPickedUp génère et envoie ce code dès la prise en
+// charge (trip.status encore à PASSENGER_PICKED_UP), mais quand le
+// chauffeur signale ensuite son arrivée (TripsService.markArrived),
+// trip.status passe à ARRIVED — valeur absente de la condition
+// d'affichage de DropoffCodeCard, qui se refermait donc juste avant que
+// le client en ait le plus besoin. ARRIVED est désormais inclus.
 
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
@@ -189,7 +197,8 @@ export default function BookingDetailScreen() {
         <PickupCodeCard bookingId={booking.id} />
       ) : null}
 
-      {booking.status === 'CONFIRMED' && (trip?.status === 'PASSENGER_PICKED_UP' || trip?.status === 'IN_PROGRESS') ? (
+      {booking.status === 'CONFIRMED' &&
+      (trip?.status === 'PASSENGER_PICKED_UP' || trip?.status === 'IN_PROGRESS' || trip?.status === 'ARRIVED') ? (
         <DropoffCodeCard bookingId={booking.id} />
       ) : null}
 

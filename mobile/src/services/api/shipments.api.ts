@@ -1,4 +1,5 @@
 // mobile/src/services/api/shipments.api.ts
+// [30/09/2026] v3 — revealDeliveryOtpForSender : l'expéditeur peut revoir le code de livraison dans l'app.
 // [21/09/2026] v2 — quote, extend ; liste des envois disponibles typée AvailableShipment.
 import { api } from './client';
 import type { Paginated } from './types';
@@ -48,7 +49,8 @@ export const shipmentsApi = {
 
   // smsSent indique si le SMS est bien parti — le code est de toute
   // façon toujours généré et consultable (par l'expéditeur, côté
-  // récupération) dans l'app, le SMS n'est qu'un canal best-effort.
+  // récupération comme côté livraison) dans l'app, le SMS n'est qu'un
+  // canal best-effort.
 
   requestPickupOtp: (id: string) =>
     api.post<{ expiresInSeconds: number; smsSent: boolean }>(`/shipments/${id}/otp/pickup/request`),
@@ -66,12 +68,21 @@ export const shipmentsApi = {
 
   markDeliveryPending: (id: string) => api.post<Shipment>(`/shipments/${id}/delivery-pending`),
 
-  // Le destinataire n'a pas de compte dans l'app (contrairement à
-  // l'expéditeur) : il n'existe pas de reveal-for-recipient, ce code
-  // dépend donc entièrement de ce SMS — voir le message à l'utilisateur
-  // à ce sujet.
+  // Le SMS de ce code part sur le téléphone du DESTINATAIRE, qui n'a pas
+  // de compte dans l'app — c'est lui qui doit le communiquer au chauffeur
+  // à la livraison. revealDeliveryOtpForSender ci-dessous permet
+  // seulement à l'expéditeur de le retrouver dans son propre espace
+  // (utile si le SMS n'est pas arrivé au destinataire, ou pour le lui
+  // retransmettre autrement).
+
   requestDeliveryOtp: (id: string) =>
     api.post<{ expiresInSeconds: number; smsSent: boolean }>(`/shipments/${id}/otp/delivery/request`),
+
+  /** Pour l'expéditeur : revoir le code de livraison dans l'app (renvoie le code en clair). Le SMS continue de partir sur le téléphone du destinataire. */
+  revealDeliveryOtpForSender: (id: string) =>
+    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean }>(
+      `/shipments/${id}/otp/delivery/reveal-for-sender`,
+    ),
 
   verifyDeliveryOtp: (id: string, code: string) =>
     api.post<Shipment>(`/shipments/${id}/otp/delivery/verify`, { code }),

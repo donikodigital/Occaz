@@ -3,6 +3,16 @@
 // v2 — Habillage bleu océan ; logique inchangée. Le montant à payer occupe
 // un bandeau sombre, les moyens de paiement sont des cartes avec un
 // indicateur de choix, et « Payer » reprend le bouton plein du profil.
+//
+// v3 — Le montant affiché ici utilisait systématiquement le "GNF" par
+// défaut de formatMoney, quelle que soit la vraie devise de l'envoi ou
+// du trajet (ex. un envoi Dakar → Koundara facturé en XOF s'affichait en
+// GNF sur cet écran). Pour un envoi (shipmentId), on passe désormais
+// shipment.currency.isoCode — la même relation déjà utilisée sur l'écran
+// de suivi de l'envoi (shipment/[id].tsx). Le cas réservation (bookingId)
+// reste sur le défaut pour l'instant : Booking n'expose que currencyId
+// (l'identifiant brut), pas le code ISO — à corriger une fois cette
+// relation disponible côté API/type.
 
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
@@ -38,6 +48,9 @@ export default function PaymentScreen() {
   const initiatePayment = useInitiatePayment();
 
   const totalAmount = bookingId ? bookingQuery.data?.totalAmount : shipmentQuery.data?.totalAmount;
+  // shipmentQuery.data.currency.isoCode existe (voir shipment/[id].tsx) ;
+  // Booking n'a pas encore cette relation résolue, seulement currencyId.
+  const currencyCode = bookingId ? undefined : shipmentQuery.data?.currency?.isoCode;
   const isLoadingAmount = bookingId ? bookingQuery.isLoading : shipmentQuery.isLoading;
 
   function handlePay() {
@@ -74,7 +87,7 @@ export default function PaymentScreen() {
           Montant à payer
         </AppText>
         <AppText variant="display" weight="bold" color={OCEAN.onDark}>
-          {isLoadingAmount ? '…' : formatMoney(totalAmount ?? '0')}
+          {isLoadingAmount ? '…' : formatMoney(totalAmount ?? '0', currencyCode)}
         </AppText>
         <View style={styles.secure}>
           <IconShieldLock size={14} color={OCEAN.gold} />

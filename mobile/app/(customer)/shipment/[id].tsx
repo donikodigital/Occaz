@@ -1,4 +1,5 @@
 // mobile/app/(customer)/shipment/[id].tsx
+// [30/09/2026] v4 — le client voit désormais aussi le code de livraison (DeliveryCodeCard, pendant DELIVERY_PENDING), et pas seulement celui de récupération : le destinataire le reçoit toujours par SMS, mais l'expéditeur peut maintenant le retrouver dans son espace.
 // [21/09/2026] v3 — Habillage bleu océan ; logique inchangée : période, prolongation ou remboursement, montant unique payé, messagerie dès qu'un chauffeur est assigné.
 //
 // Un bandeau sombre porte le statut (avec la couleur qui va avec : bleu en
@@ -33,7 +34,7 @@ import { OtpCodeCard } from '@/components/screens/OtpCodeCard';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCancelShipment, useExtendShipment, useShipment } from '@/hooks/useShipments';
-import { useRevealShipmentPickupOtpForSender } from '@/hooks/useShipmentOtp';
+import { useRevealShipmentDeliveryOtpForSender, useRevealShipmentPickupOtpForSender } from '@/hooks/useShipmentOtp';
 import { useShipmentRatings } from '@/hooks/useRatings';
 import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
@@ -74,6 +75,24 @@ function PickupCodeCard({ shipmentId }: { shipmentId: string }) {
     <OtpCodeCard
       title="Code de récupération"
       description="Communiquez-le au chauffeur pour confirmer la remise du colis — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
+      code={reveal.data?.code}
+      smsSent={reveal.data?.smsSent}
+      isPending={reveal.isPending}
+      isError={reveal.isError}
+      error={reveal.error}
+      onRequest={() => reveal.mutate()}
+    />
+  );
+}
+
+/** Même principe que PickupCodeCard, pour la livraison : le SMS part sur le téléphone du destinataire, mais l'expéditeur peut aussi le retrouver ici. */
+function DeliveryCodeCard({ shipmentId }: { shipmentId: string }) {
+  const reveal = useRevealShipmentDeliveryOtpForSender(shipmentId);
+
+  return (
+    <OtpCodeCard
+      title="Code de livraison"
+      description="Envoyé par SMS au destinataire, qui le communique au chauffeur pour confirmer la réception — récupérable ici aussi si besoin (copie directe possible)."
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
       isPending={reveal.isPending}
@@ -225,6 +244,8 @@ export default function ShipmentDetailScreen() {
       ) : null}
 
       {shipment.status === 'PICKUP_PENDING' ? <PickupCodeCard shipmentId={shipment.id} /> : null}
+
+      {shipment.status === 'DELIVERY_PENDING' ? <DeliveryCodeCard shipmentId={shipment.id} /> : null}
 
       {shipment.status === 'SEARCHING_DRIVER' && !needsExtensionAnswer ? (
         <OceanCard style={styles.infoCard}>

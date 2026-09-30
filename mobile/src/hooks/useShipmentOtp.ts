@@ -1,4 +1,5 @@
 // mobile/src/hooks/useShipmentOtp.ts
+// [30/09/2026] v+ — useRevealShipmentDeliveryOtpForSender : l'expéditeur peut revoir le code de livraison, sur le modèle de useRevealShipmentPickupOtpForSender.
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { shipmentsApi } from '@/services/api/shipments.api';
 
@@ -48,6 +49,11 @@ export function useVerifyShipmentPickupOtp(shipmentId: string) {
 
 export function useRequestShipmentDeliveryOtp(shipmentId: string) {
   return useMutation({ mutationFn: () => shipmentsApi.requestDeliveryOtp(shipmentId) });
+}
+
+/** Pour l'expéditeur : revoir son propre code de livraison dans l'app — le SMS continue de partir sur le téléphone du destinataire. */
+export function useRevealShipmentDeliveryOtpForSender(shipmentId: string) {
+  return useMutation({ mutationFn: () => shipmentsApi.revealDeliveryOtpForSender(shipmentId) });
 }
 
 export function useVerifyShipmentDeliveryOtp(shipmentId: string) {

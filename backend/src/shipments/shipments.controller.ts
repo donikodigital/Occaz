@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.controller.ts
+// [30/09/2026] v3 — route otp/delivery/reveal-for-sender : l'expéditeur peut revoir le code de livraison, sur le modèle de otp/pickup/reveal-for-sender.
 // [21/09/2026] v2 — /quote, /extend, /available réservé aux chauffeurs validés, assign = acceptation.
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -180,6 +181,13 @@ export class ShipmentsController {
   async requestDeliveryOtp(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
     return this.shipmentOtpService.requestDeliveryOtp(id, driverId);
+  }
+
+  /** Pour l'expéditeur : revoir le code de livraison dans l'app. Le SMS continue de partir sur le téléphone du destinataire, qui n'a pas de compte dans l'app. */
+  @Post(':id/otp/delivery/reveal-for-sender')
+  async revealDeliveryOtpForSender(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const customer = await this.customerProfilesService.findByUserId(user.id);
+    return this.shipmentOtpService.requestDeliveryOtpForCustomer(id, customer.id);
   }
 
   @Post(':id/otp/delivery/verify')
