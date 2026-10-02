@@ -5,6 +5,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { DocumentsService } from './documents.service';
 import { RejectDocumentDto } from './dto/reject-document.dto';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
@@ -20,10 +21,18 @@ import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 @Permissions(PERMISSIONS.DOCUMENT_READ)
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly documentsService: DocumentsService) {}
+  constructor(
+    private readonly documentsService: DocumentsService,
+    private readonly scope: CountryScopeService,
+  ) {}
 
   @Get()
-  findAll(@Query() query: ListDocumentsQueryDto) {
+  async findAll(@Query() query: ListDocumentsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    // Un agent limité à un pays doit cibler un propriétaire (chauffeur, véhicule…) de son périmètre.
+    await this.scope.assertDocumentListAllowed(user, PERMISSIONS.DOCUMENT_READ, {
+      ownerType: query.ownerType,
+      ownerId: query.ownerId,
+    });
     return this.documentsService.findAll(query, {
       ownerType: query.ownerType,
       ownerId: query.ownerId,
@@ -32,33 +41,38 @@ export class DocumentsController {
   }
 
   @Get('expiring-soon')
-  findExpiringSoon(@Query('days') days?: string) {
-    return this.documentsService.findExpiringSoon(days ? parseInt(days, 10) : 30);
+  async findExpiringSoon(@CurrentUser() user: AuthenticatedUser, @Query('days') days?: string) {
+    const documents = await this.documentsService.findExpiringSoon(days ? parseInt(days, 10) : 30);
+    return this.scope.filterDocuments(user, PERMISSIONS.DOCUMENT_READ, documents);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertDocument(user, PERMISSIONS.DOCUMENT_READ, id);
     return this.documentsService.findOne(id);
   }
 
   @Get(':id/download-url')
-  getDownloadUrl(@Param('id') id: string) {
+  async getDownloadUrl(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertDocument(user, PERMISSIONS.DOCUMENT_READ, id);
     return this.documentsService.createDownloadUrl(id);
   }
 
   @Permissions(PERMISSIONS.DOCUMENT_VERIFY)
   @Patch(':id/verify')
-  verify(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async verify(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertDocument(user, PERMISSIONS.DOCUMENT_VERIFY, id);
     return this.documentsService.verify(id, user.id);
   }
 
   @Permissions(PERMISSIONS.DOCUMENT_VERIFY)
   @Patch(':id/reject')
-  reject(
+  async reject(
     @Param('id') id: string,
     @Body() dto: RejectDocumentDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.scope.assertDocument(user, PERMISSIONS.DOCUMENT_VERIFY, id);
     return this.documentsService.reject(id, dto.reason, user.id);
   }
 }

@@ -1,4 +1,7 @@
 // web-admin/src/stores/authStore.ts
+// [02/10/2026] v+ — Les permissions du compte (rôles attribués) sont chargées via GET /users/me : au
+// démarrage (hydrate) et juste après une connexion (setSession). Le menu et les actions du back-office
+// s'en servent pour n'afficher que ce que le compte a le droit de faire.
 import { create } from 'zustand';
 import { authApi } from '@/services/api/auth.api';
 import { usersApi } from '@/services/api/users.api';
@@ -30,8 +33,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       return;
     }
     try {
-      const user = await usersApi.getMe();
-      set({ user, isAuthenticated: true, isHydrating: false });
+      const me = await usersApi.getMe();
+      // `?? []` : si le serveur (pas encore mis à jour) ne renvoie pas les permissions, on ne bloque pas sur « Chargement… ».
+      set({ user: { ...me, permissions: me.permissions ?? [] }, isAuthenticated: true, isHydrating: false });
     } catch {
       tokenStorage.clearTokens();
       set({ user: null, isAuthenticated: false, isHydrating: false });
@@ -41,6 +45,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   setSession: (result) => {
     tokenStorage.setTokens(result.accessToken, result.refreshToken);
     set({ user: result.user, isAuthenticated: true, isHydrating: false });
+
+    // Le résultat de connexion ne contient pas les permissions : on les récupère aussitôt. En cas
+    // d'échec on les fixe à vide plutôt que de laisser le back-office attendre indéfiniment.
+    usersApi
+      .getMe()
+      .then((me) => set((state) => (state.isAuthenticated ? { user: { ...me, permissions: me.permissions ?? [] } } : state)))
+      .catch(() =>
+        set((state) =>
+          state.user && state.user.permissions === undefined
+            ? { user: { ...state.user, permissions: [] } }
+            : state,
+        ),
+      );
   },
 
   logout: async () => {

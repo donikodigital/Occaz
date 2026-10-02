@@ -13,6 +13,9 @@
 //   - Recherche différée de 300 ms (une requête par pause de frappe et non
 //     une par lettre), squelettes de chargement, état vide avec « Effacer
 //     les filtres ».
+// [02/10/2026] v3 — Le filtre de rôle ne propose que les types de comptes que le compte connecté a le droit de voir
+// (un Support voit clients et chauffeurs ; l'équipe n'apparaît qu'avec la permission d'attribuer les litiges ;
+// le SuperAdmin voit tout) — même règle que côté serveur.
 
 'use client';
 
@@ -23,6 +26,8 @@ import { useUsersList } from '@/hooks/useUsers';
 import { ACCOUNT_TYPE_LABELS } from '@/utils/userLabels';
 import type { AccountType, SafeUser } from '@/types/auth.types';
 import { UserDetailModal } from '@/components/users/UserDetailModal';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/utils/permissions';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -95,6 +100,12 @@ function UserCard({ user, onClick }: { user: SafeUser; onClick: () => void }) {
 }
 
 export default function UsersPage() {
+  const { can, isSuperAdmin } = usePermissions();
+  const visibleTypes: AccountType[] = isSuperAdmin
+    ? ['CUSTOMER', 'DRIVER', 'SUPPORT', 'SUPERADMIN']
+    : can(PERMISSIONS.DISPUTE_ASSIGN)
+      ? ['CUSTOMER', 'DRIVER', 'SUPPORT']
+      : ['CUSTOMER', 'DRIVER'];
   const [search, setSearch] = useState('');
   const [accountType, setAccountType] = useState<AccountType | ''>('');
   const debouncedSearch = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
@@ -126,7 +137,9 @@ export default function UsersPage() {
           <div className="min-w-0">
             <p className="text-sm font-medium text-[rgba(255,255,255,0.75)]">Comptes de la plateforme</p>
             <h1 className="mt-1 text-2xl font-bold text-[#ffffff] sm:text-3xl">Utilisateurs</h1>
-            <p className="mt-1 text-sm text-[rgba(255,255,255,0.82)]">Clients, chauffeurs et équipe support.</p>
+            <p className="mt-1 text-sm text-[rgba(255,255,255,0.82)]">
+              {visibleTypes.includes('SUPPORT') ? 'Clients, chauffeurs et équipe support.' : 'Clients et chauffeurs.'}
+            </p>
           </div>
           <div className="shrink-0 rounded-2xl bg-[rgba(255,255,255,0.14)] px-4 py-3 text-center backdrop-blur-sm">
             <p className="text-2xl font-bold leading-none text-[#ffffff]">{total ?? '…'}</p>
@@ -169,9 +182,9 @@ export default function UsersPage() {
             className="w-full appearance-none rounded-xl border border-border bg-surface py-2.5 pl-3.5 pr-9 text-sm text-text-primary shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="">Tous les rôles</option>
-            {Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => (
+            {visibleTypes.map((value) => (
               <option key={value} value={value}>
-                {label}
+                {ACCOUNT_TYPE_LABELS[value]}
               </option>
             ))}
           </select>

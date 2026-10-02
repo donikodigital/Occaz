@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { AuditModule } from '../audit/audit.module';
 import { DOMAIN_EVENTS, ShipmentSearchOpenedEvent } from '../common/events/domain-events';
+import { CountryScopeModule } from '../common/scope/country-scope.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShipmentDispatchService } from './shipment-dispatch.service';
@@ -32,7 +33,7 @@ describe('ShipmentsModule', () => {
 
   async function buildModule() {
     return Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true }), EventEmitterModule.forRoot(), PrismaModule, AuditModule, ShipmentsModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true }), EventEmitterModule.forRoot(), PrismaModule, AuditModule, CountryScopeModule, ShipmentsModule],
     })
       .overrideProvider(PrismaService)
       .useValue({})

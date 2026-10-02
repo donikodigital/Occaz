@@ -1,6 +1,15 @@
 // backend/src/users/users.service.ts
 // [22/09/2026] v+ — deleteSelf() : suppression de compte en libre-service, bloquée s'il reste une réservation, un envoi ou un trajet en cours.
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+// [02/10/2026] v+ — Garde-fous sur les comptes d'équipe : un Support ne peut plus modifier, suspendre ni
+// désactiver un SuperAdmin (ni un collègue), personne ne peut suspendre/désactiver son propre compte, et
+// la liste / la fiche d'un utilisateur ne montrent que les types de comptes que l'acteur a le droit de voir.
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AccountType, Prisma, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -9,6 +18,8 @@ import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
+import { PERMISSIONS } from '../common/constants/permissions.constants';
+import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 
 /** Vue "sûre" d'un utilisateur — ne contient jamais passwordHash / twoFactorSecret. */
 export type SafeUser = Omit<User, 'passwordHash' | 'twoFactorSecret'> & {
@@ -64,6 +75,58 @@ export class UsersService {
     return this.toSafeUser(user);
   }
 
+  /**
+   * Types de comptes qu'un acteur du back-office a le droit de voir. `null` = aucune restriction
+   * (SuperAdmin). Les autres voient les clients et les chauffeurs ; les comptes Support ne sont
+   * visibles qu'avec la permission d'attribuer les litiges (nécessaire pour choisir un agent) ;
+   * les comptes SuperAdmin ne le sont jamais.
+   */
+  private visibleAccountTypes(actor: AuthenticatedUser): AccountType[] | null {
+    if (actor.accountType === AccountType.SUPERADMIN) return null;
+    const types: AccountType[] = [AccountType.CUSTOMER, AccountType.DRIVER];
+    if (actor.permissions.includes(PERMISSIONS.DISPUTE_ASSIGN)) types.push(AccountType.SUPPORT);
+    return types;
+  }
+
+  /** Fiche d'un utilisateur pour le back-office : 404 si le type de compte n'est pas visible par l'acteur (hors son propre compte). */
+  async getSafeByIdForActor(id: string, actor: AuthenticatedUser): Promise<SafeUser> {
+    const safe = await this.getSafeById(id);
+    const visible = this.visibleAccountTypes(actor);
+    if (visible && id !== actor.id && !visible.includes(safe.accountType)) {
+      throw new NotFoundException('Utilisateur introuvable.');
+    }
+    return safe;
+  }
+
+  /**
+   * Vérifie qu'un acteur peut agir sur un compte : seul un SuperAdmin touche aux comptes de l'équipe
+   * (Support / SuperAdmin) — sauf pour modifier son propre compte quand `allowSelf` est vrai — et
+   * personne ne suspend ni ne désactive son propre compte.
+   */
+  private async assertActorMayManage(
+    actorId: string,
+    targetId: string,
+    options: { allowSelf?: boolean } = {},
+  ): Promise<void> {
+    const [actor, target] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: actorId }, select: { id: true, accountType: true } }),
+      this.prisma.user.findUnique({ where: { id: targetId }, select: { id: true, accountType: true } }),
+    ]);
+    if (!target) throw new NotFoundException('Utilisateur introuvable.');
+    if (!actor) throw new ForbiddenException('Action non autorisée.');
+
+    const isSelf = actor.id === target.id;
+    if (isSelf && !options.allowSelf) {
+      throw new ForbiddenException('Vous ne pouvez pas appliquer cette action à votre propre compte.');
+    }
+
+    const targetIsStaff =
+      target.accountType === AccountType.SUPPORT || target.accountType === AccountType.SUPERADMIN;
+    if (targetIsStaff && !isSelf && actor.accountType !== AccountType.SUPERADMIN) {
+      throw new ForbiddenException("Seul un SuperAdmin peut gérer les comptes de l'équipe.");
+    }
+  }
+
   async createUser(data: {
     phone: string;
     accountType: AccountType;
@@ -83,6 +146,7 @@ export class UsersService {
    * chauffeur existe déjà — Support/SuperAdmin n'en ont pas.
    */
   async adminUpdate(id: string, dto: AdminUpdateUserDto, actorId: string): Promise<SafeUser> {
+    await this.assertActorMayManage(actorId, id, { allowSelf: true });
     const existing = await this.prisma.user.findUnique({ where: { id }, include: PROFILE_NAME_INCLUDE });
     if (!existing) throw new NotFoundException('Utilisateur introuvable.');
 
@@ -119,9 +183,16 @@ export class UsersService {
   async findAll(
     query: PaginationQueryDto,
     accountType?: AccountType,
+    actor?: AuthenticatedUser,
+    /** Filtre de portée par pays (voir CountryScopeService.userListWhere) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.UserWhereInput,
   ): Promise<PaginatedResult<SafeUser>> {
-    const where = {
-      accountType,
+    const visible = actor ? this.visibleAccountTypes(actor) : null;
+    if (visible && accountType && !visible.includes(accountType)) {
+      return new PaginatedResult<SafeUser>([], 0, query.page, query.limit);
+    }
+    const baseWhere = {
+      accountType: accountType ?? (visible ? { in: visible } : undefined),
       ...(query.search
         ? {
             OR: [
@@ -131,6 +202,7 @@ export class UsersService {
           }
         : {}),
     };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
@@ -150,6 +222,7 @@ export class UsersService {
   }
 
   async suspend(id: string, reason: string, actorId: string): Promise<SafeUser> {
+    await this.assertActorMayManage(actorId, id);
     const user = await this.prisma.user.update({
       where: { id },
       data: { isSuspended: true, suspendedReason: reason },
@@ -166,6 +239,7 @@ export class UsersService {
   }
 
   async unsuspend(id: string, actorId: string): Promise<SafeUser> {
+    await this.assertActorMayManage(actorId, id);
     const user = await this.prisma.user.update({
       where: { id },
       data: { isSuspended: false, suspendedReason: null },
@@ -186,6 +260,7 @@ export class UsersService {
    * "Supprimer" dans l'UI admin désactive le compte (isActive: false).
    */
   async deactivate(id: string, actorId: string): Promise<SafeUser> {
+    await this.assertActorMayManage(actorId, id);
     const user = await this.prisma.user.update({
       where: { id },
       data: { isActive: false },
@@ -196,6 +271,7 @@ export class UsersService {
   }
 
   async activate(id: string, actorId: string): Promise<SafeUser> {
+    await this.assertActorMayManage(actorId, id);
     const user = await this.prisma.user.update({
       where: { id },
       data: { isActive: true },

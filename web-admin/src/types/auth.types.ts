@@ -1,4 +1,5 @@
 // web-admin/src/types/auth.types.ts
+// [02/10/2026] v+ — SafeUser.permissions : permissions effectives du compte connecté (renvoyées par GET /users/me uniquement).
 export type AccountType = 'CUSTOMER' | 'DRIVER' | 'SUPPORT' | 'SUPERADMIN';
 
 /** Miroir de UsersService.SafeUser côté backend — jamais de passwordHash/twoFactorSecret. */
@@ -18,6 +19,13 @@ export interface SafeUser {
   /** Dénormalisés depuis CustomerProfile/DriverProfile — null pour Support/SuperAdmin (pas de profil). */
   firstName: string | null;
   lastName: string | null;
+  /**
+   * Permissions effectives (rôles attribués). Présent uniquement sur le compte connecté, une fois
+   * GET /users/me chargé — absent des listes d'utilisateurs et juste après la connexion.
+   */
+  permissions?: string[];
+  /** Pays auxquels les rôles du compte sont limités (GET /users/me) ; vide ou absent = aucune limite géographique. */
+  scopedCountries?: { id: string; name: string }[];
 }
 
 export interface LoginPasswordPayload {

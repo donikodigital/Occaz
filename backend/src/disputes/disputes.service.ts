@@ -26,6 +26,7 @@ import { DocumentsService } from '../documents/documents.service';
 import { PaymentsService } from '../payments/payments.service';
 import { WalletsService } from '../wallets/wallets.service';
 import { UsersService } from '../users/users.service';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TripOtpService } from '../trips/trip-otp.service';
 import { ShipmentOtpService } from '../shipments/shipment-otp.service';
@@ -35,6 +36,9 @@ import { toMoneyBigInt } from '../common/utils/money.util';
 import { CreateDisputeDto } from './dto/create-dispute.dto';
 import { AddDisputeEvidenceDto } from './dto/add-dispute-evidence.dto';
 import { ResolveDisputeDto } from './dto/resolve-dispute.dto';
+
+/** Champs d'un utilisateur exposés dans un litige — jamais passwordHash / twoFactorSecret. */
+const SAFE_USER_SELECT = { id: true, phone: true, email: true } as const;
 
 /**
  * Section 21/22. Un point important, confirmé explicitement : un
@@ -62,6 +66,7 @@ export class DisputesService {
     private readonly notifications: NotificationsService,
     private readonly tripOtpService: TripOtpService,
     private readonly shipmentOtpService: ShipmentOtpService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   async findOne(id: string) {
@@ -70,9 +75,10 @@ export class DisputesService {
       include: {
         booking: true,
         shipment: true,
-        openedBy: true,
-        assignedAgent: true,
-        messages: { orderBy: { createdAt: 'asc' }, include: { author: true } },
+        // Jamais la ligne User complète (hash du mot de passe, secret 2FA…) : seulement de quoi identifier la personne.
+        openedBy: { select: SAFE_USER_SELECT },
+        assignedAgent: { select: SAFE_USER_SELECT },
+        messages: { orderBy: { createdAt: 'asc' }, include: { author: { select: SAFE_USER_SELECT } } },
         evidence: { include: { document: true } },
         resolution: true,
       },
@@ -121,16 +127,23 @@ export class DisputesService {
   }
 
   /**
-   * Alerte tous les agents avec la permission dispute.read — pas de
-   * portée par pays ici (UserRole en porte une, mais résoudre le pays du
-   * litige ajouterait une requête supplémentaire pour un premier jet ;
-   * mieux vaut alerter un peu trop large que laisser un litige invisible).
+   * Alerte les agents avec la permission dispute.read dont le périmètre couvre le litige (rôle sans pays, ou
+   * rôle limité à l'un des pays du dossier — voir CountryScopeService.countriesOfDispute).
    * Un litige ouvert n'a pas encore d'agent assigné, donc pas de
    * destinataire unique évident — c'est le rôle qui compte, pas la personne.
    */
   private async notifySupportOfNewDispute(disputeId: string, reason: string): Promise<void> {
+    // Un agent limité à un pays n'est alerté que pour les litiges de son périmètre ; un rôle sans pays alerte partout.
+    const disputeCountryIds = await this.scope.countriesOfDispute(disputeId);
     const agents = await this.prisma.user.findMany({
-      where: { userRoles: { some: { role: { permissions: { some: { permission: { key: 'dispute.read' } } } } } } },
+      where: {
+        userRoles: {
+          some: {
+            role: { permissions: { some: { permission: { key: 'dispute.read' } } } },
+            OR: [{ countryId: null }, { countryId: { in: disputeCountryIds } }],
+          },
+        },
+      },
       select: { id: true },
     });
     await Promise.all(
@@ -212,19 +225,22 @@ export class DisputesService {
   async findAll(
     query: PaginationQueryDto,
     filters: { status?: DisputeStatus; priority?: DisputePriority; assignedAgentId?: string } = {},
+    /** Filtre de portée par pays (CountryScopeService) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.DisputeWhereInput,
   ): Promise<PaginatedResult<unknown>> {
-    const where = {
+    const baseWhere = {
       status: filters.status,
       priority: filters.priority,
       assignedAgentId: filters.assignedAgentId,
     };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [data, total] = await Promise.all([
       this.prisma.dispute.findMany({
         where,
         skip: query.skip,
         take: query.take,
         orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
-        include: { openedBy: true, assignedAgent: true },
+        include: { openedBy: { select: SAFE_USER_SELECT }, assignedAgent: { select: SAFE_USER_SELECT } },
       }),
       this.prisma.dispute.count({ where }),
     ]);
@@ -239,7 +255,7 @@ export class DisputesService {
     const dispute = await this.findOne(disputeId);
     const created = await this.prisma.disputeMessage.create({
       data: { disputeId, authorId, message },
-      include: { author: true },
+      include: { author: { select: SAFE_USER_SELECT } },
     });
 
     await this.notifyOtherParties(dispute, authorId);

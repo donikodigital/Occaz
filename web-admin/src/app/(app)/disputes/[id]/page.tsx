@@ -1,5 +1,8 @@
 // web-admin/src/app/(app)/disputes/[id]/page.tsx
 // [21/09/2026] v+ — le chauffeur d'un envoi s'affiche aussi quand il n'a pas de trajet (Shipment.driver).
+// [02/10/2026] v+ — Les actions suivent les permissions : assigner (dispute.assign), changer le statut / résoudre /
+// clore (dispute.resolve) ; un remboursement exige en plus refund.create et une suspension user.suspend. Un agent
+// qui n'a que dispute.read consulte le dossier et écrit dans la conversation, sans pouvoir trancher.
 'use client';
 
 import React, { useState } from 'react';
@@ -32,6 +35,8 @@ import { useBookingContext } from '@/hooks/useBookingContext';
 import { useShipmentContext } from '@/hooks/useShipmentContext';
 import { useUsersList } from '@/hooks/useUsers';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/utils/permissions';
 import {
   DISPUTE_PRIORITY_LABELS,
   DISPUTE_RESOLUTION_TYPE_LABELS,
@@ -167,6 +172,16 @@ export default function DisputeDetailPage() {
   const currentUserId = useAuthStore((state) => state.user?.id);
   const { data: dispute, isLoading, isError } = useDispute(id);
   const { data: agentsPage } = useUsersList({ accountType: 'SUPPORT' });
+  const { can } = usePermissions();
+  const canAssign = can(PERMISSIONS.DISPUTE_ASSIGN);
+  const canResolve = can(PERMISSIONS.DISPUTE_RESOLVE);
+  const availableResolutionTypes = RESOLUTION_TYPES.filter((type) => {
+    if (type === 'FULL_REFUND' || type === 'PARTIAL_REFUND' || type === 'SHARED_RESPONSIBILITY') {
+      return can(PERMISSIONS.REFUND_CREATE);
+    }
+    if (type === 'SUSPENSION') return can(PERMISSIONS.USER_SUSPEND);
+    return true;
+  });
 
   const addMessage = useAddDisputeMessage(id);
   const assignDispute = useAssignDispute(id);
@@ -335,6 +350,8 @@ export default function DisputeDetailPage() {
             </div>
           )}
 
+          {canAssign ? (
+          <>
           <div className="flex items-end gap-3">
             <SelectField
               label="Agent"
@@ -374,11 +391,13 @@ export default function DisputeDetailPage() {
           >
             Assigner
           </ActionButton>
+          </>
+          ) : null}
         </Panel>
       ) : null}
 
       {/* ---------- Statut du traitement ---------- */}
-      {!isClosed && dispute.status !== 'RESOLVED' ? (
+      {!isClosed && dispute.status !== 'RESOLVED' && canResolve ? (
         <Panel title="Statut du traitement" icon={<IconActivity size={18} />} delay={200}>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {REVIEWABLE_STATUSES.map((value) => {
@@ -509,7 +528,7 @@ export default function DisputeDetailPage() {
             <p className="mt-3 text-sm leading-relaxed text-slate-600">{dispute.resolution.notes}</p>
           ) : null}
 
-          {dispute.status === 'RESOLVED' ? (
+          {dispute.status === 'RESOLVED' && canResolve ? (
             <div className="mt-4">
               <ActionButton variant="secondary" onClick={() => closeDispute.mutate()} loading={closeDispute.isPending}>
                 Clore le litige
@@ -517,7 +536,7 @@ export default function DisputeDetailPage() {
             </div>
           ) : null}
         </section>
-      ) : !isClosed ? (
+      ) : !isClosed && canResolve ? (
         <Panel title="Résoudre le litige" icon={<IconGavel size={18} />} delay={320}>
           <div className="space-y-4">
             <SelectField
@@ -525,7 +544,7 @@ export default function DisputeDetailPage() {
               value={resolutionType}
               onChange={(e) => setResolutionType(e.target.value as DisputeResolutionType)}
             >
-              {RESOLUTION_TYPES.map((value) => (
+              {availableResolutionTypes.map((value) => (
                 <option key={value} value={value}>
                   {DISPUTE_RESOLUTION_TYPE_LABELS[value]}
                 </option>

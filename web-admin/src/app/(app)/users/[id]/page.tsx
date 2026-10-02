@@ -1,4 +1,7 @@
 // web-admin/src/app/(app)/users/[id]/page.tsx
+// [02/10/2026] v+ — La section « Rôles » exige role.manage et le bloc de suspension user.suspend ; seul un
+// SuperAdmin agit sur un compte de l'équipe, et personne ne suspend son propre compte.
+// [02/10/2026] v+ — Attribution d'un rôle « limité à un pays » : le rôle ne s'applique alors qu'aux dossiers de ce pays.
 'use client';
 
 import React, { useState } from 'react';
@@ -8,7 +11,10 @@ import { IconArrowLeft } from '@tabler/icons-react';
 import { Badge, Button, Card, Select, TextArea } from '@/components/ui';
 import { useSuspendUser, useUnsuspendUser, useUser } from '@/hooks/useUsers';
 import { useAssignRole, useRevokeRole, useRoles, useUserRoles } from '@/hooks/useRbac';
+import { useCountries } from '@/hooks/useGeography';
 import { ACCOUNT_TYPE_LABELS } from '@/utils/userLabels';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/utils/permissions';
 import { ApiError } from '@/services/api/ApiError';
 
 function UserRolesSection({ userId }: { userId: string }) {
@@ -16,7 +22,9 @@ function UserRolesSection({ userId }: { userId: string }) {
   const { data: allRoles } = useRoles();
   const assignRole = useAssignRole(userId);
   const revokeRole = useRevokeRole(userId);
+  const { data: countries } = useCountries();
   const [selectedRoleId, setSelectedRoleId] = useState('');
+  const [selectedCountryId, setSelectedCountryId] = useState('');
 
   return (
     <Card className="space-y-4">
@@ -45,21 +53,40 @@ function UserRolesSection({ userId }: { userId: string }) {
         <p className="text-sm text-text-muted">Aucun rôle attribué.</p>
       )}
 
-      <div className="flex items-end gap-3">
-        <Select label="Attribuer un rôle" value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)} className="max-w-xs">
-          <option value="">Choisir…</option>
-          {(allRoles ?? []).map((role) => (
-            <option key={role.id} value={role.id}>
-              {role.name}
-            </option>
-          ))}
-        </Select>
+      <div className="space-y-3 rounded-2xl bg-primary-light/40 p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select label="Attribuer un rôle" value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)}>
+            <option value="">Choisir…</option>
+            {(allRoles ?? []).map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
+            ))}
+          </Select>
+          <Select label="Portée géographique" value={selectedCountryId} onChange={(e) => setSelectedCountryId(e.target.value)}>
+            <option value="">Tous les pays</option>
+            {(countries ?? [])
+              .filter((country) => country.isActive)
+              .map((country) => (
+                <option key={country.id} value={country.id}>
+                  {country.name}
+                </option>
+              ))}
+          </Select>
+        </div>
+        <p className="text-xs leading-relaxed text-text-secondary">
+          Limité à un pays, le rôle ne donne accès qu&apos;aux clients, chauffeurs, trajets, envois et litiges rattachés à ce
+          pays. Les droits de configuration de la plateforme (rôles, paramètres, géographie, journal d&apos;audit, tarification,
+          moyens de paiement, promotions, tableau de bord administrateur) ne peuvent pas être limités à un pays : ils sont
+          ignorés pour une attribution limitée.
+        </p>
         <Button
           disabled={!selectedRoleId}
           loading={assignRole.isPending}
           onClick={() => {
-            assignRole.mutate({ userId, roleId: selectedRoleId });
+            assignRole.mutate({ userId, roleId: selectedRoleId, countryId: selectedCountryId || undefined });
             setSelectedRoleId('');
+            setSelectedCountryId('');
           }}
         >
           Attribuer
@@ -74,6 +101,7 @@ export default function UserDetailPage() {
   const { data: user, isLoading, isError } = useUser(id);
   const suspendUser = useSuspendUser(id);
   const unsuspendUser = useUnsuspendUser(id);
+  const { can, isSuperAdmin, user: currentUser } = usePermissions();
 
   const [reason, setReason] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
@@ -94,6 +122,10 @@ export default function UserDetailPage() {
 
   if (isError) return <p className="text-sm text-danger">Utilisateur introuvable.</p>;
   if (isLoading || !user) return <p className="text-sm text-text-secondary">Chargement…</p>;
+
+  const targetIsStaff = user.accountType === 'SUPPORT' || user.accountType === 'SUPERADMIN';
+  const canSuspend =
+    can(PERMISSIONS.USER_SUSPEND) && (!targetIsStaff || isSuperAdmin) && currentUser?.id !== user.id;
 
   return (
     <div className="max-w-xl space-y-6">
@@ -126,10 +158,11 @@ export default function UserDetailPage() {
         ) : null}
       </Card>
 
-      {user.accountType === 'SUPPORT' || user.accountType === 'SUPERADMIN' ? (
+      {targetIsStaff && can(PERMISSIONS.ROLE_MANAGE) ? (
         <UserRolesSection userId={user.id} />
       ) : null}
 
+      {canSuspend ? (
       <Card className="space-y-4">
         {user.isSuspended ? (
           <Button variant="success" onClick={() => unsuspendUser.mutate()} loading={unsuspendUser.isPending}>
@@ -151,6 +184,7 @@ export default function UserDetailPage() {
           </>
         )}
       </Card>
+      ) : null}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { TripsService } from './trips.service';
 import { BookingsService } from './bookings.service';
 import { CreateTripDto } from './dto/create-trip.dto';
@@ -28,6 +29,7 @@ export class TripsController {
     private readonly bookingsService: BookingsService,
     private readonly driverProfilesService: DriverProfilesService,
     private readonly customerProfilesService: CustomerProfilesService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   @Get('search')
@@ -147,7 +149,7 @@ export class TripsController {
 
   @Get(':id/bookings')
   async findBookings(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    if (!user.permissions.includes(PERMISSIONS.BOOKING_READ)) {
+    if (!(await this.scope.hasTripBookingsAccess(user, id))) {
       const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
       await this.tripsService.findOne(id).then((trip) => {
         if (trip.driverId !== driverId) {
@@ -160,7 +162,11 @@ export class TripsController {
 
   @Permissions(PERMISSIONS.TRIP_READ)
   @Get()
-  findAll(@Query() query: ListTripsQueryDto) {
-    return this.tripsService.findAll(query, { status: query.status, driverId: query.driverId });
+  findAll(@Query() query: ListTripsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.tripsService.findAll(
+      query,
+      { status: query.status, driverId: query.driverId },
+      this.scope.tripWhere(user, PERMISSIONS.TRIP_READ),
+    );
   }
 }

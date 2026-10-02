@@ -1,4 +1,7 @@
 // web-admin/src/components/users/UserDetailModal.tsx
+// [02/10/2026] v+ — Les actions suivent les permissions du compte connecté : modifier (user.update), suspendre
+// (user.suspend), désactiver (user.delete). Seul un SuperAdmin agit sur les comptes de l'équipe ; chacun peut
+// modifier le sien mais ni le suspendre ni le désactiver. Le serveur applique les mêmes règles.
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -7,6 +10,8 @@ import { IconEye, IconPencil, IconPlayerPause, IconPlayerPlay, IconTrash } from 
 import { Button, DetailField, DetailSection, EntityAvatar, Modal, TextArea, TextField, TintedIconButton } from '@/components/ui';
 import { useActivateUser, useDeactivateUser, useSuspendUser, useUnsuspendUser, useUpdateUser } from '@/hooks/useUsers';
 import { ACCOUNT_TYPE_LABELS } from '@/utils/userLabels';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/utils/permissions';
 import { ApiError } from '@/services/api/ApiError';
 import type { SafeUser } from '@/types/auth.types';
 
@@ -58,6 +63,7 @@ export function UserDetailModal({ open, onClose, user }: UserDetailModalProps) {
   const unsuspendUser = useUnsuspendUser(user?.id ?? '');
   const deactivateUser = useDeactivateUser(user?.id ?? '');
   const activateUser = useActivateUser(user?.id ?? '');
+  const { can, isSuperAdmin, user: currentUser } = usePermissions();
 
   useEffect(() => {
     if (!open || !user) return;
@@ -73,6 +79,12 @@ export function UserDetailModal({ open, onClose, user }: UserDetailModalProps) {
   if (!displayUser) return null;
 
   const hasProfile = HAS_PROFILE.includes(displayUser.accountType);
+  const isSelf = currentUser?.id === displayUser.id;
+  const targetIsStaff = displayUser.accountType === 'SUPPORT' || displayUser.accountType === 'SUPERADMIN';
+  const canManageTarget = !targetIsStaff || isSuperAdmin;
+  const canEdit = can(PERMISSIONS.USER_UPDATE) && (canManageTarget || isSelf);
+  const canSuspend = can(PERMISSIONS.USER_SUSPEND) && canManageTarget && !isSelf;
+  const canDeactivate = can(PERMISSIONS.USER_DELETE) && canManageTarget && !isSelf;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -153,14 +165,14 @@ export function UserDetailModal({ open, onClose, user }: UserDetailModalProps) {
         </div>
 
         <div className="flex flex-wrap gap-2.5">
-          <TintedIconButton icon={IconPencil} label="Modifier" tone="primary" onClick={focusEditForm} />
+          {canEdit ? <TintedIconButton icon={IconPencil} label="Modifier" tone="primary" onClick={focusEditForm} /> : null}
           <TintedIconButton icon={IconEye} label="Voir la fiche complète" tone="neutral" onClick={() => window.open(`/users/${displayUser.id}`, '_self')} />
-          {displayUser.isSuspended ? (
+          {!canSuspend ? null : displayUser.isSuspended ? (
             <TintedIconButton icon={IconPlayerPlay} label="Lever la suspension" tone="success" onClick={handleUnsuspend} loading={unsuspendUser.isPending} />
           ) : (
             <TintedIconButton icon={IconPlayerPause} label="Suspendre" tone="accent" onClick={() => setActiveAction('suspend')} />
           )}
-          {displayUser.isActive ? (
+          {!canDeactivate ? null : displayUser.isActive ? (
             <TintedIconButton icon={IconTrash} label="Supprimer" tone="danger" onClick={() => setActiveAction('deactivate')} />
           ) : (
             <TintedIconButton icon={IconPlayerPlay} label="Réactiver le compte" tone="success" onClick={handleActivate} loading={activateUser.isPending} />
@@ -230,6 +242,7 @@ export function UserDetailModal({ open, onClose, user }: UserDetailModalProps) {
           <DetailField label="Dernière connexion" value={formatDateTime(displayUser.lastLoginAt)} />
         </DetailSection>
 
+        {canEdit ? (
         <form id="user-edit-form" onSubmit={handleSubmit} className="space-y-3 border-t border-border pt-4">
           <h4 className="text-xs font-bold uppercase tracking-wide text-primary">Modifier</h4>
           <TextField id="user-edit-email" label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@exemple.com" />
@@ -246,6 +259,7 @@ export function UserDetailModal({ open, onClose, user }: UserDetailModalProps) {
             Enregistrer
           </Button>
         </form>
+        ) : null}
       </div>
     </Modal>
   );

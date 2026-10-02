@@ -1,14 +1,13 @@
 // backend/src/rbac/user-roles.service.ts
+// [02/10/2026] v+ — Portée géographique appliquée : getEffectivePermissions() calcule, par permission, les pays
+// auxquels elle est limitée (voir common/scope/country-scope.ts) ; assign() vérifie que le pays existe.
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AssignRoleDto } from './dto/assign-role.dto';
+import { EffectivePermissions, resolveEffectivePermissions } from '../common/scope/country-scope';
 
-export interface EffectivePermissions {
-  permissions: string[];
-  /** Pays pour lesquels au moins un rôle scopé a été attribué (vide = aucune restriction géographique explicite). */
-  scopedCountryIds: string[];
-}
+export type { EffectivePermissions };
 
 @Injectable()
 export class UserRolesService {
@@ -31,6 +30,10 @@ export class UserRolesService {
     ]);
     if (!user) throw new NotFoundException('Utilisateur introuvable.');
     if (!role) throw new NotFoundException('Rôle introuvable.');
+    if (dto.countryId) {
+      const country = await this.prisma.country.findUnique({ where: { id: dto.countryId }, select: { id: true } });
+      if (!country) throw new NotFoundException('Pays introuvable.');
+    }
 
     // Même limitation que dans accounts.seed.ts : la clé composite
     // @@unique([userId, roleId, countryId]) type `countryId` en `string`
@@ -81,21 +84,11 @@ export class UserRolesService {
       include: { role: { include: { permissions: { include: { permission: true } } } } },
     });
 
-    const permissions = new Set<string>();
-    const scopedCountryIds = new Set<string>();
-
-    for (const userRole of userRoles) {
-      for (const rolePermission of userRole.role.permissions) {
-        permissions.add(rolePermission.permission.key);
-      }
-      if (userRole.countryId) {
-        scopedCountryIds.add(userRole.countryId);
-      }
-    }
-
-    return {
-      permissions: Array.from(permissions),
-      scopedCountryIds: Array.from(scopedCountryIds),
-    };
+    return resolveEffectivePermissions(
+      userRoles.map((userRole) => ({
+        countryId: userRole.countryId,
+        permissionKeys: userRole.role.permissions.map((rolePermission) => rolePermission.permission.key),
+      })),
+    );
   }
 }

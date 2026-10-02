@@ -446,8 +446,11 @@ export class TripsService {
   async findAll(
     query: PaginationQueryDto,
     filters: { status?: TripStatus; driverId?: string } = {},
+    /** Filtre de portée par pays (CountryScopeService) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.TripWhereInput,
   ): Promise<PaginatedResult<unknown>> {
-    const where = { status: filters.status, driverId: filters.driverId };
+    const baseWhere = { status: filters.status, driverId: filters.driverId };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [data, total] = await Promise.all([
       this.prisma.trip.findMany({
         where,

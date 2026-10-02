@@ -1,4 +1,7 @@
 // web-admin/src/app/(app)/dashboard/page.tsx
+// [02/10/2026] v+ — Le tableau de bord s'adapte au compte : la vue administrateur (finances, activité) pour qui a
+// `dashboard.admin_read`, la vue Support (file de litiges) pour qui a `dispute.read`, sinon un accueil sobre.
+// Avant, un compte Support tombait sur « Impossible de charger le tableau de bord… DASHBOARD_ADMIN_READ ».
 'use client';
 
 import React, { useMemo } from 'react';
@@ -18,6 +21,9 @@ import { DashboardShortcuts } from '@/components/dashboard/DashboardShortcuts';
 import { ActivityChart } from '@/components/dashboard/ActivityChart';
 import { useAdminDashboard, useTopRoutes } from '@/hooks/useAdminDashboard';
 import { useActivityTimeSeries } from '@/hooks/useActivityTimeSeries';
+import { SupportDashboard, EmptyDashboard } from '@/components/dashboard/SupportDashboard';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/utils/permissions';
 import { formatMoney, formatNumber, sumMoney } from '@/utils/money';
 import { plural } from '@/utils/text';
 
@@ -32,7 +38,7 @@ function SectionTitle({ children, tone = 'primary' }: { children: React.ReactNod
   );
 }
 
-export default function DashboardPage() {
+function AdminDashboardView() {
   const { data, isLoading, isError } = useAdminDashboard();
   const { data: topRoutes } = useTopRoutes();
 
@@ -212,4 +218,13 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+export default function DashboardPage() {
+  const { can, isReady } = usePermissions();
+
+  if (!isReady) return <p className="text-sm text-text-secondary">Chargement…</p>;
+  if (can(PERMISSIONS.DASHBOARD_ADMIN_READ)) return <AdminDashboardView />;
+  if (can(PERMISSIONS.DISPUTE_READ)) return <SupportDashboard />;
+  return <EmptyDashboard />;
 }

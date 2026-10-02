@@ -442,8 +442,11 @@ export class BookingsService {
   async findAll(
     query: PaginationQueryDto,
     filters: { status?: BookingStatus; tripId?: string } = {},
+    /** Filtre de portée par pays (CountryScopeService) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.BookingWhereInput,
   ): Promise<PaginatedResult<unknown>> {
-    const where = { status: filters.status, tripId: filters.tripId };
+    const baseWhere = { status: filters.status, tripId: filters.tripId };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [data, total] = await Promise.all([
       this.prisma.booking.findMany({
         where,

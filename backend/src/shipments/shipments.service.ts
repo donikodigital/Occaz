@@ -822,8 +822,11 @@ export class ShipmentsService {
   async findAll(
     query: PaginationQueryDto,
     filters: { status?: ShipmentStatus } = {},
+    /** Filtre de portée par pays (CountryScopeService) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.ShipmentWhereInput,
   ): Promise<PaginatedResult<unknown>> {
-    const where = { status: filters.status };
+    const baseWhere = { status: filters.status };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [data, total] = await Promise.all([
       this.prisma.shipment.findMany({
         where,

@@ -190,8 +190,10 @@ export class DriverProfilesService {
   async findAll(
     query: PaginationQueryDto,
     filters: { status?: DriverAccountStatus; countryId?: string } = {},
+    /** Filtre de portée par pays (CountryScopeService) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.DriverProfileWhereInput,
   ): Promise<PaginatedResult<unknown>> {
-    const where = {
+    const baseWhere = {
       status: filters.status,
       countryId: filters.countryId,
       ...(query.search
@@ -203,6 +205,7 @@ export class DriverProfilesService {
           }
         : {}),
     };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [data, total] = await Promise.all([
       this.prisma.driverProfile.findMany({
         where,

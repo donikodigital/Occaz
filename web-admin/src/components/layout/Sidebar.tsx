@@ -4,6 +4,7 @@
 // gauche), item actif en fond plein avec ombre douce, carte utilisateur
 // arrondie en pied de page. Structure et logique inchangées : toujours un
 // tiroir piloté par isOpen/onClose en dessous de lg, fixe au-delà.
+// [02/10/2026] v3 — Le menu ne montre plus que les entrées permises au compte connecté (voir nav-items.ts).
 'use client';
 
 import React, { useEffect } from 'react';
@@ -11,7 +12,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { IconLogout, IconRoute, IconX } from '@tabler/icons-react';
 import { useAuthStore } from '@/stores/authStore';
-import { NAV_SECTIONS } from './nav-items';
+import { usePermissions } from '@/hooks/usePermissions';
+import { getVisibleSections } from './nav-items';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -42,6 +44,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const { can } = usePermissions();
+  const sections = getVisibleSections(can);
 
   // Referme le tiroir à chaque changement de page.
   useEffect(() => {
@@ -99,7 +103,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
-          {NAV_SECTIONS.map((section) => (
+          {sections.map((section) => (
             <div key={section.title}>
               <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-text-muted">
                 {section.title}
@@ -143,6 +147,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-text-primary">{user?.email ?? user?.phone}</p>
+              {user?.scopedCountries && user.scopedCountries.length > 0 ? (
+                <p className="truncate text-[11px] font-medium text-text-secondary">
+                  Périmètre : {user.scopedCountries.map((country) => country.name).join(', ')}
+                </p>
+              ) : null}
               <button
                 onClick={handleLogout}
                 className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-danger transition-colors hover:text-danger-dark"

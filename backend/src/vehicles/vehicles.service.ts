@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DocumentOwnerType, DocumentStatus, NotificationChannel, NotificationType } from '@prisma/client';
+import { DocumentOwnerType, DocumentStatus, NotificationChannel, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DocumentsService } from '../documents/documents.service';
@@ -79,8 +79,10 @@ export class VehiclesService {
   async findAll(
     query: PaginationQueryDto,
     filters: { verificationStatus?: DocumentStatus; driverId?: string } = {},
+    /** Filtre de portée par pays (CountryScopeService) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.VehicleWhereInput,
   ): Promise<PaginatedResult<unknown>> {
-    const where = {
+    const baseWhere = {
       verificationStatus: filters.verificationStatus,
       driverId: filters.driverId,
       ...(query.search
@@ -93,6 +95,7 @@ export class VehiclesService {
           }
         : {}),
     };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [data, total] = await Promise.all([
       this.prisma.vehicle.findMany({
         where,

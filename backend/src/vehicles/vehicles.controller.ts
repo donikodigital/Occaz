@@ -5,6 +5,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { VehiclesService } from './vehicles.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
@@ -20,6 +21,7 @@ export class VehiclesController {
   constructor(
     private readonly vehiclesService: VehiclesService,
     private readonly driverProfilesService: DriverProfilesService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   @Get('mine')
@@ -82,19 +84,25 @@ export class VehiclesController {
 
   @Permissions(PERMISSIONS.VEHICLE_READ)
   @Get()
-  findAll(@Query() query: ListVehiclesQueryDto) {
-    return this.vehiclesService.findAll(query, { verificationStatus: query.verificationStatus, driverId: query.driverId });
+  findAll(@Query() query: ListVehiclesQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.vehiclesService.findAll(
+      query,
+      { verificationStatus: query.verificationStatus, driverId: query.driverId },
+      this.scope.vehicleWhere(user, PERMISSIONS.VEHICLE_READ),
+    );
   }
 
   @Permissions(PERMISSIONS.VEHICLE_VERIFY)
   @Patch(':id/verify')
-  verify(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async verify(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertVehicle(user, PERMISSIONS.VEHICLE_VERIFY, id);
     return this.vehiclesService.verify(id, user.id);
   }
 
   @Permissions(PERMISSIONS.VEHICLE_VERIFY)
   @Patch(':id/reject')
-  reject(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async reject(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertVehicle(user, PERMISSIONS.VEHICLE_VERIFY, id);
     return this.vehiclesService.reject(id, user.id);
   }
 }

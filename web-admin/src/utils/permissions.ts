@@ -1,0 +1,47 @@
+// web-admin/src/utils/permissions.ts
+// [02/10/2026] Miroir de backend/src/common/constants/permissions.constants.ts — mêmes clés, pour que le
+// back-office n'affiche que ce que le compte connecté a le droit de faire. Le serveur reste l'autorité :
+// ces clés servent à l'affichage (menu, boutons), jamais à la sécurité.
+export const PERMISSIONS = {
+  USER_READ: 'user.read',
+  USER_UPDATE: 'user.update',
+  USER_SUSPEND: 'user.suspend',
+  USER_DELETE: 'user.delete',
+  ROLE_MANAGE: 'role.manage',
+  SETTINGS_UPDATE: 'settings.update',
+  AUDIT_READ: 'audit.read',
+  DASHBOARD_ADMIN_READ: 'dashboard.admin_read',
+  GEOGRAPHY_MANAGE: 'geography.manage',
+  CUSTOMER_READ: 'customer.read',
+  DRIVER_READ: 'driver.read',
+  DRIVER_VERIFY: 'driver.verify',
+  DRIVER_SUSPEND: 'driver.suspend',
+  VEHICLE_READ: 'vehicle.read',
+  VEHICLE_VERIFY: 'vehicle.verify',
+  DOCUMENT_READ: 'document.read',
+  DOCUMENT_VERIFY: 'document.verify',
+  TRIP_READ: 'trip.read',
+  TRIP_UPDATE: 'trip.update',
+  TRIP_CANCEL: 'trip.cancel',
+  BOOKING_READ: 'booking.read',
+  BOOKING_CANCEL: 'booking.cancel',
+  SHIPMENT_READ: 'shipment.read',
+  SHIPMENT_UPDATE: 'shipment.update',
+  SHIPMENT_CATEGORY_MANAGE: 'shipment_category.manage',
+  PAYMENT_READ: 'payment.read',
+  PAYMENT_PROVIDER_MANAGE: 'payment_provider.manage',
+  REFUND_CREATE: 'refund.create',
+  WALLET_READ: 'wallet.read',
+  WALLET_ADJUST: 'wallet.adjust',
+  PAYOUT_MANAGE: 'payout.manage',
+  COMMISSION_MANAGE: 'commission.manage',
+  PROMOTION_MANAGE: 'promotion.manage',
+  CANCELLATION_POLICY_MANAGE: 'cancellation_policy.manage',
+  DISPUTE_READ: 'dispute.read',
+  DISPUTE_RESOLVE: 'dispute.resolve',
+  DISPUTE_ASSIGN: 'dispute.assign',
+  NOTIFICATION_TEMPLATE_MANAGE: 'notification_template.manage',
+  CONVERSATION_READ: 'conversation.read',
+} as const;
+
+export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

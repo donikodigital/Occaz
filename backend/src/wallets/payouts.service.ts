@@ -1,6 +1,6 @@
 // backend/src/wallets/payouts.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PayoutStatus } from '@prisma/client';
+import { PayoutStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { WalletsService } from './wallets.service';
@@ -46,8 +46,11 @@ export class PayoutsService {
   async findAll(
     query: PaginationQueryDto,
     filters: { status?: PayoutStatus } = {},
+    /** Filtre de portée par pays (CountryScopeService) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.PayoutWhereInput,
   ): Promise<PaginatedResult<unknown>> {
-    const where = { status: filters.status };
+    const baseWhere = { status: filters.status };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [data, total] = await Promise.all([
       this.prisma.payout.findMany({
         where,

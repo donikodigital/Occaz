@@ -9,6 +9,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { ShipmentsService } from './shipments.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { AssignShipmentDto } from './dto/assign-shipment.dto';
@@ -32,6 +33,7 @@ export class ShipmentsController {
     private readonly customerProfilesService: CustomerProfilesService,
     private readonly driverProfilesService: DriverProfilesService,
     private readonly shipmentOtpService: ShipmentOtpService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   @Get('mine')
@@ -75,7 +77,7 @@ export class ShipmentsController {
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const shipment = await this.shipmentsService.findOne(id);
 
-    if (!user.permissions.includes(PERMISSIONS.SHIPMENT_READ)) {
+    if (!(await this.scope.hasShipmentAccess(user, id))) {
       const customer = await this.customerProfilesService.findByUserId(user.id).catch(() => null);
       const isOwningCustomer = customer?.id === shipment.customerId;
 
@@ -202,7 +204,11 @@ export class ShipmentsController {
 
   @Permissions(PERMISSIONS.SHIPMENT_READ)
   @Get()
-  findAll(@Query() query: ListShipmentsQueryDto) {
-    return this.shipmentsService.findAll(query, { status: query.status });
+  findAll(@Query() query: ListShipmentsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.shipmentsService.findAll(
+      query,
+      { status: query.status },
+      this.scope.shipmentWhere(user, PERMISSIONS.SHIPMENT_READ),
+    );
   }
 }

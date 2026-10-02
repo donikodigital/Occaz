@@ -6,6 +6,8 @@ import { IconCheck, IconEye, IconFileText, IconX } from '@tabler/icons-react';
 import { Badge, Button, IconActionButton, TextArea } from '@/components/ui';
 import { useDocumentsForOwner, useRejectDocument, useVerifyDocument } from '@/hooks/useDocuments';
 import { documentsApi } from '@/services/api/documents.api';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/utils/permissions';
 import type { AppDocument, DocumentOwnerType } from '@/types/documents.types';
 
 const STATUS_TONE: Record<AppDocument['status'], 'success' | 'danger' | 'accent'> = {
@@ -22,6 +24,7 @@ const STATUS_LABEL: Record<AppDocument['status'], string> = {
 function DocumentRow({ document, ownerType, ownerId }: { document: AppDocument; ownerType: DocumentOwnerType; ownerId: string }) {
   const verify = useVerifyDocument(ownerType, ownerId);
   const reject = useRejectDocument(ownerType, ownerId);
+  const { can } = usePermissions();
   const [isViewing, setViewing] = useState(false);
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [reason, setReason] = useState('');
@@ -53,7 +56,7 @@ function DocumentRow({ document, ownerType, ownerId }: { document: AppDocument; 
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <Badge label={STATUS_LABEL[document.status]} tone={STATUS_TONE[document.status]} />
           <IconActionButton icon={IconEye} label="Voir le document" onClick={handleView} loading={isViewing} />
-          {document.status === 'PENDING' ? (
+          {document.status === 'PENDING' && can(PERMISSIONS.DOCUMENT_VERIFY) ? (
             <>
               <IconActionButton
                 icon={IconCheck}

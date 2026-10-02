@@ -45,7 +45,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Compte suspendu.');
     }
 
-    const { permissions, scopedCountryIds } =
+    const { permissions, scopedCountryIds, countryScopes } =
       await this.userRolesService.getEffectivePermissions(user.id);
 
     return {
@@ -55,6 +55,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       sessionId: payload.sessionId,
       permissions,
       scopedCountryIds,
+      countryScopes,
     };
   }
 }

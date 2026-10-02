@@ -7,6 +7,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { VerificationsService } from './verifications.service';
 import { CreateVerificationDto } from './dto/create-verification.dto';
 import { RejectVerificationDto } from './dto/reject-verification.dto';
@@ -19,6 +20,7 @@ export class VerificationsController {
   constructor(
     private readonly verificationsService: VerificationsService,
     private readonly driverProfilesService: DriverProfilesService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   @Get('mine')
@@ -39,31 +41,39 @@ export class VerificationsController {
   @Get()
   findAll(
     @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: VerificationStatus,
     @Query('type') type?: VerificationType,
   ) {
-    return this.verificationsService.findAll(query, { status, type });
+    return this.verificationsService.findAll(
+      query,
+      { status, type },
+      this.scope.verificationWhere(user, PERMISSIONS.DRIVER_VERIFY),
+    );
   }
 
   @Permissions(PERMISSIONS.DRIVER_VERIFY)
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertVerification(user, PERMISSIONS.DRIVER_VERIFY, id);
     return this.verificationsService.findOne(id);
   }
 
   @Permissions(PERMISSIONS.DRIVER_VERIFY)
   @Patch(':id/approve')
-  approve(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async approve(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertVerification(user, PERMISSIONS.DRIVER_VERIFY, id);
     return this.verificationsService.approve(id, user.id);
   }
 
   @Permissions(PERMISSIONS.DRIVER_VERIFY)
   @Patch(':id/reject')
-  reject(
+  async reject(
     @Param('id') id: string,
     @Body() dto: RejectVerificationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.scope.assertVerification(user, PERMISSIONS.DRIVER_VERIFY, id);
     return this.verificationsService.reject(id, dto.reason, user.id);
   }
 }

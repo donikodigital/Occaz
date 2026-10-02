@@ -6,6 +6,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { PayoutsService } from './payouts.service';
 import { RequestPayoutDto } from './dto/request-payout.dto';
 import { FailPayoutDto } from './dto/fail-payout.dto';
@@ -19,6 +20,7 @@ export class PayoutsController {
   constructor(
     private readonly payoutsService: PayoutsService,
     private readonly driverProfilesService: DriverProfilesService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   @Get('mine')
@@ -35,35 +37,43 @@ export class PayoutsController {
 
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)
   @Get()
-  findAll(@Query() query: ListPayoutsQueryDto) {
-    return this.payoutsService.findAll(query, { status: query.status });
+  findAll(@Query() query: ListPayoutsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.payoutsService.findAll(
+      query,
+      { status: query.status },
+      this.scope.payoutWhere(user, PERMISSIONS.PAYOUT_MANAGE),
+    );
   }
 
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertPayout(user, PERMISSIONS.PAYOUT_MANAGE, id);
     return this.payoutsService.findOne(id);
   }
 
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)
   @Patch(':id/processing')
-  markProcessing(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async markProcessing(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertPayout(user, PERMISSIONS.PAYOUT_MANAGE, id);
     return this.payoutsService.markProcessing(id, user.id);
   }
 
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)
   @Patch(':id/paid')
-  markPaid(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async markPaid(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertPayout(user, PERMISSIONS.PAYOUT_MANAGE, id);
     return this.payoutsService.markPaid(id, user.id);
   }
 
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)
   @Patch(':id/failed')
-  markFailed(
+  async markFailed(
     @Param('id') id: string,
     @Body() dto: FailPayoutDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.scope.assertPayout(user, PERMISSIONS.PAYOUT_MANAGE, id);
     return this.payoutsService.markFailed(id, dto.reason, user.id);
   }
 }

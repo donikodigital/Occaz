@@ -7,6 +7,8 @@ import { DocumentsPanel } from '@/components/layout/DocumentsPanel';
 import { useRejectVehicle, useVerifyVehicle } from '@/hooks/useVehicles';
 import { VEHICLE_TYPE_LABELS } from '@/utils/driverLabels';
 import { ToneButton } from './driverUi';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/utils/permissions';
 import type { Vehicle } from '@/types/drivers.types';
 
 const VEHICLE_STATUS_STYLE = {
@@ -53,6 +55,7 @@ type VehicleDetailRowProps = {
 export function VehicleDetailRow({ vehicle, driverId, defaultOpen = true }: VehicleDetailRowProps) {
   const verifyVehicle = useVerifyVehicle(driverId);
   const rejectVehicle = useRejectVehicle(driverId);
+  const { can } = usePermissions();
   const [showDocuments, setShowDocuments] = useState(defaultOpen);
   const status = VEHICLE_STATUS_STYLE[vehicle.verificationStatus];
 
@@ -88,7 +91,7 @@ export function VehicleDetailRow({ vehicle, driverId, defaultOpen = true }: Vehi
       </div>
 
       {/* Valider / Rejeter (uniquement si en attente) */}
-      {vehicle.verificationStatus === 'PENDING' ? (
+      {vehicle.verificationStatus === 'PENDING' && can(PERMISSIONS.VEHICLE_VERIFY) ? (
         <div className="mt-4 grid grid-cols-2 gap-2">
           <ToneButton
             variant="success"

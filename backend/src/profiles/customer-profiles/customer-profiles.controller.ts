@@ -7,6 +7,7 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../../common/types/request-with-user.interface';
+import { CountryScopeService } from '../../common/scope/country-scope.service';
 import { RequestUploadUrlDto } from '../../storage/dto/request-upload-url.dto';
 import { CustomerProfilesService } from './customer-profiles.service';
 import { CreateCustomerProfileDto } from './dto/create-customer-profile.dto';
@@ -17,7 +18,10 @@ import { ConfirmPhotoDto } from './dto/confirm-photo.dto';
 @ApiBearerAuth()
 @Controller('customer-profiles')
 export class CustomerProfilesController {
-  constructor(private readonly customerProfilesService: CustomerProfilesService) {}
+  constructor(
+    private readonly customerProfilesService: CustomerProfilesService,
+    private readonly scope: CountryScopeService,
+  ) {}
 
   @Post('me')
   createMine(@Body() dto: CreateCustomerProfileDto, @CurrentUser() user: AuthenticatedUser) {
@@ -46,13 +50,22 @@ export class CustomerProfilesController {
 
   @Permissions(PERMISSIONS.CUSTOMER_READ)
   @Get()
-  findAll(@Query() query: PaginationQueryDto, @Query('countryId') countryId?: string) {
-    return this.customerProfilesService.findAll(query, countryId);
+  findAll(
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('countryId') countryId?: string,
+  ) {
+    return this.customerProfilesService.findAll(
+      query,
+      countryId,
+      this.scope.customerWhere(user, PERMISSIONS.CUSTOMER_READ),
+    );
   }
 
   @Permissions(PERMISSIONS.CUSTOMER_READ)
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertCustomer(user, PERMISSIONS.CUSTOMER_READ, id);
     return this.customerProfilesService.findOne(id);
   }
 }

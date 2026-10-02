@@ -17,6 +17,11 @@ export interface AuthenticatedUser {
   permissions: string[];
   /** Pays de portée pour les rôles Support scopés géographiquement (peut être vide = accès global). */
   scopedCountryIds: string[];
+  /**
+   * Portée par permission : pour chaque permission accordée uniquement par des rôles limités à un pays, la
+   * liste de ces pays. Une permission absente est valable partout. Voir common/scope/country-scope.ts.
+   */
+  countryScopes: Record<string, string[]>;
 }
 
 export interface RequestWithUser extends Request {

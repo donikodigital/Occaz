@@ -5,6 +5,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { AdminDashboardService } from './admin-dashboard.service';
 import { DriverDashboardService } from './driver-dashboard.service';
 import { CustomerDashboardService } from './customer-dashboard.service';
@@ -27,6 +28,7 @@ export class DashboardsController {
     private readonly commissionSummary: CommissionSummaryService,
     private readonly driverProfilesService: DriverProfilesService,
     private readonly customerProfilesService: CustomerProfilesService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   @Permissions(PERMISSIONS.DASHBOARD_ADMIN_READ)
@@ -92,9 +94,10 @@ export class DashboardsController {
     return this.customerDashboard.getOverview(customer.id);
   }
 
+  /** Limité au périmètre géographique de l'agent (voir CountryScopeService) ; SuperAdmin / rôle sans pays : tout. */
   @Permissions(PERMISSIONS.DISPUTE_READ)
   @Get('support')
-  getSupportOverview() {
-    return this.supportDashboard.getOverview();
+  getSupportOverview(@CurrentUser() user: AuthenticatedUser) {
+    return this.supportDashboard.getOverview(this.scope.scope(user, PERMISSIONS.DISPUTE_READ));
   }
 }

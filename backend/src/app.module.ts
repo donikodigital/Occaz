@@ -43,6 +43,7 @@ import { DealsModule } from './deals/deals.module';
 import { ArticlesModule } from './articles/articles.module';
 import { SavedCardsModule } from './saved-cards/saved-cards.module';
 import { CookieConsentModule } from './cookie-consent/cookie-consent.module';
+import { CountryScopeModule } from './common/scope/country-scope.module';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -103,6 +104,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     ArticlesModule,
     SavedCardsModule,
     CookieConsentModule,
+    CountryScopeModule,
 
     // Toutes les Parties du cahier des charges sont couvertes — voir
     // README.md pour la correspondance Lot / section.

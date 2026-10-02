@@ -25,6 +25,8 @@ import { VehicleDetailRow } from './VehicleDetailRow';
 import { DriverAvatar, DriverStatusPill, StatTile, ToneButton, driverStatusStyle, formatDate } from './driverUi';
 import { useDriver, useReactivateDriver, useSuspendDriver, useVerifyDriver } from '@/hooks/useDrivers';
 import { ApiError } from '@/services/api/ApiError';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/utils/permissions';
 
 type DriverProfileProps = {
   driverId: string;
@@ -38,6 +40,7 @@ export function DriverProfile({ driverId, showFullPageLink = false }: DriverProf
   const verifyDriver = useVerifyDriver(driverId);
   const suspendDriver = useSuspendDriver(driverId);
   const reactivateDriver = useReactivateDriver(driverId);
+  const { can } = usePermissions();
 
   const [showSuspendForm, setShowSuspendForm] = useState(false);
   const [reason, setReason] = useState('');
@@ -142,7 +145,7 @@ export function DriverProfile({ driverId, showFullPageLink = false }: DriverProf
       {/* ---------- Actions ---------- */}
       <Panel title="Actions" icon={<IconShieldCheck size={18} />} delay={80}>
         <div className="flex flex-wrap gap-2.5">
-          {canVerify ? (
+          {canVerify && can(PERMISSIONS.DRIVER_VERIFY) ? (
             <ToneButton
               variant="success"
               size="fluid"
@@ -168,7 +171,7 @@ export function DriverProfile({ driverId, showFullPageLink = false }: DriverProf
             </ToneButton>
           ) : null}
 
-          {isSuspended ? (
+          {!can(PERMISSIONS.DRIVER_SUSPEND) ? null : isSuspended ? (
             <ToneButton
               variant="success"
               size="fluid"

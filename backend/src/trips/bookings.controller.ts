@@ -7,6 +7,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
@@ -25,6 +26,7 @@ export class BookingsController {
     private readonly customerProfilesService: CustomerProfilesService,
     private readonly driverProfilesService: DriverProfilesService,
     private readonly tripOtpService: TripOtpService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   @Get('mine')
@@ -46,7 +48,7 @@ export class BookingsController {
       trip: { driverId: string };
     };
 
-    if (!user.permissions.includes(PERMISSIONS.BOOKING_READ)) {
+    if (!(await this.scope.hasBookingAccess(user, id))) {
       const customer = await this.customerProfilesService.findByUserId(user.id).catch(() => null);
       const isOwningCustomer = customer?.id === booking.customerId;
 
@@ -123,7 +125,11 @@ export class BookingsController {
 
   @Permissions(PERMISSIONS.BOOKING_READ)
   @Get()
-  findAll(@Query() query: ListBookingsQueryDto) {
-    return this.bookingsService.findAll(query, { status: query.status, tripId: query.tripId });
+  findAll(@Query() query: ListBookingsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.bookingsService.findAll(
+      query,
+      { status: query.status, tripId: query.tripId },
+      this.scope.bookingWhere(user, PERMISSIONS.BOOKING_READ),
+    );
   }
 }

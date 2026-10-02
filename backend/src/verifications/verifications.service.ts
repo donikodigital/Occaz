@@ -1,6 +1,6 @@
 // backend/src/verifications/verifications.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { VerificationStatus, VerificationType } from '@prisma/client';
+import { Prisma, VerificationStatus, VerificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
@@ -57,8 +57,11 @@ export class VerificationsService {
   async findAll(
     query: PaginationQueryDto,
     filters: { status?: VerificationStatus; type?: VerificationType } = {},
+    /** Filtre de portée par pays (CountryScopeService) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.VerificationWhereInput,
   ): Promise<PaginatedResult<unknown>> {
-    const where = { status: filters.status, type: filters.type };
+    const baseWhere = { status: filters.status, type: filters.type };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [data, total] = await Promise.all([
       this.prisma.verification.findMany({
         where,

@@ -6,6 +6,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { WalletsService } from './wallets.service';
 import { AdjustWalletDto } from './dto/adjust-wallet.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
@@ -17,6 +18,7 @@ export class WalletsController {
   constructor(
     private readonly walletsService: WalletsService,
     private readonly driverProfilesService: DriverProfilesService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   @Get('mine')
@@ -37,23 +39,30 @@ export class WalletsController {
 
   @Permissions(PERMISSIONS.WALLET_READ)
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertWallet(user, PERMISSIONS.WALLET_READ, id);
     return this.walletsService.findOne(id);
   }
 
   @Permissions(PERMISSIONS.WALLET_READ)
   @Get(':id/transactions')
-  findTransactions(@Param('id') id: string, @Query() query: PaginationQueryDto) {
+  async findTransactions(
+    @Param('id') id: string,
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.scope.assertWallet(user, PERMISSIONS.WALLET_READ, id);
     return this.walletsService.getTransactions(id, query);
   }
 
   @Permissions(PERMISSIONS.WALLET_ADJUST)
   @Post(':driverId/adjust')
-  adjust(
+  async adjust(
     @Param('driverId') driverId: string,
     @Body() dto: AdjustWalletDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.scope.assertDriver(user, PERMISSIONS.WALLET_ADJUST, driverId);
     return this.walletsService.adjustBalance(driverId, dto.amount, dto.reason, user.id);
   }
 }

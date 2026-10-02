@@ -155,8 +155,10 @@ export class CustomerProfilesService {
   async findAll(
     query: PaginationQueryDto,
     countryId?: string,
+    /** Filtre de portée par pays (CountryScopeService) ; absent = aucune restriction. */
+    scopeWhere?: Prisma.CustomerProfileWhereInput,
   ): Promise<PaginatedResult<unknown>> {
-    const where = {
+    const baseWhere = {
       countryId,
       ...(query.search
         ? {
@@ -167,6 +169,7 @@ export class CustomerProfilesService {
           }
         : {}),
     };
+    const where = scopeWhere ? { AND: [baseWhere, scopeWhere] } : baseWhere;
     const [data, total] = await Promise.all([
       this.prisma.customerProfile.findMany({
         where,

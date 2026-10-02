@@ -20,6 +20,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { PaymentsService } from './payments.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { ManualRefundDto } from './dto/manual-refund.dto';
@@ -33,6 +34,7 @@ export class PaymentsController {
     private readonly paymentsService: PaymentsService,
     private readonly customerProfilesService: CustomerProfilesService,
     private readonly audit: AuditService,
+    private readonly scope: CountryScopeService,
   ) {}
 
   @ApiBearerAuth()
@@ -77,6 +79,7 @@ export class PaymentsController {
     @Body() dto: ManualRefundDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.scope.assertBooking(user, PERMISSIONS.REFUND_CREATE, bookingId);
     await this.paymentsService.refundBooking(bookingId, dto.percentage ?? 100);
     await this.audit.log({
       actorId: user.id,
@@ -96,6 +99,7 @@ export class PaymentsController {
     @Body() dto: ManualRefundDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.scope.assertShipment(user, PERMISSIONS.REFUND_CREATE, shipmentId);
     await this.paymentsService.refundShipment(shipmentId, dto.percentage ?? 100);
     await this.audit.log({
       actorId: user.id,

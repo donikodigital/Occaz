@@ -5,6 +5,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { CountryScopeService } from '../common/scope/country-scope.service';
 import { ConversationsService } from './conversations.service';
 import { SendMessageDto } from './dto/send-message.dto';
 
@@ -12,7 +13,10 @@ import { SendMessageDto } from './dto/send-message.dto';
 @ApiBearerAuth()
 @Controller('conversations')
 export class ConversationsController {
-  constructor(private readonly conversationsService: ConversationsService) {}
+  constructor(
+    private readonly conversationsService: ConversationsService,
+    private readonly scope: CountryScopeService,
+  ) {}
 
   @Get('mine')
   findMine(@Query() query: PaginationQueryDto, @CurrentUser() user: AuthenticatedUser) {
@@ -30,16 +34,12 @@ export class ConversationsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.conversationsService.findOne(
-      id,
-      user.id,
-      user.permissions.includes(PERMISSIONS.CONVERSATION_READ),
-    );
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.conversationsService.findOne(id, user.id, await this.scope.hasConversationAccess(user, id));
   }
 
   @Get(':id/messages')
-  findMessages(
+  async findMessages(
     @Param('id') id: string,
     @Query() query: PaginationQueryDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -47,20 +47,20 @@ export class ConversationsController {
     return this.conversationsService.findMessages(
       id,
       user.id,
-      user.permissions.includes(PERMISSIONS.CONVERSATION_READ),
+      await this.scope.hasConversationAccess(user, id),
       query,
     );
   }
 
   @Post(':id/messages')
-  sendMessage(
+  async sendMessage(
     @Param('id') id: string,
     @Body() dto: SendMessageDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.conversationsService.sendMessage(
       id,
-      { id: user.id, hasSupportAccess: user.permissions.includes(PERMISSIONS.CONVERSATION_READ) },
+      { id: user.id, hasSupportAccess: await this.scope.hasConversationAccess(user, id) },
       dto.content,
     );
   }
