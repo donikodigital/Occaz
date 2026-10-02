@@ -43,7 +43,7 @@ export interface ShipmentContext {
 export interface ShipmentPlace {
   id: string;
   label: string;
-  city?: { id: string; name: string } | null;
+  city?: { id: string; name: string; country?: { id: string; name: string; isoCode: string } } | null;
 }
 
 /** Une ligne de la liste admin (GET /shipments). */

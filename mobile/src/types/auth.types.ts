@@ -25,6 +25,8 @@ export interface DeviceInfo {
 export interface RequestOtpPayload {
   phone: string;
   signupAccountType?: 'CUSTOMER' | 'DRIVER';
+  /** LOGIN : le numéro doit déjà être inscrit. SIGNUP : un compte est créé si besoin. */
+  intent?: 'LOGIN' | 'SIGNUP';
 }
 
 export interface VerifyOtpPayload {

@@ -2,6 +2,9 @@
 // [22/09/2026] v2 — Habillage bleu Ocean, dans l'esprit Tiime : illustration
 // à étincelles au-dessus du titre, bouton retour en carte flottante, champ
 // téléphone dans une carte. Logique inchangée.
+// [02/10/2026] v3 — Le paramètre `mode` ('login' | 'signup') venu de l'écran
+// Bienvenue est transmis au backend (`intent`) : en mode connexion, un numéro
+// non inscrit est refusé au lieu de créer un compte. Design inchangé.
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -18,12 +21,16 @@ import { isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
 import type { AccountType } from '@/types/auth.types';
 
 export default function LoginScreen() {
-  const { accountType } = useLocalSearchParams<{ accountType?: Extract<AccountType, 'CUSTOMER' | 'DRIVER'> }>();
+  const { accountType, mode } = useLocalSearchParams<{
+    accountType?: Extract<AccountType, 'CUSTOMER' | 'DRIVER'>;
+    mode?: 'login' | 'signup';
+  }>();
+  const intent = mode === 'login' ? 'LOGIN' : mode === 'signup' ? 'SIGNUP' : undefined;
   const [phone, setPhone] = useState('+224');
   const [fieldError, setFieldError] = useState<string | undefined>();
 
   const requestOtp = useMutation({
-    mutationFn: () => authApi.requestOtp({ phone, signupAccountType: accountType }),
+    mutationFn: () => authApi.requestOtp({ phone, signupAccountType: accountType, intent }),
     onSuccess: () => {
       router.push({ pathname: '/(auth)/verify-otp', params: { phone, accountType } });
     },

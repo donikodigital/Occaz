@@ -38,6 +38,18 @@ export interface VehicleSummary {
   photoUrl: string | null;
 }
 
+export interface TripLocationCountry {
+  id: string;
+  name: string;
+  isoCode: string;
+}
+
+export interface TripLocationCity {
+  id: string;
+  name: string;
+  country?: TripLocationCountry;
+}
+
 export interface TripLocation {
   id: string;
   label: string;
@@ -45,6 +57,8 @@ export interface TripLocation {
   latitude: number | null;
   longitude: number | null;
   cityId: string | null;
+  /** Renseigné seulement là où le serveur l'inclut (ex. détail d'un envoi) — absent ailleurs. */
+  city?: TripLocationCity | null;
 }
 
 export interface TripStop {

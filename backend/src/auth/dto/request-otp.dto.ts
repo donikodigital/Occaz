@@ -16,4 +16,13 @@ export class RequestOtpDto {
   @IsOptional()
   @IsIn([AccountType.CUSTOMER, AccountType.DRIVER])
   signupAccountType?: AccountType;
+
+  @ApiPropertyOptional({
+    enum: ['LOGIN', 'SIGNUP'],
+    description:
+      "Intention de l'utilisateur. LOGIN : le numéro doit déjà être inscrit, sinon la demande est refusée (aucun compte n'est créé). SIGNUP ou absent : un compte est créé si le numéro est inconnu.",
+  })
+  @IsOptional()
+  @IsIn(['LOGIN', 'SIGNUP'])
+  intent?: 'LOGIN' | 'SIGNUP';
 }

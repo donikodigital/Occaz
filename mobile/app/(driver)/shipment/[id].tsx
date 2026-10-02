@@ -24,7 +24,7 @@ import {
   useVerifyShipmentDeliveryOtp,
 } from '@/hooks/useShipmentOtp';
 import { formatMoney } from '@/utils/money';
-import { driverNetAmount, formatWindow } from '@/utils/shipmentDisplay';
+import { driverNetAmount, formatLocation, formatWindow } from '@/utils/shipmentDisplay';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_TONE } from '@/utils/tripStatusLabels';
 import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { ApiError } from '@/services/api/ApiError';
@@ -206,7 +206,7 @@ export default function DriverShipmentDetailScreen() {
           <View style={styles.metaRow}>
             <IconMapPin size={12} color={colors.textSecondary} />
             <AppText variant="xs" color="textSecondary" style={{ flex: 1 }}>
-              {shipment.senderLocation?.label ?? '—'}
+              {formatLocation(shipment.senderLocation)}
             </AppText>
           </View>
         </View>
@@ -222,7 +222,7 @@ export default function DriverShipmentDetailScreen() {
           <View style={styles.metaRow}>
             <IconMapPin size={12} color={colors.textSecondary} />
             <AppText variant="xs" color="textSecondary" style={{ flex: 1 }}>
-              {shipment.recipientLocation?.label ?? '—'}
+              {formatLocation(shipment.recipientLocation)}
             </AppText>
           </View>
         </View>

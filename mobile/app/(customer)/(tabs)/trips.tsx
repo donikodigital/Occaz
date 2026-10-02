@@ -20,6 +20,7 @@ import { useMyBookings } from '@/hooks/useBookings';
 import { useMyShipments } from '@/hooks/useShipments';
 import { formatMoney } from '@/utils/money';
 import { formatDateShort, formatTime } from '@/utils/date';
+import { formatCityCountry } from '@/utils/shipmentDisplay';
 import type { Booking, BookingStatus } from '@/types/bookings.types';
 import type { Shipment, ShipmentStatus } from '@/types/shipments.types';
 
@@ -119,7 +120,7 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
           {shipment.recipientName}
         </AppText>
         <AppText variant="xs" color="textSecondary" numberOfLines={1}>
-          {shipment.recipientLocation?.label ?? formatDateShort(shipment.createdAt)}
+          {formatCityCountry(shipment.recipientLocation) ?? shipment.recipientLocation?.label ?? formatDateShort(shipment.createdAt)}
         </AppText>
       </View>
       <View style={styles.rowEnd}>

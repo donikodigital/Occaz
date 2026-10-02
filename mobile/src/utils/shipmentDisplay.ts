@@ -1,7 +1,7 @@
 // mobile/src/utils/shipmentDisplay.ts
 // [21/09/2026] v1 — gain net, période, trajets éligibles (plage de dates incluse).
 import type { AvailableShipment, Shipment } from '@/types/shipments.types';
-import type { Trip } from '@/types/trips.types';
+import type { Trip, TripLocation } from '@/types/trips.types';
 import { formatDateShort } from '@/utils/date';
 
 /**
@@ -44,6 +44,32 @@ export function formatWindow(shipment: Pick<Shipment, 'windowStart' | 'windowEnd
   const start = formatDateShort(shipment.windowStart);
   const end = formatDateShort(shipment.windowEnd);
   return start === end ? `Le ${start}` : `Du ${start} au ${end}`;
+}
+
+/**
+ * "Marché Medina — Dakar, Sénégal" : ville et pays seulement là où le
+ * serveur les a inclus (détail d'un envoi, GET /shipments/:id) — se
+ * réduit au seul libellé sinon, pour ne rien casser là où cette donnée
+ * n'est pas (encore) renvoyée.
+ */
+export function formatLocation(location: Pick<TripLocation, 'label' | 'city'> | null | undefined): string {
+  if (!location) return '—';
+  const city = location.city;
+  if (!city) return location.label;
+  const place = [city.name, city.country?.name].filter(Boolean).join(', ');
+  return place ? `${location.label} — ${place}` : location.label;
+}
+
+/**
+ * "Dakar, Sénégal" — affichage compact pour une ligne de liste (sans le
+ * libellé de rue, trop long pour une ligne). null si le serveur n'a pas
+ * inclus la ville : à l'appelant de choisir son repli.
+ */
+export function formatCityCountry(location: Pick<TripLocation, 'city'> | null | undefined): string | null {
+  const city = location?.city;
+  if (!city) return null;
+  const parts = [city.name, city.country?.name].filter(Boolean);
+  return parts.length ? parts.join(', ') : null;
 }
 
 type WithCities = {

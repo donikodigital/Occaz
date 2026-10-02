@@ -79,20 +79,67 @@ export class AuthService {
   // ---------------------------------------------------------------------
 
   /**
+   * Refuse la demande de code quand le rôle choisi à l'écran ne correspond
+   * pas au compte existant (ex. un conducteur qui appuie sur « Je suis
+   * client »). Sans ce garde-fou, la personne se retrouvait dans l'autre
+   * espace sans comprendre pourquoi.
+   */
+  private assertRequestedRoleMatches(user: Pick<User, 'accountType'>, dto: RequestOtpDto): void {
+    const requested = dto.signupAccountType;
+    if (!requested) return;
+
+    const isCustomerOrDriver =
+      user.accountType === AccountType.CUSTOMER || user.accountType === AccountType.DRIVER;
+    if (!isCustomerOrDriver || user.accountType === requested) return;
+
+    const label = (type: AccountType) => (type === AccountType.DRIVER ? 'Conducteur' : 'Client');
+    const existing = label(user.accountType);
+    const wanted = label(requested);
+
+    if (dto.intent === 'LOGIN') {
+      throw new BadRequestException(
+        `Ce numéro est associé à un compte ${existing}. Appuyez sur « Je suis ${existing.toLowerCase()} » pour vous connecter.`,
+      );
+    }
+
+    throw new BadRequestException(
+      `Ce numéro est déjà associé à un compte ${existing}. Utilisez un autre numéro pour créer un compte ${wanted}, ou connectez-vous en tant que ${existing}.`,
+    );
+  }
+
+  /**
    * Le compte User est créé dès la demande d'OTP (avec isPhoneVerified à
    * false) plutôt qu'à la confirmation : cela évite d'avoir besoin d'un
    * champ `phone` séparé sur OtpCode, l'OTP est directement rattaché au
    * userId. Si le compte existe déjà, `signupAccountType` est ignoré.
+   *
+   * [02/10/2026] `intent` distingue connexion et inscription : avec
+   * `intent: 'LOGIN'`, un numéro inconnu est refusé au lieu de créer un
+   * compte. Sans `intent` (web-admin, dev-login) ou avec `'SIGNUP'`, le
+   * comportement historique est conservé.
+   *
+   * [02/10/2026] Un numéro = un seul rôle : si le numéro appartient déjà à un
+   * compte Client et que l'écran demande Conducteur (ou l'inverse), la demande
+   * est refusée AVANT l'envoi du SMS, avec un message qui dit quoi faire. Les
+   * comptes équipe (SUPPORT, SUPERADMIN) et les appels sans `signupAccountType`
+   * (web-admin, dev-login) ne sont pas concernés.
    */
   async requestOtp(dto: RequestOtpDto): Promise<{ expiresInSeconds: number }> {
     let user = await this.usersService.findByPhone(dto.phone);
 
     if (!user) {
+      if (dto.intent === 'LOGIN') {
+        throw new BadRequestException(
+          "Aucun compte n'existe avec ce numéro. Créez votre compte depuis l'écran d'accueil.",
+        );
+      }
       user = await this.usersService.createUser({
         phone: dto.phone,
         accountType: dto.signupAccountType ?? AccountType.CUSTOMER,
       });
     }
+
+    this.assertRequestedRoleMatches(user, dto);
 
     if (user.isSuspended) {
       throw new BadRequestException('Ce compte est suspendu.');

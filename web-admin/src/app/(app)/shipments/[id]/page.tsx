@@ -18,6 +18,7 @@ import {
   SHIPMENT_STATUS_TONE,
   driverNet,
   formatDateTime,
+  formatPlace,
   formatWindow,
   routeLabel,
 } from '@/utils/shipmentLabels';
@@ -132,7 +133,7 @@ export default function ShipmentDetailPage() {
                 {shipment.senderPhone}
               </a>
             </Field>
-            <Field label="Adresse de récupération">{shipment.senderLocation?.label ?? '—'}</Field>
+            <Field label="Adresse de récupération">{formatPlace(shipment.senderLocation)}</Field>
           </div>
         </SectionCard>
 
@@ -144,7 +145,7 @@ export default function ShipmentDetailPage() {
                 {shipment.recipientPhone}
               </a>
             </Field>
-            <Field label="Adresse de livraison">{shipment.recipientLocation?.label ?? '—'}</Field>
+            <Field label="Adresse de livraison">{formatPlace(shipment.recipientLocation)}</Field>
           </div>
         </SectionCard>
       </div>

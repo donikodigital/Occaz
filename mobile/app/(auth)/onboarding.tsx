@@ -3,13 +3,22 @@
 // sur un aplat doux à étincelles (AuthIllustration) au lieu du carré plein
 // indigo, cartes de rôle arrondies avec ombre douce, typographie plus
 // généreuse. Logique inchangée.
-import React from 'react';
-import { Image, ImageBackground, Pressable, StyleSheet, View } from 'react-native';
+// [02/10/2026] v3 — « Chauffeur » devient « Conducteur » sur tout l'écran.
+// Le lien du bas « Déjà inscrit ? Se connecter » faisait exactement la même
+// chose que les deux cartes de rôle : il est remplacé par « Pas encore client
+// ou conducteur ? Créer votre compte », qui ouvre une modale pour choisir son
+// type de compte. Les deux cartes du haut restent là pour que les personnes
+// déjà inscrites se connectent immédiatement.
+// Les cartes ouvrent l'écran téléphone en mode « login » (un numéro inconnu
+// est refusé), la modale l'ouvre en mode « signup » (le compte est créé).
+import React, { useState } from 'react';
+import { Image, ImageBackground, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowRight, IconSteeringWheel, IconUser } from '@tabler/icons-react-native';
+import { IconArrowRight, IconSteeringWheel, IconUser, IconX } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
 import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
-import { colors, radius, spacing } from '@/theme';
+import { useResponsive } from '@/hooks/useResponsive';
+import { colors, maxContentWidth, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import type { AccountType } from '@/types/auth.types';
 
@@ -29,6 +38,8 @@ function RoleOption({ title, subtitle, icon, iconBackground, tone, onPress }: Ro
   const isOcean = tone === 'ocean';
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
       onPress={onPress}
       style={({ pressed }) => [
         styles.option,
@@ -50,9 +61,82 @@ function RoleOption({ title, subtitle, icon, iconBackground, tone, onPress }: Ro
   );
 }
 
+interface SignupSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (accountType: Extract<AccountType, 'CUSTOMER' | 'DRIVER'>) => void;
+}
+
+// Modale « Créer votre compte » : même enveloppe que ConfirmDialog (feuille en
+// bas sur mobile, centrée dès le seuil tablette). Un appui sur le fond assombri
+// ou sur la croix referme la feuille.
+function SignupSheet({ visible, onClose, onSelect }: SignupSheetProps) {
+  const { isTablet } = useResponsive();
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={[styles.overlay, isTablet && styles.overlayCentered]}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
+        />
+        <View style={[styles.sheet, isTablet && styles.sheetCentered]}>
+          <View style={styles.sheetHeader}>
+            <View style={styles.sheetHeaderText}>
+              <AppText variant="xl" weight="bold" color={OCEAN.deep}>
+                Créer votre compte
+              </AppText>
+              <AppText variant="sm" color="textSecondary" style={styles.sheetSubtitle}>
+                Vous êtes plutôt…
+              </AppText>
+            </View>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+              style={styles.closeButton}
+            >
+              <IconX size={18} color={colors.textPrimary} />
+            </Pressable>
+          </View>
+
+          <View style={styles.options}>
+            <RoleOption
+              title="Client"
+              subtitle="Réserver un trajet ou un envoi"
+              icon={<IconUser size={19} color={OCEAN.onDark} />}
+              iconBackground="rgba(255,255,255,0.16)"
+              tone="ocean"
+              onPress={() => onSelect('CUSTOMER')}
+            />
+            <RoleOption
+              title="Conducteur"
+              subtitle="Rentabiliser mes trajets"
+              icon={<IconSteeringWheel size={19} color={colors.successDark} />}
+              iconBackground={colors.successLight}
+              tone="surface"
+              onPress={() => onSelect('DRIVER')}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function OnboardingScreen() {
-  function selectRole(accountType: AccountType) {
-    router.push({ pathname: '/(auth)/login', params: { accountType } });
+  const [signupOpen, setSignupOpen] = useState(false);
+
+  function goToPhoneScreen(accountType: AccountType, mode: 'login' | 'signup') {
+    router.push({ pathname: '/(auth)/login', params: { accountType, mode } });
+  }
+
+  function selectSignupRole(accountType: Extract<AccountType, 'CUSTOMER' | 'DRIVER'>) {
+    setSignupOpen(false);
+    goToPhoneScreen(accountType, 'signup');
   }
 
   return (
@@ -76,27 +160,34 @@ export default function OnboardingScreen() {
             icon={<IconUser size={19} color={OCEAN.onDark} />}
             iconBackground="rgba(255,255,255,0.16)"
             tone="ocean"
-            onPress={() => selectRole('CUSTOMER')}
+            onPress={() => goToPhoneScreen('CUSTOMER', 'login')}
           />
           <RoleOption
-            title="Je suis chauffeur"
+            title="Je suis conducteur"
             subtitle="Rentabiliser mes trajets"
             icon={<IconSteeringWheel size={19} color={colors.successDark} />}
             iconBackground={colors.successLight}
             tone="surface"
-            onPress={() => selectRole('DRIVER')}
+            onPress={() => goToPhoneScreen('DRIVER', 'login')}
           />
         </View>
 
-        <Pressable onPress={() => router.push({ pathname: '/(auth)/login' })} style={styles.loginLink}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Créer votre compte"
+          onPress={() => setSignupOpen(true)}
+          style={styles.signupLink}
+        >
           <AppText variant="sm" color="textSecondary" align="center">
-            Déjà inscrit ?{' '}
+            Pas encore client ou conducteur ?{'\n'}
             <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-              Se connecter
+              Créer votre compte
             </AppText>
           </AppText>
         </Pressable>
       </ScreenContainer>
+
+      <SignupSheet visible={signupOpen} onClose={() => setSignupOpen(false)} onSelect={selectSignupRole} />
     </ImageBackground>
   );
 }
@@ -164,7 +255,58 @@ const styles = StyleSheet.create({
   optionText: {
     flex: 1,
   },
-  loginLink: {
+  signupLink: {
     marginTop: spacing.xl,
+    paddingVertical: spacing.xs,
+  },
+
+  // --- Modale « Créer votre compte » ---------------------------------------
+  overlay: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  overlayCentered: {
+    justifyContent: 'center',
+  },
+  sheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
+    shadowColor: OCEAN.deep,
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 12,
+  },
+  sheetCentered: {
+    maxWidth: maxContentWidth.form,
+    width: '100%',
+    alignSelf: 'center',
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  sheetHeaderText: {
+    flex: 1,
+  },
+  sheetSubtitle: {
+    marginTop: spacing.xxs,
+  },
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.lg,
+    backgroundColor: OCEAN.mist,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

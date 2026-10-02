@@ -39,7 +39,7 @@ import { useShipmentRatings } from '@/hooks/useRatings';
 import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
-import { formatWindow } from '@/utils/shipmentDisplay';
+import { formatLocation, formatWindow } from '@/utils/shipmentDisplay';
 import { ApiError } from '@/services/api/ApiError';
 import type { ShipmentStatus } from '@/types/shipments.types';
 
@@ -299,7 +299,7 @@ export default function ShipmentDetailScreen() {
         <View style={styles.addressBox}>
           <IconMapPin size={15} color={OCEAN.base} />
           <AppText variant="xs" color="textSecondary" style={styles.addressText}>
-            {shipment.senderLocation?.label ?? '—'}
+            {formatLocation(shipment.senderLocation)}
           </AppText>
         </View>
       </OceanSection>
@@ -316,7 +316,7 @@ export default function ShipmentDetailScreen() {
         <View style={styles.addressBox}>
           <IconMapPin size={15} color={OCEAN.base} />
           <AppText variant="xs" color="textSecondary" style={styles.addressText}>
-            {shipment.recipientLocation?.label ?? '—'}
+            {formatLocation(shipment.recipientLocation)}
           </AppText>
         </View>
       </OceanSection>

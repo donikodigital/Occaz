@@ -100,3 +100,12 @@ export function routeLabel(shipment: Pick<AdminShipmentListItem, 'senderLocation
   const to = shipment.recipientLocation?.city?.name ?? shipment.recipientLocation?.label ?? '—';
   return `${from} → ${to}`;
 }
+
+/** « Marché Medina — Dakar, Sénégal » — ville et pays seulement quand le serveur les a renvoyés. */
+export function formatPlace(place: { label: string; city?: { name: string; country?: { name: string } } | null } | null | undefined): string {
+  if (!place) return '—';
+  const city = place.city;
+  if (!city) return place.label;
+  const area = [city.name, city.country?.name].filter(Boolean).join(', ');
+  return area ? `${place.label} — ${area}` : place.label;
+}
