@@ -52,9 +52,14 @@ export class CreateTripDto {
   @IsString()
   pricePerSeat!: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    deprecated: true,
+    description:
+      "Ignoré : la devise d'un trajet est celle du pays de sa ville de départ (le passager y monte et y paie). Conservé pour les anciennes versions de l'application ; utilisé seulement si le pays de départ n'a pas de devise par défaut configurée.",
+  })
+  @IsOptional()
   @IsString()
-  currencyId!: string;
+  currencyId?: string;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()

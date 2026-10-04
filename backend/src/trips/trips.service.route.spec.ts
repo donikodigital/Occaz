@@ -43,7 +43,15 @@ function tripRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function build(options: { candidates?: unknown[]; trip?: Record<string, unknown>; distances?: Array<number | null> } = {}) {
+function build(
+  options: {
+    candidates?: unknown[];
+    trip?: Record<string, unknown>;
+    distances?: Array<number | null>;
+    /** Devise par défaut du pays de la ville de départ ; null = pays sans devise par défaut configurée. */
+    originCurrency?: string | null;
+  } = {},
+) {
   const trip = tripRow(options.trip);
   const tx = {
     trip: { create: jest.fn().mockResolvedValue({ id: 'new-trip' }) },
@@ -59,6 +67,11 @@ function build(options: { candidates?: unknown[]; trip?: Record<string, unknown>
     trip: {
       findMany: jest.fn().mockResolvedValue(options.candidates ?? []),
       findUnique: jest.fn().mockResolvedValue(trip),
+    },
+    city: {
+      findUnique: jest.fn().mockResolvedValue({
+        country: { defaultCurrencyId: options.originCurrency === undefined ? 'cur-gnf' : options.originCurrency },
+      }),
     },
     tripStop: { update: jest.fn().mockResolvedValue({ id: 's-kindia' }) },
     booking: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
@@ -90,6 +103,53 @@ function build(options: { candidates?: unknown[]; trip?: Record<string, unknown>
   );
   return { service, prisma, tx, pricing, locations, notifications, trip };
 }
+
+describe('TripsService.create — devise du trajet', () => {
+  const dto = (extra: Record<string, unknown> = {}) =>
+    ({
+      vehicleId: 'v1', originCityId: 'conakry', originLocationId: 'loc-conakry',
+      destinationCityId: 'labe', destinationLocationId: 'loc-labe',
+      departureAt: new Date(Date.now() + 86_400_000).toISOString(), totalSeats: 3, pricePerSeat: '100000',
+      ...extra,
+    }) as never;
+  const createdCurrency = (tx: ReturnType<typeof build>['tx']) => tx.trip.create.mock.calls[0][0].data.currencyId;
+
+  it('la devise est celle du pays de la ville de départ, sans que le chauffeur ait à la choisir', async () => {
+    const { service, tx, prisma } = build({ originCurrency: 'cur-gnf' });
+    await service.create('driver1', dto());
+    expect(createdCurrency(tx)).toBe('cur-gnf');
+    expect(prisma.city.findUnique).toHaveBeenCalledWith({
+      where: { id: 'conakry' },
+      select: { country: { select: { defaultCurrencyId: true } } },
+    });
+  });
+
+  it('départ au Sénégal : XOF, même si la requête demande une autre devise (ancienne version ou client modifié)', async () => {
+    const { service, tx } = build({ originCurrency: 'cur-xof' });
+    await service.create('driver1', dto({ currencyId: 'cur-gnf' }));
+    expect(createdCurrency(tx)).toBe('cur-xof');
+  });
+
+  it('pays de départ sans devise par défaut : la devise demandée sert de repli', async () => {
+    const { service, tx } = build({ originCurrency: null });
+    await service.create('driver1', dto({ currencyId: 'cur-gnf' }));
+    expect(createdCurrency(tx)).toBe('cur-gnf');
+  });
+
+  it('pays de départ sans devise par défaut et aucune devise demandée : refusé avec un message clair', async () => {
+    const { service, tx } = build({ originCurrency: null });
+    await expect(service.create('driver1', dto())).rejects.toThrow(/devise par défaut/);
+    expect(tx.trip.create).not.toHaveBeenCalled();
+  });
+
+  it('la mise à jour d\'un brouillon ne change jamais la devise', async () => {
+    const { service, prisma } = build({ trip: { status: TripStatus.DRAFT, stops: [] } });
+    const tx = { trip: { update: jest.fn().mockResolvedValue({}) }, tripStop: { update: jest.fn() } };
+    (prisma.$transaction as jest.Mock).mockImplementation((callback: (client: unknown) => unknown) => callback(tx));
+    await service.update('trip1', 'driver1', { currencyId: 'cur-xof', notes: 'ok' } as never);
+    expect(tx.trip.update.mock.calls[0][0].data).not.toHaveProperty('currencyId');
+  });
+});
 
 describe('TripsService.search — par villes, avec les étapes', () => {
   const base = { page: 1, limit: 20, skip: 0, take: 20 } as never;
@@ -449,5 +509,89 @@ describe('Places par tronçon — recherche et détail', () => {
     const { service } = build({ trip: { stops: [] } });
     const trip = (await service.findOne('trip1')) as unknown as { seatsByLeg?: unknown };
     expect(trip.seatsByLeg).toBeUndefined();
+  });
+});
+
+describe('TripsService.search — une seule ville', () => {
+  const base = { page: 1, limit: 20, skip: 0, take: 20, passengersCount: 1 };
+  type Found = { data: Array<{ id: string; segment: Record<string, unknown>; customerPricePerSeat: bigint }> };
+  const search = (service: TripsService, dto: Record<string, unknown>) => service.search({ ...base, ...dto } as never) as Promise<Found>;
+
+  it('destination seule : un trajet qui y arrive est proposé, au prix du trajet, avec le départ du conducteur', async () => {
+    const { service } = build({ candidates: [tripRow()] });
+    const { data } = await search(service, { destinationCityId: 'labe' });
+    expect(data).toHaveLength(1);
+    expect(data[0].segment).toMatchObject({ boardingCityName: 'Conakry', alightingCityName: 'Labé', isFullTrip: true });
+  });
+
+  it('destination seule : un trajet qui traverse la ville est proposé, au prix de l\'étape (ex. Mamou)', async () => {
+    const { service } = build({ candidates: [tripRow()] });
+    const { data } = await search(service, { destinationCityId: 'mamou' });
+    expect(data).toHaveLength(1);
+    expect(data[0].segment).toMatchObject({ boardingCityName: 'Conakry', alightingCityName: 'Mamou', pricePerSeat: 65_000n, isFullTrip: false });
+    // commission sur le prix du tronçon : 65 000 + 15 %
+    expect(data[0].customerPricePerSeat).toBe(74_750n);
+  });
+
+  it('destination seule : la ville de départ du trajet, une ville hors route et une étape fermée aux passagers ne le font pas apparaître', async () => {
+    const { service } = build({ candidates: [tripRow()] });
+    expect((await search(service, { destinationCityId: 'conakry' })).data).toHaveLength(0);
+    expect((await search(service, { destinationCityId: 'dakar' })).data).toHaveLength(0);
+    const closed = build({ candidates: [tripRow({ stops: [stop('s-kindia', 1, 'kindia', 'Kindia', 35_000n, 2, { isBookable: false })] })] });
+    expect((await search(closed.service, { destinationCityId: 'kindia' })).data).toHaveLength(0);
+  });
+
+  it('destination seule : plusieurs trajets d\'origines différentes, classés par heure de passage', async () => {
+    const dakar = tripRow({
+      id: 'dakar-labe', originCityId: 'dakar', originCity: { id: 'dakar', name: 'Dakar', countryId: 'sn' },
+      departureAt: new Date(DEPARTURE.getTime() - 3_600_000), stops: [],
+    });
+    const { service } = build({ candidates: [tripRow({ id: 'conakry-labe' }), dakar] });
+    const { data } = await search(service, { destinationCityId: 'labe' });
+    expect(data.map((trip) => trip.id)).toEqual(['dakar-labe', 'conakry-labe']);
+  });
+
+  it('destination seule : la date demandée s\'applique au départ du trajet', async () => {
+    const { service } = build({ candidates: [tripRow()] });
+    expect((await search(service, { destinationCityId: 'labe', departureDate: '2026-10-10' })).data).toHaveLength(1);
+    expect((await search(service, { destinationCityId: 'labe', departureDate: '2026-10-11' })).data).toHaveLength(0);
+  });
+
+  it('destination seule : le prix maximum et le nombre de places s\'appliquent au tronçon', async () => {
+    const full = tripRow({ bookings: [{ seatsCount: 4, boardingStopId: null, alightingStopId: null }] });
+    const a = build({ candidates: [full] });
+    expect((await search(a.service, { destinationCityId: 'labe' })).data).toHaveLength(0);
+    const b = build({ candidates: [tripRow()] });
+    expect((await search(b.service, { destinationCityId: 'labe', maxPricePerSeat: '70000' })).data).toHaveLength(0);
+    expect((await search(b.service, { destinationCityId: 'mamou', maxPricePerSeat: '70000' })).data).toHaveLength(1);
+  });
+
+  it('destination seule : la requête en base cible les trajets qui y arrivent ou la traversent', async () => {
+    const { service, prisma } = build();
+    await search(service, { destinationCityId: 'labe' });
+    const where = prisma.trip.findMany.mock.calls[0][0].where;
+    expect(where.AND[0].OR).toHaveLength(2);
+    expect(where.AND[0].OR[0]).toEqual({ destinationCityId: 'labe' });
+    expect(where.AND[0].OR[1].stops.some).toMatchObject({ cityId: 'labe', isBookable: true });
+  });
+
+  it('départ seul : tous les trajets qui partent de la ville ou la traversent, jusqu\'à leur arrivée', async () => {
+    const { service, prisma } = build({ candidates: [tripRow()] });
+    const { data } = await search(service, { originCityId: 'kindia' });
+    expect(data).toHaveLength(1);
+    expect(data[0].segment).toMatchObject({ boardingCityName: 'Kindia', alightingCityName: 'Labé', pricePerSeat: 65_000n });
+    expect(prisma.trip.findMany.mock.calls[0][0].where.AND[0].OR[0]).toEqual({ originCityId: 'kindia' });
+    expect((await search(service, { originCityId: 'labe' })).data).toHaveLength(0);
+  });
+
+  it('les deux villes : comportement inchangé (4 cas)', async () => {
+    const { service, prisma } = build();
+    await search(service, { originCityId: 'kindia', destinationCityId: 'labe' });
+    expect(prisma.trip.findMany.mock.calls[0][0].where.AND[0].OR).toHaveLength(4);
+  });
+
+  it('ni ville ni position : refusé avec un message qui dit quoi fournir', async () => {
+    const { service } = build();
+    await expect(service.search({ ...base } as never)).rejects.toThrow(/au moins une ville/);
   });
 });

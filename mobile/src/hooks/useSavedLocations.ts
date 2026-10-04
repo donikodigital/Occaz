@@ -4,7 +4,9 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { locationsApi } from '@/services/api/locations.api';
 
 const DEBOUNCE_MS = 250;
-const SAVED_LOCATIONS_LIMIT = 6;
+/** Sans saisie, la liste « Récentes » reste courte (3) pour ne pas envahir l'écran ; en cherchant, on montre plus de correspondances. */
+const RECENT_LOCATIONS_LIMIT = 3;
+const SEARCH_LOCATIONS_LIMIT = 6;
 
 /** Préfixe commun des requêtes d'adresses mémorisées — sert à les invalider après une création ou une réutilisation. */
 export const SAVED_LOCATIONS_QUERY_KEY = ['locations', 'saved'] as const;
@@ -23,7 +25,8 @@ export function useSavedLocations(query: string, enabled = true) {
 
   return useQuery({
     queryKey: [...SAVED_LOCATIONS_QUERY_KEY, debouncedQuery],
-    queryFn: () => locationsApi.saved(debouncedQuery || undefined, SAVED_LOCATIONS_LIMIT),
+    queryFn: () =>
+      locationsApi.saved(debouncedQuery || undefined, debouncedQuery ? SEARCH_LOCATIONS_LIMIT : RECENT_LOCATIONS_LIMIT),
     enabled,
     staleTime: 30_000,
     // Garde la liste précédente affichée pendant la frappe : pas de clignotement.

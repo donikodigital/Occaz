@@ -1,5 +1,9 @@
 // mobile/app/(driver)/trip-new.tsx
 //
+// [04/10/2026] v6 — Formulaire en 4 étapes repliables (Itinéraire, Date et heure, Véhicule, Places et tarif) : une seule étape
+// ouverte à la fois, les autres tiennent sur une ligne avec leur résumé. Les villes traversées et les notes sont des détails
+// repliés. L'aperçu bleu disparaît sur téléphone (les résumés disent la même chose), il reste sur grand écran. La devise n'est plus
+// un choix : c'est celle du pays de la ville de départ (Sénégal → XOF, Guinée → GNF), imposée aussi par le serveur.
 // [04/10/2026] v5.1 — Adresses claires : sous chaque adresse (départ, arrivée, villes traversées, aperçu), la ville et le pays
 // s'affichent (« Kindia, Guinée »). Deux adresses de même nom dans deux villes ne se confondent plus.
 // [03/10/2026] v5 — « Villes traversées » : le conducteur ajoute les villes où il passe (Kindia, Mamou…) pour que les
@@ -45,6 +49,8 @@ import {
 } from '@/components/ui';
 import type { RouteInfo, RouteMapPoint, TimeValue } from '@/components/ui';
 import { LocationAutocompleteField } from '@/components/screens/LocationAutocompleteField';
+import { Disclosure, FormAccordionSection, StepProgress, animateNextLayout, type StepStatus } from '@/components/screens/FormAccordion';
+import { OceanButton } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useMyVehicles } from '@/hooks/useVehicles';
@@ -60,34 +66,15 @@ import { formatCityCountry } from '@/utils/shipmentDisplay';
 import { ApiError } from '@/services/api/ApiError';
 import type { TripLocation } from '@/types/trips.types';
 
+type SectionKey = 'route' | 'date' | 'vehicle' | 'price';
+const SECTION_ORDER: SectionKey[] = ['route', 'date', 'vehicle', 'price'];
+
 const ORIGIN_CITY_FIELD = 'trip-origin-city';
 const DESTINATION_CITY_FIELD = 'trip-destination-city';
 
 function toRoutePoint(location: TripLocation | null): RouteMapPoint | null {
   if (!location || location.latitude == null || location.longitude == null) return null;
   return { latitude: location.latitude, longitude: location.longitude, label: location.label };
-}
-
-function SectionCard({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card style={styles.sectionCard}>
-      <View style={styles.sectionHeader}>
-        <View style={styles.sectionIcon}>{icon}</View>
-        <AppText variant="base" weight="semibold">
-          {title}
-        </AppText>
-      </View>
-      {children}
-    </Card>
-  );
 }
 
 const HERO_MUTED = OCEAN.sky;
@@ -216,12 +203,15 @@ export default function NewTripScreen() {
   const [departureTime, setDepartureTime] = useState<TimeValue>({ hour: 8, minute: 0 });
   const [totalSeats, setTotalSeats] = useState(3);
   const [pricePerSeat, setPricePerSeat] = useState('');
-  const [currencyId, setCurrencyId] = useState<string | null>(null);
-  const [isCurrencyTouched, setIsCurrencyTouched] = useState(false);
   const [allowsShipments, setAllowsShipments] = useState(true);
   const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+  // Étape ouverte (une seule à la fois sur téléphone), étape en erreur, et date/heure confirmées (la date par défaut est
+  // « demain 8 h » : le conducteur doit la regarder, pas la valider sans la voir).
+  const [openSection, setOpenSection] = useState<SectionKey | null>('route');
+  const [errorSection, setErrorSection] = useState<SectionKey | undefined>();
+  const [dateConfirmed, setDateConfirmed] = useState(false);
 
   const { data: vehicles } = useMyVehicles();
   const { data: currencies } = useCurrencies();
@@ -241,30 +231,25 @@ export default function NewTripScreen() {
     consumeLocationSelection();
   }, [locationSelection, consumeLocationSelection]);
 
+  // Devise = celle du pays de la ville de DÉPART : c'est là que le passager monte et paie. Plus de choix à faire (ni de risque de se
+  // tromper) ; le serveur applique la même règle. La conversion vers le portefeuille du chauffeur, s'il est dans une autre devise,
+  // se fait déjà au crédit (ExchangeRateService).
+  const originCountry = useMemo(
+    () => (originCity && countries ? countries.find((item) => item.id === originCity.countryId) : undefined),
+    [originCity, countries],
+  );
+  const currency = useMemo(
+    () =>
+      originCountry?.defaultCurrencyId && currencies
+        ? (currencies.find((item) => item.id === originCountry.defaultCurrencyId) ?? null)
+        : null,
+    [originCountry, currencies],
+  );
+
+  // Un seul véhicule enregistré : il est retenu d'office (un geste de moins).
   React.useEffect(() => {
-    if (isCurrencyTouched || !currencies || currencies.length === 0) return;
-
-    // Devise de la ville de départ — c'est là que le passager montera et
-    // paiera, donc la devise qu'il attend. Le portefeuille du chauffeur
-    // peut être dans une autre devise (ex. chauffeur guinéen parti au
-    // Sénégal) : la conversion se fait déjà côté serveur au crédit du
-    // portefeuille (ExchangeRateService), ce champ ne fait que refléter
-    // la devise du trajet lui-même.
-    if (originCity && countries) {
-      const country = countries.find((item) => item.id === originCity.countryId);
-      const match = country?.defaultCurrencyId
-        ? currencies.find((item) => item.id === country.defaultCurrencyId)
-        : undefined;
-      if (match) {
-        setCurrencyId(match.id);
-        return;
-      }
-    }
-
-    // Repli tant que la ville de départ n'est pas encore choisie/résolue :
-    // mieux vaut une devise présélectionnée qu'un champ vide.
-    if (!currencyId) setCurrencyId(currencies[0].id);
-  }, [currencies, currencyId, originCity, countries, isCurrencyTouched]);
+    if (!vehicleId && vehicles && vehicles.length === 1) setVehicleId(vehicles[0].id);
+  }, [vehicles, vehicleId]);
 
   function openLocation(field: 'trip-origin' | 'trip-destination', title: string) {
     openLocationPicker(field);
@@ -282,12 +267,13 @@ export default function NewTripScreen() {
   function handleAddStop(location: TripLocation | null) {
     if (!location) return;
     setErrorMessage(undefined);
+    setErrorSection(undefined);
     if (!location.cityId) {
-      setErrorMessage('Choisissez une adresse située dans la ville traversée.');
+      fail('route', 'Choisissez une adresse située dans la ville traversée.');
     } else if (location.cityId === origin?.cityId || location.cityId === destination?.cityId) {
-      setErrorMessage("Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
+      fail('route', "Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
     } else if (stops.some((stop) => stop.cityId === location.cityId)) {
-      setErrorMessage('Cette ville est déjà dans la liste.');
+      fail('route', 'Cette ville est déjà dans la liste.');
     } else {
       setStops((current) => [...current, location]);
     }
@@ -313,30 +299,56 @@ export default function NewTripScreen() {
     return date;
   }, [departureDate, departureTime]);
 
+  const routeDone = Boolean(origin && destination && origin.cityId && destination.cityId);
+  const vehicleDone = vehicleId !== null;
+  const priceDone = hasValidPrice;
+  const done: Record<SectionKey, boolean> = { route: routeDone, date: dateConfirmed, vehicle: vehicleDone, price: priceDone };
+  const doneCount = SECTION_ORDER.filter((key) => done[key]).length;
+  const statusOf = (key: SectionKey): StepStatus =>
+    done[key] ? 'done' : errorSection === key && errorMessage ? 'error' : 'todo';
+
+  function toggleSection(key: SectionKey) {
+    animateNextLayout();
+    setOpenSection((current) => (current === key ? null : key));
+  }
+
+  function goToNextSection(from: SectionKey) {
+    animateNextLayout();
+    if (from === 'date') setDateConfirmed(true);
+    setOpenSection(SECTION_ORDER[SECTION_ORDER.indexOf(from) + 1] ?? null);
+  }
+
+  /** Erreur de validation : ouvre l'étape concernée pour que le conducteur voie tout de suite quoi corriger. */
+  function fail(section: SectionKey, message: string) {
+    animateNextLayout();
+    setOpenSection(section);
+    setErrorSection(section);
+    setErrorMessage(message);
+  }
+
   function handleSubmit() {
     setErrorMessage(undefined);
-    if (!vehicleId) {
-      setErrorMessage('Choisissez un véhicule.');
-      return;
-    }
+    setErrorSection(undefined);
+
+    // Dans l'ordre des étapes : la première à corriger s'ouvre.
     if (!origin || !destination) {
-      setErrorMessage('Renseignez le point de départ et la destination.');
+      fail('route', 'Renseignez le point de départ et la destination.');
       return;
     }
     if (!origin.cityId || !destination.cityId) {
-      setErrorMessage('Les adresses doivent être rattachées à une ville.');
-      return;
-    }
-    if (!hasValidPrice) {
-      setErrorMessage('Indiquez le prix par place.');
+      fail('route', 'Les adresses doivent être rattachées à une ville.');
       return;
     }
     if (orderedStops.some((stop) => stop.cityId === origin.cityId || stop.cityId === destination.cityId)) {
-      setErrorMessage("Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
+      fail('route', "Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
       return;
     }
-    if (!currencyId) {
-      setErrorMessage('Choisissez une devise.');
+    if (!vehicleId) {
+      fail('vehicle', 'Choisissez un véhicule.');
+      return;
+    }
+    if (!hasValidPrice) {
+      fail('price', 'Indiquez le prix par place.');
       return;
     }
 
@@ -350,7 +362,7 @@ export default function NewTripScreen() {
         departureAt: departureAt.toISOString(),
         totalSeats,
         pricePerSeat: String(Math.round(priceNumber)),
-        currencyId,
+        // Pas de devise envoyée : le serveur applique celle du pays de départ.
         allowsShipments,
         notes: notes.trim() || undefined,
         stops:
@@ -361,11 +373,33 @@ export default function NewTripScreen() {
       {
         onSuccess: (trip) => router.replace(`/(driver)/trip/${trip.id}`),
         onError: (error) => {
+          setErrorSection(undefined);
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },
       },
     );
   }
+
+  // Sur grand écran, les deux colonnes restent visibles : toutes les étapes sont ouvertes. Sur téléphone, une seule à la fois.
+  const isOpen = (key: SectionKey) => isDesktop || openSection === key;
+  const toggle = (key: SectionKey) => (isDesktop ? undefined : toggleSection(key));
+  const nextButton = (key: SectionKey, label = 'Continuer', disabled = false) =>
+    isDesktop ? null : <OceanButton label={label} variant="soft" disabled={disabled} onPress={() => goToNextSection(key)} />;
+
+  const priceUnit = currency?.isoCode;
+  const summaries: Record<SectionKey, string> = {
+    route:
+      origin && destination
+        ? `${origin.city?.name ?? origin.label} → ${destination.city?.name ?? destination.label}${
+            orderedStops.length > 0 ? ` · ${orderedStops.length} ville${orderedStops.length > 1 ? 's' : ''} traversée${orderedStops.length > 1 ? 's' : ''}` : ''
+          }`
+        : 'Départ et arrivée à choisir',
+    date: `${formatDateLong(departureAt.toISOString())} · ${formatTime(departureAt.toISOString())}`,
+    vehicle: selectedVehicle ? `${selectedVehicle.brand} ${selectedVehicle.model} · ${selectedVehicle.plateNumber}` : 'Véhicule à choisir',
+    price: hasValidPrice
+      ? `${totalSeats} place${totalSeats > 1 ? 's' : ''} · ${formatMoney(Math.round(priceNumber), priceUnit ?? '')}`
+      : `${totalSeats} place${totalSeats > 1 ? 's' : ''} · prix à indiquer`,
+  };
 
   return (
     <ScreenContainer
@@ -402,19 +436,32 @@ export default function NewTripScreen() {
         <View style={{ width: 38 }} />
       </View>
 
-      <View style={styles.previewWrap}>
-        <LivePreviewHero
-          origin={origin}
-          destination={destination}
-          departureAt={departureAt}
-          totalSeats={totalSeats}
-          priceLabel={hasValidPrice ? formatMoney(Math.round(priceNumber)) : null}
-        />
-      </View>
+      {isDesktop ? (
+        <View style={styles.previewWrap}>
+          <LivePreviewHero
+            origin={origin}
+            destination={destination}
+            departureAt={departureAt}
+            totalSeats={totalSeats}
+            priceLabel={hasValidPrice ? formatMoney(Math.round(priceNumber), priceUnit ?? '') : null}
+          />
+        </View>
+      ) : (
+        <StepProgress done={doneCount} total={SECTION_ORDER.length} />
+      )}
 
       <View style={[styles.layout, isDesktop && styles.layoutDesktop]}>
         <View style={[styles.column, isDesktop && styles.columnLeft]}>
-          <SectionCard icon={<IconRoute size={18} color={colors.primary} />} title="Itinéraire">
+          {/* 1 — Itinéraire : départ et arrivée d'abord ; les villes traversées, repliées */}
+          <FormAccordionSection
+            step={1}
+            icon={<IconRoute size={15} color={colors.primary} />}
+            title="Itinéraire"
+            summary={summaries.route}
+            status={statusOf('route')}
+            expanded={isOpen('route')}
+            onToggle={() => toggle('route')}
+          >
             {isDesktop ? (
               <View style={styles.desktopItinerary}>
                 <View style={styles.itineraryRow}>
@@ -476,69 +523,111 @@ export default function NewTripScreen() {
                 />
               </View>
             )}
-          </SectionCard>
 
-          <SectionCard icon={<IconMapPin size={18} color={colors.primary} />} title="Villes traversées (facultatif)">
-            <AppText variant="sm" color="textSecondary">
-              Ajoutez les villes où vous passez : les clients qui y habitent pourront trouver votre trajet et monter ou
-              descendre chez eux. Les prix sont calculés automatiquement ; vous pourrez les modifier avant de publier.
-            </AppText>
-            {orderedStops.map((stop, index) => (
-              <View key={stop.id} style={styles.stopRow}>
-                <View style={styles.stopBadge}>
-                  <AppText variant="xs" weight="bold" color="primary">
-                    {index + 1}
-                  </AppText>
-                </View>
-                <View style={styles.stopLabel}>
-                  <AppText variant="sm" weight="semibold" numberOfLines={1}>
-                    {stop.label}
-                  </AppText>
-                  {formatCityCountry(stop) ? (
-                    <AppText variant="xs" color="textSecondary" numberOfLines={1}>
-                      {formatCityCountry(stop)}
+            <Disclosure
+              icon={<IconMapPin size={15} color={OCEAN.base} />}
+              label="Villes traversées (facultatif)"
+              preview={
+                orderedStops.length > 0
+                  ? orderedStops.map((stop) => stop.city?.name ?? stop.label).join(' · ')
+                  : 'Ajoutez les villes où vous passez'
+              }
+              defaultExpanded={isDesktop}
+            >
+              <AppText variant="sm" color="textSecondary">
+                Les clients qui y habitent pourront trouver votre trajet et monter ou descendre chez eux. Les prix sont
+                calculés automatiquement ; vous pourrez les modifier avant de publier.
+              </AppText>
+              {orderedStops.map((stop, index) => (
+                <View key={stop.id} style={styles.stopRow}>
+                  <View style={styles.stopBadge}>
+                    <AppText variant="xs" weight="bold" color="primary">
+                      {index + 1}
                     </AppText>
-                  ) : null}
+                  </View>
+                  <View style={styles.stopLabel}>
+                    <AppText variant="sm" weight="semibold" numberOfLines={1}>
+                      {stop.label}
+                    </AppText>
+                    {formatCityCountry(stop) ? (
+                      <AppText variant="xs" color="textSecondary" numberOfLines={1}>
+                        {formatCityCountry(stop)}
+                      </AppText>
+                    ) : null}
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Retirer ${stop.label}`}
+                    onPress={() => handleRemoveStop(stop.id)}
+                    hitSlop={8}
+                  >
+                    <IconX size={18} color={colors.textSecondary} />
+                  </Pressable>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Retirer ${stop.label}`}
-                  onPress={() => handleRemoveStop(stop.id)}
-                  hitSlop={8}
-                >
-                  <IconX size={18} color={colors.textSecondary} />
-                </Pressable>
-              </View>
-            ))}
-            <LocationAutocompleteField
-              key={stopFieldKey}
-              label=""
-              value={null}
-              onChange={handleAddStop}
-              placeholder="Ajouter une ville traversée (ex. Kindia)"
-            />
-          </SectionCard>
+              ))}
+              <LocationAutocompleteField
+                key={stopFieldKey}
+                label=""
+                value={null}
+                onChange={handleAddStop}
+                placeholder="Ajouter une ville traversée (ex. Kindia)"
+              />
+            </Disclosure>
 
-          <SectionCard icon={<IconCalendarEvent size={18} color={colors.primary} />} title="Date et heure">
+            {nextButton('route', 'Continuer', !routeDone)}
+          </FormAccordionSection>
+
+          {/* 2 — Date et heure */}
+          <FormAccordionSection
+            step={2}
+            icon={<IconCalendarEvent size={15} color={colors.primary} />}
+            title="Date et heure"
+            summary={summaries.date}
+            status={statusOf('date')}
+            expanded={isOpen('date')}
+            onToggle={() => toggle('date')}
+          >
             <View style={styles.dateTimeRow}>
               <View style={styles.dateTimeColumn}>
                 <CalendarPicker
                   label=""
                   selectedDate={departureDate}
                   onSelectDate={(date) => {
-                    if (date) setDepartureDate(date);
+                    if (date) {
+                      setDepartureDate(date);
+                      setDateConfirmed(true);
+                    }
                   }}
                 />
               </View>
               <View style={styles.dateTimeColumn}>
-                <TimePicker label="" value={departureTime} onChange={setDepartureTime} startHour={5} endHour={23} />
+                <TimePicker
+                  label=""
+                  value={departureTime}
+                  onChange={(value) => {
+                    setDepartureTime(value);
+                    setDateConfirmed(true);
+                  }}
+                  startHour={5}
+                  endHour={23}
+                />
               </View>
             </View>
-          </SectionCard>
+            {nextButton('date')}
+          </FormAccordionSection>
         </View>
 
         <View style={[styles.column, isDesktop && styles.columnRight]}>
-          <SectionCard icon={<IconCar size={18} color={colors.primary} />} title="Véhicule">
+          {/* 3 — Véhicule */}
+          <FormAccordionSection
+            step={3}
+            icon={<IconCar size={15} color={colors.primary} />}
+            title="Véhicule"
+            summary={summaries.vehicle}
+            status={statusOf('vehicle')}
+            expanded={isOpen('vehicle')}
+            onToggle={() => toggle('vehicle')}
+          >
             {vehicles && vehicles.length > 0 ? (
               <View style={styles.vehicleRow}>
                 {vehicles.map((vehicle) => {
@@ -576,9 +665,19 @@ export default function NewTripScreen() {
                 />
               </View>
             )}
-          </SectionCard>
+            {nextButton('vehicle', 'Continuer', !vehicleDone)}
+          </FormAccordionSection>
 
-          <SectionCard icon={<IconUsers size={18} color={colors.primary} />} title="Places et tarif">
+          {/* 4 — Places et tarif : l'essentiel d'abord ; les notes, repliées */}
+          <FormAccordionSection
+            step={4}
+            icon={<IconUsers size={15} color={colors.primary} />}
+            title="Places et tarif"
+            summary={summaries.price}
+            status={statusOf('price')}
+            expanded={isOpen('price')}
+            onToggle={() => toggle('price')}
+          >
             <View style={styles.fields}>
               <View style={styles.stepperBlock}>
                 <AppText variant="sm" weight="medium" color="textSecondary">
@@ -588,7 +687,7 @@ export default function NewTripScreen() {
                   <IconButton
                     icon={<IconMinus size={16} color={colors.textPrimary} />}
                     accessibilityLabel="Retirer une place"
-                    onPress={() => setTotalSeats((s) => Math.max(1, s - 1))}
+                    onPress={() => setTotalSeats((value) => Math.max(1, value - 1))}
                   />
                   <AppText variant="lg" weight="semibold" style={styles.stepperValue}>
                     {totalSeats}
@@ -596,7 +695,7 @@ export default function NewTripScreen() {
                   <IconButton
                     icon={<IconPlus size={16} color={colors.textPrimary} />}
                     accessibilityLabel="Ajouter une place"
-                    onPress={() => setTotalSeats((s) => Math.min(12, s + 1))}
+                    onPress={() => setTotalSeats((value) => Math.min(12, value + 1))}
                   />
                 </View>
               </View>
@@ -614,35 +713,23 @@ export default function NewTripScreen() {
                       placeholder="Ex : 50000"
                     />
                   </View>
-                  {currencies && currencies.length > 1 ? (
-                    <View style={styles.currencySegment}>
-                      {currencies.map((currency, index) => {
-                        const isActive = currency.id === currencyId;
-                        return (
-                          <Pressable
-                            key={currency.id}
-                            onPress={() => {
-                              setIsCurrencyTouched(true);
-                              setCurrencyId(currency.id);
-                            }}
-                            style={[
-                              styles.currencyOption,
-                              index > 0 && styles.currencyOptionDivider,
-                              isActive && styles.currencyOptionActive,
-                            ]}
-                          >
-                            <AppText variant="xs" weight="semibold" color={isActive ? 'primary' : 'textSecondary'}>
-                              {currency.isoCode}
-                            </AppText>
-                          </Pressable>
-                        );
-                      })}
+                  {/* Devise imposée par le pays de départ : un repère, pas un choix. */}
+                  {currency ? (
+                    <View style={styles.currencyBadge} accessibilityLabel={`Devise : ${currency.isoCode}`}>
+                      <AppText variant="sm" weight="semibold" color="primary">
+                        {currency.isoCode}
+                      </AppText>
                     </View>
                   ) : null}
                 </View>
+                <AppText variant="xs" color="textMuted" style={styles.currencyHint}>
+                  {currency
+                    ? `Devise du pays de départ${originCountry ? ` (${originCountry.name})` : ''}.`
+                    : 'La devise est celle du pays de départ : choisissez d’abord le départ.'}
+                </AppText>
               </View>
 
-              <Pressable onPress={() => setAllowsShipments((v) => !v)} style={styles.switchRow}>
+              <Pressable onPress={() => setAllowsShipments((value) => !value)} style={styles.switchRow}>
                 <IconPackage size={16} color={colors.textSecondary} />
                 <AppText variant="sm" style={styles.switchLabel}>
                   Accepter les colis sur ce trajet
@@ -655,16 +742,22 @@ export default function NewTripScreen() {
                 />
               </Pressable>
 
-              <TextField
-                label="Notes (optionnel)"
-                value={notes}
-                onChangeText={setNotes}
-                placeholder="Informations complémentaires pour les passagers"
-                multiline
-                style={styles.notesField}
-              />
+              <Disclosure
+                icon={<IconPackage size={15} color={OCEAN.base} />}
+                label="Notes pour les passagers (optionnel)"
+                preview={notes.trim() ? notes.trim() : 'Informations complémentaires'}
+                defaultExpanded={isDesktop}
+              >
+                <TextField
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder="Informations complémentaires pour les passagers"
+                  multiline
+                  style={styles.notesField}
+                />
+              </Disclosure>
             </View>
-          </SectionCard>
+          </FormAccordionSection>
         </View>
       </View>
     </ScreenContainer>
@@ -784,23 +877,6 @@ const styles = StyleSheet.create({
   columnRight: {
     flex: 0.9,
   },
-  sectionCard: {
-    marginBottom: spacing.md,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  sectionIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm + 2,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   vehicleRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -892,26 +968,6 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     gap: spacing.xs,
   },
-  currencySegment: {
-    flexDirection: 'row',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-  },
-  currencyOption: {
-    minWidth: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-  },
-  currencyOptionDivider: {
-    borderLeftWidth: 1.5,
-    borderLeftColor: colors.border,
-  },
-  currencyOptionActive: {
-    backgroundColor: colors.primaryLight,
-  },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -956,5 +1012,19 @@ const styles = StyleSheet.create({
   },
   stopLabel: {
     flex: 1,
+  },
+  currencyBadge: {
+    minWidth: 56,
+    height: 52,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: OCEAN.mist,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  currencyHint: {
+    marginTop: spacing.xs,
   },
 });

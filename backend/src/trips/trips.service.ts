@@ -39,6 +39,8 @@ import {
   SEGMENT_FAILURE_MESSAGES,
   buildRoute,
   matchRoute,
+  matchRouteFromCity,
+  matchRouteToCity,
   rescaleFares,
   resolveSegment,
   type RouteSegment,
@@ -251,6 +253,7 @@ export class TripsService {
 
     const pricePerSeat = toMoneyBigInt(dto.pricePerSeat);
     const departureAt = new Date(dto.departureAt);
+    const currencyId = await this.currencyForOriginCity(dto.originCityId, dto.currencyId);
     const plannedStops = await this.planner.planStops({
       departureAt,
       pricePerSeat,
@@ -284,7 +287,7 @@ export class TripsService {
           maxShipmentWeightKg: dto.maxShipmentWeightKg,
           availableShipmentWeightKg: dto.maxShipmentWeightKg,
           pricePerSeat,
-          currencyId: dto.currencyId,
+          currencyId,
           notes: dto.notes,
         },
       });
@@ -295,6 +298,25 @@ export class TripsService {
     });
 
     return this.findOne(trip.id);
+  }
+
+  /**
+   * Devise du trajet = devise par défaut du pays de la ville de DÉPART : c'est là que le passager monte et paie, donc la devise
+   * qu'il attend. Départ au Sénégal → XOF, en Guinée → GNF — le chauffeur n'a pas à la choisir (et ne peut pas se tromper). La
+   * conversion vers le portefeuille du chauffeur, s'il est dans une autre devise, se fait déjà au crédit (ExchangeRateService).
+   * `requested` (ancienne version de l'app) ne sert que si ce pays n'a pas de devise par défaut configurée.
+   */
+  private async currencyForOriginCity(originCityId: string, requested?: string): Promise<string> {
+    const city = await this.prisma.city.findUnique({
+      where: { id: originCityId },
+      select: { country: { select: { defaultCurrencyId: true } } },
+    });
+    const fromCountry = city?.country?.defaultCurrencyId;
+    if (fromCountry) return fromCountry;
+    if (requested) return requested;
+    throw new BadRequestException(
+      "Impossible de déterminer la devise : le pays de la ville de départ n'a pas de devise par défaut configurée.",
+    );
   }
 
   /** Chaque étape doit avoir une ville, différente de celles du départ, de l'arrivée et des autres étapes. */
@@ -355,7 +377,7 @@ export class TripsService {
           maxShipmentWeightKg: dto.maxShipmentWeightKg,
           availableShipmentWeightKg: dto.maxShipmentWeightKg,
           pricePerSeat: dto.pricePerSeat ? toMoneyBigInt(dto.pricePerSeat) : undefined,
-          currencyId: dto.currencyId,
+          // La devise ne se modifie pas : elle suit le pays de la ville de départ, qui ne change pas en brouillon.
           notes: dto.notes,
         },
       });
@@ -846,12 +868,14 @@ export class TripsService {
   // -----------------------------------------------------------------------
 
   async search(dto: SearchTripsDto): Promise<PaginatedResult<unknown>> {
-    const hasCityMode = Boolean(dto.originCityId && dto.destinationCityId);
+    // Une seule ville suffit : sans départ, tous les trajets qui mènent à la destination ; sans arrivée, tous ceux qui partent
+    // de la ville de départ.
+    const hasCityMode = Boolean(dto.originCityId || dto.destinationCityId);
     const hasGeoMode = Boolean(dto.originLatitude !== undefined && dto.originLongitude !== undefined);
 
     if (!hasCityMode && !hasGeoMode) {
       throw new BadRequestException(
-        'Fournissez soit originCityId + destinationCityId, soit originLatitude + originLongitude.',
+        'Fournissez au moins une ville (originCityId ou destinationCityId), ou originLatitude + originLongitude.',
       );
     }
 
@@ -870,8 +894,7 @@ export class TripsService {
    * de montée et le prix du tronçon se vérifient ensuite en mémoire sur ces candidats (au plus SEARCH_CANDIDATE_LIMIT).
    */
   private async searchByCities(dto: SearchTripsDto): Promise<PaginatedResult<unknown>> {
-    const originCityId = dto.originCityId as string;
-    const destinationCityId = dto.destinationCityId as string;
+    const { originCityId, destinationCityId } = dto;
     const settings = await loadRouteSettings(this.pricing);
     const maxPrice = dto.maxPricePerSeat ? toMoneyBigInt(dto.maxPricePerSeat) : undefined;
 
@@ -887,14 +910,20 @@ export class TripsService {
       // le jour exact est vérifié ensuite sur l'heure de passage à la montée.
       ...(dto.departureDate ? this.dayWindowPrefilter(dto.departureDate) : {}),
       AND: [
-        {
-          OR: [
-            { originCityId, destinationCityId },
-            { originCityId, ...bookableStopIn(destinationCityId) },
-            { destinationCityId, ...bookableStopIn(originCityId) },
-            { AND: [bookableStopIn(originCityId), bookableStopIn(destinationCityId)] },
-          ],
-        },
+        originCityId && destinationCityId
+          ? {
+              OR: [
+                { originCityId, destinationCityId },
+                { originCityId, ...bookableStopIn(destinationCityId) },
+                { destinationCityId, ...bookableStopIn(originCityId) },
+                { AND: [bookableStopIn(originCityId), bookableStopIn(destinationCityId)] },
+              ],
+            }
+          : destinationCityId
+            ? // Seulement la destination : trajets qui y arrivent, ou qui la traversent en y laissant descendre.
+              { OR: [{ destinationCityId }, bookableStopIn(destinationCityId)] }
+            : // Seulement le départ : trajets qui en partent, ou qui le traversent en y laissant monter.
+              { OR: [{ originCityId: originCityId as string }, bookableStopIn(originCityId as string)] },
         // Les places se comptent par tronçon : un trajet complet de bout en bout peut encore avoir de la place entre deux
         // villes. Sans étapes, le compteur suffit ; avec étapes, le contrôle exact se fait ensuite sur chaque tronçon.
         { OR: [{ availableSeats: { gte: passengersCount } }, { stops: { some: {} } }] },
@@ -917,7 +946,14 @@ export class TripsService {
 
     const matches: Array<{ trip: (typeof candidates)[number]; segment: RouteSegment; boardingAt: Date }> = [];
     for (const trip of candidates) {
-      const segment = matchRoute(buildRoute(trip), originCityId, destinationCityId, { minPrice: settings.minSegmentPrice });
+      const route = buildRoute(trip);
+      const options = { minPrice: settings.minSegmentPrice };
+      const segment =
+        originCityId && destinationCityId
+          ? matchRoute(route, originCityId, destinationCityId, options)
+          : destinationCityId
+            ? matchRouteToCity(route, destinationCityId, options)
+            : matchRouteFromCity(route, originCityId as string, options);
       if (!segment) continue;
       const boardingAt = segment.boardingAt ?? trip.departureAt;
       if (dto.departureDate && !this.isOnDay(boardingAt, dto.departureDate)) continue;

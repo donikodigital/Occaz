@@ -32,7 +32,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useLatestMessageAlert, useMarkNotificationRead, useMyNotifications } from '@/hooks/useNotifications';
 import { MessageAlertCard } from '@/components/screens/MessageAlertCard';
-import { recentSearchesStorage, RecentSearch } from '@/services/storage/recentSearches';
+import { recentSearchesStorage, formatRecentSearch, RecentSearch } from '@/services/storage/recentSearches';
 import { formatDateShort } from '@/utils/date';
 
 const TRUST_POINTS = [
@@ -168,17 +168,17 @@ export default function CustomerHomeScreen() {
           <View style={styles.recentList}>
             {recentSearches.map((search) => (
               <OceanCard
-                key={`${search.originCityId}-${search.destinationCityId}`}
+                key={`${search.originCityId ?? 'all'}-${search.destinationCityId ?? 'all'}`}
                 onPress={() => reuseSearch(search)}
                 style={styles.recentCard}
-                accessibilityLabel={`${search.originCityName} vers ${search.destinationCityName}`}
+                accessibilityLabel={formatRecentSearch(search).replace('→', 'vers')}
               >
                 <View style={styles.recentIcon}>
                   <IconClockHour4 size={18} color={OCEAN.base} />
                 </View>
                 <View style={styles.recentText}>
                   <AppText variant="sm" weight="semibold" numberOfLines={1}>
-                    {search.originCityName} → {search.destinationCityName}
+                    {formatRecentSearch(search)}
                   </AppText>
                   <AppText variant="xs" color="textSecondary">
                     {formatDateShort(search.searchedAt)}

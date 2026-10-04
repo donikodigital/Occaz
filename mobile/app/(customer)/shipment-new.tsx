@@ -1,4 +1,8 @@
 // mobile/app/(customer)/shipment-new.tsx
+// [04/10/2026] v6 — Formulaire en étapes repliables : une seule étape ouverte à la fois, les autres tiennent sur une ligne avec un
+// résumé de ce qui est saisi (pastille numéro / coche / alerte). Les informations du profil et les détails facultatifs du colis
+// sont repliés par défaut ; le code promo et le détail du prix aussi. Le prix à payer et « Confirmer l'envoi » restent fixes en
+// bas de l'écran. Une erreur à la validation ouvre l'étape concernée. Tous les champs et règles sont conservés.
 // [04/10/2026] v5 — Expéditeur verrouillé : nom, téléphone et adresse viennent du profil et ne se modifient que dans le profil
 // (le serveur impose lui aussi le nom et le téléphone). L'adresse de récupération reste modifiable, pré-remplie avec l'adresse
 // du profil ; « Utiliser l'adresse de mon profil » la rétablit. Les adresses affichent leur ville et leur pays.
@@ -11,13 +15,16 @@
 // devis en direct (ShipmentQuoteCard) reste au-dessus du bouton.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
+  IconAdjustmentsHorizontal,
   IconAlertCircle,
   IconCalendarEvent,
   IconCheck,
   IconChevronRight,
+  IconDiscount2,
+  IconInfoCircle,
   IconLock,
   IconMapPin,
   IconPackage,
@@ -30,7 +37,6 @@ import {
   OceanCard,
   OceanChip,
   OceanScreenHeader,
-  OceanSection,
   OceanStepper,
   OceanSwitchRow,
 } from '@/components/ocean/OceanKit';
@@ -40,13 +46,15 @@ import { ShipmentQuoteCard } from '@/components/screens/ShipmentQuoteCard';
 import { ShipmentWindowField, toShipmentWindow } from '@/components/screens/ShipmentWindowField';
 import { PromoCodeField } from '@/components/screens/PromoCodeField';
 import { LockedField } from '@/components/screens/LockedField';
+import { Disclosure, FormAccordionSection, StepProgress, animateNextLayout, type StepStatus } from '@/components/screens/FormAccordion';
 import { useShipmentCategories } from '@/hooks/useShipmentCategories';
 import { useCreateShipment, useShipmentQuote } from '@/hooks/useShipments';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useAuthStore } from '@/stores/authStore';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
-import { normalizePhoneInput } from '@/utils/phone';
-import { formatCityCountry } from '@/utils/shipmentDisplay';
+import { isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
+import { formatMoney } from '@/utils/money';
+import { formatCityCountry, formatWindow } from '@/utils/shipmentDisplay';
 import { locationsApi } from '@/services/api/locations.api';
 import { ApiError } from '@/services/api/ApiError';
 import type { QuoteShipmentPayload } from '@/types/shipments.types';
@@ -95,6 +103,9 @@ function AddressCard({
     </OceanCard>
   );
 }
+
+type SectionKey = 'sender' | 'recipient' | 'parcel' | 'window';
+const SECTION_ORDER: SectionKey[] = ['sender', 'recipient', 'parcel', 'window'];
 
 export default function NewShipmentScreen() {
   const { data: profile } = useCustomerProfile();
@@ -157,7 +168,11 @@ export default function NewShipmentScreen() {
   const [windowEnd, setWindowEnd] = useState<Date | null>(null);
   const [isUrgent, setIsUrgent] = useState(false);
   const [promoCode, setPromoCode] = useState<string | undefined>();
-  const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [promoDiscount, setPromoDiscount] = useState<string | undefined>();
+  // Étape ouverte (une seule à la fois) et dernière erreur de validation, rattachée à son étape quand elle en a une.
+  const [openSection, setOpenSection] = useState<SectionKey | null>('sender');
+  const [formError, setFormError] = useState<{ message: string; section?: SectionKey } | null>(null);
+  const userToggled = useRef(false);
 
   const { data: categories } = useShipmentCategories();
   const createShipment = useCreateShipment();
@@ -200,7 +215,90 @@ export default function NewShipmentScreen() {
   // pas d'appel réseau supplémentaire — seulement un second abonnement au
   // même devis, pour connaître le montant à passer au champ code promo.
   const debouncedQuotePayload = useDebouncedValue(quotePayload, 500);
-  const { data: quote } = useShipmentQuote(debouncedQuotePayload);
+  const { data: quote, isFetching: isQuoteFetching, error: quoteError } = useShipmentQuote(debouncedQuotePayload);
+
+  // --- État de chaque étape : complète, à faire ou à corriger -------------------------------------------------------------
+  const weight = Number(weightKg.replace(',', '.'));
+  const weightOk = Number.isFinite(weight) && weight > 0;
+  const senderDone = senderName.length >= 2 && senderLocation !== null;
+  const recipientDone = recipientName.trim().length >= 2 && isValidPhoneNumber(recipientPhone) && recipientLocation !== null;
+  const parcelDone = categoryId !== null && weightOk;
+  const windowDone = windowStart !== null && windowEnd !== null;
+  const done: Record<SectionKey, boolean> = { sender: senderDone, recipient: recipientDone, parcel: parcelDone, window: windowDone };
+  const doneCount = SECTION_ORDER.filter((key) => done[key]).length;
+  const visibleError = formError && (!formError.section || !done[formError.section]) ? formError : null;
+  const statusOf = (key: SectionKey): StepStatus =>
+    done[key] ? 'done' : visibleError?.section === key ? 'error' : 'todo';
+
+  // Dès que l'adresse de récupération est connue (adresse du profil chargée), on passe au destinataire — sauf si la personne
+  // a déjà ouvert ou fermé une étape elle-même.
+  useEffect(() => {
+    if (!userToggled.current && senderDone && openSection === 'sender') {
+      animateNextLayout();
+      setOpenSection('recipient');
+    }
+  }, [senderDone, openSection]);
+
+  function toggleSection(key: SectionKey) {
+    userToggled.current = true;
+    animateNextLayout();
+    setOpenSection((current) => (current === key ? null : key));
+  }
+
+  function goToNextSection(from: SectionKey) {
+    userToggled.current = true;
+    animateNextLayout();
+    const next = SECTION_ORDER[SECTION_ORDER.indexOf(from) + 1];
+    setOpenSection(next ?? null);
+  }
+
+  /** Erreur de validation : ouvre l'étape concernée pour que la personne voie tout de suite quoi corriger. */
+  function fail(section: SectionKey | undefined, message: string) {
+    if (section) {
+      userToggled.current = true;
+      animateNextLayout();
+      setOpenSection(section);
+    }
+    setFormError({ message, section });
+  }
+
+  // --- Résumés des étapes repliées ------------------------------------------------------------------------------------------
+  const categoryName = (categories ?? []).find((category) => category.id === categoryId)?.name;
+  const pickupPlace = senderLocation ? formatCityCountry(senderLocation) : null;
+  const deliveryPlace = recipientLocation ? formatCityCountry(recipientLocation) : null;
+  const summaries: Record<SectionKey, string> = {
+    sender: senderLocation
+      ? `${senderLocation.label}${pickupPlace ? ` · ${pickupPlace}` : ''}`
+      : 'Adresse de récupération à choisir',
+    recipient: [
+      recipientName.trim() || null,
+      recipientLocation ? (deliveryPlace ?? recipientLocation.label) : null,
+      recipientDone ? null : !recipientLocation ? 'adresse à choisir' : !isValidPhoneNumber(recipientPhone) ? 'téléphone à compléter' : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || 'À renseigner',
+    parcel: parcelDone
+      ? `${categoryName ?? 'Colis'} · ${weight} kg${quantity > 1 ? ` × ${quantity}` : ''}${isUrgent ? ' · Urgent' : ''}`
+      : 'Catégorie et poids à indiquer',
+    window: windowStart && windowEnd ? formatWindow(toShipmentWindow(windowStart, windowEnd)) : 'Dates à choisir',
+  };
+
+  const optionalDetails = [
+    [lengthCm, widthCm, heightCm].every((value) => value.trim().length > 0) ? 'Dimensions' : null,
+    declaredValue.trim() ? 'Valeur déclarée' : null,
+    description.trim() ? 'Description' : null,
+  ].filter(Boolean) as string[];
+
+  // Ce qui manque pour afficher le prix — dit sous le « — » du pied de page.
+  const missingForQuote = [
+    !senderLocation ? 'adresse de récupération' : null,
+    !recipientLocation ? 'adresse de livraison' : null,
+    !categoryId ? 'catégorie' : null,
+    !weightOk ? 'poids' : null,
+  ].filter(Boolean) as string[];
+  const isPriceComputing = quotePayload !== null && (quotePayload !== debouncedQuotePayload || !quote || isQuoteFetching);
+  const discountNumber = promoDiscount ? Number(promoDiscount) : 0;
+  const amountDue = quote ? Math.max(0, Number(quote.totalAmount) - discountNumber) : 0;
 
   function openAddressPicker(field: 'sender' | 'recipient') {
     openLocationPicker(field);
@@ -211,31 +309,39 @@ export default function NewShipmentScreen() {
   }
 
   function handleSubmit() {
-    setErrorMessage(undefined);
+    setFormError(null);
 
+    // Dans l'ordre des étapes : la première à corriger s'ouvre.
     if (senderName.length < 2) {
-      setErrorMessage("Complétez votre profil (nom) avant d'envoyer un colis.");
+      fail('sender', "Complétez votre profil (nom) avant d'envoyer un colis.");
+      return;
+    }
+    if (!senderLocation) {
+      fail('sender', "Choisissez l'adresse de récupération.");
       return;
     }
     if (recipientName.trim().length < 2) {
-      setErrorMessage('Renseignez le nom du destinataire.');
+      fail('recipient', 'Renseignez le nom du destinataire.');
       return;
     }
-    if (!senderLocation || !recipientLocation) {
-      setErrorMessage("Renseignez l'adresse de récupération et de livraison.");
+    if (!isValidPhoneNumber(recipientPhone)) {
+      fail('recipient', 'Renseignez le téléphone du destinataire au format international, par exemple +224620000000.');
+      return;
+    }
+    if (!recipientLocation) {
+      fail('recipient', "Choisissez l'adresse de livraison.");
       return;
     }
     if (!categoryId) {
-      setErrorMessage('Choisissez une catégorie de colis.');
+      fail('parcel', 'Choisissez une catégorie de colis.');
       return;
     }
-    const weight = Number(weightKg.replace(',', '.'));
-    if (!Number.isFinite(weight) || weight <= 0) {
-      setErrorMessage('Indiquez le poids du colis.');
+    if (!weightOk) {
+      fail('parcel', 'Indiquez le poids du colis.');
       return;
     }
     if (!windowStart || !windowEnd) {
-      setErrorMessage('Indiquez la période pendant laquelle le colis peut partir.');
+      fail('window', 'Indiquez la période pendant laquelle le colis peut partir.');
       return;
     }
 
@@ -260,41 +366,86 @@ export default function NewShipmentScreen() {
       {
         onSuccess: (shipment) => router.replace(`/(customer)/shipment/${shipment.id}`),
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setFormError({ message: error instanceof ApiError ? error.message : 'Une erreur est survenue.' });
         },
       },
     );
   }
 
-  return (
-    <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Envoyer un colis" subtitle="Remplissez les 4 étapes ci-dessous" onBack={() => router.back()} />
-
-      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Expéditeur">
-        <LockedField label="Nom complet" value={senderName} placeholder="Nom non renseigné" />
-        <LockedField label="Téléphone" value={senderPhone} placeholder="Téléphone non renseigné" />
-        <LockedField
-          label="Adresse du profil"
-          value={profileAddress}
-          secondary={profilePlace || null}
-          placeholder="Adresse non renseignée"
-        />
-        <View style={styles.lockedNote}>
-          <IconLock size={14} color={OCEAN.base} />
-          <AppText variant="xs" color="textSecondary" style={styles.lockedNoteText}>
-            Ces informations sont celles de votre profil : elles ne se modifient que dans{' '}
-            <AppText
-              variant="xs"
-              weight="semibold"
-              color={OCEAN.base}
-              onPress={() => router.push('/(customer)/edit-profile')}
-              accessibilityRole="link"
-            >
-              mon profil
-            </AppText>
-            .
+  const footer = (
+    <View style={styles.footer}>
+      {visibleError ? (
+        <View style={styles.footerError}>
+          <IconAlertCircle size={15} color={colors.danger} />
+          <AppText variant="xs" color="danger" style={styles.footerErrorText}>
+            {visibleError.message}
           </AppText>
         </View>
+      ) : null}
+      <View style={styles.footerRow}>
+        <View style={styles.footerPrice}>
+          <AppText variant="xs" color="textSecondary">
+            Prix à payer
+          </AppText>
+          {quotePayload === null ? (
+            <>
+              <AppText variant="lg" weight="bold" color="textMuted">
+                —
+              </AppText>
+              <AppText variant="xs" color="textMuted" numberOfLines={2}>
+                {missingForQuote.length > 0 ? `Il manque : ${missingForQuote.join(', ')}` : ''}
+              </AppText>
+            </>
+          ) : quoteError ? (
+            <AppText variant="sm" color="danger" numberOfLines={2}>
+              Prix indisponible pour le moment
+            </AppText>
+          ) : isPriceComputing ? (
+            <View style={styles.computing}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <AppText variant="xs" color="textSecondary">
+                Calcul…
+              </AppText>
+            </View>
+          ) : (
+            <>
+              <AppText variant="xl" weight="bold" color={OCEAN.deep} numberOfLines={1} adjustsFontSizeToFit>
+                {formatMoney(String(amountDue), quote?.currencyCode ?? undefined)}
+              </AppText>
+              {discountNumber > 0 ? (
+                <AppText variant="xs" color={colors.successDark}>
+                  Code promo appliqué
+                </AppText>
+              ) : null}
+            </>
+          )}
+        </View>
+        <OceanButton
+          label="Confirmer l'envoi"
+          onPress={handleSubmit}
+          loading={createShipment.isPending}
+          style={styles.footerButton}
+        />
+      </View>
+    </View>
+  );
+
+  return (
+    <ScreenContainer scroll maxWidth="detail" footer={footer}>
+      <OceanScreenHeader title="Envoyer un colis" subtitle="Complétez les étapes, une à la fois" onBack={() => router.back()} />
+
+      <StepProgress done={doneCount} total={SECTION_ORDER.length} />
+
+      {/* 1 — Expéditeur : l'adresse de récupération d'abord ; les informations du profil, repliées */}
+      <FormAccordionSection
+        step={1}
+        icon={<IconUser size={15} color={OCEAN.base} />}
+        title="Expéditeur"
+        summary={summaries.sender}
+        status={statusOf('sender')}
+        expanded={openSection === 'sender'}
+        onToggle={() => toggleSection('sender')}
+      >
         {!hasProfileAddress ? (
           <AppText variant="xs" color="danger">
             Ajoutez votre adresse et votre ville dans votre profil pour qu'elles soient proposées comme adresse de récupération.
@@ -321,9 +472,51 @@ export default function NewShipmentScreen() {
             </AppText>
           </Pressable>
         ) : null}
-      </OceanSection>
 
-      <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title="Destinataire">
+        <Disclosure
+          icon={<IconLock size={15} color={OCEAN.base} />}
+          label="Mes informations (profil)"
+          preview={[senderName || 'Nom non renseigné', senderPhone || null].filter(Boolean).join(' · ')}
+        >
+          <LockedField label="Nom complet" value={senderName} placeholder="Nom non renseigné" />
+          <LockedField label="Téléphone" value={senderPhone} placeholder="Téléphone non renseigné" />
+          <LockedField
+            label="Adresse du profil"
+            value={profileAddress}
+            secondary={profilePlace || null}
+            placeholder="Adresse non renseignée"
+          />
+          <View style={styles.lockedNote}>
+            <IconLock size={14} color={OCEAN.base} />
+            <AppText variant="xs" color="textSecondary" style={styles.lockedNoteText}>
+              Ces informations sont celles de votre profil : elles ne se modifient que dans{' '}
+              <AppText
+                variant="xs"
+                weight="semibold"
+                color={OCEAN.base}
+                onPress={() => router.push('/(customer)/edit-profile')}
+                accessibilityRole="link"
+              >
+                mon profil
+              </AppText>
+              .
+            </AppText>
+          </View>
+        </Disclosure>
+
+        <OceanButton label="Continuer" variant="soft" disabled={!senderDone} onPress={() => goToNextSection('sender')} />
+      </FormAccordionSection>
+
+      {/* 2 — Destinataire */}
+      <FormAccordionSection
+        step={2}
+        icon={<IconUserCheck size={15} color={OCEAN.base} />}
+        title="Destinataire"
+        summary={summaries.recipient}
+        status={statusOf('recipient')}
+        expanded={openSection === 'recipient'}
+        onToggle={() => toggleSection('recipient')}
+      >
         <TextField
           label="Nom complet"
           value={recipientName}
@@ -338,9 +531,19 @@ export default function NewShipmentScreen() {
           placeholder="+224620000000"
         />
         <AddressCard label="Adresse de livraison" location={recipientLocation} onPress={() => openAddressPicker('recipient')} />
-      </OceanSection>
+        <OceanButton label="Continuer" variant="soft" disabled={!recipientDone} onPress={() => goToNextSection('recipient')} />
+      </FormAccordionSection>
 
-      <OceanSection icon={<IconPackage size={17} color={OCEAN.base} />} title="Colis">
+      {/* 3 — Colis : l'essentiel d'abord ; dimensions, valeur et description, repliées */}
+      <FormAccordionSection
+        step={3}
+        icon={<IconPackage size={15} color={OCEAN.base} />}
+        title="Colis"
+        summary={summaries.parcel}
+        status={statusOf('parcel')}
+        expanded={openSection === 'parcel'}
+        onToggle={() => toggleSection('parcel')}
+      >
         <View style={styles.block}>
           <AppText variant="sm" weight="medium" color="textSecondary">
             Catégorie
@@ -372,40 +575,6 @@ export default function NewShipmentScreen() {
           <OceanStepper value={quantity} onChange={setQuantity} min={1} max={20} label="quantité" />
         </View>
 
-        <View style={styles.block}>
-          <AppText variant="sm" weight="medium" color="textSecondary">
-            Dimensions d'un colis, en cm (optionnel)
-          </AppText>
-          <View style={styles.dimensionsRow}>
-            <View style={styles.dimensionCell}>
-              <TextField value={lengthCm} onChangeText={setLengthCm} keyboardType="decimal-pad" placeholder="Long." />
-            </View>
-            <View style={styles.dimensionCell}>
-              <TextField value={widthCm} onChangeText={setWidthCm} keyboardType="decimal-pad" placeholder="Larg." />
-            </View>
-            <View style={styles.dimensionCell}>
-              <TextField value={heightCm} onChangeText={setHeightCm} keyboardType="decimal-pad" placeholder="Haut." />
-            </View>
-          </View>
-        </View>
-
-        <TextField
-          label="Valeur déclarée (optionnel)"
-          value={declaredValue}
-          onChangeText={setDeclaredValue}
-          keyboardType="numeric"
-          placeholder="Montant en chiffres"
-        />
-
-        <TextField
-          label="Description (optionnel)"
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Contenu du colis"
-          multiline
-          style={styles.multiline}
-        />
-
         <OceanSwitchRow
           value={isUrgent}
           onChange={setIsUrgent}
@@ -413,30 +582,96 @@ export default function NewShipmentScreen() {
           description="Une majoration peut s’appliquer au prix — voir le devis."
           icon={<IconAlertCircle size={18} color={OCEAN.base} />}
         />
-      </OceanSection>
 
-      <OceanSection icon={<IconCalendarEvent size={17} color={OCEAN.base} />} title="Période">
+        <Disclosure
+          icon={<IconAdjustmentsHorizontal size={15} color={OCEAN.base} />}
+          label="Plus de détails (optionnel)"
+          preview={optionalDetails.length > 0 ? optionalDetails.join(' · ') : 'Dimensions, valeur déclarée, description'}
+        >
+          <View style={styles.block}>
+            <AppText variant="sm" weight="medium" color="textSecondary">
+              Dimensions d'un colis, en cm (optionnel)
+            </AppText>
+            <View style={styles.dimensionsRow}>
+              <View style={styles.dimensionCell}>
+                <TextField value={lengthCm} onChangeText={setLengthCm} keyboardType="decimal-pad" placeholder="Long." />
+              </View>
+              <View style={styles.dimensionCell}>
+                <TextField value={widthCm} onChangeText={setWidthCm} keyboardType="decimal-pad" placeholder="Larg." />
+              </View>
+              <View style={styles.dimensionCell}>
+                <TextField value={heightCm} onChangeText={setHeightCm} keyboardType="decimal-pad" placeholder="Haut." />
+              </View>
+            </View>
+          </View>
+
+          <TextField
+            label="Valeur déclarée (optionnel)"
+            value={declaredValue}
+            onChangeText={setDeclaredValue}
+            keyboardType="numeric"
+            placeholder="Montant en chiffres"
+          />
+
+          <TextField
+            label="Description (optionnel)"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Contenu du colis"
+            multiline
+            style={styles.multiline}
+          />
+        </Disclosure>
+
+        <OceanButton label="Continuer" variant="soft" disabled={!parcelDone} onPress={() => goToNextSection('parcel')} />
+      </FormAccordionSection>
+
+      {/* 4 — Période */}
+      <FormAccordionSection
+        step={4}
+        icon={<IconCalendarEvent size={15} color={OCEAN.base} />}
+        title="Période"
+        summary={summaries.window}
+        status={statusOf('window')}
+        expanded={openSection === 'window'}
+        onToggle={() => toggleSection('window')}
+      >
         <ShipmentWindowField
           startDate={windowStart}
           endDate={windowEnd}
           onChangeStart={setWindowStart}
           onChangeEnd={setWindowEnd}
         />
-      </OceanSection>
+        <OceanButton label="Terminer" variant="soft" disabled={!windowDone} onPress={() => goToNextSection('window')} />
+      </FormAccordionSection>
 
-      <View style={styles.promoField}>
-        <PromoCodeField serviceType="SHIPMENT" amount={quote?.totalAmount ?? null} appliedCode={promoCode} onChange={setPromoCode} />
+      {/* Facultatif : le code promo et le détail du prix restent à portée de main, repliés */}
+      <View style={styles.extras}>
+        <Disclosure
+          icon={<IconDiscount2 size={15} color={OCEAN.base} />}
+          label={promoCode ? `Code ${promoCode} appliqué` : "J'ai un code promo"}
+          preview={promoDiscount ? `− ${formatMoney(promoDiscount, quote?.currencyCode ?? undefined)}` : null}
+          keepMounted
+        >
+          <PromoCodeField
+            serviceType="SHIPMENT"
+            amount={quote?.totalAmount ?? null}
+            appliedCode={promoCode}
+            onChange={(code, discount) => {
+              setPromoCode(code);
+              setPromoDiscount(code ? discount : undefined);
+            }}
+          />
+        </Disclosure>
+
+        <Disclosure
+          icon={<IconInfoCircle size={15} color={OCEAN.base} />}
+          label="Détail du prix"
+          preview="Distance, poids facturé, remboursement"
+        >
+          <ShipmentQuoteCard payload={quotePayload} discountAmount={promoDiscount} />
+        </Disclosure>
       </View>
-
-      <ShipmentQuoteCard payload={quotePayload} />
-
-      {errorMessage ? (
-        <AppText variant="sm" color="danger" style={styles.error}>
-          {errorMessage}
-        </AppText>
-      ) : null}
-
-      <OceanButton label="Confirmer l'envoi" onPress={handleSubmit} loading={createShipment.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }
@@ -499,14 +734,39 @@ const styles = StyleSheet.create({
     minHeight: 70,
     textAlignVertical: 'top',
   },
-  promoField: {
-    marginBottom: spacing.md,
-  },
-  error: {
-    marginBottom: spacing.sm,
-  },
-  submit: {
+  extras: {
+    gap: spacing.sm,
     marginTop: spacing.xs,
     marginBottom: spacing.lg,
+  },
+  footer: {
+    width: '100%',
+    gap: spacing.sm,
+  },
+  footerError: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  footerErrorText: {
+    flex: 1,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  footerPrice: {
+    flex: 1,
+    gap: 1,
+  },
+  footerButton: {
+    flex: 1.2,
+  },
+  computing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: 28,
   },
 });

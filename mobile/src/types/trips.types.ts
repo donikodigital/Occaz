@@ -199,7 +199,8 @@ export interface CreateTripPayload {
   departureAt: string;
   totalSeats: number;
   pricePerSeat: string;
-  currencyId: string;
+  /** Facultatif et ignoré par le serveur : la devise est celle du pays de la ville de départ. */
+  currencyId?: string;
   allowsLuggage?: boolean;
   allowsShipments?: boolean;
   maxShipmentWeightKg?: number;

@@ -15,11 +15,13 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 /**
  * Deux modes de recherche (section 8) :
- *  - par villes : originCityId + destinationCityId (rapide, indexé)
+ *  - par villes : originCityId et/ou destinationCityId (rapide, indexé). Les deux : trajets qui vont de l'une à l'autre.
+ *    Seulement destinationCityId : tous les trajets qui mènent à cette ville (arrivée ou ville traversée), d'où qu'ils partent.
+ *    Seulement originCityId : tous les trajets qui partent de cette ville ou la traversent. Villes traversées comprises.
  *  - par proximité ("trajets proches") : originLatitude/Longitude
  *    (+ destinationLatitude/Longitude en option), avec le rayon
  *    configurable via PlatformSetting "trip.search_radius_km".
- * Au moins un des deux modes doit être fourni — voir TripsService.search.
+ * Au moins une ville, ou une position de départ, doit être fournie — voir TripsService.search.
  */
 export class SearchTripsDto extends PaginationQueryDto {
   @ApiPropertyOptional()

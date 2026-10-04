@@ -6,14 +6,18 @@
 //   - carte « Chauffeur » (photo, badge vérifié, note, véhicule et plaque) ;
 //   - carte « Détails » : places, colis acceptés, note du chauffeur ;
 //   - pied de page fixe : le prix par place et « Réserver ».
+// [04/10/2026] v4 — Choix de la ville de montée et de descente : sur un trajet qui traverse des villes, le client choisit où il
+// monte et où il descend (puces) ; le prix, l'heure et les places s'adaptent. Utile surtout après une recherche sans ville de
+// départ, où le tronçon proposé part du départ du conducteur.
 // [03/10/2026] v3 — Villes traversées : le tronçon choisi dans la recherche (ex. Kindia → Labé) donne le prix, l'heure de
 // passage et la frise ; les étapes du conducteur sont listées avec leur heure de passage, celles du client en évidence.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   IconCar,
+  IconArrowsSplit2,
   IconInfoCircle,
   IconMapPin,
   IconPackage,
@@ -23,26 +27,42 @@ import {
   IconUsers,
 } from '@tabler/icons-react-native';
 import { AppText, Avatar, ScreenContainer } from '@/components/ui';
-import { OceanButton, OceanHeroCard, OceanPill, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import {
+  OceanButton,
+  OceanChip,
+  OceanHeroCard,
+  OceanPill,
+  OceanScreenHeader,
+  OceanSection,
+} from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useTrip } from '@/hooks/useTripSearch';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { formatSeatsAvailability } from '@/utils/seats';
-import { segmentAvailableSeats, stopAddress } from '@/utils/tripSegment';
+import { routePointOptions, segmentAvailableSeats, stopAddress } from '@/utils/tripSegment';
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 export default function TripDetailScreen() {
-  const { id, boardingStopId, alightingStopId } = useLocalSearchParams<{
+  const params = useLocalSearchParams<{
     id: string;
     boardingStopId?: string;
     alightingStopId?: string;
   }>();
-  const { data: trip, isLoading, isError } = useTrip(id, { boardingStopId, alightingStopId });
+  const { id } = params;
+  // Tronçon choisi : celui de la recherche au départ, puis modifiable ici (undefined = départ / arrivée du trajet).
+  const [boardingStopId, setBoardingStopId] = useState<string | undefined>(params.boardingStopId || undefined);
+  const [alightingStopId, setAlightingStopId] = useState<string | undefined>(params.alightingStopId || undefined);
+  const {
+    data: trip,
+    isLoading,
+    isError,
+    isPlaceholderData: isSwitchingSegment,
+  } = useTrip(id, { boardingStopId, alightingStopId }, { keepPrevious: true });
 
   if (isLoading || !trip) {
     return (
@@ -67,6 +87,13 @@ export default function TripDetailScreen() {
   const segment = trip.segment;
   const isPartial = Boolean(segment && !segment.isFullTrip);
   const boardingAt = segment?.boardingAt ?? trip.departureAt;
+
+  // Points où l'on peut monter / descendre. Le client ne peut monter qu'avant son point de descente, et descendre qu'après sa montée.
+  const routeOptions = routePointOptions(trip);
+  const boardingIndex = boardingStopId ? Math.max(0, routeOptions.findIndex((p) => p.stopId === boardingStopId)) : 0;
+  const alightingIndex = alightingStopId
+    ? Math.max(1, routeOptions.findIndex((p) => p.stopId === alightingStopId))
+    : routeOptions.length - 1;
 
   return (
     <ScreenContainer
@@ -94,7 +121,8 @@ export default function TripDetailScreen() {
                 },
               })
             }
-            disabled={isFull}
+            // Pas de réservation tant que le prix du nouveau tronçon n'est pas chargé : on ne réserve jamais sur un prix périmé.
+            disabled={isFull || isSwitchingSegment}
             style={styles.reserveButton}
           />
         </View>
@@ -171,6 +199,44 @@ export default function TripDetailScreen() {
           </View>
         </View>
       </OceanHeroCard>
+
+      {routeOptions.length > 2 ? (
+        <OceanSection icon={<IconArrowsSplit2 size={17} color={OCEAN.base} />} title="Votre trajet">
+          <AppText variant="xs" color="textSecondary">
+            Le conducteur traverse plusieurs villes : montez et descendez où vous voulez sur sa route, le prix s'adapte.
+          </AppText>
+          <View style={styles.choiceBlock}>
+            <AppText variant="sm" weight="medium" color="textSecondary">
+              Je monte à
+            </AppText>
+            <View style={styles.choiceRow}>
+              {routeOptions.slice(0, alightingIndex).map((point, index) => (
+                <OceanChip
+                  key={`up-${point.stopId ?? point.kind}`}
+                  label={`${point.cityName}${point.at ? ` · ${formatTime(point.at)}` : ''}`}
+                  active={index === boardingIndex}
+                  onPress={() => setBoardingStopId(point.stopId ?? undefined)}
+                />
+              ))}
+            </View>
+          </View>
+          <View style={styles.choiceBlock}>
+            <AppText variant="sm" weight="medium" color="textSecondary">
+              Je descends à
+            </AppText>
+            <View style={styles.choiceRow}>
+              {routeOptions.slice(boardingIndex + 1).map((point, offset) => (
+                <OceanChip
+                  key={`down-${point.stopId ?? point.kind}`}
+                  label={point.cityName}
+                  active={boardingIndex + 1 + offset === alightingIndex}
+                  onPress={() => setAlightingStopId(point.stopId ?? undefined)}
+                />
+              ))}
+            </View>
+          </View>
+        </OceanSection>
+      ) : null}
 
       <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Chauffeur">
         <View style={styles.driverRow}>
@@ -363,5 +429,13 @@ const styles = StyleSheet.create({
   },
   reserveButton: {
     minWidth: 150,
+  },
+  choiceBlock: {
+    gap: spacing.xs,
+  },
+  choiceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   },
 });

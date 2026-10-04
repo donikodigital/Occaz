@@ -15,6 +15,36 @@ export function segmentAvailableSeats(trip: Pick<Trip, 'availableSeats' | 'segme
   return trip.segment?.availableSeats ?? trip.availableSeats;
 }
 
+/** Un point de la route où le client peut monter ou descendre : le départ, une ville traversée, l'arrivée. */
+export interface RoutePointOption {
+  /** null pour le départ et l'arrivée du trajet. */
+  stopId: string | null;
+  kind: 'ORIGIN' | 'STOP' | 'DESTINATION';
+  cityName: string;
+  /** Heure de passage estimée (départ du trajet pour le premier point). */
+  at: string | null;
+}
+
+/**
+ * Départ → villes traversées où le conducteur prend des passagers → arrivée, dans l'ordre. Une étape sans prix ou fermée aux
+ * passagers n'est pas proposée (le serveur la refuserait).
+ */
+export function routePointOptions(trip: Trip): RoutePointOption[] {
+  const stops = [...(trip.stops ?? [])]
+    .filter((stop) => stop.isBookable !== false && stop.fareFromOrigin != null)
+    .sort((a, b) => a.sequence - b.sequence);
+  return [
+    { stopId: null, kind: 'ORIGIN', cityName: trip.originCity.name, at: trip.departureAt },
+    ...stops.map<RoutePointOption>((stop) => ({
+      stopId: stop.id,
+      kind: 'STOP',
+      cityName: stop.city?.name ?? stop.location?.label ?? 'Étape',
+      at: stop.estimatedArrivalAt,
+    })),
+    { stopId: null, kind: 'DESTINATION', cityName: trip.destinationCity.name, at: null },
+  ];
+}
+
 /** Nom d'une étape : sa ville, à défaut le libellé de l'adresse. */
 export function stopName(stop: TripStop): string {
   return stop.city?.name ?? stop.location?.label ?? 'Étape';

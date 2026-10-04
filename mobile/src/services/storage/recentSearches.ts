@@ -4,12 +4,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const STORAGE_KEY = 'recentTripSearches';
 const MAX_ENTRIES = 5;
 
+/** Une recherche peut ne préciser qu'une ville (ex. seulement la destination) : l'autre champ est alors absent. */
 export interface RecentSearch {
-  originCityId: string;
-  originCityName: string;
-  destinationCityId: string;
-  destinationCityName: string;
+  originCityId?: string;
+  originCityName?: string;
+  destinationCityId?: string;
+  destinationCityName?: string;
   searchedAt: string;
+}
+
+/** « Kindia → Labé », ou « Toutes les villes → Labé » quand le départ n'est pas précisé. */
+export function formatRecentSearch(search: Pick<RecentSearch, 'originCityName' | 'destinationCityName'>): string {
+  return `${search.originCityName ?? 'Toutes les villes'} → ${search.destinationCityName ?? 'Toutes les villes'}`;
 }
 
 /**

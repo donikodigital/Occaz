@@ -179,6 +179,40 @@ export function matchRoute(
   return null;
 }
 
+/**
+ * Recherche « vers » une ville seulement (le client ne connaît pas ou ne veut pas préciser son point de départ) : tout trajet dont
+ * la route atteint cette ville, que ce soit son arrivée ou une ville traversée. Le tronçon part du DÉPART du trajet — le client
+ * peut ensuite choisir de monter à une étape plus proche de chez lui (voir resolveSegment).
+ */
+export function matchRouteToCity(
+  route: RoutePoint[],
+  destinationCityId: string,
+  options: { requireBookable?: boolean; minPrice?: bigint } = {},
+): RouteSegment | null {
+  const requireBookable = options.requireBookable ?? true;
+  const to = route.find(
+    (point) => point.index > 0 && point.cityId === destinationCityId && (!requireBookable || point.isBookable),
+  );
+  return to ? buildSegment(route, route[0], to, options.minPrice ?? 1n) : null;
+}
+
+/**
+ * Recherche « depuis » une ville seulement : tout trajet qui part de cette ville ou la traverse avant son arrivée. Le tronçon va
+ * jusqu'à l'ARRIVÉE du trajet.
+ */
+export function matchRouteFromCity(
+  route: RoutePoint[],
+  originCityId: string,
+  options: { requireBookable?: boolean; minPrice?: bigint } = {},
+): RouteSegment | null {
+  const requireBookable = options.requireBookable ?? true;
+  const last = route[route.length - 1];
+  const from = route.find(
+    (point) => point.index < last.index && point.cityId === originCityId && (!requireBookable || point.isBookable),
+  );
+  return from ? buildSegment(route, from, last, options.minPrice ?? 1n) : null;
+}
+
 /** Villes de la route dans l'ordre (utile pour les colis : ramassage avant livraison). */
 export function routeCityIds(route: RoutePoint[]): string[] {
   return route.map((point) => point.cityId).filter((cityId): cityId is string => cityId !== null);

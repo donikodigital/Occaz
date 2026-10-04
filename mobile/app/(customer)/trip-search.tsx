@@ -1,5 +1,9 @@
 // mobile/app/(customer)/trip-search.tsx
 //
+// [04/10/2026] v3 — Une seule ville suffit : sans départ, le client voit tous les trajets qui mènent à sa destination (arrivée ou
+// ville traversée), d'où qu'ils partent ; sans arrivée, tous ceux qui partent de sa ville. Le départ détecté par GPS peut être
+// effacé (croix), et n'est pas remis ensuite.
+//
 // v2 — Refonte bleu océan. L'itinéraire devient un tracé (rond creux au
 // départ, rond plein à l'arrivée) avec un bouton d'inversion, comme sur
 // l'écran « Envois disponibles » côté chauffeur ; la date et les passagers
@@ -9,7 +13,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
-import { IconArrowsUpDown, IconChevronRight, IconSearch, IconUsers, IconCalendarEvent } from '@tabler/icons-react-native';
+import {
+  IconArrowsUpDown,
+  IconCalendarEvent,
+  IconChevronRight,
+  IconInfoCircle,
+  IconSearch,
+  IconUsers,
+  IconX,
+} from '@tabler/icons-react-native';
 import { AppText, CalendarPicker, ScreenContainer } from '@/components/ui';
 import { OceanButton, OceanCard, OceanScreenHeader, OceanSection, OceanStepper } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
@@ -31,12 +43,15 @@ function RouteRow({
   value,
   placeholder,
   onPress,
+  onClear,
 }: {
   index: 0 | 1;
   label: string;
   value?: string;
   placeholder: string;
   onPress: () => void;
+  /** Efface la ville choisie (champ facultatif) : une croix remplace la flèche. */
+  onClear?: () => void;
 }) {
   return (
     <Pressable
@@ -58,7 +73,19 @@ function RouteRow({
           {value ?? placeholder}
         </AppText>
       </View>
-      <IconChevronRight size={18} color={colors.textMuted} />
+      {value && onClear ? (
+        <Pressable
+          onPress={onClear}
+          accessibilityRole="button"
+          accessibilityLabel={`Effacer ${label.toLowerCase()}`}
+          hitSlop={10}
+          style={styles.clearButton}
+        >
+          <IconX size={16} color={colors.textSecondary} />
+        </Pressable>
+      ) : (
+        <IconChevronRight size={18} color={colors.textMuted} />
+      )}
     </Pressable>
   );
 }
@@ -89,6 +116,8 @@ export default function TripSearchScreen() {
   // l'utilisateur aurait fait pendant que la détection était en cours.
   const originRef = useRef(origin);
   originRef.current = origin;
+  // Départ effacé à la main : la détection par GPS, encore en cours, ne doit pas le remettre.
+  const originClearedByUser = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +135,7 @@ export default function TripSearchScreen() {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         });
-        if (city && !cancelled && !originRef.current) setOrigin(city);
+        if (city && !cancelled && !originRef.current && !originClearedByUser.current) setOrigin(city);
       } catch {
         // Échec silencieux — voir commentaire ci-dessus.
       } finally {
@@ -119,26 +148,25 @@ export default function TripSearchScreen() {
     };
   }, []);
 
-  const canSearch = Boolean(origin && destination);
+  // Une seule ville suffit (voir l'en-tête du fichier).
+  const canSearch = Boolean(origin || destination);
 
   async function handleSearch() {
-    if (!origin || !destination) return;
+    if (!origin && !destination) return;
 
     await recentSearchesStorage.add({
-      originCityId: origin.id,
-      originCityName: origin.name,
-      destinationCityId: destination.id,
-      destinationCityName: destination.name,
+      originCityId: origin?.id,
+      originCityName: origin?.name,
+      destinationCityId: destination?.id,
+      destinationCityName: destination?.name,
       searchedAt: new Date().toISOString(),
     });
 
     router.push({
       pathname: '/(customer)/trip-results',
       params: {
-        originCityId: origin.id,
-        originCityName: origin.name,
-        destinationCityId: destination.id,
-        destinationCityName: destination.name,
+        ...(origin ? { originCityId: origin.id, originCityName: origin.name } : {}),
+        ...(destination ? { destinationCityId: destination.id, destinationCityName: destination.name } : {}),
         departureDate: selectedDate ? toDateOnly(selectedDate) : undefined,
         passengersCount: String(passengersCount),
       },
@@ -170,10 +198,14 @@ export default function TripSearchScreen() {
 
           <RouteRow
             index={0}
-            label="Départ"
+            label="Départ (facultatif)"
             value={origin?.name}
-            placeholder={isDetectingOrigin ? 'Détection de votre position…' : 'Ville de départ'}
+            placeholder={isDetectingOrigin ? 'Détection de votre position…' : 'Toutes les villes'}
             onPress={() => pickCity('origin')}
+            onClear={() => {
+              originClearedByUser.current = true;
+              setOrigin(null);
+            }}
           />
           <RouteRow
             index={1}
@@ -195,6 +227,17 @@ export default function TripSearchScreen() {
           ) : null}
         </View>
       </OceanCard>
+
+      <View style={styles.hint}>
+        <IconInfoCircle size={15} color={OCEAN.base} />
+        <AppText variant="xs" color="textSecondary" style={styles.hintText}>
+          {!origin && destination
+            ? `Sans ville de départ, vous voyez tous les trajets qui mènent à ${destination.name}, d'où qu'ils partent.`
+            : origin && !destination
+              ? `Sans ville d'arrivée, vous voyez tous les trajets qui partent de ${origin.name}.`
+              : "Une seule ville suffit : sans départ, vous voyez tous les trajets qui mènent à votre destination."}
+        </AppText>
+      </View>
 
       <OceanSection icon={<IconCalendarEvent size={17} color={OCEAN.base} />} title="Date">
         <CalendarPicker label="" selectedDate={selectedDate} onSelectDate={setSelectedDate} flexibleLabel="Dates flexibles" />
@@ -293,6 +336,24 @@ const styles = StyleSheet.create({
     borderColor: OCEAN.line,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  clearButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  hint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
+  hintText: {
+    flex: 1,
   },
   passengersRow: {
     flexDirection: 'row',

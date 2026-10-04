@@ -7,6 +7,8 @@ import {
   estimateArrivalAt,
   interpolateFare,
   matchRoute,
+  matchRouteFromCity,
+  matchRouteToCity,
   rescaleFares,
   resolveSegment,
   routeCityIds,
@@ -195,5 +197,48 @@ describe('rescaleFares / interpolateFare / validateStopFare / estimateArrivalAt'
     // 110 km × 1,3 ÷ 55 km/h = 2 h 36 min
     const at = estimateArrivalAt(DEPARTURE, 110, 1.3, 55);
     expect(at.getTime() - DEPARTURE.getTime()).toBe(Math.round(2.6 * 3_600_000));
+  });
+});
+
+describe('matchRouteToCity / matchRouteFromCity — recherche avec une seule ville', () => {
+  const route = buildRoute(trip());
+
+  it('vers Labé (arrivée) : tronçon du départ à Labé, au prix du trajet', () => {
+    const match = matchRouteToCity(route, 'labe');
+    expect(match?.from.kind).toBe('ORIGIN');
+    expect(match?.isFullTrip).toBe(true);
+    expect(match?.pricePerSeat).toBe(100_000n);
+  });
+
+  it('vers Mamou (ville traversée) : tronçon du départ à Mamou, au prix de l\'étape', () => {
+    const match = matchRouteToCity(route, 'mamou');
+    expect(match?.from.kind).toBe('ORIGIN');
+    expect(match?.to.stopId).toBe('s-mamou');
+    expect(match?.pricePerSeat).toBe(65_000n);
+    expect(match?.isFullTrip).toBe(false);
+  });
+
+  it('vers la ville de départ du trajet, ou une ville hors route : rien', () => {
+    expect(matchRouteToCity(route, 'conakry')).toBeNull();
+    expect(matchRouteToCity(route, 'dakar')).toBeNull();
+  });
+
+  it('une étape fermée aux passagers ne compte pas (sauf pour les colis)', () => {
+    const closed = buildRoute(trip([stop('s-kindia', 1, 'kindia', 35_000n, { isBookable: false })]));
+    expect(matchRouteToCity(closed, 'kindia')).toBeNull();
+    expect(matchRouteToCity(closed, 'kindia', { requireBookable: false })).not.toBeNull();
+  });
+
+  it('depuis Kindia : tronçon de Kindia à l\'arrivée ; depuis Conakry : trajet entier', () => {
+    const fromKindia = matchRouteFromCity(route, 'kindia');
+    expect(fromKindia?.from.stopId).toBe('s-kindia');
+    expect(fromKindia?.to.kind).toBe('DESTINATION');
+    expect(fromKindia?.pricePerSeat).toBe(65_000n);
+    expect(matchRouteFromCity(route, 'conakry')?.isFullTrip).toBe(true);
+  });
+
+  it('depuis la ville d\'arrivée ou une ville hors route : rien', () => {
+    expect(matchRouteFromCity(route, 'labe')).toBeNull();
+    expect(matchRouteFromCity(route, 'dakar')).toBeNull();
   });
 });

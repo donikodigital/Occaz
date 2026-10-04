@@ -42,12 +42,14 @@ import { formatSeatsAvailability } from '@/utils/seats';
 import { segmentAvailableSeats } from '@/utils/tripSegment';
 import type { Trip } from '@/types/trips.types';
 
-function TripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
+function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => void; showRoute?: boolean }) {
   const initials = `${trip.driver.firstName[0] ?? ''}${trip.driver.lastName[0] ?? ''}`;
   const seats = segmentAvailableSeats(trip);
   const isFull = seats <= 0;
   const segment = trip.segment;
   const isPartial = Boolean(segment && !segment.isFullTrip);
+  // Recherche sans départ (ou sans arrivée) : les trajets ne partent plus tous de la même ville, la carte dit d'où à où.
+  const routeLabel = `${segment?.boardingCityName ?? trip.originCity.name} → ${segment?.alightingCityName ?? trip.destinationCity.name}`;
 
   return (
     <OceanCard onPress={onPress} style={[styles.card, isFull && styles.cardFull]} accessibilityLabel={`Trajet de ${trip.driver.firstName}`}>
@@ -92,11 +94,21 @@ function TripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
         </View>
       </View>
 
+      {showRoute ? (
+        <View style={styles.routeRow}>
+          <IconRoute size={15} color={OCEAN.base} />
+          <AppText variant="sm" weight="semibold" color={OCEAN.deep} numberOfLines={1} style={styles.routeText}>
+            {routeLabel}
+          </AppText>
+        </View>
+      ) : null}
+
       <View style={styles.cardBottom}>
         <View style={styles.metaRow}>
           <OceanPill
             label={
-              isPartial && segment
+              // Le client qui monte au départ du trajet garde « Départ » ; « Passage à » seulement pour une étape.
+              isPartial && segment?.boardingStopId
                 ? `Passage à ${segment.boardingCityName ?? 'votre étape'} vers ${formatTime(segment.boardingAt)}`
                 : `Départ ${formatTime(trip.departureAt)}`
             }
@@ -119,10 +131,10 @@ function TripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
 
 export default function TripResultsScreen() {
   const params = useLocalSearchParams<{
-    originCityId: string;
-    originCityName: string;
-    destinationCityId: string;
-    destinationCityName: string;
+    originCityId?: string;
+    originCityName?: string;
+    destinationCityId?: string;
+    destinationCityName?: string;
     departureDate?: string;
     passengersCount?: string;
   }>();
@@ -140,10 +152,12 @@ export default function TripResultsScreen() {
     [params, verifiedOnly],
   );
 
+  // Une seule ville suffit : sans départ, tous les trajets qui mènent à la destination (et inversement).
   const { data, isLoading, isError } = useTripSearch(
     searchParams,
-    Boolean(params.originCityId && params.destinationCityId),
+    Boolean(params.originCityId || params.destinationCityId),
   );
+  const isOpenSearch = !params.originCityId || !params.destinationCityId;
 
   const passengers = params.passengersCount ?? '1';
   const dateLabel = params.departureDate ? formatDateShort(params.departureDate) : 'Date flexible';
@@ -156,7 +170,7 @@ export default function TripResultsScreen() {
         <View style={styles.heroRoute}>
           <IconRoute size={20} color={OCEAN.sky} />
           <AppText variant="lg" weight="bold" color={OCEAN.onDark} numberOfLines={2} style={styles.heroTitle}>
-            {params.originCityName} → {params.destinationCityName}
+            {params.originCityName ?? 'Toutes les villes'} → {params.destinationCityName ?? 'Toutes les villes'}
           </AppText>
         </View>
         <AppText variant="sm" color={OCEAN.sky}>
@@ -210,6 +224,7 @@ export default function TripResultsScreen() {
         renderItem={({ item }) => (
           <TripCard
             trip={item}
+            showRoute={isOpenSearch}
             onPress={() =>
               router.push({
                 pathname: '/(customer)/trip/[id]',
@@ -229,6 +244,14 @@ export default function TripResultsScreen() {
 }
 
 const styles = StyleSheet.create({
+  routeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  routeText: {
+    flex: 1,
+  },
   list: {
     flexGrow: 1,
     paddingHorizontal: spacing.lg,
