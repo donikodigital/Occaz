@@ -37,6 +37,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
+  IconAlertTriangle,
   IconArrowLeft,
   IconCar,
   IconCircleCheck,
@@ -87,37 +88,11 @@ import { formatDateLong, formatTime } from '@/utils/date';
 import { DRIVER_BOOKING_STATUS_LABELS, TRIP_STATUS_LABELS } from '@/utils/tripStatusLabels';
 import { bookingRoute, isPartialBooking, stopAddress, stopName } from '@/utils/tripSegment';
 import { insertionSequence } from '@/utils/routeOrder';
+import { closeToHome } from '@/utils/navigation';
+import { describeUnpicked, getBookingPhase, isPickupMissed, unpickedBoarders, type BookingPhase } from '@/utils/bookingPhase';
 import { ApiError } from '@/services/api/ApiError';
 import type { Booking } from '@/types/bookings.types';
 import type { Trip, TripLocation, TripStatus, TripStop } from '@/types/trips.types';
-
-type BookingPhase = 'pickup' | 'dropoff' | 'none';
-
-/**
- * Ce que le conducteur doit valider pour CE client, selon où il monte et où il descend :
- *  - client du départ : prise en charge quand le conducteur est arrivé au départ ; dépose à l'arrivée ;
- *  - client d'une étape : prise en charge en route, une fois le conducteur arrivé à son étape ; dépose à son étape de
- *    descente (ou à l'arrivée du trajet si le conducteur n'a pas signalé l'étape).
- */
-function getBookingPhase(booking: Booking, trip: Trip): BookingPhase {
-  if (trip.status === 'ARRIVED') return 'dropoff';
-
-  const stopById = (stopId: string | null | undefined): TripStop | undefined =>
-    stopId ? trip.stops?.find((stop) => stop.id === stopId) : undefined;
-  const isPickedUp = Boolean(booking.passengers?.some((passenger) => passenger.pickedUpAt));
-
-  if (!isPickedUp) {
-    if (!booking.boardingStopId) {
-      return trip.status === 'DRIVER_ARRIVED' || trip.status === 'PASSENGER_PICKED_UP' ? 'pickup' : 'none';
-    }
-    return trip.status === 'IN_PROGRESS' && stopById(booking.boardingStopId)?.arrivedAt ? 'pickup' : 'none';
-  }
-
-  if (booking.alightingStopId && trip.status === 'IN_PROGRESS' && stopById(booking.alightingStopId)?.arrivedAt) {
-    return 'dropoff';
-  }
-  return 'none';
-}
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -344,7 +319,18 @@ function StageCard({ stage, action }: { stage: Stage; action: StageAction | null
   );
 }
 
-function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: string; phase: BookingPhase }) {
+function BookingOtpCard({
+  booking,
+  tripId,
+  phase,
+  pickupMissed = false,
+}: {
+  booking: Booking;
+  tripId: string;
+  phase: BookingPhase;
+  /** La dépose est proposée alors que la prise en charge de ce passager n'a jamais été validée. */
+  pickupMissed?: boolean;
+}) {
   const [codeVisible, setCodeVisible] = useState(false);
   const [code, setCode] = useState('');
 
@@ -452,6 +438,15 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
           <AppText variant="sm" weight="semibold">
             {phase === 'pickup' ? 'Valider la prise en charge' : 'Valider la dépose'}
           </AppText>
+          {phase === 'dropoff' && pickupMissed ? (
+            <View style={styles.missedPickup}>
+              <IconAlertTriangle size={15} color={colors.danger} />
+              <AppText variant="xs" color="danger" style={styles.missedPickupText}>
+                La prise en charge de ce passager n'a pas été validée. Vous pouvez quand même valider sa dépose avec son code :
+                elle sera enregistrée sans prise en charge.
+              </AppText>
+            </View>
+          ) : null}
           {!codeVisible ? (
             <>
               <AppText variant="xs" color="textSecondary">
@@ -533,6 +528,29 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
 // ---------------------------------------------------------------------------
 // Villes traversées
 // ---------------------------------------------------------------------------
+
+/**
+ * Avant de signaler l'arrivée à l'étape suivante ou à destination : si un client n'a pas été pris en charge à son étape (code non
+ * validé), le conducteur est prévenu. Une prise en charge oubliée ne se rattrape plus une fois l'étape dépassée ; il peut
+ * quand même continuer (client absent), et la dépose de ce client restera possible.
+ */
+function confirmIfPickupMissed(trip: Trip, bookings: Booking[], proceed: () => void): void {
+  const missed = unpickedBoarders(trip, bookings);
+  if (missed.length === 0) {
+    proceed();
+    return;
+  }
+  Alert.alert(
+    missed.length > 1 ? 'Prises en charge non validées' : 'Prise en charge non validée',
+    `${missed.map((booking) => describeUnpicked(booking, trip)).join(' ; ')} ${
+      missed.length > 1 ? "n'ont pas été pris en charge" : "n'a pas été pris en charge"
+    } (code non validé). Validez d'abord la prise en charge si le passager est à bord. Vous pourrez quand même valider sa dépose plus tard.`,
+    [
+      { text: "Valider d'abord", style: 'cancel' },
+      { text: 'Continuer quand même', style: 'destructive', onPress: proceed },
+    ],
+  );
+}
 
 /**
  * Étapes du trajet : heure de passage et prix de chaque tronçon. En brouillon, le conducteur ajuste les prix calculés
@@ -753,7 +771,9 @@ function TripStopsSection({ trip, bookings }: { trip: Trip; bookings: Booking[] 
               {nextStopToReach?.id === stop.id ? (
                 <OceanButton
                   label={`Je suis arrivé à ${stopName(stop)}`}
-                  onPress={() => markArrivedAtStop.mutate(stop.id, { onError: showError })}
+                  onPress={() =>
+                    confirmIfPickupMissed(trip, bookings, () => markArrivedAtStop.mutate(stop.id, { onError: showError }))
+                  }
                   loading={markArrivedAtStop.isPending}
                 />
               ) : null}
@@ -780,7 +800,7 @@ function TripStopsSection({ trip, bookings }: { trip: Trip; bookings: Booking[] 
 // ---------------------------------------------------------------------------
 
 export default function DriverTripDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
   const { data: trip, isLoading, isError } = useTrip(id);
   const { data: bookings } = useTripBookings(id);
 
@@ -843,7 +863,7 @@ export default function DriverTripDetailScreen() {
   } else if (trip.status === 'IN_PROGRESS') {
     action = {
       label: "Signaler l'arrivée à destination",
-      run: () => markArrived.mutate(),
+      run: () => confirmIfPickupMissed(trip, activeBookings, () => markArrived.mutate()),
       isPending: markArrived.isPending,
     };
   } else if (trip.status === 'ARRIVED' && activeBookings.length === 0) {
@@ -878,7 +898,12 @@ export default function DriverTripDetailScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Détail du trajet" onBack={() => router.back()} />
+      <OceanScreenHeader
+        title="Détail du trajet"
+        onBack={() => router.back()}
+        // Affiché juste après la création du trajet : une croix qui revient à l'accueil, pas la flèche vers le formulaire.
+        onClose={created ? () => closeToHome('/(driver)/(tabs)/home') : undefined}
+      />
 
       {/* Billet : bandeau coloré + coupon détachable */}
       <View style={styles.ticketShadow}>
@@ -986,7 +1011,13 @@ export default function DriverTripDetailScreen() {
           {activeBookings.length > 0 ? (
             <View style={styles.bookingsList}>
               {activeBookings.map((booking) => (
-                <BookingOtpCard key={booking.id} booking={booking} tripId={trip.id} phase={getBookingPhase(booking, trip)} />
+                <BookingOtpCard
+                  key={booking.id}
+                  booking={booking}
+                  tripId={trip.id}
+                  phase={getBookingPhase(booking, trip)}
+                  pickupMissed={isPickupMissed(booking, trip)}
+                />
               ))}
             </View>
           ) : (
@@ -1467,5 +1498,13 @@ const styles = StyleSheet.create({
   },
   shipmentsButton: {
     marginBottom: spacing.md,
+  },
+  missedPickup: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  missedPickupText: {
+    flex: 1,
   },
 });

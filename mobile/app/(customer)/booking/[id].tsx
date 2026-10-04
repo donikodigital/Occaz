@@ -42,6 +42,8 @@ import { useGetOrCreateConversationForBooking } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { bookingBoardingAt, bookingRouteLabel, isPartialBooking } from '@/utils/tripSegment';
+import { customerCodeVisibility } from '@/utils/bookingPhase';
+import { closeToHome } from '@/utils/navigation';
 import type { BookingStatus } from '@/types/bookings.types';
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
@@ -97,7 +99,7 @@ function DropoffCodeCard({ bookingId }: { bookingId: string }) {
 }
 
 export default function BookingDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
   const { data: booking, isLoading, isError } = useBooking(id);
   const cancelBooking = useCancelBooking(id ?? '');
   const { data: existingRatings } = useBookingRatings(id);
@@ -122,20 +124,10 @@ export default function BookingDetailScreen() {
 
   const trip = booking.trip;
 
-  // Client qui monte à une étape : son code de prise en charge n'a de sens qu'en route, une fois le conducteur arrivé à son
-  // étape ; son code de dépose, qu'après sa prise en charge. Client du départ : parcours habituel, inchangé.
-  const boardsAtStop = Boolean(booking.boardingStopId);
-  const isPickedUp = Boolean(booking.passengers?.some((passenger) => passenger.pickedUpAt));
-  const showPickupCode =
-    booking.status === 'CONFIRMED' &&
-    (boardsAtStop
-      ? trip?.status === 'IN_PROGRESS' && Boolean(booking.boardingStop?.arrivedAt) && !isPickedUp
-      : trip?.status === 'DRIVER_ARRIVED' || trip?.status === 'PASSENGER_PICKED_UP');
-  const showDropoffCode =
-    booking.status === 'CONFIRMED' &&
-    (boardsAtStop
-      ? isPickedUp
-      : trip?.status === 'PASSENGER_PICKED_UP' || trip?.status === 'IN_PROGRESS' || trip?.status === 'ARRIVED');
+  // Codes à montrer : voir customerCodeVisibility. Le code de dépose s'affiche même si la prise en charge a été oubliée par le
+  // conducteur (jamais de client coincé à l'arrivée) ; celui de prise en charge d'un client d'étape, seulement en route, une fois
+  // le conducteur arrivé à son étape.
+  const { pickup: showPickupCode, dropoff: showDropoffCode } = customerCodeVisibility(booking, trip?.status);
   const canCancel = CANCELLABLE_STATUSES.includes(booking.status);
   const hasRated = (existingRatings?.length ?? 0) > 0;
 
@@ -156,6 +148,8 @@ export default function BookingDetailScreen() {
         title="Réservation"
         subtitle={bookingRouteLabel(booking)}
         onBack={() => router.back()}
+        // Affiché juste après la réservation ou le paiement : une croix qui revient à l'accueil, pas la flèche vers les étapes d'avant.
+        onClose={created ? () => closeToHome('/(customer)/(tabs)/home') : undefined}
         right={
           <Pressable
             onPress={() =>

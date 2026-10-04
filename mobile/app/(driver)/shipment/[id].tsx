@@ -40,6 +40,7 @@ import {
 import { formatMoney } from '@/utils/money';
 import { driverNetAmount, formatLocation, formatWindow } from '@/utils/shipmentDisplay';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_TONE } from '@/utils/tripStatusLabels';
+import { closeToHome } from '@/utils/navigation';
 import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { ApiError } from '@/services/api/ApiError';
 import type { Shipment, ShipmentStatus } from '@/types/shipments.types';
@@ -213,7 +214,7 @@ function PersonCard({
 // ---------------------------------------------------------------------------
 
 export default function DriverShipmentDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
   const { data: shipment, isLoading, isError } = useShipment(id);
 
   const cancelShipment = useCancelShipment(id ?? '');
@@ -273,6 +274,8 @@ export default function DriverShipmentDetailScreen() {
         title="Détail de l'envoi"
         subtitle={shipment.category?.name ?? 'Colis'}
         onBack={() => router.back()}
+        // Affiché juste après l'acceptation de l'envoi : une croix qui revient à l'accueil.
+        onClose={created ? () => closeToHome('/(driver)/(tabs)/home') : undefined}
         right={
           shipment.driverId && !contactsClosed ? (
             <Pressable

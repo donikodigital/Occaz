@@ -62,6 +62,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { formatDateLong, formatTime, upcomingDays } from '@/utils/date';
 import { formatMoney } from '@/utils/money';
 import { sortByDistanceFrom } from '@/utils/routeOrder';
+import { FLOW_DONE_PARAM } from '@/utils/navigation';
 import { formatCityCountry } from '@/utils/shipmentDisplay';
 import { ApiError } from '@/services/api/ApiError';
 import type { TripLocation } from '@/types/trips.types';
@@ -371,7 +372,7 @@ export default function NewTripScreen() {
             : undefined,
       },
       {
-        onSuccess: (trip) => router.replace(`/(driver)/trip/${trip.id}`),
+        onSuccess: (trip) => router.replace({ pathname: '/(driver)/trip/[id]', params: { id: trip.id, ...FLOW_DONE_PARAM } }),
         onError: (error) => {
           setErrorSection(undefined);
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');

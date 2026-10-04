@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { IconArrowLeft, IconMinus, IconPlus } from '@tabler/icons-react-native';
+import { IconArrowLeft, IconMinus, IconPlus, IconX } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -31,26 +31,33 @@ export function OceanHeroCard({ children, style }: { children: React.ReactNode; 
 // En-tête d'écran
 // ---------------------------------------------------------------------------
 
+/**
+ * `onClose` : sur un écran qui termine un parcours (page affichée juste après une création, une réservation, un paiement…), la
+ * flèche « Retour » — qui ramènerait aux étapes précédentes du parcours — est remplacée par une croix « Fermer » qui renvoie
+ * directement à l'accueil.
+ */
 export function OceanScreenHeader({
   title,
   subtitle,
   onBack,
+  onClose,
   right,
 }: {
   title: string;
   subtitle?: string;
   onBack: () => void;
+  onClose?: () => void;
   right?: React.ReactNode;
 }) {
   return (
     <View style={styles.header}>
       <Pressable
-        onPress={onBack}
+        onPress={onClose ?? onBack}
         accessibilityRole="button"
-        accessibilityLabel="Retour"
+        accessibilityLabel={onClose ? 'Fermer et revenir à l’accueil' : 'Retour'}
         style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
       >
-        <IconArrowLeft size={18} color={OCEAN.base} />
+        {onClose ? <IconX size={18} color={OCEAN.base} /> : <IconArrowLeft size={18} color={OCEAN.base} />}
       </Pressable>
       <View style={styles.headerText}>
         <AppText variant="lg" weight="bold" color={OCEAN.deep} numberOfLines={1}>

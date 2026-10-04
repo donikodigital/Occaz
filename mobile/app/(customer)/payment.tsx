@@ -1,5 +1,9 @@
 // mobile/app/(customer)/payment.tsx
 //
+// [04/10/2026] v4 — Après un paiement réussi, on revient à la page de la réservation ou de l'envoi d'où l'on vient (retour dans la
+// pile) au lieu d'en ouvrir une seconde copie par-dessus : la pile ne s'allonge plus, et la croix « Fermer » de cette page (affichée
+// après une création) renvoie à l'accueil en une fois.
+//
 // v2 — Habillage bleu océan ; logique inchangée. Le montant à payer occupe
 // un bandeau sombre, les moyens de paiement sont des cartes avec un
 // indicateur de choix, et « Payer » reprend le bouton plein du profil.
@@ -64,10 +68,16 @@ export default function PaymentScreen() {
           Alert.alert('Paiement confirmé', 'Votre paiement a bien été pris en compte.', [
             {
               text: 'OK',
-              onPress: () =>
+              onPress: () => {
+                // La page de la réservation / de l'envoi est juste en dessous (le paiement s'ouvre depuis elle) : on y revient.
+                if (router.canGoBack()) {
+                  router.back();
+                  return;
+                }
                 router.replace(
                   bookingId ? `/(customer)/booking/${bookingId}` : `/(customer)/shipment/${shipmentId}`,
-                ),
+                );
+              },
             },
           ]);
         },

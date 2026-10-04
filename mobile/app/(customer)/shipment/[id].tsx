@@ -40,6 +40,7 @@ import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations'
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { formatLocation, formatWindow } from '@/utils/shipmentDisplay';
+import { closeToHome } from '@/utils/navigation';
 import { ApiError } from '@/services/api/ApiError';
 import type { ShipmentStatus } from '@/types/shipments.types';
 
@@ -104,7 +105,7 @@ function DeliveryCodeCard({ shipmentId }: { shipmentId: string }) {
 }
 
 export default function ShipmentDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
   const { data: shipment, isLoading, isError } = useShipment(id);
   const cancelShipment = useCancelShipment(id ?? '');
   const extendShipment = useExtendShipment(id ?? '');
@@ -190,6 +191,8 @@ export default function ShipmentDetailScreen() {
         title="Suivi de l'envoi"
         subtitle={shipment.category?.name ?? 'Colis'}
         onBack={() => router.back()}
+        // Affiché juste après la création ou le paiement : une croix qui revient à l'accueil.
+        onClose={created ? () => closeToHome('/(customer)/(tabs)/home') : undefined}
         right={
           // Colis livré sans litige : plus de messagerie avec le chauffeur (comme l'appel et le SMS, retirés par le serveur).
           shipment.driverId && shipment.status !== 'DELIVERED' && shipment.status !== 'COMPLETED' ? (

@@ -155,6 +155,8 @@ export interface Trip {
   /** Places occupées et libres sur chaque tronçon de la route (trajets avec étapes, détail d'un trajet). */
   seatsByLeg?: SeatsByLeg[];
   currencyId: string;
+  /** Devise du trajet (renvoyée par le détail d'un trajet) : celle du pays de la ville de départ. */
+  currency?: { id?: string; isoCode: string; symbol?: string | null } | null;
   notes: string | null;
   stops?: TripStop[];
   createdAt: string;

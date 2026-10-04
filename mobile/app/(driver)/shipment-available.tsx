@@ -54,6 +54,7 @@ import { ApiError } from '@/services/api/ApiError';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import type { AvailableShipment } from '@/types/shipments.types';
 import type { City } from '@/types/geography.types';
+import { FLOW_DONE_PARAM } from '@/utils/navigation';
 
 /** Intervalle de rafraîchissement automatique de la liste, tant que l'écran est au premier plan. */
 const REFRESH_INTERVAL_MS = 20_000;
@@ -649,7 +650,7 @@ export default function AvailableShipmentsScreen() {
         onClose={() => setSelectedShipment(null)}
         onAccepted={(shipmentId) => {
           setSelectedShipment(null);
-          router.push(`/(driver)/shipment/${shipmentId}`);
+          router.push({ pathname: '/(driver)/shipment/[id]', params: { id: shipmentId, ...FLOW_DONE_PARAM } });
         }}
         onAttemptFailed={refresh}
         preferredTripId={tripFilterId}

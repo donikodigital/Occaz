@@ -54,6 +54,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
 import { formatMoney } from '@/utils/money';
+import { FLOW_DONE_PARAM } from '@/utils/navigation';
 import { formatCityCountry, formatWindow } from '@/utils/shipmentDisplay';
 import { locationsApi } from '@/services/api/locations.api';
 import { ApiError } from '@/services/api/ApiError';
@@ -364,7 +365,8 @@ export default function NewShipmentScreen() {
         promoCode,
       },
       {
-        onSuccess: (shipment) => router.replace(`/(customer)/shipment/${shipment.id}`),
+        onSuccess: (shipment) =>
+          router.replace({ pathname: '/(customer)/shipment/[id]', params: { id: shipment.id, ...FLOW_DONE_PARAM } }),
         onError: (error) => {
           setFormError({ message: error instanceof ApiError ? error.message : 'Une erreur est survenue.' });
         },
