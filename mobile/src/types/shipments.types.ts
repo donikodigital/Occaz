@@ -125,8 +125,9 @@ export interface Shipment {
 export interface CreateShipmentPayload {
   tripId?: string;
   categoryId: string;
-  senderName: string;
-  senderPhone: string;
+  /** Facultatifs et ignorés par le serveur : l'expéditeur est le titulaire du compte (nom du profil, téléphone du compte). */
+  senderName?: string;
+  senderPhone?: string;
   senderLocationId: string;
   recipientName: string;
   recipientPhone: string;

@@ -26,6 +26,10 @@ function createService(options: { rawDiscount?: bigint; platformFee?: bigint; wi
   };
   const prisma = {
     category: {},
+    // Profil du client : nom et téléphone de l'expéditeur viennent de là, pas de la requête.
+    customerProfile: {
+      findUnique: jest.fn().mockResolvedValue({ firstName: 'Mamadou', lastName: 'Diallo', user: { phone: '+224620000001' } }),
+    },
     location: {
       findUnique: jest.fn().mockImplementation(({ where }) =>
         Promise.resolve(where.id === 'loc-a' ? senderLocation : recipientLocation),

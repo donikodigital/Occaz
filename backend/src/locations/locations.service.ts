@@ -34,6 +34,13 @@ export interface ResolvedCity {
   prefectureId: string | null;
 }
 
+/** Ville d'une adresse avec son pays : l'app affiche « Kindia, Guinée » sous chaque adresse, jamais l'adresse seule. */
+export interface LocationCityView {
+  id: string;
+  name: string;
+  country: { id: string; name: string; isoCode: string };
+}
+
 export interface SavedLocationView {
   id: string;
   label: string;
@@ -42,6 +49,8 @@ export interface SavedLocationView {
   longitude: number | null;
   cityId: string | null;
   cityName: string | null;
+  /** Ville et pays complets (cityName est conservé pour les anciennes versions de l'app). */
+  city: LocationCityView | null;
   usageCount: number;
   lastUsedAt: Date;
 }
@@ -58,6 +67,10 @@ interface CityCandidate extends ResolvedCity {
  * de relire la table à chaque recherche sans faire attendre la détection.
  */
 const CITIES_CACHE_TTL_MS = 60_000;
+/** À joindre à toute adresse renvoyée : sa ville et le pays de cette ville. */
+const LOCATION_CITY_INCLUDE = {
+  city: { select: { id: true, name: true, country: { select: { id: true, name: true, isoCode: true } } } },
+} as const;
 /** Au-delà, la ville la plus proche n'est plus fiable : on préfère demander à l'utilisateur. */
 const NEAREST_CITY_MAX_KM = 60;
 /** Deux adresses de même libellé dans la même ville sont fusionnées si elles sont à moins de cette distance. */
@@ -97,7 +110,7 @@ export class LocationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findOne(id: string) {
-    const location = await this.prisma.location.findUnique({ where: { id } });
+    const location = await this.prisma.location.findUnique({ where: { id }, include: LOCATION_CITY_INCLUDE });
     if (!location) throw new NotFoundException('Localisation introuvable.');
     return location;
   }
@@ -129,6 +142,7 @@ export class LocationsService {
         geocodeTrust: dto.geocodeTrust,
         cityId,
       },
+      include: LOCATION_CITY_INCLUDE,
     });
 
     if (dto.latitude !== undefined && dto.longitude !== undefined) {
@@ -154,6 +168,7 @@ export class LocationsService {
         geocodeTrust: dto.geocodeTrust,
         cityId: dto.cityId,
       },
+      include: LOCATION_CITY_INCLUDE,
     });
 
     if (dto.latitude !== undefined && dto.longitude !== undefined) {
@@ -346,7 +361,7 @@ export class LocationsService {
       },
       orderBy,
       take: limit,
-      include: { location: { include: { city: { select: { id: true, name: true } } } } },
+      include: { location: { include: LOCATION_CITY_INCLUDE } },
     });
 
     return rows.map((row) => ({
@@ -357,6 +372,7 @@ export class LocationsService {
       longitude: row.location.longitude,
       cityId: row.location.cityId,
       cityName: row.location.city?.name ?? null,
+      city: row.location.city ?? null,
       usageCount: row.usageCount,
       lastUsedAt: row.lastUsedAt,
     }));
@@ -398,6 +414,7 @@ export class LocationsService {
         savedBy: { some: { userId } },
       },
       take: 10,
+      include: LOCATION_CITY_INCLUDE,
     });
 
     const point = latitude !== undefined && longitude !== undefined ? { latitude, longitude } : null;

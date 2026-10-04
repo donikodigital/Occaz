@@ -2,11 +2,12 @@
 // [21/09/2026] v2 — habillage bleu Ocean, comme l'espace client : en-tête,
 // photo de profil et champs dans une section à en-tête souligné.
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconUserCircle } from '@tabler/icons-react-native';
+import { IconDeviceMobile, IconUserCircle } from '@tabler/icons-react-native';
 import { AppText, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { OceanButton, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { LockedField } from '@/components/screens/LockedField';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useDriverProfile, useUpdateDriverProfile } from '@/hooks/useDriverProfile';
@@ -90,6 +91,18 @@ export default function DriverEditProfileScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
         />
+        {/* Le numéro de connexion ne se change que par le parcours avec code SMS ; le Mobile Money, lui, est un réglage à part. */}
+        <LockedField label="Téléphone (connexion)" value={authUser?.phone} />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(driver)/change-phone')}
+          style={({ pressed }) => [styles.changePhone, pressed && styles.pressed]}
+        >
+          <IconDeviceMobile size={15} color={OCEAN.base} />
+          <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+            Changer mon numéro
+          </AppText>
+        </Pressable>
         <TextField
           label="Numéro Mobile Money"
           value={mobileMoneyNumber}
@@ -111,6 +124,15 @@ export default function DriverEditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  pressed: {
+    opacity: 0.7,
+  },
+  changePhone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
   error: {
     marginBottom: spacing.sm,
   },

@@ -1,4 +1,7 @@
 // mobile/app/(customer)/shipment-new.tsx
+// [04/10/2026] v5 — Expéditeur verrouillé : nom, téléphone et adresse viennent du profil et ne se modifient que dans le profil
+// (le serveur impose lui aussi le nom et le téléphone). L'adresse de récupération reste modifiable, pré-remplie avec l'adresse
+// du profil ; « Utiliser l'adresse de mon profil » la rétablit. Les adresses affichent leur ville et leur pays.
 // [23/09/2026] v4 — champ « Code promo », entre les informations du colis et le devis en direct.
 // [21/09/2026] v3 — Habillage bleu océan ; logique inchangée : plage de dates obligatoire, dimensions, prix calculé par le serveur.
 //
@@ -7,14 +10,15 @@
 // stepper pour la quantité et un interrupteur pour « Envoi urgent ». Le
 // devis en direct (ShipmentQuoteCard) reste au-dessus du bouton.
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   IconAlertCircle,
   IconCalendarEvent,
   IconCheck,
   IconChevronRight,
+  IconLock,
   IconMapPin,
   IconPackage,
   IconUser,
@@ -35,12 +39,15 @@ import { OCEAN } from '@/theme/ocean';
 import { ShipmentQuoteCard } from '@/components/screens/ShipmentQuoteCard';
 import { ShipmentWindowField, toShipmentWindow } from '@/components/screens/ShipmentWindowField';
 import { PromoCodeField } from '@/components/screens/PromoCodeField';
+import { LockedField } from '@/components/screens/LockedField';
 import { useShipmentCategories } from '@/hooks/useShipmentCategories';
 import { useCreateShipment, useShipmentQuote } from '@/hooks/useShipments';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useAuthStore } from '@/stores/authStore';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { normalizePhoneInput } from '@/utils/phone';
+import { formatCityCountry } from '@/utils/shipmentDisplay';
+import { locationsApi } from '@/services/api/locations.api';
 import { ApiError } from '@/services/api/ApiError';
 import type { QuoteShipmentPayload } from '@/types/shipments.types';
 import type { TripLocation } from '@/types/trips.types';
@@ -58,10 +65,13 @@ function AddressCard({
   label,
   location,
   onPress,
+  tag,
 }: {
   label: string;
   location: TripLocation | null;
   onPress: () => void;
+  /** Petite mention à côté du libellé (ex. « Adresse du profil »). */
+  tag?: string;
 }) {
   return (
     <OceanCard onPress={onPress} style={styles.addressCard} accessibilityLabel={label}>
@@ -70,11 +80,16 @@ function AddressCard({
       </View>
       <View style={styles.addressText}>
         <AppText variant="xs" color="textSecondary">
-          {label}
+          {tag ? `${label} · ${tag}` : label}
         </AppText>
         <AppText variant="sm" weight="semibold" numberOfLines={1} color={location ? 'textPrimary' : OCEAN.base}>
           {location ? location.label : 'Appuyez pour choisir'}
         </AppText>
+        {location && formatCityCountry(location) ? (
+          <AppText variant="xs" color="textSecondary" numberOfLines={1}>
+            {formatCityCountry(location)}
+          </AppText>
+        ) : null}
       </View>
       <IconChevronRight size={16} color={colors.textMuted} />
     </OceanCard>
@@ -85,24 +100,46 @@ export default function NewShipmentScreen() {
   const { data: profile } = useCustomerProfile();
   const accountUser = useAuthStore((state) => state.user);
 
-  const [senderName, setSenderName] = useState('');
-  const [senderPhone, setSenderPhone] = useState('+224');
+  // L'expéditeur, c'est le titulaire du compte : nom, téléphone et adresse viennent de son profil, en lecture seule.
+  const senderName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : '';
+  const senderPhone = accountUser?.phone ? normalizePhoneInput(accountUser.phone) : '';
+  const profileAddress = profile?.address?.trim() ?? '';
+  const profilePlace = [profile?.city?.name, profile?.country?.name].filter(Boolean).join(', ');
+  const hasProfileAddress = profileAddress.length >= 3 && Boolean(profile?.cityId);
+
   const [senderLocation, setSenderLocation] = useState<TripLocation | null>(null);
+  // Adresse du profil transformée en adresse de récupération, et vrai dès que le client en choisit une autre.
+  const [profilePickup, setProfilePickup] = useState<TripLocation | null>(null);
+  const [isCustomPickup, setIsCustomPickup] = useState(false);
+  const profilePickupKey = useRef<string | null>(null);
 
-  // Pré-remplies dès que le profil/compte est chargé, mais seulement si le
-  // client n'a pas déjà modifié le champ lui-même (utile s'il envoie le
-  // colis pour quelqu'un d'autre) — un champ non vide n'est jamais écrasé.
+  // Crée (ou retrouve, l'adresse étant dédoublonnée par le serveur) l'adresse de récupération correspondant à l'adresse du
+  // profil. Les dépendances sont des valeurs simples : un rechargement du profil sans changement d'adresse ne relance rien.
+  const profileCityId = profile?.cityId ?? null;
   useEffect(() => {
-    if (senderName === '' && profile) {
-      setSenderName(`${profile.firstName} ${profile.lastName}`.trim());
-    }
-  }, [profile, senderName]);
+    if (!hasProfileAddress || !profileCityId) return;
+    const key = `${profileAddress}|${profileCityId}`;
+    if (profilePickupKey.current === key) return;
+    profilePickupKey.current = key;
+    let cancelled = false;
+    locationsApi
+      .create({ label: profileAddress, cityId: profileCityId, geocodeTrust: 'MANUAL' })
+      .then((location) => {
+        if (!cancelled) setProfilePickup(location);
+      })
+      .catch(() => {
+        // Échec réseau : on réessaiera au prochain changement ; le client peut toujours choisir son adresse à la main.
+        if (profilePickupKey.current === key) profilePickupKey.current = null;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasProfileAddress, profileAddress, profileCityId]);
 
+  // Tant que le client n'a pas choisi une autre adresse, la récupération se fait à l'adresse du profil.
   useEffect(() => {
-    if (senderPhone === '+224' && accountUser?.phone) {
-      setSenderPhone(normalizePhoneInput(accountUser.phone));
-    }
-  }, [accountUser, senderPhone]);
+    if (profilePickup && !isCustomPickup) setSenderLocation(profilePickup);
+  }, [profilePickup, isCustomPickup]);
 
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('+224');
@@ -131,10 +168,14 @@ export default function NewShipmentScreen() {
 
   useEffect(() => {
     if (!locationSelection) return;
-    if (locationSelection.field === 'sender') setSenderLocation(locationSelection.location);
-    else setRecipientLocation(locationSelection.location);
+    if (locationSelection.field === 'sender') {
+      setSenderLocation(locationSelection.location);
+      setIsCustomPickup(locationSelection.location.id !== profilePickup?.id);
+    } else {
+      setRecipientLocation(locationSelection.location);
+    }
     consumeLocationSelection();
-  }, [locationSelection, consumeLocationSelection]);
+  }, [locationSelection, consumeLocationSelection, profilePickup]);
 
   // Devis en direct : `null` tant que adresses, catégorie et poids ne sont pas tous renseignés.
   const quotePayload = useMemo<QuoteShipmentPayload | null>(() => {
@@ -172,8 +213,12 @@ export default function NewShipmentScreen() {
   function handleSubmit() {
     setErrorMessage(undefined);
 
-    if (senderName.trim().length < 2 || recipientName.trim().length < 2) {
-      setErrorMessage("Renseignez le nom de l'expéditeur et du destinataire.");
+    if (senderName.length < 2) {
+      setErrorMessage("Complétez votre profil (nom) avant d'envoyer un colis.");
+      return;
+    }
+    if (recipientName.trim().length < 2) {
+      setErrorMessage('Renseignez le nom du destinataire.');
       return;
     }
     if (!senderLocation || !recipientLocation) {
@@ -197,8 +242,6 @@ export default function NewShipmentScreen() {
     createShipment.mutate(
       {
         categoryId,
-        senderName: senderName.trim(),
-        senderPhone,
         senderLocationId: senderLocation.id,
         recipientName: recipientName.trim(),
         recipientPhone,
@@ -228,15 +271,56 @@ export default function NewShipmentScreen() {
       <OceanScreenHeader title="Envoyer un colis" subtitle="Remplissez les 4 étapes ci-dessous" onBack={() => router.back()} />
 
       <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Expéditeur">
-        <TextField label="Nom complet" value={senderName} onChangeText={setSenderName} placeholder="Nom de l'expéditeur" />
-        <TextField
-          label="Téléphone"
-          value={senderPhone}
-          onChangeText={(t) => setSenderPhone(normalizePhoneInput(t))}
-          keyboardType="phone-pad"
-          placeholder="+224620000000"
+        <LockedField label="Nom complet" value={senderName} placeholder="Nom non renseigné" />
+        <LockedField label="Téléphone" value={senderPhone} placeholder="Téléphone non renseigné" />
+        <LockedField
+          label="Adresse du profil"
+          value={profileAddress}
+          secondary={profilePlace || null}
+          placeholder="Adresse non renseignée"
         />
-        <AddressCard label="Adresse de récupération" location={senderLocation} onPress={() => openAddressPicker('sender')} />
+        <View style={styles.lockedNote}>
+          <IconLock size={14} color={OCEAN.base} />
+          <AppText variant="xs" color="textSecondary" style={styles.lockedNoteText}>
+            Ces informations sont celles de votre profil : elles ne se modifient que dans{' '}
+            <AppText
+              variant="xs"
+              weight="semibold"
+              color={OCEAN.base}
+              onPress={() => router.push('/(customer)/edit-profile')}
+              accessibilityRole="link"
+            >
+              mon profil
+            </AppText>
+            .
+          </AppText>
+        </View>
+        {!hasProfileAddress ? (
+          <AppText variant="xs" color="danger">
+            Ajoutez votre adresse et votre ville dans votre profil pour qu'elles soient proposées comme adresse de récupération.
+          </AppText>
+        ) : null}
+        <AddressCard
+          label="Adresse de récupération"
+          tag={senderLocation && senderLocation.id === profilePickup?.id ? 'adresse du profil' : undefined}
+          location={senderLocation}
+          onPress={() => openAddressPicker('sender')}
+        />
+        {isCustomPickup && profilePickup ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setIsCustomPickup(false);
+              setSenderLocation(profilePickup);
+            }}
+            style={({ pressed }) => [styles.resetPickup, pressed && styles.pressed]}
+          >
+            <IconCheck size={14} color={OCEAN.base} />
+            <AppText variant="xs" weight="semibold" color={OCEAN.base}>
+              Utiliser l'adresse de mon profil
+            </AppText>
+          </Pressable>
+        ) : null}
       </OceanSection>
 
       <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title="Destinataire">
@@ -358,6 +442,23 @@ export default function NewShipmentScreen() {
 }
 
 const styles = StyleSheet.create({
+  pressed: {
+    opacity: 0.7,
+  },
+  lockedNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  lockedNoteText: {
+    flex: 1,
+  },
+  resetPickup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
   addressCard: {
     flexDirection: 'row',
     alignItems: 'center',

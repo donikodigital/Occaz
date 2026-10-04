@@ -8,17 +8,19 @@
 // futures uniquement — trip-new.tsx — pas adapté à une date de naissance).
 
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconChevronRight, IconMapPin, IconUserCircle } from '@tabler/icons-react-native';
+import { IconChevronRight, IconDeviceMobile, IconMapPin, IconUserCircle } from '@tabler/icons-react-native';
 import { AppText, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { CountrySelectField } from '@/components/screens/CountrySelectField';
+import { LockedField } from '@/components/screens/LockedField';
 import { OceanButton, OceanCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCustomerProfile, useUpdateCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useCustomerPhotoUpload } from '@/hooks/useCustomerPhotoUpload';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
+import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { City, Country } from '@/types/geography.types';
 
@@ -66,6 +68,7 @@ function isoToDateOfBirthDisplay(iso: string | null | undefined): string {
 
 export default function EditProfileScreen() {
   const { data: profile } = useCustomerProfile();
+  const accountPhone = useAuthStore((state) => state.user?.phone ?? '');
   const [firstName, setFirstName] = useState(profile?.firstName ?? '');
   const [lastName, setLastName] = useState(profile?.lastName ?? '');
   const [address, setAddress] = useState(profile?.address ?? '');
@@ -146,6 +149,19 @@ export default function EditProfileScreen() {
           keyboardType="number-pad"
           maxLength={10}
         />
+
+        {/* Le numéro est l'identifiant de connexion : il ne se change que par le parcours avec code SMS. */}
+        <LockedField label="Téléphone" value={accountPhone} />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(customer)/change-phone')}
+          style={({ pressed }) => [styles.changePhone, pressed && styles.pressed]}
+        >
+          <IconDeviceMobile size={15} color={OCEAN.base} />
+          <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+            Changer mon numéro
+          </AppText>
+        </Pressable>
       </OceanSection>
 
       <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Localisation">
@@ -195,6 +211,15 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  pressed: {
+    opacity: 0.7,
+  },
+  changePhone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
   cityLabel: {
     marginBottom: spacing.xxs,
   },

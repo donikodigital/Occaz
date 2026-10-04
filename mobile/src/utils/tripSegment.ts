@@ -20,6 +20,19 @@ export function stopName(stop: TripStop): string {
   return stop.city?.name ?? stop.location?.label ?? 'Étape';
 }
 
+/** « Ville, Pays » d'une étape (ou seulement la ville si le pays n'est pas connu) ; null sans ville. */
+export function stopPlace(stop: TripStop): string | null {
+  const place = [stop.city?.name, stop.city?.country?.name].filter(Boolean).join(', ');
+  return place || null;
+}
+
+/** Adresse complète d'une étape, lisible sans deviner la ville : « Station service Total — Kindia, Guinée ». */
+export function stopAddress(stop: TripStop): string {
+  const label = stop.location?.label;
+  const place = stopPlace(stop);
+  return [label, place].filter(Boolean).join(' — ') || stopName(stop);
+}
+
 export function bookingRoute(booking: BookingWithTrip): { from: string; to: string } | null {
   const trip = booking.trip;
   if (!trip) return null;

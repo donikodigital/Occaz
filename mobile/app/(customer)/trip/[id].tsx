@@ -30,7 +30,7 @@ import { useTrip } from '@/hooks/useTripSearch';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { formatSeatsAvailability } from '@/utils/seats';
-import { segmentAvailableSeats, stopName } from '@/utils/tripSegment';
+import { segmentAvailableSeats, stopAddress } from '@/utils/tripSegment';
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -154,7 +154,7 @@ export default function TripDetailScreen() {
                         {stop.estimatedArrivalAt ? ` · vers ${formatTime(stop.estimatedArrivalAt)}` : ''}
                       </AppText>
                       <AppText variant="sm" weight={isMine ? 'bold' : 'regular'} color={OCEAN.onDark} numberOfLines={2}>
-                        {stopName(stop)}
+                        {stopAddress(stop)}
                       </AppText>
                     </View>
                   );

@@ -17,6 +17,7 @@ import { AppText } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useLocationPicker, useSearchCountryCodes } from '@/hooks/useLocationPicker';
 import type { TripLocation } from '@/types/trips.types';
+import { formatCityCountry } from '@/utils/shipmentDisplay';
 import { LocationConfirmCard } from './LocationConfirmCard';
 import { LocationSearchField } from './LocationSearchField';
 
@@ -57,9 +58,16 @@ export function LocationAutocompleteField({
           <View style={styles.valueIcon}>
             <IconMapPin size={16} color={colors.primary} />
           </View>
-          <AppText variant="sm" weight="semibold" numberOfLines={1} style={styles.valueText}>
-            {value.label}
-          </AppText>
+          <View style={styles.valueText}>
+            <AppText variant="sm" weight="semibold" numberOfLines={1}>
+              {value.label}
+            </AppText>
+            {formatCityCountry(value) ? (
+              <AppText variant="xs" color="textSecondary" numberOfLines={1}>
+                {formatCityCountry(value)}
+              </AppText>
+            ) : null}
+          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Modifier cette adresse"

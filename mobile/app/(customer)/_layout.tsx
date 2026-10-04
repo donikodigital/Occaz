@@ -18,6 +18,7 @@ export default function CustomerLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="complete-profile" />
       <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="change-phone" />
       <Stack.Screen name="select-city" options={{ presentation: 'modal' }} />
       <Stack.Screen name="select-location" options={{ presentation: 'modal' }} />
       <Stack.Screen name="trip-search" />

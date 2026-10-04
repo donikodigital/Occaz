@@ -337,6 +337,8 @@ model User {
   devices   Device[]
   sessions  Session[]
 
+  phoneChangeRequests PhoneChangeRequest[]
+
   verificationsAsSubject  Verification[] @relation("VerificationSubject")
   verificationsAsReviewer Verification[] @relation("VerificationReviewer")
   documentsVerified       Document[]     @relation("DocumentVerifier")
@@ -1292,6 +1294,28 @@ model OtpCode {
   @@index([bookingId])
   @@index([shipmentId])
   @@map("otp_codes")
+}
+
+/// Demande de changement de numéro de téléphone : le code est envoyé par SMS au NOUVEAU numéro, qui n'est adopté qu'une fois
+/// le code saisi. Table dédiée (et non OtpCode) car le code doit rester lié au numéro auquel il a été envoyé.
+model PhoneChangeRequest {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  oldPhone    String
+  newPhone    String
+  codeHash    String // hash, jamais la valeur en clair
+  status      OtpStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  expiresAt   DateTime
+  verifiedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([newPhone, createdAt])
+  @@map("phone_change_requests")
 }
 
 model Verification {

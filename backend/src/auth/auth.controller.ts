@@ -6,6 +6,9 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { AuthService } from './auth.service';
+import { PhoneChangeService } from './phone-change.service';
+import { RequestPhoneChangeDto } from './dto/request-phone-change.dto';
+import { ConfirmPhoneChangeDto } from './dto/confirm-phone-change.dto';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -17,7 +20,10 @@ import { EnableTwoFactorDto } from './dto/enable-two-factor.dto';
 @ApiTags('Authentification')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly phoneChangeService: PhoneChangeService,
+  ) {}
 
   // Chaque demande de code coûte un SMS : 5 par minute et par adresse IP (en plus de la limite par numéro dans le service).
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -87,6 +93,24 @@ export class AuthController {
   @Post('logout-all')
   logoutAll(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.logoutAll(user.id);
+  }
+
+  /** Changement de numéro, étape 1 : envoie un code par SMS au NOUVEAU numéro (compte connecté). */
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('phone-change/request')
+  requestPhoneChange(@Body() dto: RequestPhoneChangeDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.phoneChangeService.request(user.id, dto.newPhone);
+  }
+
+  /** Changement de numéro, étape 2 : le bon code remplace le numéro du compte ; renvoie le compte à jour. */
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('phone-change/confirm')
+  confirmPhoneChange(@Body() dto: ConfirmPhoneChangeDto, @CurrentUser() user: AuthenticatedUser, @Ip() ip: string) {
+    return this.phoneChangeService.confirm(user.id, dto.newPhone, dto.code, { ipAddress: ip });
   }
 
   @ApiBearerAuth()

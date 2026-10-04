@@ -107,11 +107,12 @@ export class TripsService {
       include: {
         driver: true,
         vehicle: true,
-        originCity: true,
+        // Villes avec leur pays : l'app affiche « Kindia, Guinée » sous chaque adresse.
+        originCity: { include: { country: true } },
         originLocation: true,
-        destinationCity: true,
+        destinationCity: { include: { country: true } },
         destinationLocation: true,
-        stops: { orderBy: { sequence: 'asc' }, include: { location: true, city: true } },
+        stops: { orderBy: { sequence: 'asc' }, include: { location: true, city: { include: { country: true } } } },
         currency: CURRENCY_SELECT,
         bookings: SEAT_HOLDS_INCLUDE,
       },

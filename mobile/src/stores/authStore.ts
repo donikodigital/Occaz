@@ -13,6 +13,8 @@ interface AuthState {
   isHydrating: boolean;
   hydrate: () => Promise<void>;
   setSession: (result: AuthResult) => Promise<void>;
+  /** Remplace le compte en mémoire (ex. après un changement de numéro) sans toucher aux jetons. */
+  updateUser: (user: SafeUser) => void;
   logout: () => Promise<void>;
   /** Nettoyage local sans appel réseau — utilisé quand le serveur a déjà invalidé la session. */
   clearSession: () => void;
@@ -41,6 +43,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   setSession: async (result) => {
     await secureStorage.setTokens(result.accessToken, result.refreshToken);
     set({ user: result.user, isAuthenticated: true, isHydrating: false });
+  },
+
+  updateUser: (user) => {
+    set({ user });
   },
 
   logout: async () => {

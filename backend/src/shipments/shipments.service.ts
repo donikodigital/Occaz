@@ -222,7 +222,25 @@ export class ShipmentsService {
     return { start, end };
   }
 
+  /**
+   * L'expéditeur est le titulaire du compte : son nom vient de son profil et son téléphone de son compte, jamais de la
+   * requête. Verrouillé dans l'application, c'est aussi imposé ici — sinon n'importe quel client modifié pourrait faire
+   * partir un colis sous un autre nom ou numéro. Seule l'adresse de récupération reste au choix du client.
+   */
+  private async senderIdentityOf(customerId: string): Promise<{ senderName: string; senderPhone: string }> {
+    const profile = await this.prisma.customerProfile.findUnique({
+      where: { id: customerId },
+      select: { firstName: true, lastName: true, user: { select: { phone: true } } },
+    });
+    const senderName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : '';
+    if (!profile || senderName.length < 2 || !profile.user.phone) {
+      throw new BadRequestException('Complétez votre profil (nom et téléphone) avant d\'envoyer un colis.');
+    }
+    return { senderName, senderPhone: profile.user.phone };
+  }
+
   async create(customerId: string, dto: CreateShipmentDto) {
+    const { senderName, senderPhone } = await this.senderIdentityOf(customerId);
     const { start: windowStart, end: windowEnd } = this.parseWindow(dto.windowStart, dto.windowEnd);
     const { declaredValue, senderLocation, quote, currencyId } = await this.buildQuote(dto);
 
@@ -296,8 +314,8 @@ export class ShipmentsService {
           driverId: trip?.driverId,
           customerId,
           categoryId: dto.categoryId,
-          senderName: dto.senderName,
-          senderPhone: dto.senderPhone,
+          senderName,
+          senderPhone,
           senderLocationId: dto.senderLocationId,
           recipientName: dto.recipientName,
           recipientPhone: dto.recipientPhone,

@@ -71,7 +71,7 @@ export interface TripStop {
   estimatedArrivalAt: string | null;
   /** Ville traversée — le client la cherche comme une ville de départ ou d'arrivée. */
   cityId?: string | null;
-  city?: { id: string; name: string } | null;
+  city?: { id: string; name: string; country?: { id?: string; name: string } | null } | null;
   /** Prix d'une place depuis le DÉPART jusqu'à cette étape (vue conducteur : sa propre saisie, jamais montré tel quel au client). */
   fareFromOrigin?: Money | null;
   distanceFromOriginKm?: number | null;

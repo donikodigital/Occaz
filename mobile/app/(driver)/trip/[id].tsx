@@ -85,7 +85,7 @@ import { formatMoney } from '@/utils/money';
 import { formatSeatsAvailability } from '@/utils/seats';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { DRIVER_BOOKING_STATUS_LABELS, TRIP_STATUS_LABELS } from '@/utils/tripStatusLabels';
-import { bookingRoute, isPartialBooking, stopName } from '@/utils/tripSegment';
+import { bookingRoute, isPartialBooking, stopAddress, stopName } from '@/utils/tripSegment';
 import { insertionSequence } from '@/utils/routeOrder';
 import { ApiError } from '@/services/api/ApiError';
 import type { Booking } from '@/types/bookings.types';
@@ -662,6 +662,9 @@ function TripStopsSection({ trip, bookings }: { trip: Trip; bookings: Booking[] 
                 <View style={styles.stopCardText}>
                   <AppText variant="base" weight="semibold" numberOfLines={1}>
                     {stopName(stop)}
+                  </AppText>
+                  <AppText variant="xs" color="textSecondary" numberOfLines={2}>
+                    {stopAddress(stop)}
                   </AppText>
                   <AppText variant="xs" color="textSecondary">
                     {reached

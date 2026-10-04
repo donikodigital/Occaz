@@ -31,13 +31,24 @@ export class CreateShipmentDto extends QuoteShipmentDto {
   @IsDateString()
   windowEnd: string;
 
-  @ApiProperty({ example: 'Mamadou Diallo' })
+  @ApiPropertyOptional({
+    example: 'Mamadou Diallo',
+    deprecated: true,
+    description:
+      "Ignoré : l'expéditeur est le titulaire du compte, son nom vient de son profil (modifiable uniquement dans le profil). Conservé pour les anciennes versions de l'application.",
+  })
+  @IsOptional()
   @IsString()
-  senderName: string;
+  senderName?: string;
 
-  @ApiProperty({ example: '+224620000001' })
+  @ApiPropertyOptional({
+    example: '+224620000001',
+    deprecated: true,
+    description: "Ignoré : le téléphone de l'expéditeur est celui de son compte. Conservé pour les anciennes versions de l'application.",
+  })
+  @IsOptional()
   @IsString()
-  senderPhone: string;
+  senderPhone?: string;
 
   @ApiProperty({ example: 'Aïssatou Bah' })
   @IsString()

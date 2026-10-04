@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SessionsService } from './sessions.service';
 import { TwoFactorService } from './two-factor.service';
+import { PhoneChangeService } from './phone-change.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { DevicesModule } from '../devices/devices.module';
@@ -35,7 +36,7 @@ import { EmailModule } from '../integrations/email/email.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, SessionsService, TwoFactorService, JwtStrategy],
+  providers: [AuthService, SessionsService, TwoFactorService, PhoneChangeService, JwtStrategy],
   exports: [AuthService, SessionsService],
 })
 export class AuthModule {}

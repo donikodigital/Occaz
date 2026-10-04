@@ -88,6 +88,8 @@ export function useLocationPicker(onPicked: (location: TripLocation) => void) {
         latitude: saved.latitude,
         longitude: saved.longitude,
         cityId: saved.cityId,
+        // Ville et pays renvoyés avec l'adresse mémorisée : les écrans affichent « Kindia, Guinée » sous le libellé.
+        city: saved.city ?? null,
       });
     },
     [onPicked, refreshSaved],

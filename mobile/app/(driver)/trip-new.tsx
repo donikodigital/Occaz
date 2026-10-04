@@ -1,5 +1,7 @@
 // mobile/app/(driver)/trip-new.tsx
 //
+// [04/10/2026] v5.1 — Adresses claires : sous chaque adresse (départ, arrivée, villes traversées, aperçu), la ville et le pays
+// s'affichent (« Kindia, Guinée »). Deux adresses de même nom dans deux villes ne se confondent plus.
 // [03/10/2026] v5 — « Villes traversées » : le conducteur ajoute les villes où il passe (Kindia, Mamou…) pour que les
 // clients de ces villes trouvent et réservent son trajet. Les étapes sont rangées dans l'ordre de la route (distance
 // depuis le départ) ; leurs prix sont calculés automatiquement par le serveur et se modifient sur l'écran du trajet,
@@ -54,6 +56,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { formatDateLong, formatTime, upcomingDays } from '@/utils/date';
 import { formatMoney } from '@/utils/money';
 import { sortByDistanceFrom } from '@/utils/routeOrder';
+import { formatCityCountry } from '@/utils/shipmentDisplay';
 import { ApiError } from '@/services/api/ApiError';
 import type { TripLocation } from '@/types/trips.types';
 
@@ -93,7 +96,7 @@ function capitalize(value: string): string {
   return value.length > 0 ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 }
 
-function PreviewStop({ eyebrow, label }: { eyebrow: string; label?: string }) {
+function PreviewStop({ eyebrow, label, place }: { eyebrow: string; label?: string; place?: string | null }) {
   return (
     <View style={styles.previewStop}>
       <AppText variant="xs" color={HERO_MUTED}>
@@ -102,6 +105,28 @@ function PreviewStop({ eyebrow, label }: { eyebrow: string; label?: string }) {
       <AppText variant="lg" weight="bold" color={label ? colors.onPrimary : HERO_MUTED} numberOfLines={1}>
         {label ?? 'À choisir'}
       </AppText>
+      {place ? (
+        <AppText variant="xs" color={HERO_MUTED} numberOfLines={1}>
+          {place}
+        </AppText>
+      ) : null}
+    </View>
+  );
+}
+
+/** Adresse sur une ligne et, dessous, « Ville, Pays » : on sait toujours dans quelle ville se trouve le lieu. */
+function LocationRowText({ location, placeholder }: { location: TripLocation | null; placeholder: string }) {
+  const place = formatCityCountry(location);
+  return (
+    <View style={styles.locationText}>
+      <AppText variant="base" color={location ? 'textPrimary' : 'textSecondary'} numberOfLines={1}>
+        {location?.label ?? placeholder}
+      </AppText>
+      {place ? (
+        <AppText variant="xs" color="textSecondary" numberOfLines={1}>
+          {place}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -153,8 +178,8 @@ function LivePreviewHero({
           <View style={styles.previewRailDotDestination} />
         </View>
         <View style={styles.previewStops}>
-          <PreviewStop eyebrow="Départ" label={origin?.label} />
-          <PreviewStop eyebrow="Arrivée" label={destination?.label} />
+          <PreviewStop eyebrow="Départ" label={origin?.label} place={formatCityCountry(origin)} />
+          <PreviewStop eyebrow="Arrivée" label={destination?.label} place={formatCityCountry(destination)} />
         </View>
       </View>
 
@@ -432,14 +457,7 @@ export default function NewTripScreen() {
                 <Card style={styles.locationsCard}>
                   <Pressable onPress={() => openLocation('trip-origin', 'Point de départ')} style={styles.locationRow}>
                     <View style={styles.originDot} />
-                    <AppText
-                      variant="base"
-                      color={origin ? 'textPrimary' : 'textSecondary'}
-                      numberOfLines={1}
-                      style={styles.locationText}
-                    >
-                      {origin?.label ?? 'Point de départ'}
-                    </AppText>
+                    <LocationRowText location={origin} placeholder="Point de départ" />
                   </Pressable>
                   <Divider />
                   <Pressable
@@ -447,14 +465,7 @@ export default function NewTripScreen() {
                     style={styles.locationRow}
                   >
                     <IconMapPin size={14} color={colors.accentDark} />
-                    <AppText
-                      variant="base"
-                      color={destination ? 'textPrimary' : 'textSecondary'}
-                      numberOfLines={1}
-                      style={styles.locationText}
-                    >
-                      {destination?.label ?? 'Destination'}
-                    </AppText>
+                    <LocationRowText location={destination} placeholder="Destination" />
                   </Pressable>
                 </Card>
                 <IconButton
@@ -479,9 +490,16 @@ export default function NewTripScreen() {
                     {index + 1}
                   </AppText>
                 </View>
-                <AppText variant="sm" weight="semibold" numberOfLines={1} style={styles.stopLabel}>
-                  {stop.label}
-                </AppText>
+                <View style={styles.stopLabel}>
+                  <AppText variant="sm" weight="semibold" numberOfLines={1}>
+                    {stop.label}
+                  </AppText>
+                  {formatCityCountry(stop) ? (
+                    <AppText variant="xs" color="textSecondary" numberOfLines={1}>
+                      {formatCityCountry(stop)}
+                    </AppText>
+                  ) : null}
+                </View>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Retirer ${stop.label}`}
