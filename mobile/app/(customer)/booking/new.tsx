@@ -329,6 +329,7 @@ export default function NewBookingScreen() {
           <PromoCodeField
             serviceType="TRIP"
             amount={String(totalAmount)}
+            currencyCode={currencyCode}
             appliedCode={promoCode}
             onChange={(code, discount) => {
               setPromoCode(code);

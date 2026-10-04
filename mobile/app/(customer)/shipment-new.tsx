@@ -658,6 +658,7 @@ export default function NewShipmentScreen() {
           <PromoCodeField
             serviceType="SHIPMENT"
             amount={quote?.totalAmount ?? null}
+            currencyCode={quote?.currencyCode ?? undefined}
             appliedCode={promoCode}
             onChange={(code, discount) => {
               setPromoCode(code);

@@ -36,7 +36,7 @@ import {
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useTripSearch } from '@/hooks/useTripSearch';
-import { formatMoney } from '@/utils/money';
+import { currencyOf, formatMoney } from '@/utils/money';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { formatSeatsAvailability } from '@/utils/seats';
 import { segmentAvailableSeats } from '@/utils/tripSegment';
@@ -86,7 +86,7 @@ function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => voi
         </View>
         <View style={styles.priceBlock}>
           <AppText variant="lg" weight="bold" color={OCEAN.deep}>
-            {formatMoney(trip.customerPricePerSeat ?? trip.pricePerSeat)}
+            {formatMoney(trip.customerPricePerSeat ?? trip.pricePerSeat, currencyOf(trip))}
           </AppText>
           <AppText variant="xs" color="textSecondary">
             par place

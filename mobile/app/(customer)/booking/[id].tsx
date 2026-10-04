@@ -39,7 +39,7 @@ import {
 } from '@/hooks/useBookings';
 import { useBookingRatings } from '@/hooks/useRatings';
 import { useGetOrCreateConversationForBooking } from '@/hooks/useConversations';
-import { formatMoney } from '@/utils/money';
+import { currencyOf, formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { bookingBoardingAt, bookingRouteLabel, isPartialBooking } from '@/utils/tripSegment';
 import { customerCodeVisibility } from '@/utils/bookingPhase';
@@ -150,19 +150,23 @@ export default function BookingDetailScreen() {
         onBack={() => router.back()}
         // Affiché juste après la réservation ou le paiement : une croix qui revient à l'accueil, pas la flèche vers les étapes d'avant.
         onClose={created ? () => closeToHome('/(customer)/(tabs)/home') : undefined}
+        // Trajet terminé : plus de messagerie avec le conducteur (comme l'appel et le SMS, retirés par le serveur, qui refuse aussi les
+        // nouveaux messages). En cas de problème : « Signaler un problème ».
         right={
-          <Pressable
-            onPress={() =>
-              getOrCreateConversation.mutate(booking.id, {
-                onSuccess: (conversation) => router.push(`/(customer)/conversation/${conversation.id}`),
-              })
-            }
-            accessibilityRole="button"
-            accessibilityLabel="Contacter le chauffeur"
-            style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
-          >
-            <IconMessageCircle size={18} color={OCEAN.base} />
-          </Pressable>
+          booking.status === 'COMPLETED' ? undefined : (
+            <Pressable
+              onPress={() =>
+                getOrCreateConversation.mutate(booking.id, {
+                  onSuccess: (conversation) => router.push(`/(customer)/conversation/${conversation.id}`),
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Contacter le chauffeur"
+              style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
+            >
+              <IconMessageCircle size={18} color={OCEAN.base} />
+            </Pressable>
+          )
         }
       />
 
@@ -234,7 +238,7 @@ export default function BookingDetailScreen() {
               {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
             </AppText>
             <AppText variant="lg" weight="bold" color={OCEAN.deep}>
-              {formatMoney(booking.totalAmount)}
+              {formatMoney(booking.totalAmount, currencyOf(booking))}
             </AppText>
           </View>
         </View>

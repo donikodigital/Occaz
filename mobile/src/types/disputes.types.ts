@@ -45,6 +45,9 @@ export interface Dispute {
   subjectType: DisputeSubjectType;
   bookingId: string | null;
   shipmentId: string | null;
+  /** Réservation / envoi du litige, avec leur devise (le remboursement s'affiche dans cette devise). */
+  booking?: { currency?: { isoCode: string } | null } | null;
+  shipment?: { currency?: { isoCode: string } | null } | null;
   openedById: string;
   reason: string;
   description: string | null;

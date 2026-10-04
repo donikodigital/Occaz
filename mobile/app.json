@@ -2,18 +2,18 @@
   "expo": {
     "name": "Occa'Z",
     "slug": "transport-partage",
-    "scheme": "transportpartage",
+    "scheme": "occaz",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/images/icon.png",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.transportpartage.app",
+      "bundleIdentifier": "sarl.occaz.app",
       "buildNumber": "1"
     },
     "android": {
-      "package": "com.transportpartage.app",
+      "package": "sarl.occaz.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",

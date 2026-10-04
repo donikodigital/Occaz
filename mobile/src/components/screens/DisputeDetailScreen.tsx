@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowLeft, IconCircleCheck, IconSend } from '@tabler/icons-react-native';
+import { IconArrowLeft, IconCircleCheck, IconSend, IconX } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
 import { OceanPill, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
@@ -17,10 +17,12 @@ import { useAddDisputeMessage, useDispute } from '@/hooks/useDisputes';
 import { useAuthStore } from '@/stores/authStore';
 import { DISPUTE_PRIORITY_LABELS, DISPUTE_STATUS_LABELS, DISPUTE_STATUS_TONE } from '@/utils/disputeLabels';
 import { formatTime } from '@/utils/date';
-import { formatMoney } from '@/utils/money';
+import { currencyOf, formatMoney } from '@/utils/money';
 import type { DisputeMessage } from '@/types/disputes.types';
 
 export interface DisputeDetailScreenProps {
+  /** Page affichée juste après la création du signalement : remplace la flèche « Retour » par une croix qui ferme tout le parcours. */
+  onClose?: () => void;
   disputeId: string;
 }
 
@@ -76,7 +78,7 @@ function DisputeMessageBubble({
  * (`scaleY: -1`) sur les éléments : ce serait un double retournement et
  * le texte s'afficherait la tête en bas.
  */
-export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
+export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenProps) {
   const [draft, setDraft] = useState('');
   const currentUserId = useAuthStore((state) => state.user?.id);
   const { data: dispute, isLoading, isError } = useDispute(disputeId);
@@ -136,12 +138,14 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
     >
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          // Page affichée juste après la création du signalement : une croix qui revient à l'accueil, pas la flèche vers le
+          // formulaire et les écrans d'avant.
+          onPress={onClose ?? (() => router.back())}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={onClose ? 'Fermer et revenir à l’accueil' : 'Retour'}
           style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
         >
-          <IconArrowLeft size={18} color={OCEAN.base} />
+          {onClose ? <IconX size={18} color={OCEAN.base} /> : <IconArrowLeft size={18} color={OCEAN.base} />}
         </Pressable>
         <AppText variant="lg" weight="bold" color={OCEAN.deep} numberOfLines={2} style={styles.title}>
           {dispute.reason}
@@ -169,7 +173,8 @@ export function DisputeDetailScreen({ disputeId }: DisputeDetailScreenProps) {
           </View>
           {dispute.resolution.refundAmount ? (
             <AppText variant="xs" color="textSecondary">
-              Remboursement : {formatMoney(dispute.resolution.refundAmount)}
+              Remboursement :{' '}
+              {formatMoney(dispute.resolution.refundAmount, currencyOf(dispute.booking) ?? currencyOf(dispute.shipment))}
             </AppText>
           ) : null}
           {dispute.resolution.notes ? (

@@ -14,6 +14,7 @@ import { OCEAN } from '@/theme/ocean';
 import { useCreateDispute } from '@/hooks/useDisputes';
 import { ApiError } from '@/services/api/ApiError';
 import type { DisputeSubjectType } from '@/types/disputes.types';
+import { FLOW_DONE_PARAM } from '@/utils/navigation';
 
 export interface CreateDisputeScreenProps {
   basePath: '/(customer)' | '/(driver)';
@@ -61,7 +62,8 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
         description: description.trim() || undefined,
       },
       {
-        onSuccess: (dispute) => router.replace(`${basePath}/dispute/${dispute.id}`),
+        onSuccess: (dispute) =>
+          router.replace({ pathname: `${basePath}/dispute/[id]`, params: { id: dispute.id, ...FLOW_DONE_PARAM } }),
         onError: (error) => {
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },

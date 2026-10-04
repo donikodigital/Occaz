@@ -22,6 +22,8 @@ export interface PromoCodeFieldProps {
   serviceType: ServiceType;
   /** Montant courant (avant réduction), en plus petite unité — null tant que le formulaire n'est pas assez rempli pour le connaître. */
   amount: string | null;
+  /** Devise du montant (celle du trajet ou de l'envoi) — sans elle, la réduction s'afficherait en GNF. */
+  currencyCode?: string;
   /** Code effectivement appliqué (vérifié avec succès) — undefined tant qu'aucun code n'est validé. */
   appliedCode: string | undefined;
   /**
@@ -32,7 +34,7 @@ export interface PromoCodeFieldProps {
   onChange: (code: string | undefined, discountAmount?: string) => void;
 }
 
-export function PromoCodeField({ serviceType, amount, appliedCode, onChange }: PromoCodeFieldProps) {
+export function PromoCodeField({ serviceType, amount, currencyCode, appliedCode, onChange }: PromoCodeFieldProps) {
   const [input, setInput] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const validatePromoCode = useValidatePromoCode();
@@ -71,7 +73,7 @@ export function PromoCodeField({ serviceType, amount, appliedCode, onChange }: P
           </AppText>
           {validatePromoCode.data ? (
             <AppText variant="xs" color="textSecondary">
-              − {formatMoney(validatePromoCode.data.discountAmount)}
+              − {formatMoney(validatePromoCode.data.discountAmount, currencyCode)}
             </AppText>
           ) : null}
         </View>

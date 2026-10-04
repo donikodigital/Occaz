@@ -29,7 +29,7 @@ import { OCEAN } from '@/theme/ocean';
 import { useActivePaymentProviders, useInitiatePayment } from '@/hooks/usePayments';
 import { useBooking } from '@/hooks/useBookings';
 import { useShipment } from '@/hooks/useShipments';
-import { formatMoney } from '@/utils/money';
+import { currencyOf, formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
 import type { PaymentProvider } from '@/types/payments.types';
 
@@ -54,7 +54,7 @@ export default function PaymentScreen() {
   const totalAmount = bookingId ? bookingQuery.data?.totalAmount : shipmentQuery.data?.totalAmount;
   // shipmentQuery.data.currency.isoCode existe (voir shipment/[id].tsx) ;
   // Booking n'a pas encore cette relation résolue, seulement currencyId.
-  const currencyCode = bookingId ? undefined : shipmentQuery.data?.currency?.isoCode;
+  const currencyCode = bookingId ? currencyOf(bookingQuery.data) : shipmentQuery.data?.currency?.isoCode;
   const isLoadingAmount = bookingId ? bookingQuery.isLoading : shipmentQuery.isLoading;
 
   function handlePay() {

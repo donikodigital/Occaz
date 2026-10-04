@@ -20,7 +20,7 @@ import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useMyBookings } from '@/hooks/useBookings';
 import { useMyShipments } from '@/hooks/useShipments';
-import { formatMoney } from '@/utils/money';
+import { currencyOf, formatMoney } from '@/utils/money';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { formatCityCountry, formatShipmentRoute } from '@/utils/shipmentDisplay';
 import { bookingBoardingAt, bookingRouteLabel } from '@/utils/tripSegment';
@@ -104,7 +104,7 @@ function BookingRow({ booking }: { booking: Booking }) {
       </View>
       <View style={styles.rowEnd}>
         <AppText variant="sm" weight="bold" color={OCEAN.deep}>
-          {formatMoney(booking.totalAmount)}
+          {formatMoney(booking.totalAmount, currencyOf(booking))}
         </AppText>
         <OceanPill label={BOOKING_STATUS_LABELS[booking.status]} tone={TONE_TO_PILL[BOOKING_STATUS_TONE[booking.status]]} />
       </View>

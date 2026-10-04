@@ -595,3 +595,28 @@ describe('TripsService.search — une seule ville', () => {
     await expect(service.search({ ...base } as never)).rejects.toThrow(/au moins une ville/);
   });
 });
+
+describe('Devise du trajet dans les listes', () => {
+  const base = { page: 1, limit: 20, skip: 0, take: 20, passengersCount: 1 };
+
+  it('la recherche par villes joint la devise : l\'app n\'affiche plus « GNF » par défaut pour un trajet en XOF', async () => {
+    const { service, prisma } = build({ candidates: [tripRow()] });
+    await service.search({ ...base, originCityId: 'conakry', destinationCityId: 'labe' } as never);
+    expect(prisma.trip.findMany.mock.calls[0][0].include.currency).toEqual({
+      select: { id: true, isoCode: true, symbol: true },
+    });
+  });
+
+  it('« mes trajets » du conducteur joint la devise', async () => {
+    const { service, prisma } = build();
+    (prisma.trip as Record<string, unknown>).count = jest.fn().mockResolvedValue(0);
+    await service.findAllForDriver('driver1', { skip: 0, take: 20, page: 1, limit: 20 } as never);
+    expect(prisma.trip.findMany.mock.calls[0][0].include.currency).toBeTruthy();
+  });
+
+  it('le détail d\'un trajet joint déjà la devise', async () => {
+    const { service, prisma } = build();
+    await service.findOne('trip1');
+    expect(prisma.trip.findUnique.mock.calls[0][0].include.currency).toBeTruthy();
+  });
+});

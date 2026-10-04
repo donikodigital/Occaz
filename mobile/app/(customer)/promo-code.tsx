@@ -65,7 +65,7 @@ export default function PromoCodeScreen() {
       </View>
 
       <TextField
-        label="Montant estimé (GNF)"
+        label="Montant estimé"
         value={amount}
         onChangeText={setAmount}
         keyboardType="numeric"
@@ -85,10 +85,10 @@ export default function PromoCodeScreen() {
             Vous économisez
           </AppText>
           <AppText variant="xl" weight="bold" color={colors.successDark}>
-            {formatMoney(result.discountAmount)}
+            {formatMoney(result.discountAmount, '')}
           </AppText>
           <AppText variant="sm" color="textSecondary">
-            Montant final : {formatMoney(result.finalAmount)}
+            Montant final : {formatMoney(result.finalAmount, '')}
           </AppText>
         </OceanCard>
       ) : null}

@@ -69,7 +69,7 @@ export default function NewPayoutScreen() {
           Solde disponible
         </AppText>
         <AppText variant="xl" weight="semibold">
-          {wallet ? formatMoney(wallet.balance) : '…'}
+          {wallet ? formatMoney(wallet.balance, wallet.currency?.isoCode) : '…'}
         </AppText>
       </Card>
 

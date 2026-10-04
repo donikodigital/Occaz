@@ -21,6 +21,7 @@ import { ListTripsQueryDto } from './dto/list-trips-query.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 import { UpdateTripPositionDto } from './dto/update-trip-position.dto';
+import { hideContactsOnceCompleted } from './booking-contacts';
 
 @ApiTags('Trajets')
 @ApiBearerAuth()
@@ -174,15 +175,17 @@ export class TripsController {
 
   @Get(':id/bookings')
   async findBookings(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    if (!(await this.scope.hasTripBookingsAccess(user, id))) {
-      const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
-      await this.tripsService.findOne(id).then((trip) => {
-        if (trip.driverId !== driverId) {
-          throw new ForbiddenException("Ce trajet n'appartient pas à ce chauffeur.");
-        }
-      });
-    }
-    return this.bookingsService.findAllForTrip(id);
+    if (await this.scope.hasTripBookingsAccess(user, id)) return this.bookingsService.findAllForTrip(id);
+
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    await this.tripsService.findOne(id).then((trip) => {
+      if (trip.driverId !== driverId) {
+        throw new ForbiddenException("Ce trajet n'appartient pas à ce chauffeur.");
+      }
+    });
+    // Le conducteur ne garde pas le numéro d'un client dont la réservation est terminée.
+    const bookings = await this.bookingsService.findAllForTrip(id);
+    return bookings.map((booking) => hideContactsOnceCompleted(booking, 'driver'));
   }
 
   @Permissions(PERMISSIONS.TRIP_READ)

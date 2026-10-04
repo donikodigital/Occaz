@@ -91,6 +91,19 @@ export class ConversationsService {
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 
+  /** La réservation est COMPLETED, ou l'envoi DELIVERED / COMPLETED : plus d'échange direct entre le client et le conducteur. */
+  private async isConversationClosed(conversation: { bookingId: string | null; shipmentId: string | null }): Promise<boolean> {
+    if (conversation.bookingId) {
+      const booking = await this.prisma.booking.findUnique({ where: { id: conversation.bookingId }, select: { status: true } });
+      return booking?.status === 'COMPLETED';
+    }
+    if (conversation.shipmentId) {
+      const shipment = await this.prisma.shipment.findUnique({ where: { id: conversation.shipmentId }, select: { status: true } });
+      return shipment?.status === 'DELIVERED' || shipment?.status === 'COMPLETED';
+    }
+    return false;
+  }
+
   private async findConversationWithParties(conversationId: string) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -157,6 +170,14 @@ export class ConversationsService {
       sender.hasSupportAccess &&
       sender.id !== conversation.customer.userId &&
       sender.id !== conversation.driver.userId;
+
+    // Trajet terminé ou colis livré : le client et le conducteur ne s'écrivent plus (comme pour l'appel et le SMS). L'historique
+    // reste lisible ; le support, lui, peut toujours écrire.
+    if (!isSupportIntervention && (await this.isConversationClosed(conversation))) {
+      throw new ForbiddenException(
+        "Cette conversation est fermée : la prestation est terminée. En cas de problème, utilisez « Signaler un problème ».",
+      );
+    }
 
     if (
       !sender.hasSupportAccess &&

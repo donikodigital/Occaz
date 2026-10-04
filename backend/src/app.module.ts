@@ -47,8 +47,7 @@ import { CountryScopeModule } from './common/scope/country-scope.module';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 
@@ -113,8 +112,8 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
-    { provide: APP_FILTER, useClass: PrismaExceptionFilter },
-    { provide: APP_FILTER, useClass: HttpExceptionFilter },
+    // Applique HttpExceptionFilter / PrismaExceptionFilter (mêmes réponses) et remonte les vraies erreurs serveur à Sentry.
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformResponseInterceptor },
   ],

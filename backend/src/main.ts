@@ -1,4 +1,6 @@
 // backend/src/main.ts
+// Doit rester le PREMIER import : le suivi des erreurs (Sentry) doit démarrer avant le reste de l'application.
+import './instrument';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';

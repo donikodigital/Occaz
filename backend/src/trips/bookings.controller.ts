@@ -16,6 +16,7 @@ import { ListBookingsQueryDto } from './dto/list-bookings-query.dto';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { TripOtpService } from './trip-otp.service';
+import { hideContactsOnceCompleted } from './booking-contacts';
 
 @ApiTags('Réservations')
 @ApiBearerAuth()
@@ -45,10 +46,16 @@ export class BookingsController {
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const booking = (await this.bookingsService.findOne(id)) as unknown as {
       customerId: string;
+      status: string;
+      driverPhone: string | null;
+      customerPhone: string | null;
       trip: { driverId: string };
     };
 
-    if (!(await this.scope.hasBookingAccess(user, id))) {
+    // Le support garde tout ; le client et le conducteur ne voient plus les numéros une fois le trajet terminé.
+    if (await this.scope.hasBookingAccess(user, id)) return booking;
+
+    {
       const customer = await this.customerProfilesService.findByUserId(user.id).catch(() => null);
       const isOwningCustomer = customer?.id === booking.customerId;
 
@@ -63,8 +70,8 @@ export class BookingsController {
       if (!isOwningCustomer && !isOwningDriver) {
         throw new ForbiddenException('Cette réservation ne vous appartient pas.');
       }
+      return hideContactsOnceCompleted(booking, isOwningCustomer ? 'customer' : 'driver');
     }
-    return booking;
   }
 
   @Post(':id/cancel')

@@ -74,8 +74,9 @@ export class DisputesService {
     const dispute = await this.prisma.dispute.findUnique({
       where: { id },
       include: {
-        booking: true,
-        shipment: true,
+        // Devise de l'objet du litige : le remboursement s'affiche dans la même devise que la réservation / l'envoi.
+        booking: { include: { currency: { select: { id: true, isoCode: true, symbol: true } } } },
+        shipment: { include: { currency: { select: { id: true, isoCode: true, symbol: true } } } },
         // Jamais la ligne User complète (hash du mot de passe, secret 2FA…) : seulement de quoi identifier la personne.
         openedBy: { select: SAFE_USER_SELECT },
         assignedAgent: { select: SAFE_USER_SELECT },

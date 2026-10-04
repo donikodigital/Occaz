@@ -34,6 +34,8 @@ const TRIP_INCLUDE_FOR_BOOKING = {
   destinationCity: true,
   driver: true,
   vehicle: true,
+  // Devise du trajet (= celle de la réservation) : les montants de la réservation s'affichent dans cette devise.
+  currency: { select: { id: true, isoCode: true, symbol: true } },
 } as const;
 
 /**

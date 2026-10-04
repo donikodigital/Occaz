@@ -178,3 +178,16 @@ describe('BookingsService.cancel — délai compté depuis la montée du client'
     expect(result.refundEligiblePercentage).toBe(0);
   });
 });
+
+describe('BookingsService — devise de la réservation', () => {
+  it('le détail et les listes de réservations joignent la devise du trajet', async () => {
+    const booking = { id: 'b1', customerId: 'c1', tripId: 'trip1', status: 'CONFIRMED', trip: { driver: { user: { phone: '+224' } } }, customer: { user: { phone: '+224' } }, passengers: [] };
+    const prisma = {
+      booking: { findUnique: jest.fn().mockResolvedValue(booking) },
+    };
+    const service = new BookingsService(prisma as never, {} as never, { emit: jest.fn() } as never, {} as never, { notify: jest.fn() } as never);
+    await service.findOne('b1');
+    const include = prisma.booking.findUnique.mock.calls[0][0].include;
+    expect(include.trip.include.currency).toEqual({ select: { id: true, isoCode: true, symbol: true } });
+  });
+});

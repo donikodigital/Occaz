@@ -38,7 +38,7 @@ import {
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useTrip } from '@/hooks/useTripSearch';
-import { formatMoney } from '@/utils/money';
+import { currencyOf, formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { formatSeatsAvailability } from '@/utils/seats';
 import { routePointOptions, segmentAvailableSeats, stopAddress } from '@/utils/tripSegment';
@@ -106,7 +106,7 @@ export default function TripDetailScreen() {
               Prix par place
             </AppText>
             <AppText variant="lg" weight="bold" color={OCEAN.deep}>
-              {formatMoney(trip.customerPricePerSeat ?? trip.pricePerSeat)}
+              {formatMoney(trip.customerPricePerSeat ?? trip.pricePerSeat, currencyOf(trip))}
             </AppText>
           </View>
           <OceanButton

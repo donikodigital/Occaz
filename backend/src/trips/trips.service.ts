@@ -670,7 +670,13 @@ export class TripsService {
         take: query.take,
         orderBy: { departureAt: 'desc' },
         // Étapes jointes : l'app conducteur y retrouve les villes traversées (colis sur la route, « via Kindia · Mamou »).
-        include: { originCity: true, destinationCity: true, stops: { orderBy: { sequence: 'asc' }, include: { city: true } } },
+        // La devise du trajet accompagne chaque liste : l'app n'a plus à deviner « GNF ».
+        include: {
+          originCity: true,
+          destinationCity: true,
+          stops: { orderBy: { sequence: 'asc' }, include: { city: true } },
+          currency: CURRENCY_SELECT,
+        },
       }),
       this.prisma.trip.count({ where }),
     ]);
@@ -940,6 +946,7 @@ export class TripsService {
         originCity: true,
         destinationCity: true,
         stops: { orderBy: { sequence: 'asc' }, include: { city: true } },
+        currency: CURRENCY_SELECT,
         bookings: SEAT_HOLDS_INCLUDE,
       },
     });
@@ -1004,7 +1011,7 @@ export class TripsService {
     const trips = await this.prisma.trip.findMany({
       where: { id: { in: tripIds.map((row) => row.id) } },
       orderBy: { departureAt: 'asc' },
-      include: { driver: true, vehicle: true, originCity: true, destinationCity: true },
+      include: { driver: true, vehicle: true, originCity: true, destinationCity: true, currency: CURRENCY_SELECT },
     });
 
     // Le compte total exact en mode géospatial demanderait une seconde

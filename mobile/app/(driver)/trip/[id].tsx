@@ -82,7 +82,7 @@ import {
   useVerifyPickupOtp,
 } from '@/hooks/useBookings';
 import { useGetOrCreateConversationForBooking } from '@/hooks/useConversations';
-import { formatMoney } from '@/utils/money';
+import { currencyOf, formatMoney } from '@/utils/money';
 import { formatSeatsAvailability } from '@/utils/seats';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { DRIVER_BOOKING_STATUS_LABELS, TRIP_STATUS_LABELS } from '@/utils/tripStatusLabels';
@@ -711,11 +711,11 @@ function TripStopsSection({ trip, bookings }: { trip: Trip; bookings: Booking[] 
               ) : (
                 <View style={styles.stopFares}>
                   <AppText variant="xs" color="textSecondary">
-                    {trip.originCity.name} → {stopName(stop)} : <AppText variant="xs" weight="bold">{formatMoney(fare)}</AppText>
+                    {trip.originCity.name} → {stopName(stop)} : <AppText variant="xs" weight="bold">{formatMoney(fare, currencyOf(trip))}</AppText>
                   </AppText>
                   <AppText variant="xs" color="textSecondary">
                     {stopName(stop)} → {trip.destinationCity.name} :{' '}
-                    <AppText variant="xs" weight="bold">{formatMoney(Math.max(0, total - fare))}</AppText>
+                    <AppText variant="xs" weight="bold">{formatMoney(Math.max(0, total - fare), currencyOf(trip))}</AppText>
                   </AppText>
                 </View>
               )}
@@ -974,7 +974,7 @@ export default function DriverTripDetailScreen() {
                 Prix par place
               </AppText>
               <AppText variant="md" weight="bold">
-                {formatMoney(trip.pricePerSeat)}
+                {formatMoney(trip.pricePerSeat, currencyOf(trip))}
               </AppText>
             </View>
           </View>
