@@ -191,7 +191,8 @@ export default function ShipmentDetailScreen() {
         subtitle={shipment.category?.name ?? 'Colis'}
         onBack={() => router.back()}
         right={
-          shipment.driverId ? (
+          // Colis livré sans litige : plus de messagerie avec le chauffeur (comme l'appel et le SMS, retirés par le serveur).
+          shipment.driverId && shipment.status !== 'DELIVERED' && shipment.status !== 'COMPLETED' ? (
             <Pressable
               onPress={() =>
                 getOrCreateConversation.mutate(shipment.id, {

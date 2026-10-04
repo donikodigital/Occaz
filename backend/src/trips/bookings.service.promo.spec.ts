@@ -14,15 +14,28 @@ const trip = {
   currencyId: 'cur1',
   status: 'PUBLISHED',
   originCity: { countryId: 'country-1' },
+  // Route : sans étapes, la réservation porte sur le trajet entier.
+  departureAt: new Date('2026-10-10T06:00:00.000Z'),
+  originCityId: 'conakry',
+  originLocationId: 'loc-a',
+  destinationCityId: 'labe',
+  destinationLocationId: 'loc-b',
+  stops: [],
 };
 
 function createService(options: { rawDiscount?: bigint; platformFee?: bigint } = {}) {
   const platformFee = options.platformFee ?? 15_000n;
   const tx = {
-    trip: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    // Contrôle des places sous verrou : statut + nombre de places du trajet, réservations déjà là, recalcul du compteur.
+    $queryRaw: jest.fn().mockResolvedValue([{ status: 'PUBLISHED', totalSeats: 4 }]),
     booking: {
       create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'b1', ...data })),
       findUnique: jest.fn().mockResolvedValue({ id: 'b1' }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    trip: {
+      findUnique: jest.fn().mockResolvedValue({ ...trip, totalSeats: 4 }),
+      update: jest.fn().mockResolvedValue({}),
     },
     tripPassenger: { createMany: jest.fn().mockResolvedValue({}) },
   };
@@ -31,7 +44,10 @@ function createService(options: { rawDiscount?: bigint; platformFee?: bigint } =
     customerProfile: { findUnique: jest.fn().mockResolvedValue({ firstName: 'A', lastName: 'B' }) },
     $transaction: jest.fn().mockImplementation((callback: (client: unknown) => unknown) => callback(tx)),
   };
-  const pricing = { computeCommission: jest.fn().mockResolvedValue(platformFee) };
+  const pricing = {
+    computeCommission: jest.fn().mockResolvedValue(platformFee),
+    getNumericSetting: jest.fn().mockImplementation((_key: string, fallback: number) => Promise.resolve(fallback)),
+  };
   const promoCodes = {
     resolveForCheckout: jest.fn().mockResolvedValue({
       promoCode: { id: 'promo1', usageLimit: null, usedCount: 0 },
@@ -39,7 +55,7 @@ function createService(options: { rawDiscount?: bigint; platformFee?: bigint } =
     }),
     redeem: jest.fn().mockResolvedValue(undefined),
   };
-  const service = new BookingsService(prisma as never, pricing as never, { emit: jest.fn() } as never, promoCodes as never);
+  const service = new BookingsService(prisma as never, pricing as never, { emit: jest.fn() } as never, promoCodes as never, { notify: jest.fn().mockResolvedValue(undefined) } as never);
   return { service, tx, promoCodes };
 }
 

@@ -15,6 +15,8 @@ import { UpdateTripDto } from './dto/update-trip.dto';
 import { SearchTripsDto } from './dto/search-trips.dto';
 import { CancelTripDto } from './dto/cancel-trip.dto';
 import { TripStopInputDto } from './dto/trip-stop-input.dto';
+import { UpdateTripStopDto } from './dto/update-trip-stop.dto';
+import { TripSegmentQueryDto } from './dto/trip-segment-query.dto';
 import { ListTripsQueryDto } from './dto/list-trips-query.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
@@ -49,9 +51,10 @@ export class TripsController {
     return this.tripsService.create(driverId, dto);
   }
 
+  /** `boardingStopId` / `alightingStopId` (facultatifs) : prix et horaire d'un tronçon (ex. Kindia → Labé) au lieu du trajet entier. */
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.tripsService.findOne(id);
+  findOne(@Param('id') id: string, @Query() segment: TripSegmentQueryDto) {
+    return this.tripsService.findOne(id, segment);
   }
 
   @Patch(':id')
@@ -135,6 +138,28 @@ export class TripsController {
   ) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
     return this.tripsService.addStop(id, driverId, dto);
+  }
+
+  @Patch(':id/stops/:stopId')
+  async updateStop(
+    @Param('id') id: string,
+    @Param('stopId') stopId: string,
+    @Body() dto: UpdateTripStopDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    return this.tripsService.updateStop(id, stopId, driverId, dto);
+  }
+
+  /** Le conducteur signale son arrivée à une étape (trajet en cours) : prévient les clients qui y montent. */
+  @Post(':id/stops/:stopId/arrived')
+  async markArrivedAtStop(
+    @Param('id') id: string,
+    @Param('stopId') stopId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    return this.tripsService.markArrivedAtStop(id, stopId, driverId);
   }
 
   @Delete(':id/stops/:stopId')

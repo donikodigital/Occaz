@@ -1,5 +1,12 @@
 // mobile/app/(driver)/trip/[id].tsx
 //
+// [03/10/2026] v6 — Villes traversées : section « Villes traversées » (heure de passage et prix de chaque étape, modifiables
+// tant que le trajet est en brouillon ; en route, bouton « Je suis arrivé à … » qui prévient les clients de l'étape), lien
+// « Colis sur ce trajet », et chaque client affiche son tronçon (« Kindia → Labé »). La prise en charge d'un client qui monte
+// à une étape se valide en route, une fois arrivé à son étape ; sa dépose, à son étape de descente.
+// [03/10/2026] v7 — Places par tronçon : sous les villes traversées, « Places libres par tronçon » montre où il reste de la
+// place (un siège pris de Conakry à Kindia est de nouveau libre de Kindia à Labé) ; « Places » du billet vaut pour le trajet entier.
+//
 // v5 — stageCard et bookingCard n'avaient aucun padding défini dans leur
 // style (seulement gap/marginBottom), contrairement aux autres cartes de
 // l'app (ex. infoCard dans shipment/[id].tsx, qui pose explicitement
@@ -27,7 +34,7 @@
 // structure du billet (coupon détachable, pastilles de sièges) inchangées.
 
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   IconArrowLeft,
@@ -37,27 +44,35 @@ import {
   IconInfoCircle,
   IconLifebuoy,
   IconLuggage,
+  IconMapPin,
   IconMessageCircle,
   IconNotes,
   IconPackage,
+  IconPencil,
   IconRoute,
   IconUsers,
+  IconX,
 } from '@tabler/icons-react-native';
 import { AppText, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
+import { LocationAutocompleteField } from '@/components/screens/LocationAutocompleteField';
 import { OceanButton, OceanCard, OceanPill, OceanScreenHeader, OceanSection, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useTrip } from '@/hooks/useTripSearch';
 import { useTripPositionBroadcast } from '@/hooks/useTripPositionBroadcast';
 import {
+  useAddTripStop,
   useCancelTrip,
   useCompleteTrip,
+  useMarkArrivedAtStop,
   useMarkDriverArrived,
   useMarkTripArrived,
   usePublishTrip,
+  useRemoveTripStop,
   useStartTrip,
   useTripBookings,
+  useUpdateTripStop,
 } from '@/hooks/useDriverTrips';
 import {
   useRequestDropoffOtp,
@@ -70,11 +85,39 @@ import { formatMoney } from '@/utils/money';
 import { formatSeatsAvailability } from '@/utils/seats';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { DRIVER_BOOKING_STATUS_LABELS, TRIP_STATUS_LABELS } from '@/utils/tripStatusLabels';
+import { bookingRoute, isPartialBooking, stopName } from '@/utils/tripSegment';
+import { insertionSequence } from '@/utils/routeOrder';
 import { ApiError } from '@/services/api/ApiError';
 import type { Booking } from '@/types/bookings.types';
-import type { TripStatus } from '@/types/trips.types';
+import type { Trip, TripLocation, TripStatus, TripStop } from '@/types/trips.types';
 
 type BookingPhase = 'pickup' | 'dropoff' | 'none';
+
+/**
+ * Ce que le conducteur doit valider pour CE client, selon où il monte et où il descend :
+ *  - client du départ : prise en charge quand le conducteur est arrivé au départ ; dépose à l'arrivée ;
+ *  - client d'une étape : prise en charge en route, une fois le conducteur arrivé à son étape ; dépose à son étape de
+ *    descente (ou à l'arrivée du trajet si le conducteur n'a pas signalé l'étape).
+ */
+function getBookingPhase(booking: Booking, trip: Trip): BookingPhase {
+  if (trip.status === 'ARRIVED') return 'dropoff';
+
+  const stopById = (stopId: string | null | undefined): TripStop | undefined =>
+    stopId ? trip.stops?.find((stop) => stop.id === stopId) : undefined;
+  const isPickedUp = Boolean(booking.passengers?.some((passenger) => passenger.pickedUpAt));
+
+  if (!isPickedUp) {
+    if (!booking.boardingStopId) {
+      return trip.status === 'DRIVER_ARRIVED' || trip.status === 'PASSENGER_PICKED_UP' ? 'pickup' : 'none';
+    }
+    return trip.status === 'IN_PROGRESS' && stopById(booking.boardingStopId)?.arrivedAt ? 'pickup' : 'none';
+  }
+
+  if (booking.alightingStopId && trip.status === 'IN_PROGRESS' && stopById(booking.alightingStopId)?.arrivedAt) {
+    return 'dropoff';
+  }
+  return 'none';
+}
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -144,6 +187,7 @@ function getStage(
   hasBookings: boolean,
   positionError: string | null | undefined,
   positionMode: string | null | undefined,
+  onlyStopBookings = false,
 ): Stage | null {
   switch (status) {
     case 'DRAFT':
@@ -161,6 +205,14 @@ function getStage(
         tone: 'ocean',
       };
     case 'DRIVER_ARRIVED':
+      if (onlyStopBookings) {
+        return {
+          icon: IconRoute,
+          title: 'Personne ne monte au départ',
+          text: 'Vos clients vous attendent aux villes traversées : démarrez le trajet et signalez votre arrivée à chaque étape.',
+          tone: 'ocean',
+        };
+      }
       return hasBookings
         ? {
             icon: IconUsers,
@@ -366,6 +418,12 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
           <AppText variant="base" weight="semibold" numberOfLines={1}>
             {passengerNames}
           </AppText>
+          {isPartialBooking(booking) ? (
+            <AppText variant="xs" weight="semibold" color={OCEAN.base} numberOfLines={1}>
+              {bookingRoute(booking)?.from} → {bookingRoute(booking)?.to}
+              {booking.boardingStop?.estimatedArrivalAt ? ` · prise en charge vers ${formatTime(booking.boardingStop.estimatedArrivalAt)}` : ''}
+            </AppText>
+          ) : null}
           <View style={styles.bookingMeta}>
             <AppText variant="xs" color="textSecondary">
               {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
@@ -473,6 +531,248 @@ function BookingOtpCard({ booking, tripId, phase }: { booking: Booking; tripId: 
 }
 
 // ---------------------------------------------------------------------------
+// Villes traversées
+// ---------------------------------------------------------------------------
+
+/**
+ * Étapes du trajet : heure de passage et prix de chaque tronçon. En brouillon, le conducteur ajuste les prix calculés
+ * automatiquement, décoche une ville où il ne prend personne, retire ou ajoute une ville. En route, il signale son
+ * arrivée à chaque étape pour prévenir les clients qui y montent.
+ */
+function TripStopsSection({ trip, bookings }: { trip: Trip; bookings: Booking[] }) {
+  const isDraft = trip.status === 'DRAFT';
+  const isRunning = trip.status === 'IN_PROGRESS';
+  const stops = trip.stops ?? [];
+
+  const addStop = useAddTripStop(trip.id);
+  const updateStop = useUpdateTripStop(trip.id);
+  const removeStop = useRemoveTripStop(trip.id);
+  const markArrivedAtStop = useMarkArrivedAtStop(trip.id);
+
+  const [editingStopId, setEditingStopId] = useState<string | null>(null);
+  const [fareText, setFareText] = useState('');
+  const [addFieldKey, setAddFieldKey] = useState(0);
+
+  // Rien à montrer sans étape, sauf en brouillon où le conducteur peut en ajouter.
+  if (stops.length === 0 && !isDraft) return null;
+
+  const total = Number(trip.pricePerSeat);
+  const nextStopToReach = isRunning ? stops.find((stop) => !stop.arrivedAt) : undefined;
+
+  function showError(error: unknown) {
+    Alert.alert('Erreur', error instanceof ApiError ? error.message : 'Réessayez.');
+  }
+
+  function startEditing(stop: TripStop) {
+    setEditingStopId(stop.id);
+    setFareText(stop.fareFromOrigin ? String(Number(stop.fareFromOrigin)) : '');
+  }
+
+  function saveFare(stop: TripStop) {
+    const value = Number(fareText.replace(',', '.'));
+    if (!Number.isFinite(value) || value <= 0) {
+      Alert.alert('Prix invalide', 'Indiquez un prix supérieur à zéro.');
+      return;
+    }
+    updateStop.mutate(
+      { stopId: stop.id, fareFromOrigin: String(Math.round(value)) },
+      { onSuccess: () => setEditingStopId(null), onError: showError },
+    );
+  }
+
+  function confirmRemove(stop: TripStop) {
+    Alert.alert(`Retirer ${stopName(stop)} ?`, 'Les prix des autres villes ne changent pas.', [
+      { text: 'Garder', style: 'cancel' },
+      { text: 'Retirer', style: 'destructive', onPress: () => removeStop.mutate(stop.id, { onError: showError }) },
+    ]);
+  }
+
+  function handleAdd(location: TripLocation | null) {
+    if (!location) return;
+    setAddFieldKey((value) => value + 1);
+    if (!location.cityId) {
+      Alert.alert('Ville manquante', 'Choisissez une adresse située dans la ville traversée.');
+      return;
+    }
+    if (
+      location.cityId === trip.originCityId ||
+      location.cityId === trip.destinationCityId ||
+      stops.some((stop) => stop.cityId === location.cityId)
+    ) {
+      Alert.alert('Ville déjà sur la route', 'Cette ville est déjà le départ, l’arrivée ou une ville traversée.');
+      return;
+    }
+    addStop.mutate(
+      { locationId: location.id, sequence: insertionSequence(trip.originLocation, stops, location) },
+      { onError: showError },
+    );
+  }
+
+  /** Clients qui montent / descendent à cette étape — le conducteur sait qui l'attend. */
+  function peopleAt(stop: TripStop) {
+    const boarding = bookings.filter((booking) => booking.boardingStopId === stop.id);
+    const alighting = bookings.filter((booking) => booking.alightingStopId === stop.id);
+    const count = (list: Booking[]) => list.reduce((sum, booking) => sum + booking.seatsCount, 0);
+    return { boarding: count(boarding), alighting: count(alighting) };
+  }
+
+  return (
+    <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Villes traversées">
+      {isDraft ? (
+        <AppText variant="xs" color="textSecondary">
+          Les prix sont calculés automatiquement au prorata de la distance. Vous pouvez les modifier avant de publier ; ils
+          ne changent plus ensuite.
+        </AppText>
+      ) : null}
+
+      {!isDraft && trip.seatsByLeg && trip.seatsByLeg.length > 0 ? (
+        <View style={styles.legSeats}>
+          <AppText variant="xs" weight="semibold" color="textSecondary">
+            Places libres par tronçon
+          </AppText>
+          <View style={styles.legSeatsChips}>
+            {trip.seatsByLeg.map((leg) => (
+              <OceanPill
+                key={`${leg.fromStopId ?? 'origin'}-${leg.toStopId ?? 'destination'}`}
+                label={`${leg.fromCityName ?? '…'} → ${leg.toCityName ?? '…'} : ${leg.freeSeats}/${trip.totalSeats}`}
+                tone={leg.freeSeats === 0 ? 'neutral' : 'ocean'}
+              />
+            ))}
+          </View>
+          <AppText variant="xs" color="textMuted">
+            Un client qui descend à une étape libère sa place pour les tronçons suivants.
+          </AppText>
+        </View>
+      ) : null}
+
+      <View style={styles.stopList}>
+        {stops.map((stop, index) => {
+          const fare = stop.fareFromOrigin != null ? Number(stop.fareFromOrigin) : null;
+          const isEditing = editingStopId === stop.id;
+          const people = peopleAt(stop);
+          const reached = Boolean(stop.arrivedAt);
+          return (
+            <View key={stop.id} style={styles.stopCard}>
+              <View style={styles.stopCardHeader}>
+                <View style={[styles.stopCardBadge, reached && styles.stopCardBadgeDone]}>
+                  <AppText variant="xs" weight="bold" color={reached ? colors.onPrimary : OCEAN.base}>
+                    {index + 1}
+                  </AppText>
+                </View>
+                <View style={styles.stopCardText}>
+                  <AppText variant="base" weight="semibold" numberOfLines={1}>
+                    {stopName(stop)}
+                  </AppText>
+                  <AppText variant="xs" color="textSecondary">
+                    {reached
+                      ? `Passé à ${formatTime(stop.arrivedAt as string)}`
+                      : stop.estimatedArrivalAt
+                        ? `Passage estimé vers ${formatTime(stop.estimatedArrivalAt)}`
+                        : 'Heure de passage non estimée'}
+                  </AppText>
+                </View>
+                {isDraft ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Retirer ${stopName(stop)}`}
+                    onPress={() => confirmRemove(stop)}
+                    hitSlop={8}
+                  >
+                    <IconX size={18} color={colors.textSecondary} />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {fare === null ? (
+                <AppText variant="xs" color="danger">
+                  Prix non défini : cette ville n'est pas réservable tant que vous n'avez pas indiqué un prix.
+                </AppText>
+              ) : (
+                <View style={styles.stopFares}>
+                  <AppText variant="xs" color="textSecondary">
+                    {trip.originCity.name} → {stopName(stop)} : <AppText variant="xs" weight="bold">{formatMoney(fare)}</AppText>
+                  </AppText>
+                  <AppText variant="xs" color="textSecondary">
+                    {stopName(stop)} → {trip.destinationCity.name} :{' '}
+                    <AppText variant="xs" weight="bold">{formatMoney(Math.max(0, total - fare))}</AppText>
+                  </AppText>
+                </View>
+              )}
+
+              {people.boarding > 0 || people.alighting > 0 ? (
+                <AppText variant="xs" weight="semibold" color={OCEAN.base}>
+                  {[
+                    people.boarding > 0 ? `${people.boarding} place${people.boarding > 1 ? 's' : ''} à prendre ici` : null,
+                    people.alighting > 0 ? `${people.alighting} place${people.alighting > 1 ? 's' : ''} à déposer ici` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </AppText>
+              ) : null}
+
+              {isDraft ? (
+                isEditing ? (
+                  <View style={styles.stopEditRow}>
+                    <TextField
+                      value={fareText}
+                      onChangeText={(text) => setFareText(text.replace(/[^0-9]/g, ''))}
+                      keyboardType="number-pad"
+                      placeholder={`Prix de ${trip.originCity.name} à ${stopName(stop)}`}
+                      containerStyle={styles.codeInput}
+                    />
+                    <OceanButton label="Valider" onPress={() => saveFare(stop)} loading={updateStop.isPending} />
+                  </View>
+                ) : (
+                  <View style={styles.stopActionsRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => startEditing(stop)}
+                      style={({ pressed }) => [styles.stopEditLink, pressed && styles.pressed]}
+                    >
+                      <IconPencil size={14} color={OCEAN.base} />
+                      <AppText variant="xs" weight="semibold" color={OCEAN.base}>
+                        Modifier le prix
+                      </AppText>
+                    </Pressable>
+                    <View style={styles.stopSwitch}>
+                      <AppText variant="xs" color="textSecondary">
+                        Je prends des passagers ici
+                      </AppText>
+                      <Switch
+                        value={stop.isBookable !== false}
+                        onValueChange={(value) => updateStop.mutate({ stopId: stop.id, isBookable: value }, { onError: showError })}
+                      />
+                    </View>
+                  </View>
+                )
+              ) : null}
+
+              {nextStopToReach?.id === stop.id ? (
+                <OceanButton
+                  label={`Je suis arrivé à ${stopName(stop)}`}
+                  onPress={() => markArrivedAtStop.mutate(stop.id, { onError: showError })}
+                  loading={markArrivedAtStop.isPending}
+                />
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+
+      {isDraft ? (
+        <LocationAutocompleteField
+          key={addFieldKey}
+          label=""
+          value={null}
+          onChange={handleAdd}
+          placeholder="Ajouter une ville traversée (ex. Mamou)"
+        />
+      ) : null}
+    </OceanSection>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Écran
 // ---------------------------------------------------------------------------
 
@@ -505,12 +805,10 @@ export default function DriverTripDetailScreen() {
 
   const activeBookings = (bookings ?? []).filter((b) => b.status === 'CONFIRMED');
 
-  const phase: BookingPhase =
-    trip.status === 'DRIVER_ARRIVED' || trip.status === 'PASSENGER_PICKED_UP'
-      ? 'pickup'
-      : trip.status === 'ARRIVED'
-        ? 'dropoff'
-        : 'none';
+  // Clients qui montent au départ / à une étape — décide si le conducteur peut démarrer sans prise en charge au départ.
+  const waitingAtOrigin = activeBookings.filter((booking) => !booking.boardingStopId && !booking.passengers?.some((p) => p.pickedUpAt));
+  const waitingAtStops = activeBookings.filter((booking) => booking.boardingStopId);
+  const onlyStopBookings = waitingAtOrigin.length === 0 && waitingAtStops.length > 0;
 
   function handleCancel() {
     Alert.alert('Annuler ce trajet ?', 'Toutes les réservations actives seront annulées.', [
@@ -537,7 +835,7 @@ export default function DriverTripDetailScreen() {
       run: () => markDriverArrived.mutate(),
       isPending: markDriverArrived.isPending,
     };
-  } else if (trip.status === 'PASSENGER_PICKED_UP') {
+  } else if (trip.status === 'PASSENGER_PICKED_UP' || (trip.status === 'DRIVER_ARRIVED' && onlyStopBookings)) {
     action = { label: 'Démarrer le trajet', run: () => startTrip.mutate(), isPending: startTrip.isPending };
   } else if (trip.status === 'IN_PROGRESS') {
     action = {
@@ -549,7 +847,7 @@ export default function DriverTripDetailScreen() {
     action = { label: 'Clôturer le trajet', run: () => completeTrip.mutate(), isPending: completeTrip.isPending };
   }
 
-  const stage = getStage(trip.status, activeBookings.length > 0, positionError, positionMode);
+  const stage = getStage(trip.status, activeBookings.length > 0, positionError, positionMode, onlyStopBookings);
 
   const originAddress =
     trip.originLocation?.label && trip.originLocation.label !== trip.originCity.name ? trip.originLocation.label : undefined;
@@ -613,6 +911,11 @@ export default function DriverTripDetailScreen() {
                 <RouteStop eyebrow="Arrivée" city={trip.destinationCity.name} address={destinationAddress} />
               </View>
             </View>
+            {trip.stops && trip.stops.length > 0 ? (
+              <AppText variant="xs" color={HERO_MUTED} numberOfLines={2}>
+                Via {trip.stops.map((stop) => stopName(stop)).join(' · ')}
+              </AppText>
+            ) : null}
           </View>
 
           <View style={styles.tear}>
@@ -634,6 +937,7 @@ export default function DriverTripDetailScreen() {
               <SeatDots total={trip.totalSeats} available={trip.availableSeats} />
               <AppText variant="xs" color="textMuted">
                 {trip.totalSeats} place{trip.totalSeats > 1 ? 's' : ''} au total
+                {trip.stops && trip.stops.length > 0 ? ' · sur tout le trajet' : ''}
               </AppText>
             </View>
             <View style={styles.couponDivider} />
@@ -650,6 +954,17 @@ export default function DriverTripDetailScreen() {
       </View>
 
       {stage ? <StageCard stage={stage} action={action} /> : null}
+
+      <TripStopsSection trip={trip} bookings={bookings ?? []} />
+
+      {trip.allowsShipments && ['PUBLISHED', 'DRIVER_ARRIVED'].includes(trip.status) ? (
+        <OceanButton
+          label="Colis sur ce trajet"
+          variant="soft"
+          onPress={() => router.push({ pathname: '/(driver)/shipment-available', params: { tripId: trip.id } })}
+          style={styles.shipmentsButton}
+        />
+      ) : null}
 
       {showPassengers ? (
         <OceanSection
@@ -668,7 +983,7 @@ export default function DriverTripDetailScreen() {
           {activeBookings.length > 0 ? (
             <View style={styles.bookingsList}>
               {activeBookings.map((booking) => (
-                <BookingOtpCard key={booking.id} booking={booking} tripId={trip.id} phase={phase} />
+                <BookingOtpCard key={booking.id} booking={booking} tripId={trip.id} phase={getBookingPhase(booking, trip)} />
               ))}
             </View>
           ) : (
@@ -1083,5 +1398,71 @@ const styles = StyleSheet.create({
 
   cancelButton: {
     marginBottom: spacing.lg,
+  },
+  stopList: {
+    gap: spacing.sm,
+  },
+  legSeats: {
+    gap: spacing.xs,
+  },
+  legSeatsChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  stopCard: {
+    padding: spacing.md,
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    shadowColor: '#0B3C5D',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  stopCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  stopCardBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: OCEAN.mist,
+  },
+  stopCardBadgeDone: {
+    backgroundColor: OCEAN.base,
+  },
+  stopCardText: {
+    flex: 1,
+  },
+  stopFares: {
+    gap: 2,
+  },
+  stopEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  stopActionsRow: {
+    gap: spacing.sm,
+  },
+  stopEditLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stopSwitch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  shipmentsButton: {
+    marginBottom: spacing.md,
   },
 });

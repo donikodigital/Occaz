@@ -11,15 +11,26 @@ import { DOMAIN_EVENTS } from '../common/events/domain-events';
 function createService(options: { claimCount?: number; booking?: Record<string, unknown> | null } = {}) {
   const booking = options.booking !== undefined ? options.booking : { id: 'b1', tripId: 't1', seatsCount: 2 };
   const tx = {
-    booking: { updateMany: jest.fn().mockResolvedValue({ count: options.claimCount ?? 1 }) },
-    trip: { update: jest.fn().mockResolvedValue({}) },
+    $queryRaw: jest.fn().mockResolvedValue([{ status: 'PUBLISHED', totalSeats: 4 }]),
+    booking: {
+      updateMany: jest.fn().mockResolvedValue({ count: options.claimCount ?? 1 }),
+      // réservations qui occupent encore des places une fois celle-ci annulée : 1 place prise sur tout le trajet
+      findMany: jest.fn().mockResolvedValue([{ seatsCount: 1, boardingStopId: null, alightingStopId: null }]),
+    },
+    trip: {
+      update: jest.fn().mockResolvedValue({}),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 't1', totalSeats: 4, departureAt: new Date(), pricePerSeat: 100_000n, originCityId: 'a',
+        originLocationId: 'la', destinationCityId: 'b', destinationLocationId: 'lb', stops: [],
+      }),
+    },
   };
   const prisma = {
     booking: { findUnique: jest.fn().mockResolvedValue(booking) },
     $transaction: jest.fn().mockImplementation((callback: (client: unknown) => unknown) => callback(tx)),
   };
   const eventEmitter = { emit: jest.fn() };
-  const service = new BookingsService(prisma as never, {} as never, eventEmitter as never, {} as never);
+  const service = new BookingsService(prisma as never, {} as never, eventEmitter as never, {} as never, { notify: jest.fn().mockResolvedValue(undefined) } as never);
   return { service, prisma, tx, eventEmitter };
 }
 
@@ -34,10 +45,8 @@ describe('BookingsService.expireUnpaid', () => {
         data: expect.objectContaining({ status: BookingStatus.CANCELLED }),
       }),
     );
-    expect(tx.trip.update).toHaveBeenCalledWith({
-      where: { id: 't1' },
-      data: { availableSeats: { increment: 2 } },
-    });
+    // compteur recalculé : 4 places − 1 encore réservée = 3 libres (et non plus « +2 » à l'aveugle)
+    expect(tx.trip.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { availableSeats: 3 } });
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       DOMAIN_EVENTS.BOOKING_CANCELLED,
       expect.objectContaining({ bookingId: 'b1', refundEligiblePercentage: 0 }),

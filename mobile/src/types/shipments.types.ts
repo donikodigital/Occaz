@@ -83,11 +83,13 @@ export interface Shipment {
   categoryId: string;
   category?: ShipmentCategory;
   senderName: string;
-  senderPhone: string;
+  /** null côté chauffeur une fois le colis livré sans litige : le serveur ne communique plus les numéros. */
+  senderPhone: string | null;
   senderLocationId: string;
   senderLocation?: TripLocation;
   recipientName: string;
-  recipientPhone: string;
+  /** null côté chauffeur une fois le colis livré sans litige. */
+  recipientPhone: string | null;
   recipientLocationId: string;
   recipientLocation?: TripLocation;
   description: string | null;
@@ -209,6 +211,8 @@ export interface CancelShipmentPayload {
 export interface SearchAvailableShipmentsParams {
   originCityId?: string;
   destinationCityId?: string;
+  /** Un de mes trajets : ne garde que les colis dont le ramassage précède la livraison sur sa route (villes traversées comprises). */
+  tripId?: string;
   page?: number;
   limit?: number;
 }

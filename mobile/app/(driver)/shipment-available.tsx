@@ -1,5 +1,9 @@
 // mobile/app/(driver)/shipment-available.tsx
 //
+// [03/10/2026] v4 — « Colis sur ce trajet » : ouvert avec `tripId` (depuis l'écran d'un trajet), l'écran ne montre que les colis
+// dont le ramassage précède la livraison sur la route du trajet, villes traversées comprises (un colis Kindia → Labé sur un
+// trajet Conakry → Labé), et retient ce trajet à l'acceptation. Un bouton ramène à la liste complète.
+//
 // v3 — Plus de force et de repères. Logique inchangée (mêmes filtres de
 // ville, même rafraîchissement automatique toutes les 20 s, même feuille
 // d'acceptation) ; tout ce qui se voit est refait.
@@ -28,7 +32,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   IconAlertTriangle,
   IconArrowLeft,
@@ -45,6 +49,7 @@ import { ShipmentRequestCard } from '@/components/screens/ShipmentRequestCard';
 import { ShipmentTileIllustration } from '@/components/illustrations/ShipmentTileIllustration';
 import { colors, radius, spacing } from '@/theme';
 import { useAvailableShipments } from '@/hooks/useDriverShipments';
+import { useTrip } from '@/hooks/useTripSearch';
 import { ApiError } from '@/services/api/ApiError';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import type { AvailableShipment } from '@/types/shipments.types';
@@ -451,6 +456,10 @@ function Separator() {
 // ---------------------------------------------------------------------------
 
 export default function AvailableShipmentsScreen() {
+  const params = useLocalSearchParams<{ tripId?: string }>();
+  // Trajet dont on cherche les colis ; « Voir tous les colis » le retire sans quitter l'écran.
+  const [tripFilterId, setTripFilterId] = useState<string | undefined>(params.tripId || undefined);
+  const { data: filterTrip } = useTrip(tripFilterId);
   const [originCity, setOriginCity] = useState<City | null>(null);
   const [destinationCity, setDestinationCity] = useState<City | null>(null);
   const [selectedShipment, setSelectedShipment] = useState<AvailableShipment | null>(null);
@@ -470,6 +479,7 @@ export default function AvailableShipmentsScreen() {
   const { data, isLoading, isError, error, isRefetching, refetch } = useAvailableShipments({
     originCityId: originCity?.id,
     destinationCityId: destinationCity?.id,
+    tripId: tripFilterId,
     limit: 20,
   });
 
@@ -512,6 +522,30 @@ export default function AvailableShipmentsScreen() {
 
   const listHeader = (
     <View>
+      {tripFilterId ? (
+        <View style={styles.tripFilterBanner}>
+          <View style={styles.tripFilterText}>
+            <AppText variant="xs" color="textSecondary">
+              Colis sur votre trajet
+            </AppText>
+            <AppText variant="sm" weight="bold" numberOfLines={1}>
+              {filterTrip ? `${filterTrip.originCity.name} → ${filterTrip.destinationCity.name}` : '…'}
+              {filterTrip?.stops && filterTrip.stops.length > 0
+                ? ` · via ${filterTrip.stops.map((stop) => stop.city?.name ?? stop.location?.label ?? '').filter(Boolean).join(', ')}`
+                : ''}
+            </AppText>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setTripFilterId(undefined)}
+            style={({ pressed }) => [styles.tripFilterButton, pressed && styles.pressed]}
+          >
+            <AppText variant="xs" weight="semibold" color={colors.primary}>
+              Voir tous les colis
+            </AppText>
+          </Pressable>
+        </View>
+      ) : null}
       <Hero
         count={shipments.length}
         isLoading={isLoading}
@@ -570,14 +604,18 @@ export default function AvailableShipmentsScreen() {
     <View style={styles.empty}>
       <Radar />
       <AppText variant="md" weight="semibold" align="center">
-        {hasFilters ? 'Aucun envoi sur cet itinéraire' : 'On guette les nouvelles demandes'}
+        {tripFilterId ? 'Aucun colis sur votre trajet' : hasFilters ? 'Aucun envoi sur cet itinéraire' : 'On guette les nouvelles demandes'}
       </AppText>
       <AppText variant="sm" color="textSecondary" align="center">
-        {hasFilters
+        {tripFilterId
+          ? 'Aucun colis ne se trouve entre vos villes de départ, d’arrivée ou traversées pour vos dates. Il en arrivera peut-être d’autres : la liste se met à jour toute seule.'
+          : hasFilters
           ? 'Essayez avec d’autres villes ou retirez les filtres.'
           : 'Dès qu’un client publie un colis, il apparaît ici. La liste se met à jour toute seule.'}
       </AppText>
-      {hasFilters ? (
+      {tripFilterId ? (
+        <Button label="Voir tous les colis" variant="outline" size="md" fullWidth={false} onPress={() => setTripFilterId(undefined)} />
+      ) : hasFilters ? (
         <Button label="Effacer les filtres" variant="outline" size="md" fullWidth={false} onPress={clearFilters} />
       ) : (
         <>
@@ -614,6 +652,7 @@ export default function AvailableShipmentsScreen() {
           router.push(`/(driver)/shipment/${shipmentId}`);
         }}
         onAttemptFailed={refresh}
+        preferredTripId={tripFilterId}
       />
     </ScreenContainer>
   );
@@ -622,6 +661,26 @@ export default function AvailableShipmentsScreen() {
 const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
+  },
+  tripFilterBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    shadowColor: '#0B3C5D',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  tripFilterText: {
+    flex: 1,
+  },
+  tripFilterButton: {
+    paddingVertical: spacing.xs,
   },
   list: {
     flexGrow: 1,

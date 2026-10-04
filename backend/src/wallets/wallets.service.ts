@@ -150,17 +150,16 @@ export class WalletsService {
       metadata?: Prisma.InputJsonValue;
       triggeredByUserId?: string;
     },
+    /** Transaction englobante : permet d'enchaîner plusieurs écritures de façon atomique (tout ou rien). */
+    client?: Prisma.TransactionClient,
   ) {
-    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } });
-
-      const result = await tx.wallet.updateMany({
-        where: { id: walletId, version: wallet.version },
+    const run = async (tx: Prisma.TransactionClient) => {
+      // Incrément atomique côté base : deux crédits simultanés s'additionnent au lieu de se bloquer l'un l'autre
+      // (l'ancien verrou de version levait un conflit — fatal quand le crédit suivait une confirmation de paiement).
+      const wallet = await tx.wallet.update({
+        where: { id: walletId },
         data: { [field]: { increment: delta }, version: { increment: 1 } },
       });
-      if (result.count === 0) {
-        throw new ConflictException('Conflit de version sur le portefeuille, veuillez réessayer.');
-      }
 
       return tx.walletTransaction.create({
         data: {
@@ -178,7 +177,8 @@ export class WalletsService {
           triggeredByUserId: entry.triggeredByUserId,
         },
       });
-    });
+    };
+    return client ? run(client) : this.prisma.$transaction(run);
   }
 
   /**
@@ -197,22 +197,13 @@ export class WalletsService {
     commission: bigint;
     sourceCurrencyId: string;
   }) {
-    const wallet = await this.findByDriverId(params.driverId);
-
-    const gross = await this.exchangeRates.convert(params.grossAmount, params.sourceCurrencyId, wallet.currencyId);
-    await this.applyDelta(wallet.id, 'pendingBalance', gross.amount, {
-      type: WalletTransactionType.BOOKING_REVENUE,
-      status: WalletTransactionStatus.PENDING,
-      bookingId: params.bookingId,
-      metadata: gross.conversion ? ({ conversion: gross.conversion } as unknown as Prisma.InputJsonValue) : undefined,
-    });
-
-    const commission = await this.exchangeRates.convert(params.commission, params.sourceCurrencyId, wallet.currencyId);
-    await this.applyDelta(wallet.id, 'pendingBalance', -commission.amount, {
-      type: WalletTransactionType.COMMISSION,
-      status: WalletTransactionStatus.PENDING,
-      bookingId: params.bookingId,
-      metadata: commission.conversion ? ({ conversion: commission.conversion } as unknown as Prisma.InputJsonValue) : undefined,
+    await this.holdRevenue({
+      driverId: params.driverId,
+      grossAmount: params.grossAmount,
+      commission: params.commission,
+      sourceCurrencyId: params.sourceCurrencyId,
+      revenueType: WalletTransactionType.BOOKING_REVENUE,
+      reference: { bookingId: params.bookingId },
     });
   }
 
@@ -223,22 +214,66 @@ export class WalletsService {
     commission: bigint;
     sourceCurrencyId: string;
   }) {
-    const wallet = await this.findByDriverId(params.driverId);
-
-    const gross = await this.exchangeRates.convert(params.grossAmount, params.sourceCurrencyId, wallet.currencyId);
-    await this.applyDelta(wallet.id, 'pendingBalance', gross.amount, {
-      type: WalletTransactionType.SHIPMENT_REVENUE,
-      status: WalletTransactionStatus.PENDING,
-      shipmentId: params.shipmentId,
-      metadata: gross.conversion ? ({ conversion: gross.conversion } as unknown as Prisma.InputJsonValue) : undefined,
+    await this.holdRevenue({
+      driverId: params.driverId,
+      grossAmount: params.grossAmount,
+      commission: params.commission,
+      sourceCurrencyId: params.sourceCurrencyId,
+      revenueType: WalletTransactionType.SHIPMENT_REVENUE,
+      reference: { shipmentId: params.shipmentId },
     });
+  }
 
+  /**
+   * Met en attente le revenu d'une prestation et sa commission, EN UNE SEULE TRANSACTION : l'une ne peut plus être
+   * enregistrée sans l'autre (sinon le chauffeur serait crédité sans commission). Idempotent : si le revenu de
+   * cette prestation est déjà enregistré (webhook rejoué, reprise après erreur), rien n'est compté une seconde fois.
+   */
+  private async holdRevenue(params: {
+    driverId: string;
+    grossAmount: bigint;
+    commission: bigint;
+    sourceCurrencyId: string;
+    revenueType: WalletTransactionType;
+    reference: { bookingId: string } | { shipmentId: string };
+  }) {
+    const wallet = await this.findByDriverId(params.driverId);
+    const gross = await this.exchangeRates.convert(params.grossAmount, params.sourceCurrencyId, wallet.currencyId);
     const commission = await this.exchangeRates.convert(params.commission, params.sourceCurrencyId, wallet.currencyId);
-    await this.applyDelta(wallet.id, 'pendingBalance', -commission.amount, {
-      type: WalletTransactionType.COMMISSION,
-      status: WalletTransactionStatus.PENDING,
-      shipmentId: params.shipmentId,
-      metadata: commission.conversion ? ({ conversion: commission.conversion } as unknown as Prisma.InputJsonValue) : undefined,
+
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const already = await tx.walletTransaction.findFirst({
+        where: { type: params.revenueType, ...params.reference },
+        select: { id: true },
+      });
+      if (already) return;
+
+      await this.applyDelta(
+        wallet.id,
+        'pendingBalance',
+        gross.amount,
+        {
+          type: params.revenueType,
+          status: WalletTransactionStatus.PENDING,
+          ...params.reference,
+          metadata: gross.conversion ? ({ conversion: gross.conversion } as unknown as Prisma.InputJsonValue) : undefined,
+        },
+        tx,
+      );
+      await this.applyDelta(
+        wallet.id,
+        'pendingBalance',
+        -commission.amount,
+        {
+          type: WalletTransactionType.COMMISSION,
+          status: WalletTransactionStatus.PENDING,
+          ...params.reference,
+          metadata: commission.conversion
+            ? ({ conversion: commission.conversion } as unknown as Prisma.InputJsonValue)
+            : undefined,
+        },
+        tx,
+      );
     });
   }
 
@@ -248,37 +283,43 @@ export class WalletsService {
    * fois à la mise en attente) — aucune conversion à refaire ici.
    */
   async releaseHeldFunds(params: { driverId: string; bookingId?: string; shipmentId?: string }) {
+    if (!params.bookingId && !params.shipmentId) return; // sans référence, le filtre prendrait TOUTES les lignes en attente
     const wallet = await this.findByDriverId(params.driverId);
-    const pending = await this.prisma.walletTransaction.findMany({
-      where: {
-        walletId: wallet.id,
-        status: WalletTransactionStatus.PENDING,
-        bookingId: params.bookingId,
-        shipmentId: params.shipmentId,
-      },
-    });
-    if (pending.length === 0) return;
 
-    const netAmount: bigint = pending.reduce((sum: bigint, t: { amount: bigint }) => sum + t.amount, 0n);
+    const netAmount = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const pending = await tx.walletTransaction.findMany({
+        where: {
+          walletId: wallet.id,
+          status: WalletTransactionStatus.PENDING,
+          bookingId: params.bookingId,
+          shipmentId: params.shipmentId,
+        },
+      });
+      if (pending.length === 0) return null;
 
-    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.walletTransaction.updateMany({
-        where: { id: { in: pending.map((t) => t.id) } },
+      // On ne libère que les lignes encore PENDING au moment de l'écriture : si un autre appel vient de les
+      // libérer (double validation, reprise), 0 ligne est réclamée et on s'arrête — jamais de double crédit.
+      const claimed = await tx.walletTransaction.updateMany({
+        where: { id: { in: pending.map((t) => t.id) }, status: WalletTransactionStatus.PENDING },
         data: { status: WalletTransactionStatus.COMPLETED },
       });
-      const freshWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
-      const result = await tx.wallet.updateMany({
-        where: { id: wallet.id, version: freshWallet.version },
+      if (claimed.count === 0) return null;
+      if (claimed.count !== pending.length) {
+        throw new ConflictException('Libération concurrente des fonds, veuillez réessayer.');
+      }
+
+      const net: bigint = pending.reduce((sum: bigint, t: { amount: bigint }) => sum + t.amount, 0n);
+      await tx.wallet.update({
+        where: { id: wallet.id },
         data: {
-          pendingBalance: { decrement: netAmount },
-          balance: { increment: netAmount },
+          pendingBalance: { decrement: net },
+          balance: { increment: net },
           version: { increment: 1 },
         },
       });
-      if (result.count === 0) {
-        throw new ConflictException('Conflit de version sur le portefeuille, veuillez réessayer.');
-      }
+      return net;
     });
+    if (netAmount === null) return;
 
     const driver = await this.prisma.driverProfile.findUnique({
       where: { id: params.driverId },
@@ -301,29 +342,44 @@ export class WalletsService {
     shipmentId?: string;
     reason: string;
   }) {
+    if (!params.bookingId && !params.shipmentId) return;
     const wallet = await this.findByDriverId(params.driverId);
-    const pending = await this.prisma.walletTransaction.findMany({
-      where: {
-        walletId: wallet.id,
-        status: WalletTransactionStatus.PENDING,
-        bookingId: params.bookingId,
-        shipmentId: params.shipmentId,
-      },
-    });
-    if (pending.length === 0) return;
 
-    const netAmount: bigint = pending.reduce((sum: bigint, t: { amount: bigint }) => sum + t.amount, 0n);
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const pending = await tx.walletTransaction.findMany({
+        where: {
+          walletId: wallet.id,
+          status: WalletTransactionStatus.PENDING,
+          bookingId: params.bookingId,
+          shipmentId: params.shipmentId,
+        },
+      });
+      if (pending.length === 0) return;
 
-    await this.prisma.walletTransaction.updateMany({
-      where: { id: { in: pending.map((t) => t.id) } },
-      data: { status: WalletTransactionStatus.REVERSED },
-    });
+      // Même principe que releaseHeldFunds : on ne réclame que les lignes encore PENDING, dans la même
+      // transaction que la mise à jour du solde — pas de solde en attente qui reste gonflé ni de double reprise.
+      const claimed = await tx.walletTransaction.updateMany({
+        where: { id: { in: pending.map((t) => t.id) }, status: WalletTransactionStatus.PENDING },
+        data: { status: WalletTransactionStatus.REVERSED },
+      });
+      if (claimed.count === 0) return;
+      if (claimed.count !== pending.length) {
+        throw new ConflictException('Reprise concurrente des fonds, veuillez réessayer.');
+      }
 
-    await this.applyDelta(wallet.id, 'pendingBalance', -netAmount, {
-      type: WalletTransactionType.REFUND,
-      bookingId: params.bookingId,
-      shipmentId: params.shipmentId,
-      metadata: { reason: params.reason },
+      const net: bigint = pending.reduce((sum: bigint, t: { amount: bigint }) => sum + t.amount, 0n);
+      await this.applyDelta(
+        wallet.id,
+        'pendingBalance',
+        -net,
+        {
+          type: WalletTransactionType.REFUND,
+          bookingId: params.bookingId,
+          shipmentId: params.shipmentId,
+          metadata: { reason: params.reason },
+        },
+        tx,
+      );
     });
   }
 

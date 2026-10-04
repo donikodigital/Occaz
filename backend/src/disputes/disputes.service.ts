@@ -36,6 +36,7 @@ import { toMoneyBigInt } from '../common/utils/money.util';
 import { CreateDisputeDto } from './dto/create-dispute.dto';
 import { AddDisputeEvidenceDto } from './dto/add-dispute-evidence.dto';
 import { ResolveDisputeDto } from './dto/resolve-dispute.dto';
+import { syncTripSeats } from '../trips/trip-seats.db';
 
 /** Champs d'un utilisateur exposés dans un litige — jamais passwordHash / twoFactorSecret. */
 const SAFE_USER_SELECT = { id: true, phone: true, email: true } as const;
@@ -448,16 +449,14 @@ export class DisputesService {
         if (serviceType === ServiceType.TRIP) {
           const booking = await this.prisma.booking.findUnique({ where: { id: targetId } });
           if (booking && booking.status !== BookingStatus.CANCELLED && booking.status !== BookingStatus.REFUNDED) {
-            await this.prisma.$transaction([
-              this.prisma.booking.update({
+            await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+              await tx.booking.update({
                 where: { id: targetId },
                 data: { status: BookingStatus.CANCELLED, cancelledAt: new Date(), cancellationReason: dto.notes },
-              }),
-              this.prisma.trip.update({
-                where: { id: booking.tripId },
-                data: { availableSeats: { increment: booking.seatsCount } },
-              }),
-            ]);
+              });
+              // Places libérées sur les tronçons qu'occupait la réservation (voir trip-seats.ts).
+              await syncTripSeats(tx, booking.tripId);
+            });
           }
         } else {
           const shipment = await this.prisma.shipment.findUnique({ where: { id: targetId } });

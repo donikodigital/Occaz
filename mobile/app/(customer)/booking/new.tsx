@@ -1,5 +1,6 @@
 // mobile/app/(customer)/booking/new.tsx
 // [23/09/2026] v+ — champ « Code promo », entre le nombre de places et le récapitulatif.
+// [03/10/2026] v+ — Tronçon réservé : le prix et le récapitulatif sont ceux du tronçon choisi (ex. Kindia → Labé).
 import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -12,11 +13,16 @@ import { useCreateBooking } from '@/hooks/useBookings';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
+import { segmentAvailableSeats } from '@/utils/tripSegment';
 import type { PassengerInput } from '@/types/bookings.types';
 
 export default function NewBookingScreen() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { data: trip, isLoading } = useTrip(tripId);
+  const { tripId, boardingStopId, alightingStopId } = useLocalSearchParams<{
+    tripId: string;
+    boardingStopId?: string;
+    alightingStopId?: string;
+  }>();
+  const { data: trip, isLoading } = useTrip(tripId, { boardingStopId, alightingStopId });
   const { data: profile } = useCustomerProfile();
   const [seatsCount, setSeatsCount] = useState(1);
   const [extraPassengers, setExtraPassengers] = useState<PassengerInput[]>([]);
@@ -33,7 +39,9 @@ export default function NewBookingScreen() {
     );
   }
 
-  const maxSeats = Math.min(trip.availableSeats, 8);
+  // Places libres sur le tronçon du client : un siège pris jusqu'à Kindia est de nouveau libre après.
+  const availableSeats = segmentAvailableSeats(trip);
+  const maxSeats = Math.min(availableSeats, 8);
   // Le prix client (commission incluse) — jamais le prix brut du
   // chauffeur, qui ne regarde ni le client ni cet écran.
   const customerPricePerSeat = Number(trip.customerPricePerSeat ?? trip.pricePerSeat);
@@ -81,7 +89,7 @@ export default function NewBookingScreen() {
           ];
 
     createBooking.mutate(
-      { tripId: trip.id, seatsCount, passengers, promoCode },
+      { tripId: trip.id, seatsCount, passengers, promoCode, boardingStopId, alightingStopId },
       {
         onSuccess: (booking) => router.replace(`/(customer)/booking/${booking.id}`),
         onError: (error) => {
@@ -107,7 +115,7 @@ export default function NewBookingScreen() {
 
       <Card style={styles.routeSummary}>
         <AppText variant="sm" color="textSecondary">
-          {trip.originCity.name} → {trip.destinationCity.name}
+          {trip.segment?.boardingCityName ?? trip.originCity.name} → {trip.segment?.alightingCityName ?? trip.destinationCity.name}
         </AppText>
         <AppText variant="base" weight="medium">
           {trip.driver.firstName} {trip.driver.lastName[0]}. · {formatMoney(String(customerPricePerSeat))} / place
@@ -132,7 +140,7 @@ export default function NewBookingScreen() {
           onPress={() => adjustSeats(1)}
         />
         <AppText variant="sm" color="textMuted">
-          sur {trip.availableSeats} disponible{trip.availableSeats > 1 ? 's' : ''}
+          sur {availableSeats} disponible{availableSeats > 1 ? 's' : ''}
         </AppText>
       </View>
 

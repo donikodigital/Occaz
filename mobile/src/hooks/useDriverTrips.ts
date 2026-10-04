@@ -1,7 +1,7 @@
 // mobile/src/hooks/useDriverTrips.ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tripsApi } from '@/services/api/trips.api';
-import type { CancelTripPayload, CreateTripPayload } from '@/types/trips.types';
+import type { CancelTripPayload, CreateTripPayload, TripStopInput, UpdateTripStopPayload } from '@/types/trips.types';
 
 export function useMyTrips(page = 1) {
   return useQuery({
@@ -76,4 +76,34 @@ export function useCancelTrip(tripId: string) {
       queryClient.invalidateQueries({ queryKey: ['trips', 'mine'] });
     },
   });
+}
+
+/** Les étapes (villes traversées) se modifient en brouillon : chaque changement recharge le détail du trajet. */
+function useStopMutation<TVariables, TResult>(tripId: string, mutationFn: (variables: TVariables) => Promise<TResult>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trips', tripId] });
+      queryClient.invalidateQueries({ queryKey: ['trips', 'mine'] });
+    },
+  });
+}
+
+export function useAddTripStop(tripId: string) {
+  return useStopMutation(tripId, (payload: TripStopInput) => tripsApi.addStop(tripId, payload));
+}
+
+export function useUpdateTripStop(tripId: string) {
+  return useStopMutation(tripId, ({ stopId, ...payload }: { stopId: string } & UpdateTripStopPayload) =>
+    tripsApi.updateStop(tripId, stopId, payload),
+  );
+}
+
+export function useRemoveTripStop(tripId: string) {
+  return useStopMutation(tripId, (stopId: string) => tripsApi.removeStop(tripId, stopId));
+}
+
+export function useMarkArrivedAtStop(tripId: string) {
+  return useStopMutation(tripId, (stopId: string) => tripsApi.markArrivedAtStop(tripId, stopId));
 }

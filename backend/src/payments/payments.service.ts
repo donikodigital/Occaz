@@ -9,7 +9,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { BookingStatus, NotificationChannel, NotificationType, PaymentProviderType, PaymentStatus } from '@prisma/client';
+import { BookingStatus, NotificationChannel, NotificationType, PaymentProviderType, PaymentStatus, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentProvidersService } from '../payment-providers/payment-providers.service';
 import { PaymentProviderRegistry } from './providers/payment-provider-registry.service';
@@ -190,12 +190,21 @@ export class PaymentsService {
     return this.settleTransaction(providerType, parsed.externalReference, parsed.status, rawPayload);
   }
 
+  /**
+   * Règle un paiement à la réception d'une réponse du prestataire (webhook ou réponse immédiate).
+   *
+   * Sûr face aux envois en double et aux retries du prestataire : on « réclame » le passage à CAPTURED par une mise à
+   * jour conditionnelle (un seul appel gagne, les autres sortent sans rien refaire), et un échec ne peut jamais
+   * écraser un paiement déjà capturé par une autre tentative. Si le traitement métier échoue, la transaction repasse
+   * en attente pour que le renvoi du webhook le reprenne (toutes ses étapes sont rejouables).
+   */
   private async settleTransaction(
     providerType: PaymentProviderType,
     externalReference: string,
     status: 'CAPTURED' | 'FAILED',
     rawPayload: unknown,
   ) {
+    void providerType;
     const transaction = await this.prisma.paymentTransaction.findFirst({
       where: { externalReference },
     });
@@ -206,25 +215,62 @@ export class PaymentsService {
       return { paymentId: transaction.paymentId, status: transaction.status };
     }
 
-    await this.prisma.paymentTransaction.update({
-      where: { id: transaction.id },
-      data: {
-        status,
-        webhookReceivedAt: new Date(),
-        rawPayload: rawPayload as never,
-      },
-    });
+    const received = { webhookReceivedAt: new Date(), rawPayload: rawPayload as never };
 
-    const payment = await this.prisma.payment.update({
-      where: { id: transaction.paymentId },
-      data: { status },
-    });
-
-    if (status === 'CAPTURED') {
-      await this.handleCaptured(payment);
+    if (status === 'FAILED') {
+      await this.prisma.paymentTransaction.updateMany({
+        where: { id: transaction.id, status: { not: PaymentStatus.CAPTURED } },
+        data: { status: PaymentStatus.FAILED, ...received },
+      });
+      await this.prisma.payment.updateMany({
+        where: {
+          id: transaction.paymentId,
+          status: { notIn: [PaymentStatus.CAPTURED, PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED] },
+        },
+        data: { status: PaymentStatus.FAILED },
+      });
+      const current = await this.prisma.payment.findUniqueOrThrow({ where: { id: transaction.paymentId } });
+      return { paymentId: current.id, status: current.status };
     }
 
-    return { paymentId: payment.id, status };
+    const claimedTransaction = await this.prisma.paymentTransaction.updateMany({
+      where: { id: transaction.id, status: { not: PaymentStatus.CAPTURED } },
+      data: { status: PaymentStatus.CAPTURED, ...received },
+    });
+    if (claimedTransaction.count === 0) {
+      return { paymentId: transaction.paymentId, status: PaymentStatus.CAPTURED };
+    }
+
+    const claimedPayment = await this.prisma.payment.updateMany({
+      where: {
+        id: transaction.paymentId,
+        status: { notIn: [PaymentStatus.CAPTURED, PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED] },
+      },
+      data: { status: PaymentStatus.CAPTURED },
+    });
+    if (claimedPayment.count === 0) {
+      // Une autre tentative a déjà capturé ce paiement : le client a été débité deux fois chez le prestataire.
+      // On ne recrédite surtout pas le chauffeur une seconde fois.
+      this.logger.error(
+        `Double capture sur le paiement ${transaction.paymentId} (transaction ${transaction.id}, réf. ${externalReference}) — le client a été débité deux fois : remboursement manuel à prévoir.`,
+      );
+      return { paymentId: transaction.paymentId, status: PaymentStatus.CAPTURED };
+    }
+
+    const payment = await this.prisma.payment.findUniqueOrThrow({ where: { id: transaction.paymentId } });
+    try {
+      await this.handleCaptured(payment);
+    } catch (error) {
+      await this.prisma.paymentTransaction
+        .update({ where: { id: transaction.id }, data: { status: PaymentStatus.PENDING } })
+        .catch(() => undefined);
+      await this.prisma.payment
+        .update({ where: { id: payment.id }, data: { status: PaymentStatus.PENDING } })
+        .catch(() => undefined);
+      throw error;
+    }
+
+    return { paymentId: payment.id, status: PaymentStatus.CAPTURED };
   }
 
   private async handleCaptured(payment: {
@@ -235,13 +281,30 @@ export class PaymentsService {
     if (payment.bookingId) {
       const booking = await this.prisma.booking.findUniqueOrThrow({
         where: { id: payment.bookingId },
-        include: { trip: { include: { driver: true, originCity: true, destinationCity: true } }, customer: true },
+        include: {
+          trip: { include: { driver: true, originCity: true, destinationCity: true } },
+          customer: true,
+          boardingStop: { include: { city: true } },
+          alightingStop: { include: { city: true } },
+        },
       });
-      await this.bookingsService.confirmPayment(booking.id);
+      const outcome = await this.bookingsService.confirmPayment(booking.id);
+      if (outcome === 'NOT_PAYABLE') {
+        // Paiement arrivé après l'annulation / l'expiration de la réservation (mobile money asynchrone) : la place
+        // n'est plus réservée. On rembourse intégralement le client et on ne crédite pas le chauffeur.
+        this.logger.warn(`Paiement reçu pour la réservation ${booking.id} déjà annulée — remboursement intégral.`);
+        await this.refundBooking(booking.id, 100);
+        return;
+      }
       await this.wallets.holdBookingRevenue({
         driverId: booking.trip.driverId,
         bookingId: booking.id,
-        grossAmount: (booking.totalAmount as bigint) - (booking.platformFee as bigint),
+        // Même formule que pour les envois : le client paie un seul montant (totalAmount), la commission de la
+        // plateforme (platformFee) en est retirée, le reste revient au chauffeur — soit exactement le prix qu'il a
+        // fixé (pricePerSeat × places), quel que soit le code promo : un rabais ne réduit que platformFee, donc
+        // totalAmount baisse du même montant et le net du chauffeur ne bouge pas (ex. 115 000 payés − 15 000 = 100 000 ;
+        // avec 10 000 de rabais : 105 000 − 5 000 = 100 000).
+        grossAmount: booking.totalAmount as bigint,
         commission: booking.platformFee,
         // Devise dans laquelle le client a payé — Booking.currencyId,
         // déjà disponible sans requête supplémentaire. Peut différer de
@@ -261,7 +324,7 @@ export class PaymentsService {
         type: NotificationType.BOOKING,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: 'Nouvelle réservation',
-        fallbackBody: `${booking.seatsCount} place${booking.seatsCount > 1 ? 's' : ''} réservée${booking.seatsCount > 1 ? 's' : ''} sur votre trajet ${booking.trip.originCity.name} → ${booking.trip.destinationCity.name}.`,
+        fallbackBody: `${booking.seatsCount} place${booking.seatsCount > 1 ? 's' : ''} réservée${booking.seatsCount > 1 ? 's' : ''} sur votre trajet ${booking.boardingStop?.city?.name ?? booking.trip.originCity.name} → ${booking.alightingStop?.city?.name ?? booking.trip.destinationCity.name}.`,
         pushData: { type: 'BOOKING', tripId: booking.trip.id, bookingId: booking.id },
       });
       await this.notifyReferralOfFirstPayment(booking.customer.userId);
@@ -272,6 +335,12 @@ export class PaymentsService {
         where: { id: payment.shipmentId },
         include: { customer: true },
       });
+      if (shipment.status === ShipmentStatus.CANCELLED || shipment.status === ShipmentStatus.REFUNDED) {
+        // Même cas pour un envoi : paiement tardif sur une demande déjà annulée → remboursement intégral.
+        this.logger.warn(`Paiement reçu pour l'envoi ${shipment.id} déjà annulé — remboursement intégral.`);
+        await this.refundShipment(shipment.id, 100);
+        return;
+      }
       await this.shipmentsService.confirmPayment(shipment.id);
       if (shipment.driverId) {
         // Un chauffeur était déjà choisi avant le paiement : on peut
@@ -360,14 +429,26 @@ export class PaymentsService {
   }
 
   async refundBooking(bookingId: string, refundPercentage: number): Promise<void> {
+    // 0 % : rien n'est remboursé, donc ni statut « remboursé » ni notification trompeuse.
+    if (Math.round(refundPercentage) <= 0) return;
     const payment = await this.prisma.payment.findUnique({ where: { bookingId } });
     if (!payment || payment.status !== PaymentStatus.CAPTURED) return;
     await this.executeRefund(payment, refundPercentage);
     const booking = await this.prisma.booking.update({
       where: { id: bookingId },
       data: { status: BookingStatus.REFUNDED },
-      include: { customer: true },
+      include: { customer: true, trip: { select: { driverId: true } } },
     });
+    if (refundPercentage >= 100) {
+      // Client remboursé en totalité : le chauffeur ne doit plus toucher cette course (si ses fonds sont encore en
+      // attente). S'ils sont déjà libérés, c'est au support de les ajuster (wallet.adjust) — on le signale.
+      await this.wallets.reverseHeldFunds({
+        driverId: booking.trip.driverId,
+        bookingId,
+        reason: 'Remboursement intégral du client',
+      });
+      await this.warnIfFundsAlreadyReleased({ bookingId }, 'réservation');
+    }
     await this.notifications.notify({
       userId: booking.customer.userId,
       type: NotificationType.REFUND,
@@ -378,6 +459,7 @@ export class PaymentsService {
   }
 
   async refundShipment(shipmentId: string, refundPercentage: number): Promise<void> {
+    if (Math.round(refundPercentage) <= 0) return;
     const payment = await this.prisma.payment.findUnique({ where: { shipmentId } });
     if (!payment || payment.status !== PaymentStatus.CAPTURED) return;
     await this.executeRefund(payment, refundPercentage);
@@ -389,6 +471,14 @@ export class PaymentsService {
       where: { id: shipmentId },
       include: { customer: true },
     });
+    if (refundPercentage >= 100 && shipment.driverId) {
+      await this.wallets.reverseHeldFunds({
+        driverId: shipment.driverId,
+        shipmentId,
+        reason: 'Remboursement intégral du client',
+      });
+      await this.warnIfFundsAlreadyReleased({ shipmentId }, 'envoi');
+    }
     await this.notifications.notify({
       userId: shipment.customer.userId,
       type: NotificationType.REFUND,
@@ -396,6 +486,25 @@ export class PaymentsService {
       fallbackTitle: 'Remboursement effectué',
       fallbackBody: `Votre remboursement (${refundPercentage}%) a été traité.`,
     });
+  }
+
+  /** Signale au support un remboursement intégral dont l'argent est déjà dans le solde disponible du chauffeur. */
+  private async warnIfFundsAlreadyReleased(
+    reference: { bookingId: string } | { shipmentId: string },
+    label: string,
+  ): Promise<void> {
+    const released = await this.prisma.walletTransaction.count({
+      where: {
+        ...reference,
+        status: 'COMPLETED',
+        type: { in: ['BOOKING_REVENUE', 'SHIPMENT_REVENUE'] },
+      },
+    });
+    if (released > 0) {
+      this.logger.warn(
+        `Remboursement intégral d'une ${label} dont les gains du chauffeur sont déjà libérés (${JSON.stringify(reference)}) — ajustement manuel du portefeuille à prévoir (wallet.adjust).`,
+      );
+    }
   }
 
   private async executeRefund(

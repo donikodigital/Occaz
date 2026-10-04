@@ -54,3 +54,36 @@ function maskLocation(location: AvailableShipmentSource['senderLocation']) {
     cityId: location.cityId,
   };
 }
+// ---------------------------------------------------------------------------
+// Contacts une fois le colis livré
+// ---------------------------------------------------------------------------
+
+/** Statuts où la prestation est terminée sans litige : plus aucun appel ni SMS entre le chauffeur et les clients. */
+const CONTACT_CLOSED_STATUSES: ReadonlySet<string> = new Set(['DELIVERED', 'COMPLETED']);
+
+export type ShipmentViewer = 'customer' | 'driver';
+
+/**
+ * Une fois le colis livré SANS litige (DELIVERED / COMPLETED), les numéros de téléphone ne sont plus communiqués :
+ *  - au chauffeur : ceux de l'expéditeur et du destinataire (il n'a plus de raison de les appeler) ;
+ *  - au client : celui du chauffeur.
+ * Si un litige s'ouvre ensuite (statut DISPUTED), les numéros reviennent le temps de le régler. Le personnel du support
+ * n'est jamais concerné (il garde tout) : cette fonction ne s'applique qu'aux vues client et chauffeur.
+ *
+ * C'est la vraie protection : l'application ne fait que ne rien afficher quand le serveur ne renvoie rien.
+ */
+export function hideContactsOnceDelivered<
+  T extends { status: string; senderPhone: string; recipientPhone: string; driverPhone?: string | null },
+>(
+  shipment: T,
+  viewer: ShipmentViewer,
+): Omit<T, 'senderPhone' | 'recipientPhone' | 'driverPhone'> & {
+  senderPhone: string | null;
+  recipientPhone: string | null;
+  driverPhone?: string | null;
+} {
+  if (!CONTACT_CLOSED_STATUSES.has(shipment.status)) return shipment;
+  return viewer === 'driver'
+    ? { ...shipment, senderPhone: null, recipientPhone: null }
+    : { ...shipment, driverPhone: shipment.driverPhone === undefined ? undefined : null };
+}

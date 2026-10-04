@@ -687,6 +687,7 @@ model City {
   driverProfiles     DriverProfile[]
   tripsAsOrigin      Trip[]            @relation("TripOriginCity")
   tripsAsDestination Trip[]            @relation("TripDestinationCity")
+  tripStops          TripStop[]
 
   @@index([countryId])
   @@map("cities")
@@ -821,9 +822,28 @@ model TripStop {
   sequence           Int
   estimatedArrivalAt DateTime?
 
+  // Ville de l'étape, dénormalisée comme Trip.originCityId : la recherche « Kindia → Labé » se fait par ville.
+  cityId String?
+  city   City?   @relation(fields: [cityId], references: [id], onDelete: Restrict)
+
+  // Prix d'une place depuis le DÉPART du trajet jusqu'à cette étape (même devise que Trip.pricePerSeat).
+  // Calculé automatiquement (au prorata de la distance) puis modifiable par le chauffeur tant que le trajet est
+  // en brouillon. Le prix d'un tronçon A → B est fareFromOrigin(B) − fareFromOrigin(A) : départ = 0, arrivée =
+  // Trip.pricePerSeat. Une étape sans prix (anciens trajets) n'est pas réservable.
+  fareFromOrigin       BigInt?
+  distanceFromOriginKm Float?
+
+  // Le chauffeur peut décocher une ville traversée où il ne prend personne.
+  isBookable Boolean   @default(true)
+  arrivedAt  DateTime?
+
+  bookingsBoarding  Booking[] @relation("BookingBoardingStop")
+  bookingsAlighting Booking[] @relation("BookingAlightingStop")
+
   createdAt DateTime @default(now())
 
   @@unique([tripId, sequence])
+  @@index([cityId])
   @@map("trip_stops")
 }
 
@@ -837,11 +857,18 @@ model Booking {
   customer   CustomerProfile @relation(fields: [customerId], references: [id])
 
   seatsCount   Int
+  // Prix par place du TRONÇON réservé (= Trip.pricePerSeat pour le trajet entier).
   pricePerSeat BigInt
   platformFee  BigInt
   totalAmount  BigInt
   currencyId   String
   currency     Currency @relation(fields: [currencyId], references: [id])
+
+  // Tronçon réservé : étape de montée et de descente. null = départ (montée) / arrivée (descente) du trajet.
+  boardingStopId  String?
+  boardingStop    TripStop? @relation("BookingBoardingStop", fields: [boardingStopId], references: [id], onDelete: Restrict)
+  alightingStopId String?
+  alightingStop   TripStop? @relation("BookingAlightingStop", fields: [alightingStopId], references: [id], onDelete: Restrict)
 
   status BookingStatus @default(PENDING_PAYMENT)
 
@@ -865,6 +892,8 @@ model Booking {
   @@index([tripId])
   @@index([customerId])
   @@index([status])
+  @@index([boardingStopId])
+  @@index([alightingStopId])
   @@map("bookings")
 }
 

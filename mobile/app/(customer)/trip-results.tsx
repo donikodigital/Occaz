@@ -6,6 +6,11 @@
 // telle que renvoyée par l'API, plus aucune devise écrite en dur — puis
 // l'heure de départ, les places (formulation commune « 2 places libres » /
 // « Complet ») et « Colis ok ».
+// [03/10/2026] v3 — Villes traversées : un client de Kindia trouve un trajet Conakry → Labé qui passe par Kindia. La
+// carte affiche alors l'heure de passage à Kindia (et non le départ de Conakry), le prix du tronçon et le trajet complet
+// du conducteur ; le tronçon choisi est transmis au détail puis à la réservation.
+// [03/10/2026] v4 — Places par tronçon : « 3 places libres » / « Complet » valent pour le tronçon du client, pas pour le
+// trajet entier (le siège d'un client descendu à Kindia est de nouveau libre de Kindia à Labé).
 
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -34,11 +39,15 @@ import { useTripSearch } from '@/hooks/useTripSearch';
 import { formatMoney } from '@/utils/money';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { formatSeatsAvailability } from '@/utils/seats';
+import { segmentAvailableSeats } from '@/utils/tripSegment';
 import type { Trip } from '@/types/trips.types';
 
 function TripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
   const initials = `${trip.driver.firstName[0] ?? ''}${trip.driver.lastName[0] ?? ''}`;
-  const isFull = trip.availableSeats <= 0;
+  const seats = segmentAvailableSeats(trip);
+  const isFull = seats <= 0;
+  const segment = trip.segment;
+  const isPartial = Boolean(segment && !segment.isFullTrip);
 
   return (
     <OceanCard onPress={onPress} style={[styles.card, isFull && styles.cardFull]} accessibilityLabel={`Trajet de ${trip.driver.firstName}`}>
@@ -67,6 +76,11 @@ function TripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
               Nouveau chauffeur
             </AppText>
           )}
+          {isPartial ? (
+            <AppText variant="xs" color="textSecondary" numberOfLines={1}>
+              Trajet du conducteur : {trip.originCity.name} → {trip.destinationCity.name}
+            </AppText>
+          ) : null}
         </View>
         <View style={styles.priceBlock}>
           <AppText variant="lg" weight="bold" color={OCEAN.deep}>
@@ -80,9 +94,16 @@ function TripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
 
       <View style={styles.cardBottom}>
         <View style={styles.metaRow}>
-          <OceanPill label={`Départ ${formatTime(trip.departureAt)}`} icon={<IconClock size={13} color={OCEAN.base} />} />
           <OceanPill
-            label={formatSeatsAvailability(trip.availableSeats)}
+            label={
+              isPartial && segment
+                ? `Passage à ${segment.boardingCityName ?? 'votre étape'} vers ${formatTime(segment.boardingAt)}`
+                : `Départ ${formatTime(trip.departureAt)}`
+            }
+            icon={<IconClock size={13} color={OCEAN.base} />}
+          />
+          <OceanPill
+            label={formatSeatsAvailability(seats)}
             tone={isFull ? 'neutral' : 'ocean'}
             icon={<IconUsers size={13} color={isFull ? colors.textSecondary : OCEAN.base} />}
           />
@@ -186,7 +207,22 @@ export default function TripResultsScreen() {
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListHeaderComponent={header}
         ListEmptyComponent={emptyState}
-        renderItem={({ item }) => <TripCard trip={item} onPress={() => router.push(`/(customer)/trip/${item.id}`)} />}
+        renderItem={({ item }) => (
+          <TripCard
+            trip={item}
+            onPress={() =>
+              router.push({
+                pathname: '/(customer)/trip/[id]',
+                params: {
+                  id: item.id,
+                  // Tronçon trouvé par la recherche : transmis tel quel au détail, puis à la réservation.
+                  ...(item.segment?.boardingStopId ? { boardingStopId: item.segment.boardingStopId } : {}),
+                  ...(item.segment?.alightingStopId ? { alightingStopId: item.segment.alightingStopId } : {}),
+                },
+              })
+            }
+          />
+        )}
       />
     </ScreenContainer>
   );

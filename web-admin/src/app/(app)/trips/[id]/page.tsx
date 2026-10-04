@@ -115,23 +115,68 @@ export default function TripDetailPage() {
       </SectionCard>
 
       {trip.stops.length > 0 ? (
-        <SectionCard title="Étapes intermédiaires">
-          <ol className="space-y-0">
-            {trip.stops.map((stop, index) => (
-              <li key={stop.id} className="flex gap-3">
-                <div className="flex w-3 flex-col items-center">
-                  <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-border" />
-                  {index < trip.stops.length - 1 ? <span className="w-0.5 flex-1 bg-border" /> : null}
-                </div>
-                <div className="pb-4">
-                  <p className="text-sm font-semibold text-text-primary">{stop.location.label}</p>
+        <SectionCard
+          title="Villes traversées"
+          description="Chaque ville est un point de montée et de descente possible. Le prix d'un tronçon est la différence entre les prix de ses deux extrémités."
+        >
+          {trip.seatsByLeg && trip.seatsByLeg.length > 0 ? (
+            <div className="mb-4 rounded-2xl border border-border bg-background p-3 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Places par tronçon</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {trip.seatsByLeg.map((leg) => (
+                  <Chip
+                    key={`${leg.fromStopId ?? 'origin'}-${leg.toStopId ?? 'destination'}`}
+                    tone={leg.freeSeats === 0 ? 'neutral' : 'primary'}
+                  >
+                    {leg.fromCityName ?? '…'} → {leg.toCityName ?? '…'} : {leg.occupiedSeats} prise{leg.occupiedSeats > 1 ? 's' : ''} sur{' '}
+                    {trip.totalSeats ?? leg.occupiedSeats + leg.freeSeats}
+                  </Chip>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-text-muted">
+                Un client qui descend à une étape libère sa place pour les tronçons suivants.
+              </p>
+            </div>
+          ) : null}
+          <div className="space-y-3">
+            {trip.stops.map((stop, index) => {
+              const fare = stop.fareFromOrigin != null ? Number(stop.fareFromOrigin) : null;
+              const total = Number(trip.pricePerSeat);
+              const name = stop.city?.name ?? stop.location.label;
+              return (
+                <div key={stop.id} className="rounded-2xl border border-border bg-background p-3 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-light text-xs font-bold text-primary">
+                        {index + 1}
+                      </span>
+                      {name}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {stop.arrivedAt ? <Chip tone="success">Passé à {formatDateTime(stop.arrivedAt)}</Chip> : null}
+                      {stop.isBookable === false ? <Chip tone="neutral">Ne prend pas de passagers</Chip> : null}
+                      {fare === null ? <Chip tone="danger">Sans prix : non réservable</Chip> : null}
+                    </div>
+                  </div>
                   {stop.estimatedArrivalAt ? (
-                    <p className="text-xs text-text-secondary">Arrivée estimée {formatDateTime(stop.estimatedArrivalAt)}</p>
+                    <p className="mt-1 text-xs text-text-secondary">Passage estimé {formatDateTime(stop.estimatedArrivalAt)}</p>
+                  ) : null}
+                  {fare !== null ? (
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <MoneyTile
+                        label={`${trip.originCity.name} → ${name}`}
+                        value={formatMoney(String(fare), currencyCode)}
+                      />
+                      <MoneyTile
+                        label={`${name} → ${trip.destinationCity.name}`}
+                        value={formatMoney(String(Math.max(0, total - fare)), currencyCode)}
+                      />
+                    </div>
                   ) : null}
                 </div>
-              </li>
-            ))}
-          </ol>
+              );
+            })}
+          </div>
         </SectionCard>
       ) : null}
 
@@ -182,6 +227,19 @@ export default function TripDetailPage() {
                   </p>
                   <Chip tone={BOOKING_STATUS_TONE[booking.status]}>{BOOKING_STATUS_LABELS[booking.status]}</Chip>
                 </div>
+                {booking.boardingStop || booking.alightingStop ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Chip tone="primary">
+                      Tronçon : {booking.boardingStop?.city?.name ?? booking.boardingStop?.location?.label ?? trip.originCity.name} →{' '}
+                      {booking.alightingStop?.city?.name ?? booking.alightingStop?.location?.label ?? trip.destinationCity.name}
+                    </Chip>
+                    {booking.pricePerSeat ? (
+                      <span className="text-xs text-text-secondary">
+                        {formatMoney(booking.pricePerSeat, currencyCode)} par place
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
                 <p className="mt-1 text-xs text-text-secondary">
                   {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''} · {formatMoney(booking.totalAmount, currencyCode)}
                   {booking.customerPhone ? (

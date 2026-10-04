@@ -1,5 +1,8 @@
 // mobile/app/(driver)/(tabs)/trips.tsx
 //
+// [03/10/2026] v3 — La carte d'un envoi montre « ville de départ → ville d'arrivée » et la période, plus le nom du destinataire ;
+// le gain net passe à droite, au-dessus du statut.
+//
 // v2 — Habillage bleu océan, comme l'espace client : titre, deux segments
 // (Trajets / Envois) avec leur compteur, cartes ombrées par trajet ou
 // envoi, états vides avec une action (publier un trajet, voir les envois
@@ -16,7 +19,7 @@ import { OCEAN } from '@/theme/ocean';
 import { useMyTrips } from '@/hooks/useDriverTrips';
 import { useAssignedShipments } from '@/hooks/useDriverShipments';
 import { formatDateShort, formatTime } from '@/utils/date';
-import { driverNetAmount, formatWindow } from '@/utils/shipmentDisplay';
+import { driverNetAmount, formatShipmentRoute, formatWindow } from '@/utils/shipmentDisplay';
 import { formatMoney } from '@/utils/money';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_TONE, TRIP_STATUS_LABELS, TRIP_STATUS_TONE } from '@/utils/tripStatusLabels';
 import type { Trip } from '@/types/trips.types';
@@ -59,13 +62,18 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
       </View>
       <View style={styles.rowText}>
         <AppText variant="sm" weight="semibold" numberOfLines={1}>
-          {shipment.recipientName}
+          {formatShipmentRoute(shipment) ?? shipment.recipientName}
         </AppText>
         <AppText variant="xs" color="textSecondary" numberOfLines={1}>
-          Vous recevrez {formatMoney(driverNetAmount(shipment), shipment.currency?.isoCode)} · {formatWindow(shipment)}
+          {formatWindow(shipment)}
         </AppText>
       </View>
-      <OceanPill label={SHIPMENT_STATUS_LABELS[shipment.status]} tone={TONE_TO_PILL[SHIPMENT_STATUS_TONE[shipment.status]]} />
+      <View style={styles.rowEnd}>
+        <AppText variant="sm" weight="bold" color={OCEAN.deep}>
+          {formatMoney(driverNetAmount(shipment), shipment.currency?.isoCode)}
+        </AppText>
+        <OceanPill label={SHIPMENT_STATUS_LABELS[shipment.status]} tone={TONE_TO_PILL[SHIPMENT_STATUS_TONE[shipment.status]]} />
+      </View>
     </OceanCard>
   );
 }
@@ -253,6 +261,10 @@ const styles = StyleSheet.create({
   rowText: {
     flex: 1,
     gap: 2,
+  },
+  rowEnd: {
+    alignItems: 'flex-end',
+    gap: 5,
   },
   emptyButton: {
     alignSelf: 'stretch',

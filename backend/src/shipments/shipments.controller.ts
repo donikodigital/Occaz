@@ -23,6 +23,7 @@ import { CreateDocumentDto } from '../documents/dto/create-document.dto';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { ShipmentOtpService } from './shipment-otp.service';
+import { hideContactsOnceDelivered } from './shipment-views';
 
 @ApiTags('Envois')
 @ApiBearerAuth()
@@ -57,8 +58,8 @@ export class ShipmentsController {
    */
   @Get('available')
   async findAvailable(@Query() query: SearchAvailableShipmentsDto, @CurrentUser() user: AuthenticatedUser) {
-    await this.shipmentsService.requireEligibleDriver(user.id);
-    return this.shipmentsService.findAvailable(query);
+    const driverId = await this.shipmentsService.requireEligibleDriver(user.id);
+    return this.shipmentsService.findAvailable(query, driverId);
   }
 
   /** Prix affiché au client avant paiement — même calcul que la création. */
@@ -77,7 +78,10 @@ export class ShipmentsController {
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const shipment = await this.shipmentsService.findOne(id);
 
-    if (!(await this.scope.hasShipmentAccess(user, id))) {
+    // Le personnel du support garde tout ; un client ou un chauffeur ne voit plus les numéros une fois le colis livré.
+    if (await this.scope.hasShipmentAccess(user, id)) return shipment;
+
+    {
       const customer = await this.customerProfilesService.findByUserId(user.id).catch(() => null);
       const isOwningCustomer = customer?.id === shipment.customerId;
 
@@ -92,8 +96,8 @@ export class ShipmentsController {
       if (!isOwningCustomer && !isOwningDriver) {
         throw new ForbiddenException('Cet envoi ne vous appartient pas.');
       }
+      return hideContactsOnceDelivered(shipment, isOwningCustomer ? 'customer' : 'driver');
     }
-    return shipment;
   }
 
   /**

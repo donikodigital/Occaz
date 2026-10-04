@@ -72,6 +72,19 @@ export function formatCityCountry(location: Pick<TripLocation, 'city'> | null | 
   return parts.length ? parts.join(', ') : null;
 }
 
+/**
+ * « Dakar → Koundara » : ville de ramassage puis ville de livraison d'un envoi. À défaut de ville (adresse non rattachée),
+ * le libellé de l'adresse ; null si l'une des deux extrémités est inconnue (l'appelant choisit son repli).
+ */
+export function formatShipmentRoute(shipment: {
+  senderLocation?: Pick<TripLocation, 'city' | 'label'> | null;
+  recipientLocation?: Pick<TripLocation, 'city' | 'label'> | null;
+}): string | null {
+  const from = shipment.senderLocation?.city?.name ?? shipment.senderLocation?.label;
+  const to = shipment.recipientLocation?.city?.name ?? shipment.recipientLocation?.label;
+  return from && to ? `${from} → ${to}` : null;
+}
+
 type WithCities = {
   senderLocation?: { cityId: string | null };
   recipientLocation?: { cityId: string | null };
@@ -82,6 +95,29 @@ export function isSameRoute(trip: Pick<Trip, 'originCityId' | 'destinationCityId
   const from = shipment.senderLocation?.cityId;
   const to = shipment.recipientLocation?.cityId;
   return Boolean(from && to && trip.originCityId === from && trip.destinationCityId === to);
+}
+
+/**
+ * Heure à laquelle le trajet passe à la ville de ramassage de l'envoi, si sa route (départ, villes traversées, arrivée) va
+ * de cette ville à la ville de livraison dans cet ordre ; null sinon. Un colis Kindia → Labé convient donc à un trajet
+ * Conakry → Labé qui traverse Kindia. Même règle que le serveur (ShipmentsService.accept).
+ */
+export function shipmentPassingAt(trip: Trip, shipment: WithCities): Date | null {
+  const from = shipment.senderLocation?.cityId;
+  const to = shipment.recipientLocation?.cityId;
+  if (!from || !to) return null;
+
+  const stops = [...(trip.stops ?? [])].sort((a, b) => a.sequence - b.sequence);
+  const route: Array<{ cityId: string | null | undefined; at: string | null }> = [
+    { cityId: trip.originCityId, at: trip.departureAt },
+    ...stops.map((stop) => ({ cityId: stop.cityId, at: stop.estimatedArrivalAt })),
+    { cityId: trip.destinationCityId, at: null },
+  ];
+  for (let i = 0; i < route.length; i += 1) {
+    if (route[i].cityId !== from) continue;
+    if (route.slice(i + 1).some((point) => point.cityId === to)) return new Date(route[i].at ?? trip.departureAt);
+  }
+  return null;
 }
 
 /** Le départ du trajet tombe dans la plage de dates choisie par le client. */
@@ -98,12 +134,23 @@ export function isWithinWindow(trip: Pick<Trip, 'departureAt'>, shipment: Pick<S
  * Un chauffeur sans trajet compatible peut quand même accepter, sans trajet.
  */
 export function getEligibleTrips(trips: Trip[], shipment: AvailableShipment): Trip[] {
+  const hasCities = Boolean(shipment.senderLocation?.cityId && shipment.recipientLocation?.cityId);
+
+  /** Le trajet passe par les deux villes dans le bon ordre ET son passage au ramassage tombe dans la plage du client. */
+  function fitsWindowAndRoute(trip: Trip): boolean {
+    if (!hasCities) return isWithinWindow(trip, shipment);
+    const passingAt = shipmentPassingAt(trip, shipment);
+    if (!passingAt) return false;
+    const time = passingAt.getTime();
+    return time >= new Date(shipment.windowStart).getTime() && time <= new Date(shipment.windowEnd).getTime();
+  }
+
   return trips
     .filter(
       (trip) =>
         trip.status === 'PUBLISHED' &&
         trip.allowsShipments &&
-        isWithinWindow(trip, shipment) &&
+        fitsWindowAndRoute(trip) &&
         (trip.availableShipmentWeightKg === null || trip.availableShipmentWeightKg >= shipment.weightKg),
     )
     .sort((a, b) => {

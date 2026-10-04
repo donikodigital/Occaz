@@ -1,5 +1,10 @@
 // mobile/app/(driver)/trip-new.tsx
 //
+// [03/10/2026] v5 — « Villes traversées » : le conducteur ajoute les villes où il passe (Kindia, Mamou…) pour que les
+// clients de ces villes trouvent et réservent son trajet. Les étapes sont rangées dans l'ordre de la route (distance
+// depuis le départ) ; leurs prix sont calculés automatiquement par le serveur et se modifient sur l'écran du trajet,
+// avant la publication.
+//
 // v4.1 — Corrige une seule chose depuis v4 : IconButton n'accepte pas de
 // prop `style` (volontairement, voir IconButtonProps). Le bouton
 // d'inversion desktop est désormais enveloppé dans une View qui porte le
@@ -21,6 +26,7 @@ import {
   IconPlus,
   IconRoute,
   IconUsers,
+  IconX,
 } from '@tabler/icons-react-native';
 import {
   AppText,
@@ -47,6 +53,7 @@ import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import { formatDateLong, formatTime, upcomingDays } from '@/utils/date';
 import { formatMoney } from '@/utils/money';
+import { sortByDistanceFrom } from '@/utils/routeOrder';
 import { ApiError } from '@/services/api/ApiError';
 import type { TripLocation } from '@/types/trips.types';
 
@@ -178,6 +185,8 @@ export default function NewTripScreen() {
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [origin, setOrigin] = useState<TripLocation | null>(null);
   const [destination, setDestination] = useState<TripLocation | null>(null);
+  const [stops, setStops] = useState<TripLocation[]>([]);
+  const [stopFieldKey, setStopFieldKey] = useState(0);
   const [departureDate, setDepartureDate] = useState<Date>(() => upcomingDays(1)[0]);
   const [departureTime, setDepartureTime] = useState<TimeValue>({ hour: 8, minute: 0 });
   const [totalSeats, setTotalSeats] = useState(3);
@@ -242,7 +251,31 @@ export default function NewTripScreen() {
     const previousOrigin = origin;
     setOrigin(destination);
     setDestination(previousOrigin);
+    // La route est inversée : l'ordre de passage des villes traversées aussi.
   }
+
+  function handleAddStop(location: TripLocation | null) {
+    if (!location) return;
+    setErrorMessage(undefined);
+    if (!location.cityId) {
+      setErrorMessage('Choisissez une adresse située dans la ville traversée.');
+    } else if (location.cityId === origin?.cityId || location.cityId === destination?.cityId) {
+      setErrorMessage("Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
+    } else if (stops.some((stop) => stop.cityId === location.cityId)) {
+      setErrorMessage('Cette ville est déjà dans la liste.');
+    } else {
+      setStops((current) => [...current, location]);
+    }
+    // Remet le champ à zéro pour ajouter une autre ville.
+    setStopFieldKey((value) => value + 1);
+  }
+
+  function handleRemoveStop(locationId: string) {
+    setStops((current) => current.filter((stop) => stop.id !== locationId));
+  }
+
+  // Villes traversées rangées dans l'ordre de la route : de la plus proche du départ à la plus éloignée.
+  const orderedStops = useMemo(() => sortByDistanceFrom(origin, stops), [stops, origin]);
 
   const priceNumber = Number(pricePerSeat.replace(',', '.'));
   const hasValidPrice = Number.isFinite(priceNumber) && priceNumber > 0;
@@ -273,6 +306,10 @@ export default function NewTripScreen() {
       setErrorMessage('Indiquez le prix par place.');
       return;
     }
+    if (orderedStops.some((stop) => stop.cityId === origin.cityId || stop.cityId === destination.cityId)) {
+      setErrorMessage("Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
+      return;
+    }
     if (!currencyId) {
       setErrorMessage('Choisissez une devise.');
       return;
@@ -291,6 +328,10 @@ export default function NewTripScreen() {
         currencyId,
         allowsShipments,
         notes: notes.trim() || undefined,
+        stops:
+          orderedStops.length > 0
+            ? orderedStops.map((stop, index) => ({ locationId: stop.id, sequence: index + 1 }))
+            : undefined,
       },
       {
         onSuccess: (trip) => router.replace(`/(driver)/trip/${trip.id}`),
@@ -424,6 +465,40 @@ export default function NewTripScreen() {
                 />
               </View>
             )}
+          </SectionCard>
+
+          <SectionCard icon={<IconMapPin size={18} color={colors.primary} />} title="Villes traversées (facultatif)">
+            <AppText variant="sm" color="textSecondary">
+              Ajoutez les villes où vous passez : les clients qui y habitent pourront trouver votre trajet et monter ou
+              descendre chez eux. Les prix sont calculés automatiquement ; vous pourrez les modifier avant de publier.
+            </AppText>
+            {orderedStops.map((stop, index) => (
+              <View key={stop.id} style={styles.stopRow}>
+                <View style={styles.stopBadge}>
+                  <AppText variant="xs" weight="bold" color="primary">
+                    {index + 1}
+                  </AppText>
+                </View>
+                <AppText variant="sm" weight="semibold" numberOfLines={1} style={styles.stopLabel}>
+                  {stop.label}
+                </AppText>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Retirer ${stop.label}`}
+                  onPress={() => handleRemoveStop(stop.id)}
+                  hitSlop={8}
+                >
+                  <IconX size={18} color={colors.textSecondary} />
+                </Pressable>
+              </View>
+            ))}
+            <LocationAutocompleteField
+              key={stopFieldKey}
+              label=""
+              value={null}
+              onChange={handleAddStop}
+              placeholder="Ajouter une ville traversée (ex. Kindia)"
+            />
           </SectionCard>
 
           <SectionCard icon={<IconCalendarEvent size={18} color={colors.primary} />} title="Date et heure">
@@ -846,5 +921,22 @@ const styles = StyleSheet.create({
   },
   error: {
     marginBottom: spacing.xxs,
+  },
+  stopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  stopBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: OCEAN.mist,
+  },
+  stopLabel: {
+    flex: 1,
   },
 });

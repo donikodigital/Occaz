@@ -1,4 +1,7 @@
 // backend/src/shipments/shipments.service.ts
+// [03/10/2026] v5 — colis et villes traversées : « Colis sur mon trajet » (findAvailable avec tripId) ne garde que les envois
+// dont le ramassage précède la livraison sur la route du trajet (étapes comprises), et l'acceptation avec un trajet vérifie
+// la même chose — le passage au ramassage (ex. Kindia) doit tomber dans la plage de dates du client.
 // [21/09/2026] v4 — l'autre partie est prévenue d'une annulation (chauffeur ou client).
 // [21/09/2026] v3 — devise jointe aux listes client et chauffeur ; liste admin avec villes, chauffeur et devise.
 // [21/09/2026] v2 — plage de dates, prix unique, acceptation atomique (premier arrivé), chauffeur sans trajet, annulation remboursée à 100 %, prolongation, expiration ; profil chauffeur limité aux champs publics.
@@ -31,6 +34,7 @@ import { CreateDocumentDto } from '../documents/dto/create-document.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PromoCodesService } from '../promo-codes/promo-codes.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { buildRoute, matchRoute } from '../trips/trip-route';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { toMoneyBigInt } from '../common/utils/money.util';
 import {
@@ -41,7 +45,7 @@ import {
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { QuoteShipmentDto } from './dto/quote-shipment.dto';
 import { SearchAvailableShipmentsDto } from './dto/search-available-shipments.dto';
-import { toAvailableShipmentView } from './shipment-views';
+import { hideContactsOnceDelivered, toAvailableShipmentView } from './shipment-views';
 
 /**
  * Jusqu'à quel statut le client ou le chauffeur peuvent annuler. Une fois
@@ -399,28 +403,72 @@ export class ShipmentsService {
     return driver.id;
   }
 
-  /** Envois en recherche de chauffeur dont la plage n'est pas terminée, filtrables par ville — vue sans données personnelles. */
-  async findAvailable(dto: SearchAvailableShipmentsDto): Promise<PaginatedResult<unknown>> {
-    const where: Prisma.ShipmentWhereInput = {
+  /**
+   * Envois en recherche de chauffeur dont la plage n'est pas terminée, filtrables par ville — vue sans données personnelles.
+   * Avec `tripId` (un trajet du chauffeur) : seulement les envois « sur ce trajet », c'est-à-dire dont la ville de ramassage
+   * précède la ville de livraison sur sa route (départ, villes traversées, arrivée) et dont la plage de dates couvre l'heure
+   * à laquelle le chauffeur passe à la ville de ramassage.
+   */
+  async findAvailable(dto: SearchAvailableShipmentsDto, driverId?: string): Promise<PaginatedResult<unknown>> {
+    const include = {
+      category: true,
+      currency: true,
+      senderLocation: { include: { city: true } },
+      recipientLocation: { include: { city: true } },
+    } as const;
+    const baseWhere: Prisma.ShipmentWhereInput = {
       status: ShipmentStatus.SEARCHING_DRIVER,
       windowEnd: { gte: new Date() },
       ...(dto.originCityId ? { senderLocation: { cityId: dto.originCityId } } : {}),
       ...(dto.destinationCityId ? { recipientLocation: { cityId: dto.destinationCityId } } : {}),
     };
+
+    if (dto.tripId) {
+      const trip = await this.prisma.trip.findUnique({
+        where: { id: dto.tripId },
+        include: { stops: { orderBy: { sequence: 'asc' } } },
+      });
+      if (!trip) throw new NotFoundException('Trajet introuvable.');
+      if (driverId && trip.driverId !== driverId) {
+        throw new ForbiddenException("Ce trajet n'appartient pas à ce chauffeur.");
+      }
+      const route = buildRoute(trip);
+      const cityIds = route.map((point) => point.cityId).filter((cityId): cityId is string => cityId !== null);
+
+      const candidates = await this.prisma.shipment.findMany({
+        where: {
+          AND: [
+            baseWhere,
+            { senderLocation: { cityId: { in: cityIds } }, recipientLocation: { cityId: { in: cityIds } } },
+          ],
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 300,
+        include,
+      });
+
+      const onRoute = candidates.filter((shipment) => {
+        const senderCityId = shipment.senderLocation.cityId;
+        const recipientCityId = shipment.recipientLocation.cityId;
+        if (!senderCityId || !recipientCityId) return false;
+        const segment = matchRoute(route, senderCityId, recipientCityId, { requireBookable: false });
+        if (!segment) return false;
+        const passingAt = segment.boardingAt ?? trip.departureAt;
+        return passingAt >= shipment.windowStart && passingAt <= shipment.windowEnd;
+      });
+      const page = onRoute.slice(dto.skip, dto.skip + dto.take);
+      return new PaginatedResult(page.map(toAvailableShipmentView), onRoute.length, dto.page, dto.limit);
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.shipment.findMany({
-        where,
+        where: baseWhere,
         skip: dto.skip,
         take: dto.take,
         orderBy: { createdAt: 'asc' },
-        include: {
-          category: true,
-          currency: true,
-          senderLocation: { include: { city: true } },
-          recipientLocation: { include: { city: true } },
-        },
+        include,
       }),
-      this.prisma.shipment.count({ where }),
+      this.prisma.shipment.count({ where: baseWhere }),
     ]);
     return new PaginatedResult(data.map(toAvailableShipmentView), total, dto.page, dto.limit);
   }
@@ -452,17 +500,36 @@ export class ShipmentsService {
 
     let trip: Trip | null = null;
     if (tripId) {
-      trip = await this.prisma.trip.findUnique({ where: { id: tripId } });
-      if (!trip) throw new NotFoundException('Trajet introuvable.');
+      const tripWithStops = await this.prisma.trip.findUnique({
+        where: { id: tripId },
+        include: { stops: { orderBy: { sequence: 'asc' } } },
+      });
+      trip = tripWithStops;
+      if (!tripWithStops || !trip) throw new NotFoundException('Trajet introuvable.');
       if (trip.driverId !== driverId) {
         throw new ForbiddenException("Ce trajet n'appartient pas à ce chauffeur.");
       }
       if (trip.status !== TripStatus.PUBLISHED || !trip.allowsShipments) {
         throw new BadRequestException("Ce trajet n'accepte pas d'envois pour le moment.");
       }
-      if (trip.departureAt < shipment.windowStart || trip.departureAt > shipment.windowEnd) {
+
+      // Le trajet doit passer par la ville de ramassage PUIS par la ville de livraison (villes traversées comprises), et
+      // son passage au ramassage doit tomber dans la plage choisie par le client — pas forcément son départ de Conakry.
+      const senderCityId = shipment.senderLocation?.cityId ?? null;
+      const recipientCityId = shipment.recipientLocation?.cityId ?? null;
+      let passingAt = trip.departureAt;
+      if (senderCityId && recipientCityId) {
+        const segment = matchRoute(buildRoute(tripWithStops), senderCityId, recipientCityId, { requireBookable: false });
+        if (!segment) {
+          throw new BadRequestException(
+            'Ce trajet ne passe pas par les villes de cet envoi : le ramassage doit se trouver avant la livraison sur sa route. Acceptez-le sans trajet si vous le faites en dehors.',
+          );
+        }
+        passingAt = segment.boardingAt ?? trip.departureAt;
+      }
+      if (passingAt < shipment.windowStart || passingAt > shipment.windowEnd) {
         throw new BadRequestException(
-          'Le départ de ce trajet est en dehors de la plage de dates choisie par le client.',
+          'Le passage de ce trajet à la ville de ramassage est en dehors de la plage de dates choisie par le client.',
         );
       }
     }
@@ -812,11 +879,24 @@ export class ShipmentsService {
         skip: query.skip,
         take: query.take,
         orderBy: { createdAt: 'desc' },
-        include: { category: true, trip: true, currency: CURRENCY_SELECT },
+        // Villes de ramassage et de livraison : la carte de l'activité du chauffeur affiche « Dakar → Koundara ».
+        include: {
+          category: true,
+          trip: true,
+          currency: CURRENCY_SELECT,
+          senderLocation: { include: { city: true } },
+          recipientLocation: { include: { city: true } },
+        },
       }),
       this.prisma.shipment.count({ where }),
     ]);
-    return new PaginatedResult(data, total, query.page, query.limit);
+    // Colis livré sans litige : les numéros de l'expéditeur et du destinataire ne sont plus communiqués au chauffeur.
+    return new PaginatedResult(
+      data.map((shipment) => hideContactsOnceDelivered(shipment, 'driver')),
+      total,
+      query.page,
+      query.limit,
+    );
   }
 
   async findAll(

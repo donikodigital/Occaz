@@ -15,7 +15,7 @@ function createService(trip: unknown, activeBooking: unknown = null) {
   } as unknown as PrismaService;
 
   const stub = {} as any;
-  return new TripsService(prisma, stub, stub, stub, stub, stub, stub);
+  return new TripsService(prisma, stub, stub, stub, stub, stub, stub, stub);
 }
 
 describe('TripsService.getPosition', () => {

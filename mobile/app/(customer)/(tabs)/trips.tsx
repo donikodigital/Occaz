@@ -1,5 +1,7 @@
 // mobile/app/(customer)/(tabs)/trips.tsx
 // [21/09/2026] v+ — le montant d'un envoi s'affiche dans sa devise.
+// [03/10/2026] v+ — la carte d'un envoi montre « ville de départ → ville d'arrivée » : on comprend d'un coup d'œil pourquoi
+// deux envois sont dans deux devises (la devise est celle du pays de ramassage).
 //
 // v2 — « Mon activité » en bleu océan, dans le style de l'accueil et du
 // profil. Un titre, deux segments (Trajets / Envois) avec leur compteur, un
@@ -20,7 +22,8 @@ import { useMyBookings } from '@/hooks/useBookings';
 import { useMyShipments } from '@/hooks/useShipments';
 import { formatMoney } from '@/utils/money';
 import { formatDateShort, formatTime } from '@/utils/date';
-import { formatCityCountry } from '@/utils/shipmentDisplay';
+import { formatCityCountry, formatShipmentRoute } from '@/utils/shipmentDisplay';
+import { bookingBoardingAt, bookingRouteLabel } from '@/utils/tripSegment';
 import type { Booking, BookingStatus } from '@/types/bookings.types';
 import type { Shipment, ShipmentStatus } from '@/types/shipments.types';
 
@@ -93,10 +96,10 @@ function BookingRow({ booking }: { booking: Booking }) {
       </View>
       <View style={styles.rowText}>
         <AppText variant="sm" weight="semibold" numberOfLines={1}>
-          {trip ? `${trip.originCity.name} → ${trip.destinationCity.name}` : 'Trajet'}
+          {bookingRouteLabel(booking) ?? 'Trajet'}
         </AppText>
         <AppText variant="xs" color="textSecondary">
-          {trip ? `${formatDateShort(trip.departureAt)} · ${formatTime(trip.departureAt)}` : ''}
+          {trip ? `${formatDateShort(bookingBoardingAt(booking) ?? trip.departureAt)} · ${formatTime(bookingBoardingAt(booking) ?? trip.departureAt)}` : ''}
         </AppText>
       </View>
       <View style={styles.rowEnd}>
@@ -120,7 +123,10 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
           {shipment.recipientName}
         </AppText>
         <AppText variant="xs" color="textSecondary" numberOfLines={1}>
-          {formatCityCountry(shipment.recipientLocation) ?? shipment.recipientLocation?.label ?? formatDateShort(shipment.createdAt)}
+          {formatShipmentRoute(shipment) ??
+            formatCityCountry(shipment.recipientLocation) ??
+            shipment.recipientLocation?.label ??
+            formatDateShort(shipment.createdAt)}
         </AppText>
       </View>
       <View style={styles.rowEnd}>

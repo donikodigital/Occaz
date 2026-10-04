@@ -1,5 +1,6 @@
 // backend/src/auth/auth.controller.ts
 import { Body, Controller, HttpCode, HttpStatus, Ip, Post, Headers } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -18,6 +19,8 @@ import { EnableTwoFactorDto } from './dto/enable-two-factor.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Chaque demande de code coûte un SMS : 5 par minute et par adresse IP (en plus de la limite par numéro dans le service).
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('otp/request')
@@ -25,6 +28,7 @@ export class AuthController {
     return this.authService.requestOtp(dto);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('otp/verify')
@@ -36,6 +40,7 @@ export class AuthController {
     return this.authService.verifyOtpAndLogin(dto, { ipAddress: ip, userAgent });
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')
@@ -47,6 +52,7 @@ export class AuthController {
     return this.authService.loginWithPassword(dto, { ipAddress: ip, userAgent });
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('password-reset/request')
@@ -54,6 +60,7 @@ export class AuthController {
     return this.authService.requestPasswordReset(dto);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('password-reset/confirm')

@@ -1,7 +1,7 @@
 // mobile/src/types/bookings.types.ts
 // [23/09/2026] v+ — champ promoCode facultatif sur CreateBookingPayload.
 import type { Money } from '@/services/api/types';
-import type { Trip } from './trips.types';
+import type { Trip, TripStop } from './trips.types';
 
 export type BookingStatus =
   | 'PENDING_PAYMENT'
@@ -29,10 +29,16 @@ export interface Booking {
   trip?: Trip;
   customerId: string;
   seatsCount: number;
+  /** Prix par place du tronçon réservé (celui du trajet entier si le client monte au départ et descend à l'arrivée). */
   pricePerSeat: Money;
   platformFee: Money;
   totalAmount: Money;
   currencyId: string;
+  /** Étape de montée / de descente ; null = départ / arrivée du trajet. */
+  boardingStopId?: string | null;
+  alightingStopId?: string | null;
+  boardingStop?: TripStop | null;
+  alightingStop?: TripStop | null;
   status: BookingStatus;
   cancelledAt: string | null;
   cancelledBy: string | null;
@@ -56,6 +62,9 @@ export interface CreateBookingPayload {
   passengers?: PassengerInput[];
   /** Code promo à appliquer, s'il y en a un — voir /promo-codes/validate pour l'aperçu avant envoi. */
   promoCode?: string;
+  /** Tronçon réservé : étape de montée / de descente (absent = départ / arrivée du trajet). */
+  boardingStopId?: string;
+  alightingStopId?: string;
 }
 
 export interface CancelBookingPayload {

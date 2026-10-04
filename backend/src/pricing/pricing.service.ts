@@ -83,6 +83,11 @@ export class PricingService {
       fee = rule.maxAmount;
     }
 
+    // Garde-fou : une commission ne peut jamais dépasser le montant sur lequel elle porte (une règle mal
+    // configurée, ex. montant fixe supérieur au prix, ferait sinon verser un revenu négatif au chauffeur).
+    if (fee > baseAmount) fee = baseAmount;
+    if (fee < 0n) fee = 0n;
+
     return fee;
   }
 
@@ -209,6 +214,19 @@ export class PricingService {
    * distance de zéro sans prévenir (ancien comportement : sous-facturation
    * silencieuse).
    */
+  /**
+   * Distance à vol d'oiseau entre deux adresses, ou null si elle ne peut pas être calculée (adresse sans coordonnées
+   * ni ville localisée). Sert aux étapes d'un trajet : sans distance, les prix et les heures de passage se répartissent
+   * à égale distance au lieu de faire échouer la création du trajet.
+   */
+  async distanceKmBetweenLocations(fromLocationId: string, toLocationId: string): Promise<number | null> {
+    try {
+      return await this.computeDistanceKm(fromLocationId, toLocationId);
+    } catch {
+      return null;
+    }
+  }
+
   private async computeDistanceKm(senderLocationId: string, recipientLocationId: string): Promise<number> {
     const rows = await this.prisma.$queryRaw<{ distanceMeters: number | null }[]>`
       SELECT ST_Distance(a."geoPoint", b."geoPoint") AS "distanceMeters"

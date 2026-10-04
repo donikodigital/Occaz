@@ -23,6 +23,8 @@ export interface AcceptShipmentSheetProps {
   onAccepted: (shipmentId: string) => void;
   /** Appelé si l'acceptation échoue (souvent : un autre chauffeur a été plus rapide) — sert à rafraîchir la liste. */
   onAttemptFailed?: () => void;
+  /** Trajet sur lequel le chauffeur cherche des colis (liste « Colis sur ce trajet ») : retenu d'office s'il convient. */
+  preferredTripId?: string;
 }
 
 /** Valeur de choix "sans trajet" — jamais un identifiant réel de trajet. */
@@ -92,11 +94,13 @@ function AcceptShipmentContent({
   onClose,
   onAccepted,
   onAttemptFailed,
+  preferredTripId,
 }: {
   shipment: AvailableShipment;
   onClose: () => void;
   onAccepted: (shipmentId: string) => void;
   onAttemptFailed?: () => void;
+  preferredTripId?: string;
 }) {
   const { data: tripsPage, isLoading: tripsLoading } = useMyTrips();
   const assignShipment = useAssignShipment(shipment.id);
@@ -108,7 +112,7 @@ function AcceptShipmentContent({
   const activeChoice =
     selection === NO_TRIP || eligibleTrips.some((trip) => trip.id === selection)
       ? (selection as string)
-      : (eligibleTrips[0]?.id ?? NO_TRIP);
+      : (eligibleTrips.find((trip) => trip.id === preferredTripId)?.id ?? eligibleTrips[0]?.id ?? NO_TRIP);
   const dimensions = formatDimensions(shipment);
 
   function handleConfirm() {
@@ -253,7 +257,7 @@ function AcceptShipmentContent({
  * servi. Monté avec `key={shipment.id}` pour repartir d'un état vierge à
  * chaque envoi.
  */
-export function AcceptShipmentSheet({ shipment, onClose, onAccepted, onAttemptFailed }: AcceptShipmentSheetProps) {
+export function AcceptShipmentSheet({ shipment, onClose, onAccepted, onAttemptFailed, preferredTripId }: AcceptShipmentSheetProps) {
   if (!shipment) return null;
 
   return (
@@ -264,6 +268,7 @@ export function AcceptShipmentSheet({ shipment, onClose, onAccepted, onAttemptFa
         onClose={onClose}
         onAccepted={onAccepted}
         onAttemptFailed={onAttemptFailed}
+        preferredTripId={preferredTripId}
       />
     </Modal>
   );

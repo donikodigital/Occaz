@@ -18,4 +18,12 @@ export class SearchAvailableShipmentsDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   destinationCityId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Un de vos trajets : ne renvoie que les envois dont la ville de ramassage précède la ville de livraison sur sa route (villes traversées comprises) et dont la plage de dates couvre votre passage à la ville de ramassage.",
+  })
+  @IsOptional()
+  @IsString()
+  tripId?: string;
 }

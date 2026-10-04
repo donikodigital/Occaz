@@ -584,7 +584,7 @@ explicitement par le client, pas des comptes de démonstration :
 | jallowdoniko@gmail.com | Superviseur clientèle | +33621158829 |
 | donikojallow@gmail.com | Responsable financier | +33611435397 |
 
-Mot de passe commun : `Lcd123456!`. Deux modes de connexion pour ces
+Mot de passe commun : celui que vous définissez dans `SEED_STAFF_PASSWORD` (12 caractères minimum, jamais écrit dans le code) au moment de lancer `npm run seed:accounts`. Deux modes de connexion pour ces
 quatre comptes :
 - **Téléphone + OTP** (prioritaire, comme demandé) — fonctionne
   immédiatement pour les quatre, `verifyOtpAndLogin` ne fait aucune

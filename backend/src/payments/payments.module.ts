@@ -5,6 +5,7 @@ import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { PaymentProviderRegistry } from './providers/payment-provider-registry.service';
 import { SimulatedPaymentProvider } from './providers/simulated-payment.provider';
+import { ProductionSafetyService } from '../common/safety/production-safety.service';
 import { PaymentProvidersModule } from '../payment-providers/payment-providers.module';
 import { WalletsModule } from '../wallets/wallets.module';
 import { TripsModule } from '../trips/trips.module';
@@ -32,7 +33,7 @@ import { ReferralsModule } from '../referrals/referrals.module';
     ReferralsModule,
   ],
   controllers: [PaymentsController],
-  providers: [PaymentsService, PaymentProviderRegistry, SimulatedPaymentProvider],
+  providers: [PaymentsService, PaymentProviderRegistry, SimulatedPaymentProvider, ProductionSafetyService],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

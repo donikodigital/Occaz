@@ -6,6 +6,8 @@
 //   - carte « Chauffeur » (photo, badge vérifié, note, véhicule et plaque) ;
 //   - carte « Détails » : places, colis acceptés, note du chauffeur ;
 //   - pied de page fixe : le prix par place et « Réserver ».
+// [03/10/2026] v3 — Villes traversées : le tronçon choisi dans la recherche (ex. Kindia → Labé) donne le prix, l'heure de
+// passage et la frise ; les étapes du conducteur sont listées avec leur heure de passage, celles du client en évidence.
 
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -28,14 +30,19 @@ import { useTrip } from '@/hooks/useTripSearch';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { formatSeatsAvailability } from '@/utils/seats';
+import { segmentAvailableSeats, stopName } from '@/utils/tripSegment';
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 export default function TripDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: trip, isLoading, isError } = useTrip(id);
+  const { id, boardingStopId, alightingStopId } = useLocalSearchParams<{
+    id: string;
+    boardingStopId?: string;
+    alightingStopId?: string;
+  }>();
+  const { data: trip, isLoading, isError } = useTrip(id, { boardingStopId, alightingStopId });
 
   if (isLoading || !trip) {
     return (
@@ -52,9 +59,14 @@ export default function TripDetailScreen() {
   }
 
   const initials = `${trip.driver.firstName[0] ?? ''}${trip.driver.lastName[0] ?? ''}`;
-  const isFull = trip.availableSeats <= 0;
+  // Places libres sur le tronçon du client (pas sur le trajet entier).
+  const seats = segmentAvailableSeats(trip);
+  const isFull = seats <= 0;
   const originLabel = trip.originLocation?.label ?? trip.originCity.name;
   const destinationLabel = trip.destinationLocation?.label ?? trip.destinationCity.name;
+  const segment = trip.segment;
+  const isPartial = Boolean(segment && !segment.isFullTrip);
+  const boardingAt = segment?.boardingAt ?? trip.departureAt;
 
   return (
     <ScreenContainer
@@ -72,7 +84,16 @@ export default function TripDetailScreen() {
           </View>
           <OceanButton
             label={isFull ? 'Complet' : 'Réserver'}
-            onPress={() => router.push({ pathname: '/(customer)/booking/new', params: { tripId: trip.id } })}
+            onPress={() =>
+              router.push({
+                pathname: '/(customer)/booking/new',
+                params: {
+                  tripId: trip.id,
+                  ...(boardingStopId ? { boardingStopId } : {}),
+                  ...(alightingStopId ? { alightingStopId } : {}),
+                },
+              })
+            }
             disabled={isFull}
             style={styles.reserveButton}
           />
@@ -84,7 +105,7 @@ export default function TripDetailScreen() {
       <OceanHeroCard style={styles.hero}>
         <View style={styles.heroTop}>
           <OceanPill
-            label={formatSeatsAvailability(trip.availableSeats)}
+            label={formatSeatsAvailability(seats)}
             tone={isFull ? 'neutral' : 'ocean'}
             icon={<IconUsers size={13} color={isFull ? colors.textSecondary : OCEAN.base} />}
           />
@@ -92,11 +113,16 @@ export default function TripDetailScreen() {
 
         <View style={styles.when}>
           <AppText variant="sm" color={OCEAN.sky}>
-            {capitalize(formatDateLong(trip.departureAt))}
+            {capitalize(formatDateLong(boardingAt))}
           </AppText>
           <AppText variant="xxl" weight="bold" color={OCEAN.onDark}>
-            {formatTime(trip.departureAt)}
+            {formatTime(boardingAt)}
           </AppText>
+          {isPartial && segment ? (
+            <AppText variant="sm" color={OCEAN.onDark}>
+              Vous montez à {segment.boardingCityName ?? 'votre étape'} et descendez à {segment.alightingCityName ?? 'votre arrivée'}
+            </AppText>
+          ) : null}
         </View>
 
         <View style={styles.route}>
@@ -115,16 +141,24 @@ export default function TripDetailScreen() {
               </AppText>
             </View>
             {trip.stops && trip.stops.length > 0
-              ? trip.stops.map((stop) => (
-                  <View key={stop.id} style={styles.stop}>
-                    <AppText variant="xs" color={OCEAN.sky}>
-                      Étape
-                    </AppText>
-                    <AppText variant="sm" color={OCEAN.onDark} numberOfLines={2}>
-                      {stop.location?.label ?? 'Étape'}
-                    </AppText>
-                  </View>
-                ))
+              ? trip.stops.map((stop) => {
+                  const isMine = stop.id === segment?.boardingStopId || stop.id === segment?.alightingStopId;
+                  return (
+                    <View key={stop.id} style={styles.stop}>
+                      <AppText variant="xs" color={OCEAN.sky}>
+                        {stop.id === segment?.boardingStopId
+                          ? 'Votre montée'
+                          : stop.id === segment?.alightingStopId
+                            ? 'Votre descente'
+                            : 'Étape'}
+                        {stop.estimatedArrivalAt ? ` · vers ${formatTime(stop.estimatedArrivalAt)}` : ''}
+                      </AppText>
+                      <AppText variant="sm" weight={isMine ? 'bold' : 'regular'} color={OCEAN.onDark} numberOfLines={2}>
+                        {stopName(stop)}
+                      </AppText>
+                    </View>
+                  );
+                })
               : null}
             <View style={styles.stop}>
               <AppText variant="xs" color={OCEAN.sky}>

@@ -5,6 +5,8 @@ import {
   Injectable,
   Logger,
   UnauthorizedException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -62,6 +64,28 @@ export class AuthService {
    * dans AUTH_TEST_PHONE_NUMBERS / AUTH_TEST_STAFF_EMAILS — n'importe
    * quel autre compte suit le parcours normal, sans exception.
    */
+  /**
+   * Chaque demande de code envoie un SMS payant : au plus 5 par numéro et par fenêtre de 15 minutes. Évite qu'un
+   * script (ou un utilisateur qui s'impatiente) vide le crédit SMS ou harcèle un numéro. Les numéros de test sont exemptés.
+   */
+  private async assertOtpRequestAllowed(userId: string): Promise<void> {
+    const windowMinutes = Number(process.env.OTP_REQUEST_WINDOW_MINUTES ?? 15);
+    const maxRequests = Number(process.env.OTP_REQUEST_LIMIT ?? 5);
+    const recent = await this.prisma.otpCode.count({
+      where: {
+        userId,
+        purpose: OtpPurpose.LOGIN,
+        createdAt: { gte: new Date(Date.now() - windowMinutes * 60_000) },
+      },
+    });
+    if (recent >= maxRequests) {
+      throw new HttpException(
+        `Trop de demandes de code. Patientez ${windowMinutes} minutes avant de réessayer.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
   private isTestPhone(phone: string): boolean {
     if (process.env.AUTH_TEST_MODE_ENABLED !== 'true') return false;
     const testPhones = (process.env.AUTH_TEST_PHONE_NUMBERS ?? '').split(',').map((p) => p.trim());
@@ -144,6 +168,8 @@ export class AuthService {
     if (user.isSuspended) {
       throw new BadRequestException('Ce compte est suspendu.');
     }
+
+    if (!this.isTestPhone(dto.phone)) await this.assertOtpRequestAllowed(user.id);
 
     const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
     const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;

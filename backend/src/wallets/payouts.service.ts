@@ -1,5 +1,5 @@
 // backend/src/wallets/payouts.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PayoutStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -115,15 +115,34 @@ export class PayoutsService {
     return updated;
   }
 
+  /**
+   * Un retrait ne se clôture qu'UNE fois : on « réclame » le statut avant de toucher au solde. Sans cela, un
+   * double clic ou un rejeu ferait décompter deux fois le solde en attente, et un « échec » enregistré après un
+   * « payé » remettrait au conducteur un argent déjà viré.
+   */
+  private async claimOpenPayout(id: string, next: PayoutStatus, extra: Prisma.PayoutUpdateManyMutationInput = {}) {
+    const claimed = await this.prisma.payout.updateMany({
+      where: { id, status: { in: [PayoutStatus.REQUESTED, PayoutStatus.PROCESSING] } },
+      data: { status: next, ...extra },
+    });
+    if (claimed.count === 0) {
+      throw new BadRequestException('Ce retrait est déjà clôturé (payé, échoué ou annulé).');
+    }
+  }
+
   async markPaid(id: string, actorId: string) {
     const payout = await this.findOne(id);
     const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { id: payout.walletId } });
 
-    await this.wallets.finalizePayout(wallet.driverId, payout.amount, id);
-    const updated = await this.prisma.payout.update({
-      where: { id },
-      data: { status: PayoutStatus.PAID, processedAt: new Date() },
-    });
+    await this.claimOpenPayout(id, PayoutStatus.PAID, { processedAt: new Date() });
+    try {
+      await this.wallets.finalizePayout(wallet.driverId, payout.amount, id);
+    } catch (error) {
+      // Le solde n'a pas bougé : on rouvre le retrait pour qu'il puisse être retraité.
+      await this.prisma.payout.update({ where: { id }, data: { status: payout.status, processedAt: null } });
+      throw error;
+    }
+    const updated = await this.prisma.payout.findUniqueOrThrow({ where: { id } });
     await this.audit.log({
       actorId,
       entityType: 'Payout',
@@ -137,11 +156,14 @@ export class PayoutsService {
     const payout = await this.findOne(id);
     const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { id: payout.walletId } });
 
-    await this.wallets.reversePayout(wallet.driverId, payout.amount, id);
-    const updated = await this.prisma.payout.update({
-      where: { id },
-      data: { status: PayoutStatus.FAILED },
-    });
+    await this.claimOpenPayout(id, PayoutStatus.FAILED);
+    try {
+      await this.wallets.reversePayout(wallet.driverId, payout.amount, id);
+    } catch (error) {
+      await this.prisma.payout.update({ where: { id }, data: { status: payout.status } });
+      throw error;
+    }
+    const updated = await this.prisma.payout.findUniqueOrThrow({ where: { id } });
     await this.audit.log({
       actorId,
       entityType: 'Payout',

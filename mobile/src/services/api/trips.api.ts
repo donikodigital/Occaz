@@ -2,7 +2,17 @@
 import { api } from './client';
 import type { Paginated } from './types';
 import type { Booking } from '@/types/bookings.types';
-import type { CancelTripPayload, CreateTripPayload, SearchTripsParams, Trip, TripPosition } from '@/types/trips.types';
+import type {
+  CancelTripPayload,
+  CreateTripPayload,
+  SearchTripsParams,
+  SegmentSelection,
+  Trip,
+  TripPosition,
+  TripStop,
+  TripStopInput,
+  UpdateTripStopPayload,
+} from '@/types/trips.types';
 
 export const tripsApi = {
   search: (params: SearchTripsParams) =>
@@ -10,7 +20,11 @@ export const tripsApi = {
       query: params as Record<string, string | number | boolean | undefined>,
     }),
 
-  getOne: (id: string) => api.get<Trip>(`/trips/${id}`),
+  /** `segment` : tronçon demandé (étape de montée / de descente) — le prix renvoyé est celui de ce tronçon. */
+  getOne: (id: string, segment: SegmentSelection = {}) =>
+    api.get<Trip>(`/trips/${id}`, {
+      query: { boardingStopId: segment.boardingStopId, alightingStopId: segment.alightingStopId },
+    }),
 
   // --- Côté chauffeur ---
 
@@ -32,6 +46,18 @@ export const tripsApi = {
   complete: (id: string) => api.post<Trip>(`/trips/${id}/complete`),
 
   findBookings: (id: string) => api.get<Booking[]>(`/trips/${id}/bookings`),
+
+  // --- Étapes (villes traversées) : modifiables tant que le trajet est en brouillon ---
+
+  addStop: (id: string, payload: TripStopInput) => api.post<TripStop>(`/trips/${id}/stops`, payload),
+
+  updateStop: (id: string, stopId: string, payload: UpdateTripStopPayload) =>
+    api.patch<TripStop>(`/trips/${id}/stops/${stopId}`, payload),
+
+  removeStop: (id: string, stopId: string) => api.delete<void>(`/trips/${id}/stops/${stopId}`),
+
+  /** Pendant le trajet : prévient les clients qui montent à cette étape. */
+  markArrivedAtStop: (id: string, stopId: string) => api.post<TripStop>(`/trips/${id}/stops/${stopId}/arrived`),
 
   updatePosition: (id: string, latitude: number, longitude: number) =>
     api.patch<TripPosition>(`/trips/${id}/position`, { latitude, longitude }),

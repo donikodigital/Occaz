@@ -41,6 +41,7 @@ import { useBookingRatings } from '@/hooks/useRatings';
 import { useGetOrCreateConversationForBooking } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
+import { bookingBoardingAt, bookingRouteLabel, isPartialBooking } from '@/utils/tripSegment';
 import type { BookingStatus } from '@/types/bookings.types';
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
@@ -120,6 +121,21 @@ export default function BookingDetailScreen() {
   }
 
   const trip = booking.trip;
+
+  // Client qui monte à une étape : son code de prise en charge n'a de sens qu'en route, une fois le conducteur arrivé à son
+  // étape ; son code de dépose, qu'après sa prise en charge. Client du départ : parcours habituel, inchangé.
+  const boardsAtStop = Boolean(booking.boardingStopId);
+  const isPickedUp = Boolean(booking.passengers?.some((passenger) => passenger.pickedUpAt));
+  const showPickupCode =
+    booking.status === 'CONFIRMED' &&
+    (boardsAtStop
+      ? trip?.status === 'IN_PROGRESS' && Boolean(booking.boardingStop?.arrivedAt) && !isPickedUp
+      : trip?.status === 'DRIVER_ARRIVED' || trip?.status === 'PASSENGER_PICKED_UP');
+  const showDropoffCode =
+    booking.status === 'CONFIRMED' &&
+    (boardsAtStop
+      ? isPickedUp
+      : trip?.status === 'PASSENGER_PICKED_UP' || trip?.status === 'IN_PROGRESS' || trip?.status === 'ARRIVED');
   const canCancel = CANCELLABLE_STATUSES.includes(booking.status);
   const hasRated = (existingRatings?.length ?? 0) > 0;
 
@@ -138,7 +154,7 @@ export default function BookingDetailScreen() {
     <ScreenContainer scroll maxWidth="detail">
       <OceanScreenHeader
         title="Réservation"
-        subtitle={trip ? `${trip.originCity.name} → ${trip.destinationCity.name}` : undefined}
+        subtitle={bookingRouteLabel(booking)}
         onBack={() => router.back()}
         right={
           <Pressable
@@ -178,10 +194,15 @@ export default function BookingDetailScreen() {
         <OceanSection icon={<IconRoute size={17} color={OCEAN.base} />} title="Trajet">
           <View style={styles.tripBlock}>
             <AppText variant="base" weight="bold" color={OCEAN.deep}>
-              {trip.originCity.name} → {trip.destinationCity.name}
+              {bookingRouteLabel(booking)}
             </AppText>
+            {isPartialBooking(booking) ? (
+              <AppText variant="xs" color="textSecondary">
+                Trajet du conducteur : {trip.originCity.name} → {trip.destinationCity.name}
+              </AppText>
+            ) : null}
             <AppText variant="sm" weight="semibold">
-              {formatDateLong(trip.departureAt)} à {formatTime(trip.departureAt)}
+              {formatDateLong(bookingBoardingAt(booking) ?? trip.departureAt)} à {formatTime(bookingBoardingAt(booking) ?? trip.departureAt)}
             </AppText>
             <AppText variant="sm" color="textSecondary">
               {trip.driver.firstName} {trip.driver.lastName[0]}. · {trip.vehicle.brand} {trip.vehicle.model}
@@ -193,14 +214,9 @@ export default function BookingDetailScreen() {
         </OceanSection>
       ) : null}
 
-      {booking.status === 'CONFIRMED' && (trip?.status === 'DRIVER_ARRIVED' || trip?.status === 'PASSENGER_PICKED_UP') ? (
-        <PickupCodeCard bookingId={booking.id} />
-      ) : null}
+      {showPickupCode ? <PickupCodeCard bookingId={booking.id} /> : null}
 
-      {booking.status === 'CONFIRMED' &&
-      (trip?.status === 'PASSENGER_PICKED_UP' || trip?.status === 'IN_PROGRESS' || trip?.status === 'ARRIVED') ? (
-        <DropoffCodeCard bookingId={booking.id} />
-      ) : null}
+      {showDropoffCode ? <DropoffCodeCard bookingId={booking.id} /> : null}
 
       {booking.passengers && booking.passengers.length > 0 ? (
         <OceanSection icon={<IconUsers size={17} color={OCEAN.base} />} title="Passagers">

@@ -36,6 +36,11 @@ export class SimulatedPaymentProvider implements PaymentProviderAdapter {
   }
 
   async verifyAndParseWebhook(rawPayload: unknown): Promise<WebhookParseResult> {
+    // La simulation capture instantanément (voir initiate) : elle n'a besoin d'aucun webhook. En production, cette
+    // route publique accepterait sinon n'importe quel message sans signature — on la ferme.
+    if (process.env.NODE_ENV === 'production') {
+      throw new UnauthorizedException('Webhook de simulation désactivé en production.');
+    }
     const payload = rawPayload as { externalReference?: string; status?: string };
     if (!payload?.externalReference) {
       throw new UnauthorizedException('Webhook de simulation invalide : externalReference manquant.');

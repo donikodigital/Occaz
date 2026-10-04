@@ -6,6 +6,10 @@ import { OtpService } from '../otp/otp.service';
 import { WalletsService } from '../wallets/wallets.service';
 
 /**
+ * [03/10/2026] v+ — Embarquement à une étape : un client qui monte en cours de route (Kindia, Mamou…) est pris en charge
+ * pendant que le trajet est EN COURS, avec le même code ; un client qui monte au départ garde le parcours habituel
+ * (conducteur arrivé au point de départ). Le code de dépose fonctionne partout, étape comprise.
+ *
  * Section 17 : OTP départ (le passager donne le code au chauffeur — sa
  * saisie confirme la prise en charge) puis OTP arrivée (confirme la fin
  * du trajet pour cette réservation). Un OTP est généré par Booking, pas
@@ -35,6 +39,15 @@ export class TripOtpService {
     }
   }
 
+  /**
+   * La prise en charge est possible quand le conducteur est au bon endroit : au point de départ (DRIVER_ARRIVED /
+   * PASSENGER_PICKED_UP) pour un client qui monte au départ, en route (IN_PROGRESS) pour un client qui monte à une étape.
+   */
+  private isPickupWindowOpen(booking: { boardingStopId: string | null; trip: { status: TripStatus } }): boolean {
+    if (booking.boardingStopId) return booking.trip.status === TripStatus.IN_PROGRESS;
+    return booking.trip.status === TripStatus.DRIVER_ARRIVED || booking.trip.status === TripStatus.PASSENGER_PICKED_UP;
+  }
+
   async requestPickupOtp(bookingId: string, driverId: string) {
     const booking = await this.getBookingWithContext(bookingId);
     this.assertDriverOwnsTrip(booking, driverId);
@@ -43,12 +56,11 @@ export class TripOtpService {
         'Cette réservation doit être confirmée (paiement validé) avant la prise en charge.',
       );
     }
-    if (
-      booking.trip.status !== TripStatus.DRIVER_ARRIVED &&
-      booking.trip.status !== TripStatus.PASSENGER_PICKED_UP
-    ) {
+    if (!this.isPickupWindowOpen(booking)) {
       throw new BadRequestException(
-        "Signalez d'abord votre arrivée (markDriverArrived) avant de demander le code de prise en charge.",
+        booking.boardingStopId
+          ? 'Ce client monte à une étape : le code de prise en charge se demande pendant le trajet, une fois arrivé à son étape.'
+          : "Signalez d'abord votre arrivée (markDriverArrived) avant de demander le code de prise en charge.",
       );
     }
     return this.otpService.generateAndSend(
@@ -73,12 +85,11 @@ export class TripOtpService {
         'Cette réservation doit être confirmée (paiement validé) avant la prise en charge.',
       );
     }
-    if (
-      booking.trip.status !== TripStatus.DRIVER_ARRIVED &&
-      booking.trip.status !== TripStatus.PASSENGER_PICKED_UP
-    ) {
+    if (!this.isPickupWindowOpen(booking)) {
       throw new BadRequestException(
-        "Ce code n'est disponible que lorsque le chauffeur est arrivé au point de départ.",
+        booking.boardingStopId
+          ? "Ce code n'est disponible que lorsque le conducteur est arrivé à votre étape."
+          : "Ce code n'est disponible que lorsque le chauffeur est arrivé au point de départ.",
       );
     }
     return this.otpService.generateAndSend(

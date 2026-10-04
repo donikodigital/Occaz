@@ -22,6 +22,7 @@ function createService(options: { claimCount?: number } = {}) {
     {} as never,
     {} as never,
     {} as never,
+    { notify: jest.fn().mockResolvedValue(undefined) } as never,
   );
   return { service, prisma, audit };
 }

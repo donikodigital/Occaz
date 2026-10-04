@@ -11,10 +11,10 @@ import { PrismaService } from '../prisma/prisma.service';
  * change pas le mot de passe d'un compte déjà là si on ajuste la liste
  * plus tard, sauf pour les champs listés dans `update`.
  *
- * Mot de passe unique demandé pour les quatre comptes — appliqué tel
- * quel, haché avant stockage (jamais en clair, y compris ici).
+ * Mot de passe commun lu dans SEED_STAFF_PASSWORD (12 caractères minimum),
+ * jamais écrit dans le code ni dans les logs, haché avant stockage. Relancer
+ * le seed réinitialise le mot de passe des quatre comptes avec la valeur donnée.
  */
-const SEED_PASSWORD = 'Lcd123456!';
 
 interface SeedAccount {
   email: string;
@@ -59,7 +59,14 @@ export class AccountsSeedService {
   constructor(private readonly prisma: PrismaService) {}
 
   async run(): Promise<void> {
-    const passwordHash = await bcrypt.hash(SEED_PASSWORD, 12);
+    const seedPassword = process.env.SEED_STAFF_PASSWORD;
+    if (!seedPassword || seedPassword.length < 12) {
+      throw new Error(
+        'Définissez SEED_STAFF_PASSWORD (12 caractères minimum) avant de lancer le seed des comptes : ' +
+          "le mot de passe n'est plus écrit dans le code.",
+      );
+    }
+    const passwordHash = await bcrypt.hash(seedPassword, 12);
 
     for (const account of ACCOUNTS) {
       const role = await this.prisma.role.findUnique({ where: { key: account.roleKey } });
@@ -106,7 +113,7 @@ export class AccountsSeedService {
     }
 
     this.logger.log(
-      `Terminé. Connexion : téléphone + OTP (immédiat, tous rôles) ou email + mot de passe "${SEED_PASSWORD}" ` +
+      'Terminé. Connexion : téléphone + OTP (immédiat, tous rôles) ou email + mot de passe (celui de SEED_STAFF_PASSWORD) ' +
         '(SUPERADMIN devra configurer la 2FA via /auth/2fa/setup avant que ce second mode ne fonctionne, section 3.1).',
     );
   }

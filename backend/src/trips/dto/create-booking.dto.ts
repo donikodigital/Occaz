@@ -1,5 +1,6 @@
 // backend/src/trips/dto/create-booking.dto.ts
 // [23/09/2026] v+ — champ promoCode facultatif.
+// [03/10/2026] v+ — boardingStopId / alightingStopId facultatifs : tronçon réservé (étape de montée et de descente).
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
@@ -31,4 +32,14 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   promoCode?: string;
+
+  @ApiPropertyOptional({ description: 'Étape de montée du client (absent = départ du trajet).' })
+  @IsOptional()
+  @IsString()
+  boardingStopId?: string;
+
+  @ApiPropertyOptional({ description: 'Étape de descente du client (absent = arrivée du trajet).' })
+  @IsOptional()
+  @IsString()
+  alightingStopId?: string;
 }
