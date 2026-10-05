@@ -1190,6 +1190,12 @@ model Payout {
   method         String? // ex: orange_money, bank_transfer
   destinationRef String? // numéro mobile money / IBAN masqué
 
+  // Virement automatique (voir PayoutsService.processAutomatically) : référence chez le prestataire (rapprochement avec ses
+  // relevés), raison d'un refus, et marque « traité sans validation de l'équipe ».
+  externalReference String?
+  failureReason     String?
+  autoProcessed     Boolean @default(false)
+
   transactions WalletTransaction[]
 
   requestedAt DateTime  @default(now())

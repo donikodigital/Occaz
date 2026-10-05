@@ -13,6 +13,10 @@ export interface Payout {
   destinationRef: string | null;
   requestedAt: string;
   processedAt: string | null;
+  /** Retrait envoyé tout de suite au prestataire, sans validation de l'équipe. */
+  autoProcessed?: boolean;
+  /** Raison d'un refus (numéro refusé…), le cas échéant. */
+  failureReason?: string | null;
 }
 
 export interface RequestPayoutPayload {

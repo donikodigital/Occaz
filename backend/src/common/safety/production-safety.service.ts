@@ -5,10 +5,11 @@
 // branchés. Par défaut il se contente d'écrire un avertissement dans les logs (le serveur démarre quand même, pour ne
 // pas casser une plateforme encore en phase de test). Avec PRODUCTION_STRICT=true, la moindre alerte bloque le
 // démarrage : à activer le jour du lancement public, une fois tout branché.
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { PaymentProviderType } from '@prisma/client';
 import { PaymentProviderRegistry } from '../../payments/providers/payment-provider-registry.service';
 import { SimulatedPaymentProvider } from '../../payments/providers/simulated-payment.provider';
+import { PayoutProviderRegistry } from '../../wallets/providers/payout-provider.registry';
 
 const MIN_SECRET_LENGTH = 32;
 
@@ -16,7 +17,10 @@ const MIN_SECRET_LENGTH = 32;
 export class ProductionSafetyService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ProductionSafetyService.name);
 
-  constructor(private readonly registry: PaymentProviderRegistry) {}
+  constructor(
+    private readonly registry: PaymentProviderRegistry,
+    @Optional() private readonly payoutProviders?: PayoutProviderRegistry,
+  ) {}
 
   /** Réglages à corriger avant une ouverture au public. Liste vide = prêt. */
   collectIssues(env: NodeJS.ProcessEnv = process.env): string[] {
@@ -37,6 +41,13 @@ export class ProductionSafetyService implements OnApplicationBootstrap {
       );
     }
 
+    // Retraits des conducteurs : tant que l'adaptateur Orange Money n'est pas branché, un retrait « automatique » est marqué payé
+    // sans qu'aucun argent ne parte.
+    if (this.payoutProviders?.get().isSimulated) {
+      issues.push(
+        'Retraits simulés (PAYOUT_PROVIDER absent ou « simulated ») : un retrait automatique est marqué payé sans qu\'aucun argent réel ne parte vers le conducteur. Brancher Orange Money dans PayoutProviderRegistry.',
+      );
+    }
     if (!env.TEXTBEE_API_KEY) {
       issues.push(
         "Aucun prestataire SMS configuré (TEXTBEE_API_KEY absent) : les codes de connexion ne sont pas envoyés, ils s'écrivent seulement dans les logs.",

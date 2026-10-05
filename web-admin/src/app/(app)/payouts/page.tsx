@@ -103,6 +103,25 @@ function PayoutCard({ payout }: { payout: PayoutListItem }) {
 
       <p className="mt-3 text-2xl font-bold text-text-primary">{amount}</p>
 
+      {/* Traité tout seul ou par l'équipe : on sait qui a décidé, et la référence permet de retrouver le virement chez le prestataire. */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {payout.autoProcessed ? <Badge label="Automatique" tone="primary" /> : null}
+        {payout.externalReference ? (
+          <span className="rounded-lg bg-surface-muted px-2 py-1 font-mono text-xs text-text-secondary">
+            Réf. {payout.externalReference}
+          </span>
+        ) : null}
+      </div>
+      {payout.status === 'FAILED' && payout.failureReason ? (
+        <p className="mt-2 rounded-xl bg-danger-light/50 px-3 py-2 text-sm text-danger">Motif : {payout.failureReason}</p>
+      ) : null}
+      {payout.status === 'PROCESSING' && payout.autoProcessed ? (
+        <p className="mt-2 rounded-xl bg-accent-light px-3 py-2 text-sm text-accent-dark">
+          Envoi automatique sans réponse définitive du prestataire. Vérifiez chez lui si le virement est parti avant de marquer
+          « payé » (ou de signaler un échec, qui remet le montant dans le solde du chauffeur).
+        </p>
+      ) : null}
+
       <div className="mt-3">
         <PayoutProgress status={payout.status} />
       </div>

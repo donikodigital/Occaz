@@ -20,7 +20,9 @@ function build(options: { status?: PayoutStatus; claimCount?: number; finalizeFa
       : jest.fn().mockResolvedValue(undefined),
     reversePayout: jest.fn().mockResolvedValue(undefined),
   };
-  const service = new PayoutsService(prisma as never, { log: jest.fn() } as never, wallets as never);
+  const providers = { get: () => ({ isSimulated: true, disburse: jest.fn() }) };
+  const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+  const service = new PayoutsService(prisma as never, { log: jest.fn() } as never, wallets as never, providers as never, notifications as never);
   return { service, prisma, wallets };
 }
 

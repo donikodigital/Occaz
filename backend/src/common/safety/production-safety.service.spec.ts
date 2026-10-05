@@ -15,10 +15,12 @@ const SAFE_ENV: NodeJS.ProcessEnv = {
   OTP_HASH_PEPPER: long('c'),
 };
 
-function build(simulated: boolean) {
+function build(simulated: boolean, payoutsSimulated = false) {
   const real = { initiate: jest.fn() };
   const registry = { resolve: jest.fn().mockReturnValue(simulated ? new SimulatedPaymentProvider() : real) };
-  return new ProductionSafetyService(registry as never);
+  // Registre des retraits : absent par défaut (comme avant) ; passé seulement par les tests qui le concernent.
+  const payouts = { get: () => ({ isSimulated: payoutsSimulated }) };
+  return new ProductionSafetyService(registry as never, payoutsSimulated === undefined ? undefined : (payouts as never));
 }
 
 describe('ProductionSafetyService.collectIssues', () => {
@@ -88,5 +90,16 @@ describe('ProductionSafetyService.onApplicationBootstrap', () => {
     process.env.NODE_ENV = 'production';
     process.env.PRODUCTION_STRICT = 'true';
     expect(() => build(true).onApplicationBootstrap()).toThrow(/Démarrage refusé/);
+  });
+
+  it('signale les retraits simulés : un retrait automatique serait marqué payé sans qu\'aucun argent ne parte', () => {
+    const issues = build(false, true).collectIssues(SAFE_ENV);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain('Retraits simulés');
+    expect(issues[0]).toContain('PAYOUT_PROVIDER');
+  });
+
+  it('retraits branchés sur un vrai prestataire : rien à signaler', () => {
+    expect(build(false, false).collectIssues(SAFE_ENV)).toEqual([]);
   });
 });
