@@ -13,7 +13,16 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ExchangeRateService } from '../pricing/exchange-rate.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
-import { toMoneyBigInt, formatMoney } from '../common/utils/money.util';
+import { WalletTransactionsQueryDto } from './dto/wallet-transactions-query.dto';
+import {
+  WALLET_TX_FILTERS,
+  filterByCategory,
+  mergeForDriver,
+  summarize,
+  type DriverHistoryRow,
+  type LedgerRow,
+} from './wallet-history';
+import { toMoneyBigInt, formatMoneyWithCurrency } from '../common/utils/money.util';
 
 type BalanceField = 'balance' | 'pendingBalance';
 
@@ -62,77 +71,108 @@ export class WalletsService {
   }
 
   /**
-   * Vue "chauffeur" de son propre historique — jamais le montant brut
-   * payé par le client ni la commission plateforme comme deux lignes
-   * séparées (demande explicite : le chauffeur ne doit voir que sa
-   * part). BOOKING_REVENUE/SHIPMENT_REVENUE et le COMMISSION qui
-   * l'accompagne (même bookingId/shipmentId, posés ensemble par
-   * holdBookingRevenue/holdShipmentRevenue) sont fusionnés en une seule
-   * ligne au montant net, avec un statut unique — les deux lignes
-   * source partagent toujours le même statut au même instant
-   * (releaseHeldFunds les bascule ensemble). REFUND/PAYOUT/ADJUSTMENT/
-   * CANCELLATION_FEE n'ont pas de commission jumelle : ils passent tels
-   * quels. N'affecte que cette vue — le registre comptable réel
+   * Vue « chauffeur » de son propre historique — jamais le montant brut payé par le client ni la commission plateforme comme
+   * lignes séparées (demande explicite : le chauffeur ne voit que sa part). La fusion revenu + commission en une ligne au net, le
+   * classement par catégorie et les totaux sont dans wallet-history.ts. N'affecte que cette vue : le registre comptable réel
    * (getTransactions, utilisé aussi par l'admin) n'est pas modifié.
+   *
+   * Réponse : la page demandée (filtrée par `category`, lignes enrichies de l'itinéraire / du statut du retrait), et `summary` —
+   * les totaux de TOUTES les catégories sur tout l'historique, pour que l'écran affiche le total de chaque filtre sans tout charger.
    */
-  async getTransactionsForDriverView(
-    walletId: string,
-    query: PaginationQueryDto,
-  ): Promise<PaginatedResult<unknown>> {
+  async getTransactionsForDriverView(walletId: string, query: WalletTransactionsQueryDto) {
     const rows = await this.prisma.walletTransaction.findMany({
       where: { walletId },
       orderBy: { createdAt: 'desc' },
     });
 
-    type Row = (typeof rows)[number];
-    // Annotation explicite : sans elle, TypeScript infère
-    // Set<BOOKING_REVENUE | SHIPMENT_REVENUE> (les deux littéraux
-    // passés au constructeur) plutôt que Set<WalletTransactionType> —
-    // .has(row.type) refuse alors tout WalletTransactionType plus
-    // large, dont COMMISSION. Invisible dans mon propre bac à sable
-    // (Prisma non généré là-bas, donc pas de vérification de type sur
-    // WalletTransactionType), d'où l'erreur découverte seulement à la
-    // compilation réelle.
-    const REVENUE_TYPES = new Set<WalletTransactionType>([
-      WalletTransactionType.BOOKING_REVENUE,
-      WalletTransactionType.SHIPMENT_REVENUE,
+    const history = mergeForDriver(rows as LedgerRow[]);
+    const filtered = filterByCategory(history, query.category ?? 'ALL');
+    const pageRows = filtered.slice(query.skip, query.skip + query.take);
+    const data = await this.attachSubjects(pageRows);
+
+    const summary = summarize(history);
+    const serialized = Object.fromEntries(
+      WALLET_TX_FILTERS.map((key) => [
+        key,
+        { count: summary[key].count, total: summary[key].total.toString(), pending: summary[key].pending.toString() },
+      ]),
+    );
+    return { ...new PaginatedResult(data, filtered.length, query.page, query.limit), summary: serialized };
+  }
+
+  /**
+   * Ajoute à chaque ligne de quoi la reconnaître : l'itinéraire du trajet (« Mamou → Dalaba ») ou de l'envoi, le statut et le mode de
+   * paiement d'un retrait. Villes seulement : jamais le nom ni le numéro du client.
+   */
+  private async attachSubjects(rows: DriverHistoryRow[]) {
+    const bookingIds = [...new Set(rows.map((r) => r.bookingId).filter((id): id is string => Boolean(id)))];
+    const shipmentIds = [...new Set(rows.map((r) => r.shipmentId).filter((id): id is string => Boolean(id)))];
+    const payoutIds = [...new Set(rows.map((r) => r.payoutId).filter((id): id is string => Boolean(id)))];
+
+    const [bookings, shipments, payouts] = await Promise.all([
+      bookingIds.length
+        ? this.prisma.booking.findMany({
+            where: { id: { in: bookingIds } },
+            select: {
+              id: true,
+              seatsCount: true,
+              boardingStop: { select: { city: { select: { name: true } } } },
+              alightingStop: { select: { city: { select: { name: true } } } },
+              trip: { select: { originCity: { select: { name: true } }, destinationCity: { select: { name: true } } } },
+            },
+          })
+        : [],
+      shipmentIds.length
+        ? this.prisma.shipment.findMany({
+            where: { id: { in: shipmentIds } },
+            select: {
+              id: true,
+              weightKg: true,
+              category: { select: { name: true } },
+              senderLocation: { select: { label: true, city: { select: { name: true } } } },
+              recipientLocation: { select: { label: true, city: { select: { name: true } } } },
+            },
+          })
+        : [],
+      payoutIds.length
+        ? this.prisma.payout.findMany({
+            where: { id: { in: payoutIds } },
+            select: { id: true, status: true, method: true, destinationRef: true, requestedAt: true },
+          })
+        : [],
     ]);
-    const byGroupKey = new Map<string, Row[]>();
-    const standalone: Row[] = [];
 
-    for (const row of rows) {
-      const groupKey = row.bookingId ? `booking:${row.bookingId}` : row.shipmentId ? `shipment:${row.shipmentId}` : null;
-      const isGroupable = groupKey && (REVENUE_TYPES.has(row.type) || row.type === WalletTransactionType.COMMISSION);
-      if (isGroupable) {
-        const group = byGroupKey.get(groupKey!) ?? [];
-        group.push(row);
-        byGroupKey.set(groupKey!, group);
-      } else {
-        standalone.push(row);
-      }
-    }
+    const bookingById = new Map(bookings.map((b) => [b.id, b]));
+    const shipmentById = new Map(shipments.map((s) => [s.id, s]));
+    const payoutById = new Map(payouts.map((p) => [p.id, p]));
 
-    const merged = Array.from(byGroupKey.values()).map((group) => {
-      const revenue = group.find((r) => REVENUE_TYPES.has(r.type)) ?? group[0];
-      const netAmount = group.reduce((sum, r) => sum + r.amount, 0n);
-      const latest = group.reduce((a, b) => (a.createdAt > b.createdAt ? a : b));
-      return {
-        id: `net:${revenue.bookingId ?? revenue.shipmentId}`,
-        type: revenue.type,
-        status: latest.status,
-        amount: netAmount,
-        currencyId: latest.currencyId,
-        bookingId: revenue.bookingId,
-        shipmentId: revenue.shipmentId,
-        createdAt: latest.createdAt,
-      };
+    return rows.map((row) => {
+      const booking = row.bookingId ? bookingById.get(row.bookingId) : undefined;
+      const shipment = row.shipmentId ? shipmentById.get(row.shipmentId) : undefined;
+      const payout = row.payoutId ? payoutById.get(row.payoutId) : undefined;
+
+      const subject = booking
+        ? {
+            kind: 'TRIP' as const,
+            // Le tronçon du client (« Dalaba → Pita »), pas le trajet entier du conducteur.
+            from: booking.boardingStop?.city?.name ?? booking.trip.originCity.name,
+            to: booking.alightingStop?.city?.name ?? booking.trip.destinationCity.name,
+            seats: booking.seatsCount,
+          }
+        : shipment
+          ? {
+              kind: 'SHIPMENT' as const,
+              from: shipment.senderLocation.city?.name ?? shipment.senderLocation.label,
+              to: shipment.recipientLocation.city?.name ?? shipment.recipientLocation.label,
+              weightKg: shipment.weightKg,
+              categoryName: shipment.category?.name ?? null,
+            }
+          : payout
+            ? { kind: 'PAYOUT' as const, status: payout.status, method: payout.method, destination: payout.destinationRef }
+            : null;
+
+      return { ...row, subject };
     });
-
-    const allRows = [...merged, ...standalone].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
-
-    const total = allRows.length;
-    const data = allRows.slice(query.skip, query.skip + query.take);
-    return new PaginatedResult(data, total, query.page, query.limit);
   }
 
   private async applyDelta(
@@ -331,7 +371,8 @@ export class WalletsService {
         type: NotificationType.DRIVER_PAYMENT,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: 'Paiement reçu',
-        fallbackBody: `${formatMoney(netAmount)} ont été ajoutés à votre solde disponible.`,
+        // Avec la devise du PORTEFEUILLE (celle du crédit) : sans elle, « 3875 » pouvait aussi bien être du GNF que du XOF.
+        fallbackBody: `${formatMoneyWithCurrency(netAmount, wallet.currency.isoCode)} ont été ajoutés à votre solde disponible.`,
       });
     }
   }

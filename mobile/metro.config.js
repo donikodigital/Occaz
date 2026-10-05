@@ -1,8 +1,10 @@
 // mobile/metro.config.js
 const path = require('path');
-const { getDefaultConfig } = require('expo/metro-config');
+// getSentryExpoConfig = getDefaultConfig d'Expo + les identifiants de débogage que Sentry utilise pour relire les erreurs d'une
+// version de production (sans eux, la pile d'appels d'un plantage est illisible : code compressé).
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 
 // OCCAZ est un seul dépôt Git contenant backend/, mobile/ et web-admin/ —
 // Metro/Expo peuvent détecter automatiquement la racine du monorepo (via

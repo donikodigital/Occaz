@@ -10,6 +10,7 @@ import { CountryScopeService } from '../common/scope/country-scope.service';
 import { WalletsService } from './wallets.service';
 import { AdjustWalletDto } from './dto/adjust-wallet.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
+import { WalletTransactionsQueryDto } from './dto/wallet-transactions-query.dto';
 
 @ApiTags('Portefeuilles')
 @ApiBearerAuth()
@@ -29,7 +30,7 @@ export class WalletsController {
 
   @Get('mine/transactions')
   async findMyTransactions(
-    @Query() query: PaginationQueryDto,
+    @Query() query: WalletTransactionsQueryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);

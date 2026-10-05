@@ -1,6 +1,6 @@
 // mobile/app/_layout.tsx
 import React, { useEffect, useState } from 'react';
-import { Slot } from 'expo-router';
+import { ErrorBoundary as ExpoRouterErrorBoundary, Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -18,11 +18,19 @@ import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/theme';
 import { usePushNotificationRegistration } from '@/hooks/usePushNotifications';
 import { AnimatedSplash } from '@/components/screens/AnimatedSplash';
+import { initMonitoring, withMonitoredErrorBoundary, withMonitoring } from '@/services/monitoring';
 import '@/tasks/tripLocationTask';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
-export default function RootLayout() {
+// Suivi des erreurs (Sentry) : sans EXPO_PUBLIC_SENTRY_DSN, rien n'est initialisé et rien n'est envoyé.
+initMonitoring();
+
+// Écran d'erreur d'Expo Router (affiché quand un écran plante à l'affichage) : inchangé pour l'utilisateur, mais l'erreur est
+// maintenant remontée au suivi.
+export const ErrorBoundary = withMonitoredErrorBoundary(ExpoRouterErrorBoundary);
+
+function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -67,3 +75,5 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default withMonitoring(RootLayout);

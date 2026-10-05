@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DOMAIN_EVENTS, ShipmentSearchOpenedEvent } from '../common/events/domain-events';
+import { formatMoneyWithCurrency } from '../common/utils/money.util';
 
 /** Identifiant du canal Android (créé côté app, importance maximale) qui fait sonner l'alerte. */
 export const SHIPMENT_REQUEST_CHANNEL_ID = 'shipment-requests';
@@ -61,7 +62,7 @@ export class ShipmentDispatchService {
     const from = shipment.senderLocation.city?.name ?? shipment.senderLocation.label;
     const to = shipment.recipientLocation.city?.name ?? shipment.recipientLocation.label;
     const netAmount = shipment.totalAmount - shipment.platformFee;
-    const amount = `${new Intl.NumberFormat('fr-FR').format(Number(netAmount))} ${shipment.currency.isoCode}`;
+    const amount = formatMoneyWithCurrency(netAmount, shipment.currency.isoCode);
     const until = shipment.windowEnd.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
     const emailEnabled = (await this.pricing.getNumericSetting('shipment.dispatch_email_enabled', 1)) !== 0;

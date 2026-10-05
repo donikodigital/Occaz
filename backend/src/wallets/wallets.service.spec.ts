@@ -4,7 +4,7 @@ import { WalletTransactionStatus, WalletTransactionType } from '@prisma/client';
 import { WalletsService } from './wallets.service';
 
 function build(options: { pending?: Array<{ id: string; amount: bigint }>; claimCount?: number; already?: boolean } = {}) {
-  const wallet = { id: 'w1', driverId: 'dr1', currencyId: 'GNF', balance: 0n, pendingBalance: 0n, version: 0 };
+  const wallet = { id: 'w1', driverId: 'dr1', currencyId: 'XOF', currency: { isoCode: 'XOF' }, balance: 0n, pendingBalance: 0n, version: 0 };
   const tx = {
     walletTransaction: {
       findMany: jest.fn().mockResolvedValue(options.pending ?? []),
@@ -94,6 +94,13 @@ describe('WalletsService.releaseHeldFunds', () => {
       }),
     );
     expect(notifications.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('la notification de crédit dit la devise du portefeuille (« 85 000 XOF », jamais un chiffre nu)', async () => {
+    const { service, notifications } = build({ pending });
+    await service.releaseHeldFunds({ driverId: 'dr1', bookingId: 'b1' });
+    const body: string = notifications.notify.mock.calls[0][0].fallbackBody;
+    expect(body).toMatch(/^85\s000 XOF ont été ajoutés à votre solde disponible\.$/);
   });
 
   it('ne crédite rien si un autre appel vient de libérer les mêmes lignes (0 ligne réclamée)', async () => {

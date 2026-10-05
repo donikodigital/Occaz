@@ -23,6 +23,16 @@ export function formatMoney(amount: bigint): string {
   return amount.toString();
 }
 
+/**
+ * Montant lisible AVEC sa devise, pour les textes envoyés aux gens (notifications, SMS, e-mails) : « 3 875 XOF ».
+ * Un montant sans devise (« 662 ont été ajoutés… ») ne dit pas s'il s'agit de francs guinéens ou de francs CFA — et les deux
+ * circulent dans l'application. Les séparateurs de milliers suivent l'usage français.
+ */
+export function formatMoneyWithCurrency(amount: bigint | number | string, isoCode: string): string {
+  const value = typeof amount === 'bigint' ? amount : BigInt(typeof amount === 'number' ? Math.round(amount) : amount);
+  return `${new Intl.NumberFormat('fr-FR').format(value)} ${isoCode}`.trim();
+}
+
 /** Additionne une liste de montants BigInt en toute sécurité. */
 export function sumMoney(amounts: bigint[]): bigint {
   return amounts.reduce((total, current) => total + current, 0n);
