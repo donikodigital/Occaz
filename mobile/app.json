@@ -68,8 +68,7 @@
           "color": "#0B6BA8"
         }
       ],
-      "expo-image",
-      "@sentry/react-native/expo"
+      "expo-image"
     ],
     "extra": {
       "apiUrl": "https://api.transport-partage.example.com/api/v1",

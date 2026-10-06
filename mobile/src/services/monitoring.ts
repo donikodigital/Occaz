@@ -52,9 +52,22 @@ export function withMonitoring<P extends Record<string, unknown>>(RootComponent:
   return isMonitoringEnabled ? Sentry.wrap(RootComponent) : RootComponent;
 }
 
-/** Enrobe l'écran d'erreur d'Expo Router pour que les erreurs d'affichage qu'il attrape soient remontées ; tel quel si désactivé. */
+/**
+ * Enrobe l'écran d'erreur d'Expo Router pour que les erreurs d'affichage qu'il attrape soient remontées ; tel quel si désactivé.
+ * (Le SDK Sentry 7.x n'a pas de `wrapExpoRouterErrorBoundary` : appeler cette fonction inexistante faisait planter l'app au
+ * chargement dès que le suivi était actif — donc dans les builds EAS avec un DSN, jamais en développement.)
+ */
 export function withMonitoredErrorBoundary<P extends { error: Error; retry: () => Promise<void> }>(
   Boundary: React.ComponentType<P>,
 ): React.ComponentType<P> {
-  return isMonitoringEnabled ? (Sentry.wrapExpoRouterErrorBoundary(Boundary) as React.ComponentType<P>) : Boundary;
+  if (!isMonitoringEnabled) return Boundary;
+
+  function MonitoredErrorBoundary(props: P) {
+    const { error } = props;
+    React.useEffect(() => {
+      Sentry.captureException(error);
+    }, [error]);
+    return React.createElement(Boundary, props);
+  }
+  return MonitoredErrorBoundary;
 }

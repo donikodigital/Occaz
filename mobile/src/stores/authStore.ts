@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { authApi } from '@/services/api/auth.api';
 import { usersApi } from '@/services/api/users.api';
 import { registerSessionExpiredHandler } from '@/services/api/client';
+import { ApiError } from '@/services/api/ApiError';
 import { secureStorage } from '@/services/storage/secureStorage';
 import type { AuthResult, SafeUser } from '@/types/auth.types';
 
@@ -34,8 +35,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const user = await usersApi.getMe();
       set({ user, isAuthenticated: true, isHydrating: false });
-    } catch {
-      await secureStorage.clearTokens();
+    } catch (error) {
+      // Serveur lent ou injoignable (démarrage à froid, réseau coupé) : on garde les jetons pour que la session soit
+      // retrouvée au prochain lancement. Seule une vraie erreur d'authentification les supprime.
+      if (!(error instanceof ApiError && error.isNetworkError)) {
+        await secureStorage.clearTokens();
+      }
       set({ user: null, isAuthenticated: false, isHydrating: false });
     }
   },

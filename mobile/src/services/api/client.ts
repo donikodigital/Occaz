@@ -10,6 +10,13 @@ const API_URL =
   'http://localhost:3000/api/v1';
 
 /**
+ * Délai maximal d'une requête. `fetch` n'en a aucun par défaut dans React Native : si le serveur ne répond pas (démarrage à
+ * froid de l'hébergeur, réseau mobile instable), l'appel restait en attente indéfiniment — et l'app avec lui, bloquée sur l'écran
+ * de démarrage tant que la vérification de session (authStore.hydrate) n'était pas terminée.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
  * Un seul rafraîchissement en vol à la fois — si plusieurs requêtes
  * échouent en 401 simultanément, elles attendent toutes la même
  * promesse au lieu de déclencher chacune leur propre appel à
@@ -43,31 +50,43 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
 }
 
 async function rawFetch<T>(path: string, options: RequestOptions, accessToken?: string | null): Promise<T> {
-  let response: Response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    response = await fetch(buildUrl(path, options.query), {
-      method: options.method ?? 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    });
-  } catch {
-    throw new ApiError('Connexion impossible — vérifiez votre réseau.', 0);
+    let response: Response;
+    try {
+      response = await fetch(buildUrl(path, options.query), {
+        method: options.method ?? 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+        signal: controller.signal,
+      });
+    } catch {
+      throw new ApiError(
+        controller.signal.aborted
+          ? 'Le serveur met trop de temps à répondre — réessayez dans un instant.'
+          : 'Connexion impossible — vérifiez votre réseau.',
+        0,
+      );
+    }
+
+    const json = (await response.json().catch(() => null)) as
+      | ApiSuccessEnvelope<T>
+      | ApiErrorEnvelope
+      | null;
+
+    if (!response.ok || !json || json.success === false) {
+      const message = json && 'error' in json ? formatMessage(json.error.message) : 'Une erreur est survenue.';
+      throw new ApiError(message, response.status, json && 'error' in json ? json.error.path : undefined);
+    }
+
+    return json.data;
+  } finally {
+    clearTimeout(timer);
   }
-
-  const json = (await response.json().catch(() => null)) as
-    | ApiSuccessEnvelope<T>
-    | ApiErrorEnvelope
-    | null;
-
-  if (!response.ok || !json || json.success === false) {
-    const message = json && 'error' in json ? formatMessage(json.error.message) : 'Une erreur est survenue.';
-    throw new ApiError(message, response.status, json && 'error' in json ? json.error.path : undefined);
-  }
-
-  return json.data;
 }
 
 function formatMessage(message: string | string[]): string {
