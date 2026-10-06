@@ -3,10 +3,11 @@
 // [05/10/2026] v3 — Portefeuille refait.
 //   - Bandeau allégé : une icône de portefeuille (avec sa pièce) pour comprendre d'un coup d'œil que c'est de l'argent gardé, le
 //     solde disponible, l'argent en attente, et « Retirer ». Les retraits récents n'y sont plus : ils sont dans l'historique.
+//   - [06/10/2026] Vue d'ensemble compacte : une ligne par catégorie (icône, nom et nombre, total) au lieu de grandes tuiles.
 //   - Filtres par catégorie — Tout, Trajets, Envois, Retraits, Autres — avec le TOTAL de chaque catégorie : une vue d'ensemble en
 //     tuiles, et, dès qu'un filtre est choisi, une carte de total (gagné, retiré…) et la liste correspondante.
 //   - Historique regroupé par jour, chaque opération dit de quoi il s'agit (tronçon, itinéraire de l'envoi, mode de retrait), son
-//     heure, son statut — celui de la demande pour un retrait — et la conversion de devise quand il y en a eu une.
+//     heure, son statut — celui de la demande pour un retrait. (La conversion de devise n'est plus affichée.)
 //   - « Afficher plus » charge la suite : les totaux portent sur tout l'historique, pas seulement sur ce qui est affiché.
 //
 // v2 — Habillage bleu océan, comme l'espace client.
@@ -14,7 +15,6 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
-  IconArrowsExchange,
   IconCashBanknote,
   IconClockHour4,
   IconCoin,
@@ -37,7 +37,6 @@ import {
   FILTER_LABELS,
   FILTER_TOTAL_LABELS,
   WALLET_FILTERS,
-  conversionNote,
   groupByDay,
   signOf,
   txStatus,
@@ -219,14 +218,16 @@ function OverviewTile({
       <View style={[styles.tileIcon, { backgroundColor: tone.background }]}>
         <Icon size={18} color={tone.foreground} />
       </View>
-      <AppText variant="xs" color="textSecondary">
-        {FILTER_LABELS[category]}
-      </AppText>
-      <AppText variant="base" weight="bold" color={amountColor(total)} numberOfLines={1} adjustsFontSizeToFit>
+      <View style={styles.tileText}>
+        <AppText variant="sm" weight="semibold">
+          {FILTER_LABELS[category]}
+        </AppText>
+        <AppText variant="xs" color="textMuted">
+          {countText(category, count)}
+        </AppText>
+      </View>
+      <AppText variant="base" weight="bold" color={amountColor(total)} numberOfLines={1}>
         {signedMoney(total, currencyCode)}
-      </AppText>
-      <AppText variant="xs" color="textMuted">
-        {countText(category, count)}
       </AppText>
     </Pressable>
   );
@@ -296,7 +297,6 @@ function TransactionRow({ tx, currencyCode }: { tx: WalletTransaction; currencyC
   const tone = CATEGORY_TONES[category];
   const Icon = FILTER_ICONS[category];
   const subtitle = txSubtitle(tx);
-  const conversion = conversionNote(tx.conversion);
   const status = txStatus(tx);
   return (
     <OceanCard style={styles.txCard}>
@@ -315,14 +315,6 @@ function TransactionRow({ tx, currencyCode }: { tx: WalletTransaction; currencyC
         <AppText variant="xs" color="textMuted">
           {formatTime(tx.createdAt)}
         </AppText>
-        {conversion ? (
-          <View style={styles.conversionRow}>
-            <IconArrowsExchange size={12} color={colors.textMuted} />
-            <AppText variant="xs" color="textMuted" style={styles.conversionText}>
-              {conversion}
-            </AppText>
-          </View>
-        ) : null}
       </View>
       <View style={styles.txAmountBlock}>
         <AppText variant="sm" weight="bold" color={amountColor(tx.amount)}>
@@ -565,16 +557,15 @@ const styles = StyleSheet.create({
 
   // Vue d'ensemble
   tiles: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   tile: {
-    width: '48.5%',
-    flexGrow: 1,
-    gap: 2,
-    padding: spacing.md,
-    borderRadius: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 18,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: OCEAN.line,
@@ -590,7 +581,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
+  },
+  tileText: {
+    flex: 1,
+    gap: 1,
   },
 
   // Carte de total
@@ -659,15 +653,6 @@ const styles = StyleSheet.create({
   txAmountBlock: {
     alignItems: 'flex-end',
     gap: 5,
-  },
-  conversionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 4,
-    marginTop: 2,
-  },
-  conversionText: {
-    flex: 1,
   },
   moreButton: {
     marginTop: spacing.sm,
