@@ -71,8 +71,8 @@ export class WalletsService {
   }
 
   /**
-   * Vue « chauffeur » de son propre historique — jamais le montant brut payé par le client ni la commission plateforme comme
-   * lignes séparées (demande explicite : le chauffeur ne voit que sa part). La fusion revenu + commission en une ligne au net, le
+   * Vue « conducteur » de son propre historique — jamais le montant brut payé par le client ni la commission plateforme comme
+   * lignes séparées (demande explicite : le conducteur ne voit que sa part). La fusion revenu + commission en une ligne au net, le
    * classement par catégorie et les totaux sont dans wallet-history.ts. N'affecte que cette vue : le registre comptable réel
    * (getTransactions, utilisé aussi par l'admin) n'est pas modifié.
    *
@@ -224,8 +224,8 @@ export class WalletsService {
   /**
    * `sourceCurrencyId` : devise dans laquelle grossAmount/commission sont
    * exprimés (celle du Booking/Payment) — peut différer de la devise du
-   * portefeuille du chauffeur (ex : trajet transfrontalier payé en XOF,
-   * chauffeur inscrit en Guinée avec un wallet en GNF). Convertie ici
+   * portefeuille du conducteur (ex : trajet transfrontalier payé en XOF,
+   * conducteur inscrit en Guinée avec un wallet en GNF). Convertie ici
    * avant tout crédit ; voir ExchangeRateService pour le détail. Cas le
    * plus fréquent (même devise) : aucun appel supplémentaire, aucun
    * changement de comportement.
@@ -266,7 +266,7 @@ export class WalletsService {
 
   /**
    * Met en attente le revenu d'une prestation et sa commission, EN UNE SEULE TRANSACTION : l'une ne peut plus être
-   * enregistrée sans l'autre (sinon le chauffeur serait crédité sans commission). Idempotent : si le revenu de
+   * enregistrée sans l'autre (sinon le conducteur serait crédité sans commission). Idempotent : si le revenu de
    * cette prestation est déjà enregistré (webhook rejoué, reprise après erreur), rien n'est compté une seconde fois.
    */
   private async holdRevenue(params: {

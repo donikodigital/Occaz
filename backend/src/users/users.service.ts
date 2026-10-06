@@ -77,7 +77,7 @@ export class UsersService {
 
   /**
    * Types de comptes qu'un acteur du back-office a le droit de voir. `null` = aucune restriction
-   * (SuperAdmin). Les autres voient les clients et les chauffeurs ; les comptes Support ne sont
+   * (SuperAdmin). Les autres voient les clients et les conducteurs ; les comptes Support ne sont
    * visibles qu'avec la permission d'attribuer les litiges (nécessaire pour choisir un agent) ;
    * les comptes SuperAdmin ne le sont jamais.
    */
@@ -143,7 +143,7 @@ export class UsersService {
   /**
    * Mise à jour par un administrateur (email + prénom/nom). Le
    * prénom/nom ne peuvent être modifiés que si un profil client ou
-   * chauffeur existe déjà — Support/SuperAdmin n'en ont pas.
+   * conducteur existe déjà — Support/SuperAdmin n'en ont pas.
    */
   async adminUpdate(id: string, dto: AdminUpdateUserDto, actorId: string): Promise<SafeUser> {
     await this.assertActorMayManage(actorId, id, { allowSelf: true });
@@ -171,7 +171,7 @@ export class UsersService {
       } else if (existing.driverProfile) {
         await this.prisma.driverProfile.update({ where: { userId: id }, data: nameData });
       } else {
-        throw new BadRequestException("Cet utilisateur n'a pas de profil client ou chauffeur à modifier.");
+        throw new BadRequestException("Cet utilisateur n'a pas de profil client ou conducteur à modifier.");
       }
     }
 
@@ -291,7 +291,7 @@ export class UsersService {
    * (voir auth/strategies/jwt.strategy.ts).
    *
    * Refuse tant qu'une réservation ou un envoi est encore en cours : le
-   * chauffeur (ou le client) de l'autre côté ne doit jamais se retrouver
+   * conducteur (ou le client) de l'autre côté ne doit jamais se retrouver
    * sans interlocuteur au milieu d'une prestation.
    */
   async deleteSelf(userId: string, dto: DeleteAccountDto): Promise<SafeUser> {
@@ -355,7 +355,7 @@ export class UsersService {
     });
     if (activeTripsCount > 0) {
       throw new BadRequestException(
-        'Vous avez un trajet en cours en tant que chauffeur. Terminez-le ou annulez-le avant de supprimer votre compte.',
+        'Vous avez un trajet en cours en tant que conducteur. Terminez-le ou annulez-le avant de supprimer votre compte.',
       );
     }
   }

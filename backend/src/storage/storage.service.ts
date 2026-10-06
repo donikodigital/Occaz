@@ -81,7 +81,7 @@ export class StorageService {
    *
    * `{ public: true }` n'est à passer QUE pour un contenu explicitement
    * non sensible, prévu pour être vu en permanence (ex : la photo de
-   * profil d'un chauffeur — voir requestPhotoUploadUrlForUser). Dans ce
+   * profil d'un conducteur — voir requestPhotoUploadUrlForUser). Dans ce
    * cas seulement, si STORAGE_PUBLIC_BASE_URL est configuré, l'URL
    * publique stable est utilisée ; sinon, repli sur une URL signée
    * (donc temporaire — voir STORAGE_PUBLIC_BASE_URL dans .env.example

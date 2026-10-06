@@ -1,5 +1,5 @@
 // backend/src/profiles/customer-profiles/customer-profiles.controller.ts
-// [21/09/2026] v+ — routes de photo de profil (upload-url puis confirmation), comme côté chauffeur.
+// [21/09/2026] v+ — routes de photo de profil (upload-url puis confirmation), comme côté conducteur.
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

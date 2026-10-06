@@ -55,7 +55,7 @@ export class ReferralsService {
       where: { userId: customerUserId },
       select: { id: true },
     });
-    // Un chauffeur ne paie jamais de prestation — rien à détecter ici pour un filleul chauffeur.
+    // Un conducteur ne paie jamais de prestation — rien à détecter ici pour un filleul conducteur.
     if (!customer) return;
 
     const [confirmedBookings, confirmedShipments] = await Promise.all([
@@ -163,7 +163,7 @@ export class ReferralsService {
     ]).then(([data, total]) => new PaginatedResult(data, total, query.page, query.limit));
   }
 
-  /** Réservé à l'admin : valide un parrainage et crédite le parrain s'il est chauffeur. */
+  /** Réservé à l'admin : valide un parrainage et crédite le parrain s'il est conducteur. */
   async complete(id: string, rewardAmount: string, actorId: string) {
     const referral = await this.prisma.referral.findUnique({
       where: { id },

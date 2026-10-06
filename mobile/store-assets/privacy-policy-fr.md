@@ -21,7 +21,7 @@ données décrites ci-dessous.
 
 ### Pour tous les comptes
 - Numéro de téléphone (identifiant principal de connexion)
-- Adresse email (optionnelle pour un client/chauffeur ; requise pour
+- Adresse email (optionnelle pour un client/conducteur ; requise pour
   le personnel Support/Administration)
 - Historique de connexion (date, appareil)
 
@@ -30,7 +30,7 @@ données décrites ci-dessous.
 - Pays et ville
 - Photo de profil (optionnelle)
 
-### Pour les chauffeurs
+### Pour les conducteurs
 - Les mêmes informations que les clients, plus :
 - **Pièces d'identité** : carte nationale d'identité, permis de
   conduire, carte grise et assurance du véhicule — nécessaires à la
@@ -58,20 +58,20 @@ côté Transport Partagé.
 ## 3. Pourquoi nous utilisons ces données
 
 - Créer et sécuriser votre compte (vérification par code envoyé par SMS)
-- Mettre en relation chauffeurs et passagers, calculer les tarifs
-- Vérifier l'identité des chauffeurs avant de les autoriser à opérer
+- Mettre en relation conducteurs et passagers, calculer les tarifs
+- Vérifier l'identité des conducteurs avant de les autoriser à opérer
 - Permettre le suivi d'un trajet en cours
 - Traiter les paiements et les retraits
 - Répondre à vos demandes de support et instruire les litiges
 - Vous envoyer des notifications liées à votre activité (réservation
-  confirmée, chauffeur trouvé, colis livré...)
+  confirmée, conducteur trouvé, colis livré...)
 - Respecter nos obligations légales et de sécurité de la plateforme
 
 Nous ne vendons jamais vos données personnelles à des tiers.
 
 ## 4. Avec qui nous partageons ces données
 
-- **Le chauffeur ou le client concerné par un trajet/envoi donné** :
+- **Le conducteur ou le client concerné par un trajet/envoi donné** :
   nom, position en direct pendant le trajet, éléments nécessaires au
   bon déroulement du service
 - **Nos prestataires techniques** : hébergement de la base de données,
@@ -84,7 +84,7 @@ Nous ne vendons jamais vos données personnelles à des tiers.
 
 **[À COMPLÉTER avec des durées précises]** — à titre indicatif :
 compte actif : durée de vie du compte ; pièces d'identité : durée de
-vie du compte chauffeur, supprimées à la clôture ; historique de
+vie du compte conducteur, supprimées à la clôture ; historique de
 trajets/paiements : durée légale de conservation comptable.
 
 ## 6. Vos droits

@@ -1,5 +1,5 @@
 // mobile/app/(customer)/edit-profile.tsx
-// [21/09/2026] v6 — photo de profil modifiable (galerie ou appareil photo), comme côté chauffeur.
+// [21/09/2026] v6 — photo de profil modifiable (galerie ou appareil photo), comme côté conducteur.
 //
 // v5 — Habillage bleu océan (en-tête de retour, sections à en-tête
 // soulignée, bouton plein). Logique inchangée : date de naissance en saisie

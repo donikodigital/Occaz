@@ -8,7 +8,7 @@ export const TRIP_STATUS_LABELS: Record<TripStatus, string> = {
   PUBLISHED: 'Publié',
   BOOKING_PENDING: 'Réservation en attente',
   CONFIRMED: 'Confirmé',
-  DRIVER_ARRIVED: 'Chauffeur arrivé',
+  DRIVER_ARRIVED: 'Conducteur arrivé',
   PASSENGER_PICKED_UP: 'Passagers pris en charge',
   IN_PROGRESS: 'En cours',
   ARRIVED: 'Arrivé à destination',

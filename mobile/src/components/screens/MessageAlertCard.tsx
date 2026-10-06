@@ -1,8 +1,8 @@
 // mobile/src/components/screens/MessageAlertCard.tsx
 //
-// Alerte "nouveau message" sur l'écran d'accueil (client et chauffeur) —
+// Alerte "nouveau message" sur l'écran d'accueil (client et conducteur) —
 // icône avec un halo qui pulse, même famille d'animation que le point
-// "En direct" de l'écran chauffeur (voir shipment-available.tsx). Une
+// "En direct" de l'écran conducteur (voir shipment-available.tsx). Une
 // petite carte cliquable plutôt qu'un radar plein écran : elle doit se
 // remarquer sans dominer l'écran d'accueil. Disparaît une fois ouverte —
 // géré par l'appelant, qui marque la notification lue avant de naviguer.

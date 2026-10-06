@@ -12,7 +12,7 @@
 //  3. Les filtres Prisma (`…ScopeWhere`) qui disent « ce dossier relève de ces pays ».
 //
 // Règle d'appartenance, volontairement inclusive : un dossier relève d'un pays dès que l'une de ses parties
-// (chauffeur, client) y est rattachée, ou que son trajet / ses adresses y passent. Un agent de Guinée voit
+// (conducteur, client) y est rattachée, ou que son trajet / ses adresses y passent. Un agent de Guinée voit
 // donc un trajet Conakry → Dakar, mais jamais un dossier dont aucun élément ne touche la Guinée.
 import { AccountType, Prisma } from '@prisma/client';
 import { PERMISSIONS, PermissionKey } from '../constants/permissions.constants';
@@ -116,7 +116,7 @@ export function customerScopeWhere(ids: string[]): Prisma.CustomerProfileWhereIn
   return { OR: [{ countryId: inCountries(ids) }, { city: { countryId: inCountries(ids) } }] };
 }
 
-/** Compte client ou chauffeur rattaché au pays (les comptes d'équipe, sans profil, n'ont pas de pays). */
+/** Compte client ou conducteur rattaché au pays (les comptes d'équipe, sans profil, n'ont pas de pays). */
 export function userScopeWhere(ids: string[]): Prisma.UserWhereInput {
   return { OR: [{ customerProfile: customerScopeWhere(ids) }, { driverProfile: driverScopeWhere(ids) }] };
 }
@@ -167,7 +167,7 @@ export function payoutScopeWhere(ids: string[]): Prisma.PayoutWhereInput {
   return { wallet: walletScopeWhere(ids) };
 }
 
-/** Conversation client ↔ chauffeur : dans le périmètre si l'un des deux l'est. */
+/** Conversation client ↔ conducteur : dans le périmètre si l'un des deux l'est. */
 export function conversationScopeWhere(ids: string[]): Prisma.ConversationWhereInput {
   return { OR: [{ customer: customerScopeWhere(ids) }, { driver: driverScopeWhere(ids) }] };
 }

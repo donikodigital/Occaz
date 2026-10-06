@@ -3,10 +3,10 @@
 
 /*
  * Marque : bleu océan — mêmes valeurs que OCEAN dans
- * mobile/src/theme/ocean.ts (palette du profil chauffeur, partagée
+ * mobile/src/theme/ocean.ts (palette du profil conducteur, partagée
  * avec l'espace client), émeraude pour l'argent/la confirmation, ambre
  * pour l'énergie/les alertes. Police Inter, la même que côté mobile
- * (chauffeur et client). Fond blanc cassé chaud, jamais de noir ni de
+ * (conducteur et client). Fond blanc cassé chaud, jamais de noir ni de
  * fond sombre. Cohérence de marque entre l'app et ce back-office, pas
  * un thème générique de tableau de bord.
  */

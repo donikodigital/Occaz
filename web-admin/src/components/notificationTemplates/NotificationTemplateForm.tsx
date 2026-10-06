@@ -162,7 +162,7 @@ export function NotificationTemplateForm({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={5}
-          placeholder="Votre chauffeur {{driverName}} arrive dans {{eta}} minutes."
+          placeholder="Votre conducteur {{driverName}} arrive dans {{eta}} minutes."
         />
         <p className="text-xs text-text-muted">{body.length} caractère{body.length > 1 ? 's' : ''}</p>
         {placeholders.length > 0 ? (

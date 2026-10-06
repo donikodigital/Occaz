@@ -5,7 +5,7 @@ import { ShipmentsService } from './shipments.service';
 
 /**
  * Acceptation d'un envoi : "le premier qui accepte l'emporte", sans
- * trajet obligatoire, réservé aux chauffeurs validés. Dépendances
+ * trajet obligatoire, réservé aux conducteurs validés. Dépendances
  * mockées à la main (même approche que bookings.service.spec.ts).
  */
 const future = new Date(Date.now() + 3 * 86_400_000);
@@ -65,12 +65,12 @@ function createService(options: {
 }
 
 describe('ShipmentsService.accept', () => {
-  it('refuse un chauffeur dont le compte n\'est pas validé', async () => {
+  it('refuse un conducteur dont le compte n\'est pas validé', async () => {
     const { service } = createService({ driverStatus: DriverAccountStatus.IN_VERIFICATION });
     await expect(service.accept('s1', 'u1')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('refuse un utilisateur sans profil chauffeur', async () => {
+  it('refuse un utilisateur sans profil conducteur', async () => {
     const { service } = createService({ driverStatus: null });
     await expect(service.accept('s1', 'u1')).rejects.toBeInstanceOf(ForbiddenException);
   });
@@ -80,8 +80,8 @@ describe('ShipmentsService.accept', () => {
     await expect(service.accept('s1', 'u1')).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('le second chauffeur perd la course : aucune retenue de fonds, aucun suivi créé', async () => {
-    // Les deux chauffeurs ont vu SEARCHING_DRIVER, mais l'attribution conditionnelle ne réussit qu'une fois.
+  it('le second conducteur perd la course : aucune retenue de fonds, aucun suivi créé', async () => {
+    // Les deux conducteurs ont vu SEARCHING_DRIVER, mais l'attribution conditionnelle ne réussit qu'une fois.
     const { service, tx, wallets } = createService({ claimCount: 0 });
     await expect(service.accept('s1', 'u1')).rejects.toBeInstanceOf(ConflictException);
     expect(wallets.holdShipmentRevenue).not.toHaveBeenCalled();

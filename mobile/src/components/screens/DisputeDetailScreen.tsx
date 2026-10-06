@@ -1,6 +1,6 @@
 // mobile/src/components/screens/DisputeDetailScreen.tsx
 //
-// v2 — Habillage bleu océan (partagé client / chauffeur) : en-tête avec
+// v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
 // retour rond, pastilles de statut et de priorité, carte verte « Litige
 // résolu », fil de messages aux bulles bleues (soi) et claires (l'autre),
 // message du support en doré, saisie arrondie avec bouton d'envoi bleu.

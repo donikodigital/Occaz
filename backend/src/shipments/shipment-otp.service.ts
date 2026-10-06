@@ -14,7 +14,7 @@ import { NotificationsService } from '../notifications/notifications.service';
  * colis) puis OTP livraison (le destinataire confirme la réception). À
  * la différence d'un trajet, un envoi n'a qu'un seul destinataire final
  * — la livraison OTP-vérifiée clôture directement l'envoi (COMPLETED),
- * pas besoin d'une action de clôture séparée du chauffeur.
+ * pas besoin d'une action de clôture séparée du conducteur.
  */
 @Injectable()
 export class ShipmentOtpService {
@@ -35,7 +35,7 @@ export class ShipmentOtpService {
     return shipment;
   }
 
-  /** Le chauffeur de l'envoi est celui qui l'a accepté (avec ou sans trajet) ; repli sur le trajet pour les anciennes lignes. */
+  /** Le conducteur de l'envoi est celui qui l'a accepté (avec ou sans trajet) ; repli sur le trajet pour les anciennes lignes. */
   private assertDriverOwnsShipment(
     shipment: { driverId: string | null; trip: { driverId: string } | null },
     driverId: string,
@@ -51,7 +51,7 @@ export class ShipmentOtpService {
   }
 
   // ---------------------------------------------------------------------
-  // Transitions opérationnelles (non-OTP) — pings du chauffeur
+  // Transitions opérationnelles (non-OTP) — pings du conducteur
   // ---------------------------------------------------------------------
 
   async markPickupPending(shipmentId: string, driverId: string) {
@@ -108,13 +108,13 @@ export class ShipmentOtpService {
     }
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.SHIPMENT_PICKUP, phone: shipment.senderPhone, shipmentId },
-      'Communiquez ce code au chauffeur pour confirmer la remise du colis :',
+      'Communiquez ce code au conducteur pour confirmer la remise du colis :',
     );
   }
 
   /**
    * Même code, déclenché cette fois par l'expéditeur lui-même (pas le
-   * chauffeur) — pour le retrouver dans l'app sans avoir à rouvrir le
+   * conducteur) — pour le retrouver dans l'app sans avoir à rouvrir le
    * SMS. Un nouveau code est régénéré à chaque appel (le précédent
    * devient caduc) : c'est le même mécanisme que requestPickupOtp,
    * seul l'appelant et le fait de renvoyer le code en clair changent.
@@ -126,12 +126,12 @@ export class ShipmentOtpService {
     }
     if (shipment.status !== ShipmentStatus.PICKUP_PENDING) {
       throw new BadRequestException(
-        "Ce code n'est disponible que lorsque le chauffeur est en route pour récupérer le colis.",
+        "Ce code n'est disponible que lorsque le conducteur est en route pour récupérer le colis.",
       );
     }
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.SHIPMENT_PICKUP, phone: shipment.senderPhone, shipmentId },
-      'Communiquez ce code au chauffeur pour confirmer la remise du colis :',
+      'Communiquez ce code au conducteur pour confirmer la remise du colis :',
       { revealCodeToCaller: true },
     );
   }
@@ -145,11 +145,11 @@ export class ShipmentOtpService {
   }
 
   /**
-   * Validation manuelle par le support (jamais par le chauffeur) — même
+   * Validation manuelle par le support (jamais par le conducteur) — même
    * transition d'état que verifyPickupOtp, sans code : réservée aux
    * litiges où l'expéditeur reste injoignable ou refuse de communiquer
    * son code. Déclenchée uniquement via DisputesService.resolve (type
-   * OTP_MANUAL_VALIDATION), jamais exposée directement au chauffeur.
+   * OTP_MANUAL_VALIDATION), jamais exposée directement au conducteur.
    */
   async manuallyValidatePickup(shipmentId: string) {
     const shipment = await this.getShipmentWithContext(shipmentId);
@@ -180,16 +180,16 @@ export class ShipmentOtpService {
     }
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.SHIPMENT_DELIVERY, phone: shipment.recipientPhone, shipmentId },
-      'Communiquez ce code au chauffeur pour confirmer la réception du colis :',
+      'Communiquez ce code au conducteur pour confirmer la réception du colis :',
     );
   }
 
   /**
    * Même code, mais renvoyé en clair à l'expéditeur (le client, qui a un
-   * compte dans l'app) plutôt qu'au chauffeur — même mécanisme que
+   * compte dans l'app) plutôt qu'au conducteur — même mécanisme que
    * requestPickupOtpForCustomer. Le SMS continue de partir sur le
    * téléphone du DESTINATAIRE (shipment.recipientPhone) : c'est bien lui
-   * qui doit communiquer le code au chauffeur à la livraison. Ceci ne
+   * qui doit communiquer le code au conducteur à la livraison. Ceci ne
    * fait qu'ajouter un second endroit où le même code est consultable,
    * pour que l'expéditeur puisse le retrouver ou le retransmettre au
    * destinataire si le SMS ne lui est pas parvenu.
@@ -201,12 +201,12 @@ export class ShipmentOtpService {
     }
     if (shipment.status !== ShipmentStatus.DELIVERY_PENDING) {
       throw new BadRequestException(
-        "Ce code n'est disponible que lorsque le chauffeur est en route pour livrer le colis.",
+        "Ce code n'est disponible que lorsque le conducteur est en route pour livrer le colis.",
       );
     }
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.SHIPMENT_DELIVERY, phone: shipment.recipientPhone, shipmentId },
-      'Communiquez ce code au chauffeur pour confirmer la réception du colis :',
+      'Communiquez ce code au conducteur pour confirmer la réception du colis :',
       { revealCodeToCaller: true },
     );
   }
@@ -225,12 +225,12 @@ export class ShipmentOtpService {
   }
 
   /**
-   * Validation manuelle par le support (jamais par le chauffeur) — même
+   * Validation manuelle par le support (jamais par le conducteur) — même
    * transition d'état que verifyDeliveryOtp, sans code. Reste utile même
    * maintenant que l'expéditeur peut revoir le code : si le destinataire
    * refuse de le communiquer par mauvaise foi malgré tout, seul un litige
    * validé par le support peut clôturer la livraison. Jamais exposée
-   * directement au chauffeur.
+   * directement au conducteur.
    */
   async manuallyValidateDelivery(shipmentId: string) {
     const shipment = await this.getShipmentWithContext(shipmentId);

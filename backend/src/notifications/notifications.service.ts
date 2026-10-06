@@ -68,7 +68,7 @@ export class NotificationsService {
     // title/body persistés désormais (auparavant jetés après l'envoi) —
     // sans ça, le client ne pouvait distinguer aucune notification du
     // même NotificationType (ex: STATUS_CHANGE couvre validation
-    // chauffeur, suspension, vérif véhicule/document...), toutes
+    // conducteur, suspension, vérif véhicule/document...), toutes
     // rendues avec le même libellé générique côté mobile.
     const notification = await this.prisma.notification.create({
       data: {
@@ -140,7 +140,7 @@ export class NotificationsService {
   /**
    * notify() enregistre une ligne par CANAL (push/email/sms) pour un même
    * événement (voir dispatchOne ci-dessous) — utile pour suivre l'envoi
-   * de chacun séparément, mais ça faisait apparaître "Chauffeur trouvé"
+   * de chacun séparément, mais ça faisait apparaître "Conducteur trouvé"
    * ou "Paiement confirmé" deux fois dans la liste du client, comme deux
    * événements distincts. On ne garde que la première ligne par (type,
    * title, body) créée à quelques secondes d'écart : assez large pour

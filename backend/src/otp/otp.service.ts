@@ -32,7 +32,7 @@ export interface VerifyOtpParams {
  *
  * Règle d'or (section 18) : le code est toujours généré ici, côté
  * serveur, et transmis uniquement au bénéficiaire (passager, expéditeur,
- * destinataire) — jamais au chauffeur, qui se contente de le saisir tel
+ * destinataire) — jamais au conducteur, qui se contente de le saisir tel
  * qu'on le lui communique verbalement.
  */
 @Injectable()
@@ -59,7 +59,7 @@ export class OtpService {
    */
   /**
    * `revealCodeToCaller` renvoie le code en clair dans la réponse, en plus
-   * du SMS — jamais pour le chauffeur (qui doit toujours le recevoir
+   * du SMS — jamais pour le conducteur (qui doit toujours le recevoir
    * verbalement du bénéficiaire, règle d'or de ce service), seulement
    * pour un endpoint où l'appelant authentifié EST le bénéficiaire
    * lui-même consultant son propre code (ex. l'expéditeur qui veut le
@@ -108,8 +108,8 @@ export class OtpService {
    * booking|shipment) — pas seulement le tout dernier. Le bénéficiaire
    * (passager, expéditeur) peut à tout moment régénérer son code via
    * "Voir mon code" dans l'app, indépendamment d'une demande déjà faite
-   * par le chauffeur : sans cette petite fenêtre de tolérance, le code
-   * que le chauffeur vient de recevoir verbalement (ou par SMS) devient
+   * par le conducteur : sans cette petite fenêtre de tolérance, le code
+   * que le conducteur vient de recevoir verbalement (ou par SMS) devient
    * invalide dès que l'autre partie régénère le sien, sans qu'aucune des
    * deux ne le sache — exactement le bug "Code invalide" alors que le
    * passager donne un code qu'il voit bien, valide, à l'écran.

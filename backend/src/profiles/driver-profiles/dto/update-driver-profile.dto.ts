@@ -3,7 +3,7 @@ import { PartialType, OmitType } from '@nestjs/swagger';
 import { CreateDriverProfileDto } from './create-driver-profile.dto';
 
 /**
- * countryId/cityId ne sont pas modifiables librement par le chauffeur
+ * countryId/cityId ne sont pas modifiables librement par le conducteur
  * lui-même une fois le compte créé (impact sur la portée RBAC, les
  * commissions par pays, etc.) — un changement de pays passe par le support.
  */

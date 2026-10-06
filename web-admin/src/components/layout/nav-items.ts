@@ -53,7 +53,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/dashboard', label: 'Tableau de bord', icon: IconLayoutDashboard },
       { href: '/users', label: 'Utilisateurs', icon: IconUsers, permissions: [PERMISSIONS.USER_READ] },
-      { href: '/drivers', label: 'Chauffeurs', icon: IconSteeringWheel, permissions: [PERMISSIONS.DRIVER_READ] },
+      { href: '/drivers', label: 'Conducteurs', icon: IconSteeringWheel, permissions: [PERMISSIONS.DRIVER_READ] },
       { href: '/trips', label: 'Trajets', icon: IconRoute, permissions: [PERMISSIONS.TRIP_READ] },
       { href: '/shipments', label: 'Envois', icon: IconTruckDelivery, permissions: [PERMISSIONS.SHIPMENT_READ] },
       { href: '/disputes', label: 'Litiges', icon: IconAlertTriangle, permissions: [PERMISSIONS.DISPUTE_READ] },

@@ -3,7 +3,7 @@
 // [02/10/2026] v+ — GET /users/me renvoie aussi les permissions effectives (le back-office s'en sert pour
 // n'afficher que ce que le compte a le droit de faire) ; liste et fiche filtrées selon l'acteur.
 // [02/10/2026] v+ — Portée par pays : un compte dont le rôle est limité à un pays ne voit et ne gère que les
-// clients et chauffeurs de ce pays ; /users/me indique aussi les pays de son périmètre (`scopedCountries`).
+// clients et conducteurs de ce pays ; /users/me indique aussi les pays de son périmètre (`scopedCountries`).
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';

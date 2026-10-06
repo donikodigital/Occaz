@@ -114,7 +114,7 @@ describe('TripsService.create — devise du trajet', () => {
     }) as never;
   const createdCurrency = (tx: ReturnType<typeof build>['tx']) => tx.trip.create.mock.calls[0][0].data.currencyId;
 
-  it('la devise est celle du pays de la ville de départ, sans que le chauffeur ait à la choisir', async () => {
+  it('la devise est celle du pays de la ville de départ, sans que le conducteur ait à la choisir', async () => {
     const { service, tx, prisma } = build({ originCurrency: 'cur-gnf' });
     await service.create('driver1', dto());
     expect(createdCurrency(tx)).toBe('cur-gnf');

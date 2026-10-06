@@ -7,7 +7,7 @@ import { DRIVER_STATUS_LABELS } from '@/utils/driverLabels';
 import type { DriverAccountStatus } from '@/types/drivers.types';
 
 /* ------------------------------------------------------------------ */
-/* Palette des statuts chauffeur                                       */
+/* Palette des statuts conducteur                                       */
 /* Le bleu « Validé » est en valeurs hexadécimales fixes : il ne       */
 /* dépend pas de la palette Tailwind du projet.                        */
 /* ------------------------------------------------------------------ */

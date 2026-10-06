@@ -95,7 +95,7 @@ export default function MyReviewsScreen() {
             <OceanEmpty
               icon={<IconMessageStar size={28} color={OCEAN.base} />}
               title="Aucun avis pour l'instant"
-              text="Notez un chauffeur après un trajet ou un envoi terminé — vos avis apparaîtront ici."
+              text="Notez un conducteur après un trajet ou un envoi terminé — vos avis apparaîtront ici."
               action={
                 <OceanButton
                   label="Voir mon activité"

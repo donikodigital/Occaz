@@ -180,7 +180,7 @@ export class TripsController {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
     await this.tripsService.findOne(id).then((trip) => {
       if (trip.driverId !== driverId) {
-        throw new ForbiddenException("Ce trajet n'appartient pas à ce chauffeur.");
+        throw new ForbiddenException("Ce trajet n'appartient pas à ce conducteur.");
       }
     });
     // Le conducteur ne garde pas le numéro d'un client dont la réservation est terminée.

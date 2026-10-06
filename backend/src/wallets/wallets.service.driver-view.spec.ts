@@ -1,5 +1,5 @@
 // backend/src/wallets/wallets.service.driver-view.spec.ts
-// Historique du portefeuille côté chauffeur : filtre par catégorie, totaux de toutes les catégories, lignes enrichies.
+// Historique du portefeuille côté conducteur : filtre par catégorie, totaux de toutes les catégories, lignes enrichies.
 import { WalletTransactionStatus as S, WalletTransactionType as T } from '@prisma/client';
 import { WalletsService } from './wallets.service';
 

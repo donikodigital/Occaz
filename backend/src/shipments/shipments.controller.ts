@@ -1,6 +1,6 @@
 // backend/src/shipments/shipments.controller.ts
 // [30/09/2026] v3 — route otp/delivery/reveal-for-sender : l'expéditeur peut revoir le code de livraison, sur le modèle de otp/pickup/reveal-for-sender.
-// [21/09/2026] v2 — /quote, /extend, /available réservé aux chauffeurs validés, assign = acceptation.
+// [21/09/2026] v2 — /quote, /extend, /available réservé aux conducteurs validés, assign = acceptation.
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccountType, CancellationInitiator } from '@prisma/client';
@@ -53,7 +53,7 @@ export class ShipmentsController {
   }
 
   /**
-   * Demandes ouvertes, visibles des seuls chauffeurs validés et sans
+   * Demandes ouvertes, visibles des seuls conducteurs validés et sans
    * données personnelles du client (voir shipment-views.ts).
    */
   @Get('available')
@@ -78,7 +78,7 @@ export class ShipmentsController {
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const shipment = await this.shipmentsService.findOne(id);
 
-    // Le personnel du support garde tout ; un client ou un chauffeur ne voit plus les numéros une fois le colis livré.
+    // Le personnel du support garde tout ; un client ou un conducteur ne voit plus les numéros une fois le colis livré.
     if (await this.scope.hasShipmentAccess(user, id)) return shipment;
 
     {
@@ -101,7 +101,7 @@ export class ShipmentsController {
   }
 
   /**
-   * Un chauffeur validé accepte une demande, avec un de ses trajets ou sans
+   * Un conducteur validé accepte une demande, avec un de ses trajets ou sans
    * trajet. Le premier qui accepte l'emporte : les suivants reçoivent 409.
    */
   @Post(':id/assign')

@@ -1,5 +1,5 @@
 // mobile/src/components/screens/VehicleTypePicker.tsx
-// [21/09/2026] v+ — bleu Ocean au lieu de l'indigo, comme le reste du profil chauffeur.
+// [21/09/2026] v+ — bleu Ocean au lieu de l'indigo, comme le reste du profil conducteur.
 // [21/09/2026] v+ — strokeWidth au lieu de stroke.
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';

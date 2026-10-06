@@ -14,7 +14,7 @@ const row = (over: Partial<LedgerRow> & Pick<LedgerRow, 'type' | 'amount'>): Led
   ...over,
 });
 
-/** Un trajet : revenu brut (payé par le client, commission comprise) + commission négative → net 3 875 pour le chauffeur. */
+/** Un trajet : revenu brut (payé par le client, commission comprise) + commission négative → net 3 875 pour le conducteur. */
 const trip = (id: string, status: S = S.COMPLETED, metadata?: unknown): LedgerRow[] => [
   row({ type: T.BOOKING_REVENUE, amount: 4_456n, bookingId: id, status, metadata }),
   row({ type: T.COMMISSION, amount: -581n, bookingId: id, status }),
@@ -24,7 +24,7 @@ const shipment = (id: string, amount = 662n): LedgerRow[] => [
   row({ type: T.COMMISSION, amount: -100n, shipmentId: id }),
 ];
 
-describe('mergeForDriver — le chauffeur ne voit que sa part', () => {
+describe('mergeForDriver — le conducteur ne voit que sa part', () => {
   it('fusionne revenu et commission en une ligne au montant net', () => {
     const merged = mergeForDriver(trip('b1'));
     expect(merged).toHaveLength(1);

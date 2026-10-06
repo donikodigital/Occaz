@@ -1,6 +1,6 @@
 // mobile/src/types/shipments.types.ts
 // [23/09/2026] v3 — champ promoCode facultatif sur CreateShipmentPayload.
-// [21/09/2026] v2 — plage de dates, chauffeur direct, devis, AvailableShipment, tripId facultatif à l'acceptation.
+// [21/09/2026] v2 — plage de dates, conducteur direct, devis, AvailableShipment, tripId facultatif à l'acceptation.
 import type { Money } from '@/services/api/types';
 import type { TripLocation } from './trips.types';
 
@@ -47,7 +47,7 @@ export interface ShipmentTrackingEntry {
   recordedAt: string;
 }
 
-/** Chauffeur tel que l'API l'expose aux parties d'un envoi : jamais ses coordonnées de paiement. */
+/** Conducteur tel que l'API l'expose aux parties d'un envoi : jamais ses coordonnées de paiement. */
 export interface ShipmentDriverSummary {
   id: string;
   firstName: string;
@@ -71,24 +71,24 @@ export interface ShipmentCurrency {
 
 export interface Shipment {
   id: string;
-  /** Trajet auquel l'envoi est rattaché — nul si le chauffeur n'a pas de trajet établi. */
+  /** Trajet auquel l'envoi est rattaché — nul si le conducteur n'a pas de trajet établi. */
   tripId: string | null;
   trip?: ShipmentTripSummary | null;
-  /** Chauffeur qui a accepté l'envoi (avec ou sans trajet). */
+  /** Conducteur qui a accepté l'envoi (avec ou sans trajet). */
   driverId: string | null;
   driver?: ShipmentDriverSummary | null;
-  /** Révélé par le serveur uniquement une fois un chauffeur assigné — null avant, jamais calculé côté client. */
+  /** Révélé par le serveur uniquement une fois un conducteur assigné — null avant, jamais calculé côté client. */
   driverPhone: string | null;
   customerId: string;
   categoryId: string;
   category?: ShipmentCategory;
   senderName: string;
-  /** null côté chauffeur une fois le colis livré sans litige : le serveur ne communique plus les numéros. */
+  /** null côté conducteur une fois le colis livré sans litige : le serveur ne communique plus les numéros. */
   senderPhone: string | null;
   senderLocationId: string;
   senderLocation?: TripLocation;
   recipientName: string;
-  /** null côté chauffeur une fois le colis livré sans litige. */
+  /** null côté conducteur une fois le colis livré sans litige. */
   recipientPhone: string | null;
   recipientLocationId: string;
   recipientLocation?: TripLocation;
@@ -104,10 +104,10 @@ export interface Shipment {
   /** Plage de dates souhaitée par le client. */
   windowStart: string;
   windowEnd: string;
-  /** Renseigné quand la plage est terminée sans chauffeur : le client doit prolonger ou être remboursé. */
+  /** Renseigné quand la plage est terminée sans conducteur : le client doit prolonger ou être remboursé. */
   extensionRequestedAt: string | null;
   status: ShipmentStatus;
-  /** Le client paie un seul montant : `totalAmount` (= `price`). `platformFee` est la commission prélevée sur le gain du chauffeur. */
+  /** Le client paie un seul montant : `totalAmount` (= `price`). `platformFee` est la commission prélevée sur le gain du conducteur. */
   price: Money;
   platformFee: Money;
   totalAmount: Money;
@@ -176,7 +176,7 @@ export interface ExtendShipmentPayload {
 }
 
 /**
- * Demande d'envoi telle que la voit un chauffeur AVANT d'avoir accepté :
+ * Demande d'envoi telle que la voit un conducteur AVANT d'avoir accepté :
  * sans nom, téléphone ni consigne du client, adresses réduites à leur
  * ville (voir backend/src/shipments/shipment-views.ts).
  */
@@ -219,6 +219,6 @@ export interface SearchAvailableShipmentsParams {
 }
 
 export interface AssignShipmentPayload {
-  /** Facultatif : un chauffeur validé sans trajet établi peut accepter un envoi. */
+  /** Facultatif : un conducteur validé sans trajet établi peut accepter un envoi. */
   tripId?: string;
 }

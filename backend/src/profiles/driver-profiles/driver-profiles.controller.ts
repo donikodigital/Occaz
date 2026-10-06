@@ -15,7 +15,7 @@ import { RequestUploadUrlDto } from '../../storage/dto/request-upload-url.dto';
 import { ConfirmPhotoDto } from './dto/confirm-photo.dto';
 import { ListDriverProfilesQueryDto } from './dto/list-driver-profiles-query.dto';
 
-@ApiTags('Profils — Chauffeurs')
+@ApiTags('Profils — Conducteurs')
 @ApiBearerAuth()
 @Controller('driver-profiles')
 export class DriverProfilesController {

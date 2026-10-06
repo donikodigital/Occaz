@@ -22,7 +22,7 @@ export interface ConversionResult {
 
 /**
  * Conversion entre devises au moment où un montant payé change de
- * "conteneur" financier — typiquement : un chauffeur inscrit en Guinée
+ * "conteneur" financier — typiquement : un conducteur inscrit en Guinée
  * (wallet en GNF) transporte un client qui paie en XOF ; le montant
  * crédité à son solde est converti au taux configuré, jamais laissé tel
  * quel (1 GNF ≠ 1 XOF).

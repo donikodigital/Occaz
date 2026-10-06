@@ -1,5 +1,8 @@
 // web-admin/src/app/(app)/pricing/page.tsx
 //
+// v3 — Cartes plus compactes : barre de couleur selon le service, valeur dans un
+//   encart, désactivation par un bouton icône (puis confirmation) au lieu d'un
+//   texte rouge, 2 colonnes dès la tablette, bandeau sur une ligne.
 // v2 — Refonte complète.
 //   - Deux onglets (Commissions, Annulations) au lieu de deux formulaires
 //     permanents empilés au-dessus de deux tableaux ;
@@ -13,11 +16,21 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { IconCar, IconClockHour4, IconPackage, IconPercentage, IconPlus, IconReceiptRefund } from '@tabler/icons-react';
+import {
+  IconCar,
+  IconClockHour4,
+  IconPackage,
+  IconPercentage,
+  IconPlus,
+  IconPower,
+  IconReceiptRefund,
+} from '@tabler/icons-react';
 import { Badge, Button, Modal, Select, TextField } from '@/components/ui';
 import {
+  CardShell,
   EmptyState,
   FormError,
+  IconTile,
   FormSection,
   ListSkeleton,
   Notice,
@@ -56,51 +69,58 @@ function scopeLabel(countryId: string | null | undefined, countries: Country[]):
   return country ? `${isoToFlagEmoji(country.isoCode)} ${country.name}` : 'Un pays précis';
 }
 
+const SERVICE_TONE: Record<ServiceType, 'primary' | 'accent'> = { TRIP: 'primary', SHIPMENT: 'accent' };
+
 function ServiceTile({ serviceType }: { serviceType: ServiceType }) {
   return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-light text-primary">
+    <IconTile tone={SERVICE_TONE[serviceType]}>
       {serviceType === 'TRIP' ? <IconCar size={20} /> : <IconPackage size={20} />}
-    </span>
+    </IconTile>
   );
 }
 
-/** Désactivation en deux temps : on demande confirmation avant d'appeler l'API. */
-function DeactivateControl({
+/** Bouton icône de désactivation : la confirmation s'affiche ensuite sous l'en-tête de la carte. */
+function DeactivateButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-danger-light/70 text-danger-dark transition hover:bg-danger-light active:scale-95"
+    >
+      <IconPower size={17} />
+    </button>
+  );
+}
+
+/** Confirmation en deux temps avant d'appeler l'API ; les erreurs de l'API s'affichent dessous. */
+function ConfirmBar({
   question,
+  onCancel,
   onConfirm,
   isPending,
   error,
 }: {
   question: string;
+  onCancel: () => void;
   onConfirm: () => void;
   isPending: boolean;
   error: unknown;
 }) {
-  const [confirming, setConfirming] = useState(false);
-
   return (
-    <div className="mt-4">
-      {confirming ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-danger-light/40 px-3 py-2.5">
-          <span className="text-sm font-medium text-danger-dark">{question}</span>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => setConfirming(false)}>
-              Annuler
-            </Button>
-            <Button variant="danger" loading={isPending} onClick={onConfirm}>
-              Confirmer
-            </Button>
-          </div>
+    <div className="mt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-danger-light/40 px-3 py-2">
+        <span className="text-sm font-medium text-danger-dark">{question}</span>
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={onCancel}>
+            Annuler
+          </Button>
+          <Button variant="danger" loading={isPending} onClick={onConfirm}>
+            Confirmer
+          </Button>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className="rounded-xl px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger-light/40"
-        >
-          Désactiver
-        </button>
-      )}
+      </div>
       {error ? (
         <p className="mt-2 text-sm text-danger">{error instanceof ApiError ? error.message : 'Une erreur est survenue.'}</p>
       ) : null}
@@ -114,35 +134,44 @@ function DeactivateControl({
 
 function CommissionRuleCard({ rule, countries }: { rule: CommissionRuleItem; countries: Country[] }) {
   const deactivateRule = useDeactivateCommissionRule();
+  const [confirming, setConfirming] = useState(false);
   const isPercentage = rule.percentage != null;
 
   return (
-    <div className={`rounded-2xl border border-border bg-surface p-4 shadow-sm ${rule.isActive ? '' : 'opacity-70'}`}>
-      <div className="flex items-start gap-3">
+    <CardShell
+      tone={rule.isActive ? SERVICE_TONE[rule.serviceType] : 'neutral'}
+      muted={!rule.isActive}
+      className="p-3.5 pl-5"
+    >
+      <div className="flex items-center gap-3">
         <ServiceTile serviceType={rule.serviceType} />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-text-primary">{SERVICE_TYPE_LABELS[rule.serviceType]}</p>
+          <p className="font-semibold leading-tight text-text-primary">{SERVICE_TYPE_LABELS[rule.serviceType]}</p>
           <p className="truncate text-xs text-text-secondary">{scopeLabel(rule.countryId, countries)}</p>
         </div>
         <Badge label={rule.isActive ? 'Actif' : 'Inactif'} tone={rule.isActive ? 'success' : 'neutral'} />
+        {rule.isActive && !confirming ? (
+          <DeactivateButton label="Désactiver cette règle" onClick={() => setConfirming(true)} />
+        ) : null}
       </div>
 
-      <div className="mt-4 flex items-baseline gap-2">
-        <span className="text-3xl font-bold text-text-primary">
+      <div className="mt-3 flex items-baseline gap-2 rounded-xl bg-surface-muted/70 px-3 py-2.5">
+        <span className="text-2xl font-bold leading-none text-text-primary">
           {isPercentage ? `${rule.percentage} %` : formatMoney(rule.fixedAmount ?? '0')}
         </span>
         <span className="text-sm text-text-secondary">{isPercentage ? 'de commission' : 'de commission fixe'}</span>
       </div>
 
-      {rule.isActive ? (
-        <DeactivateControl
+      {confirming ? (
+        <ConfirmBar
           question="Désactiver cette règle ?"
+          onCancel={() => setConfirming(false)}
           onConfirm={() => deactivateRule.mutate(rule.id)}
           isPending={deactivateRule.isPending}
           error={deactivateRule.error}
         />
       ) : null}
-    </div>
+    </CardShell>
   );
 }
 
@@ -274,9 +303,9 @@ function CommissionRulesTab({ countries }: { countries: Country[] }) {
   const sorted = [...(rules ?? [])].sort((a, b) => Number(b.isActive) - Number(a.isActive));
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-text-secondary">Ce que la plateforme prélève sur chaque trajet ou envoi.</p>
+        <p className="text-xs text-text-secondary sm:text-sm">Ce que la plateforme prélève sur chaque trajet ou envoi.</p>
         <Button type="button" onClick={() => setModalOpen(true)} className="shrink-0">
           <IconPlus size={16} />
           Ajouter
@@ -284,7 +313,7 @@ function CommissionRulesTab({ countries }: { countries: Country[] }) {
       </div>
 
       {isLoading ? (
-        <ListSkeleton count={2} heightClass="h-36" />
+        <ListSkeleton count={2} heightClass="h-32" gridClass="sm:grid-cols-2" />
       ) : sorted.length === 0 ? (
         <EmptyState
           icon={<IconPercentage size={26} />}
@@ -298,7 +327,7 @@ function CommissionRulesTab({ countries }: { countries: Country[] }) {
           }
         />
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           {sorted.map((rule) => (
             <CommissionRuleCard key={rule.id} rule={rule} countries={countries} />
           ))}
@@ -316,42 +345,53 @@ function CommissionRulesTab({ countries }: { countries: Country[] }) {
 
 function CancellationPolicyCard({ policy, countries }: { policy: CancellationPolicyItem; countries: Country[] }) {
   const deactivatePolicy = useDeactivateCancellationPolicy();
+  const [confirming, setConfirming] = useState(false);
+  const refund = Math.min(Math.max(policy.refundPercentage, 0), 100);
 
   return (
-    <div className={`rounded-2xl border border-border bg-surface p-4 shadow-sm ${policy.isActive ? '' : 'opacity-70'}`}>
-      <div className="flex items-start gap-3">
+    <CardShell
+      tone={policy.isActive ? SERVICE_TONE[policy.serviceType] : 'neutral'}
+      muted={!policy.isActive}
+      className="p-3.5 pl-5"
+    >
+      <div className="flex items-center gap-3">
         <ServiceTile serviceType={policy.serviceType} />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-text-primary">{SERVICE_TYPE_LABELS[policy.serviceType]}</p>
+          <p className="font-semibold leading-tight text-text-primary">{SERVICE_TYPE_LABELS[policy.serviceType]}</p>
           <p className="truncate text-xs text-text-secondary">{scopeLabel(policy.countryId, countries)}</p>
         </div>
         <Badge label={policy.isActive ? 'Actif' : 'Inactif'} tone={policy.isActive ? 'success' : 'neutral'} />
+        {policy.isActive && !confirming ? (
+          <DeactivateButton label="Désactiver cette politique" onClick={() => setConfirming(true)} />
+        ) : null}
       </div>
 
-      <div className="mt-4 flex items-center gap-2 text-sm text-text-secondary">
-        <IconClockHour4 size={16} />
-        <span>{policy.hoursBeforeDeparture} h avant le départ</span>
-      </div>
-
-      <div className="mt-3">
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">Remboursé</span>
-          <span className="text-2xl font-bold text-text-primary">{policy.refundPercentage} %</span>
+      <div className="mt-3 rounded-xl bg-surface-muted/70 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-1.5 text-sm text-text-secondary">
+            <IconClockHour4 size={16} className="shrink-0 text-text-muted" />
+            {policy.hoursBeforeDeparture} h avant le départ
+          </span>
+          <span className="whitespace-nowrap">
+            <span className="text-xl font-bold leading-none text-text-primary">{policy.refundPercentage} %</span>
+            <span className="ml-1 text-xs text-text-secondary">remboursé</span>
+          </span>
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-primary-light">
-          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(Math.max(policy.refundPercentage, 0), 100)}%` }} />
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-primary-light">
+          <div className="h-full rounded-full bg-primary" style={{ width: `${refund}%` }} />
         </div>
       </div>
 
-      {policy.isActive ? (
-        <DeactivateControl
+      {confirming ? (
+        <ConfirmBar
           question="Désactiver cette politique ?"
+          onCancel={() => setConfirming(false)}
           onConfirm={() => deactivatePolicy.mutate(policy.id)}
           isPending={deactivatePolicy.isPending}
           error={deactivatePolicy.error}
         />
       ) : null}
-    </div>
+    </CardShell>
   );
 }
 
@@ -487,9 +527,9 @@ function CancellationPoliciesTab({ countries }: { countries: Country[] }) {
   const sorted = [...(policies ?? [])].sort((a, b) => Number(b.isActive) - Number(a.isActive));
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-text-secondary">Ce qui est remboursé au client selon le moment de l’annulation.</p>
+        <p className="text-xs text-text-secondary sm:text-sm">Ce qui est remboursé au client selon le moment de l’annulation.</p>
         <Button type="button" onClick={() => setModalOpen(true)} className="shrink-0">
           <IconPlus size={16} />
           Ajouter
@@ -497,7 +537,7 @@ function CancellationPoliciesTab({ countries }: { countries: Country[] }) {
       </div>
 
       {isLoading ? (
-        <ListSkeleton count={2} heightClass="h-44" />
+        <ListSkeleton count={2} heightClass="h-36" gridClass="sm:grid-cols-2" />
       ) : sorted.length === 0 ? (
         <EmptyState
           icon={<IconReceiptRefund size={26} />}
@@ -511,7 +551,7 @@ function CancellationPoliciesTab({ countries }: { countries: Country[] }) {
           }
         />
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           {sorted.map((policy) => (
             <CancellationPolicyCard key={policy.id} policy={policy} countries={countries} />
           ))}
@@ -541,7 +581,7 @@ export default function PricingPage() {
   const countryList = countries ?? [];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHero
         eyebrow="Finance"
         title="Tarification"

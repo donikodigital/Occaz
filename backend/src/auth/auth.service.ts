@@ -99,7 +99,7 @@ export class AuthService {
   }
 
   // ---------------------------------------------------------------------
-  // OTP par téléphone — parcours principal Client / Chauffeur (section 36)
+  // OTP par téléphone — parcours principal Client / Conducteur (section 36)
   // ---------------------------------------------------------------------
 
   /**

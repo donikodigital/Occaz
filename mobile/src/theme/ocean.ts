@@ -1,6 +1,6 @@
 // mobile/src/theme/ocean.ts
 //
-// Palette « bleu océan » du profil chauffeur, partagée avec l'espace client.
+// Palette « bleu océan » du profil conducteur, partagée avec l'espace client.
 // Le fichier du thème global n'est pas touché : les écrans qui veulent cette
 // identité importent OCEAN, et les composants de OceanKit s'en servent.
 

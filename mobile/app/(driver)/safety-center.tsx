@@ -24,12 +24,12 @@ const TIPS: { icon: IconComponent; title: string; text: string }[] = [
   {
     icon: IconMessageStar,
     title: 'Notez chaque prestation',
-    text: 'Votre avis aide les autres utilisateurs et signale les chauffeurs à surveiller de plus près.',
+    text: 'Votre avis aide les autres utilisateurs et signale les conducteurs à surveiller de plus près.',
   },
   {
     icon: IconPhoneCall,
     title: 'Restez joignable',
-    text: 'Le chauffeur doit pouvoir vous contacter le jour du trajet ou de l\'envoi — vérifiez que votre numéro est à jour dans votre profil.',
+    text: 'Le conducteur doit pouvoir vous contacter le jour du trajet ou de l\'envoi — vérifiez que votre numéro est à jour dans votre profil.',
   },
   {
     icon: IconAlertTriangle,
@@ -47,7 +47,7 @@ export default function SafetyCenterScreen() {
         <IconShieldCheck size={22} color={OCEAN.base} />
         <AppText variant="sm" color="textSecondary" style={styles.heroText}>
           Chaque prise en charge et chaque livraison sont validées par un code à usage unique — personne ne peut se
-          faire passer pour vous ou pour votre chauffeur.
+          faire passer pour vous ou pour votre conducteur.
         </AppText>
       </View>
 

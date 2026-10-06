@@ -14,31 +14,31 @@ Trajets partagés et envois de colis, en Guinée
 
 ## Description complète
 
-Transport Partagé connecte chauffeurs et passagers pour des trajets
+Transport Partagé connecte conducteurs et passagers pour des trajets
 partagés, et permet l'envoi de colis d'une ville à l'autre — simple,
 sûr, et pensé pour la Guinée.
 
 **Pour les passagers**
 - Recherchez un trajet selon votre départ, votre arrivée et votre date
 - Réservez votre place en quelques secondes
-- Suivez votre chauffeur en temps réel une fois le trajet commencé
+- Suivez votre conducteur en temps réel une fois le trajet commencé
 - Envoyez un colis à un proche, avec suivi de bout en bout
 - Payez directement dans l'application (Mobile Money)
 
-**Pour les chauffeurs**
+**Pour les conducteurs**
 - Proposez vos trajets et gérez vos réservations
 - Recevez vos paiements directement sur votre portefeuille intégré
 - Retirez vos gains vers votre compte Mobile Money
 - Acceptez des colis sur vos trajets pour un revenu complémentaire
 
 **Confiance et sécurité**
-- Vérification d'identité de chaque chauffeur avant validation
+- Vérification d'identité de chaque conducteur avant validation
 - Code de vérification à l'embarquement et à la livraison
-- Notation des chauffeurs et passagers après chaque trajet
+- Notation des conducteurs et passagers après chaque trajet
 - Support disponible en cas de litige
 
 ## Mots-clés (App Store — séparés par des virgules, 100 caractères max)
-transport,covoiturage,colis,livraison,guinee,taxi,trajet,chauffeur,mobile money,conakry
+transport,covoiturage,colis,livraison,guinee,taxi,trajet,conducteur,mobile money,conakry
 
 ## Catégorie
 Principale : Voyages / Cartes et navigation
@@ -50,14 +50,14 @@ Secondaire : Style de vie
 - Politique de confidentialité : voir `privacy-policy-fr.md` — à héberger sur une URL publique avant soumission (obligatoire pour Apple et Google)
 
 ## Notes pour la revue (App Store — "App Review Information")
-Application de mise en relation chauffeurs/passagers pour du transport
+Application de mise en relation conducteurs/passagers pour du transport
 partagé et de la livraison de colis, marché guinéen. Compte de test
 fourni ci-dessous pour la revue :
-- **[À COMPLÉTER : identifiants d'un compte de test client et d'un compte de test chauffeur, déjà validés, pour que l'examinateur puisse parcourir l'app sans friction]**
+- **[À COMPLÉTER : identifiants d'un compte de test client et d'un compte de test conducteur, déjà validés, pour que l'examinateur puisse parcourir l'app sans friction]**
 
 ## Captures d'écran requises
 - iPhone 6.7" (obligatoire) : 3 à 10 images
 - iPhone 6.5" (obligatoire si pas d'iPad universel)
 - Android : téléphone (obligatoire), tablette 7"/10" (optionnel)
 
-**[À COMPLÉTER — capturer les écrans réels de l'app une fois buildée : accueil client, résultats de recherche, détail d'un trajet, suivi en direct, portefeuille chauffeur]**
+**[À COMPLÉTER — capturer les écrans réels de l'app une fois buildée : accueil client, résultats de recherche, détail d'un trajet, suivi en direct, portefeuille conducteur]**

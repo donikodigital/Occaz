@@ -31,7 +31,7 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
   au lancement, l'app vérifie qu'un jeton stocké est toujours valide via
   `GET /users/me` avant de considérer l'utilisateur connecté.
 - **Flux d'authentification complet et fonctionnel**, fidèle aux
-  maquettes validées : `onboarding` (choix client/chauffeur) →
+  maquettes validées : `onboarding` (choix client/conducteur) →
   `login` (téléphone) → `verify-otp` (code à 6 cases, auto-remplissage
   SMS iOS via `textContentType="oneTimeCode"`, renvoi avec délai). Branché
   pour de vrai sur `POST /auth/otp/request` et `POST /auth/otp/verify`.
@@ -56,9 +56,9 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
 - **Parcours de recherche complet** : sélection de ville (modal avec
   recherche, connectée à `GET /cities`), bandeau de dates (14 prochains
   jours + "flexible"), nombre de passagers — jusqu'aux résultats
-  (`GET /trips/search`), avec un filtre "chauffeurs vérifiés" réellement
+  (`GET /trips/search`), avec un filtre "conducteurs vérifiés" réellement
   fonctionnel plutôt qu'un bouton qui ne fait rien.
-- **Détail d'un trajet** : chauffeur, véhicule, itinéraire (avec étapes
+- **Détail d'un trajet** : conducteur, véhicule, itinéraire (avec étapes
   intermédiaires si présentes), prix — jusqu'à la **réservation**
   (`POST /bookings`), avec prise en charge des réservations de groupe
   (passagers nommés, section 9) et validation stricte côté client
@@ -103,7 +103,7 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
   plusieurs applications de référence du secteur.
 - Comme au Lot 2, "Payer maintenant" reste un bouton d'attente fidèle à
   la feuille de route (Lot 4). La sélection d'un trajet spécifique pour
-  un envoi (plutôt que la recherche automatique de chauffeur) n'est pas
+  un envoi (plutôt que la recherche automatique de conducteur) n'est pas
   couverte ici — signalé plutôt que construit à la hâte.
 
 ## Lot 4 (livré) — Paiement (initiation), Notation, Profil
@@ -135,20 +135,20 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
 - **Profil** : écran de modification (prénom/nom), connecté à l'onglet
   Profil du Lot 1.
 
-## Lot 5 (livré) — Espace chauffeur : Trajets (création, gestion, OTP)
+## Lot 5 (livré) — Espace conducteur : Trajets (création, gestion, OTP)
 
 - **Contrats vérifiés dans le code source du backend avant d'écrire le
   moindre écran** (comme pour le Lot 4) plutôt que reconstruits de
-  mémoire — DTOs de création de trajet/véhicule/profil chauffeur, routes
-  OTP chauffeur. Toute la couche a été bâtie sur des faits, pas des
+  mémoire — DTOs de création de trajet/véhicule/profil conducteur, routes
+  OTP conducteur. Toute la couche a été bâtie sur des faits, pas des
   suppositions sur un projet vieux de plusieurs lots.
 - **Refactor des sélecteurs ville/adresse** en composants partagés
   (`CityPickerScreen`, `LocationPickerScreen`) réutilisables entre les
   Stacks Expo Router `(customer)` et `(driver)`, qui sont deux
   navigateurs isolés — évite de dupliquer l'écran, pas seulement la
   logique.
-- **Complétion de profil chauffeur** (section 5) : contrairement au
-  profil client, pays et ville sont obligatoires — un chauffeur opère
+- **Complétion de profil conducteur** (section 5) : contrairement au
+  profil client, pays et ville sont obligatoires — un conducteur opère
   depuis un point précis. Statut de vérification (`PENDING`/`VALIDATED`/
   `SUSPENDED`/`REJECTED`) affiché en bannière sur l'accueil, sans
   bloquer la création de trajets (le backend ne l'exige pas non plus).
@@ -164,7 +164,7 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
   OTP) → clôturer. Chaque réservation active affiche sa propre carte de
   validation OTP (demande de code, saisie à 6 chiffres, vérification),
   fidèle à la règle d'or backend : le code est toujours généré côté
-  serveur et transmis au passager, jamais au chauffeur.
+  serveur et transmis au passager, jamais au conducteur.
 - **Un vrai bug de logique trouvé et corrigé après coup, pas par le
   compilateur** : la condition d'affichage du bouton "Clôturer le
   trajet" filtrait déjà la liste aux réservations `CONFIRMED` puis
@@ -172,7 +172,7 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
   accidentellement le bon résultat. Simplifié en une vérification de
   liste vide, plus lisible et moins fragile.
 
-## Lot 6 (livré) — Espace chauffeur : Envois, Portefeuille et retraits
+## Lot 6 (livré) — Espace conducteur : Envois, Portefeuille et retraits
 
 - **Envois disponibles** (`GET /shipments/available`, filtrable par
   ville de départ/arrivée) et **assignation à l'un de ses propres
@@ -180,21 +180,21 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
   la logique d'éligibilité (trajet `PUBLISHED` et acceptant les colis)
   filtrée côté client avant même l'appel serveur, qui reste la
   validation qui fait foi.
-- **Cycle de vie complet de l'envoi côté chauffeur** : en route pour la
+- **Cycle de vie complet de l'envoi côté conducteur** : en route pour la
   récupération → code OTP de récupération → en transit → en route pour
   la livraison → code OTP de livraison — même schéma de composant que
   l'OTP des trajets du Lot 5, adapté à ce second flux.
-- **Onglet "Mon activité" du chauffeur** reçoit le même sélecteur
+- **Onglet "Mon activité" du conducteur** reçoit le même sélecteur
   segmenté Trajets/Envois que côté client (Lot 3) — cohérence
   volontaire entre les deux espaces plutôt que deux patterns différents
   pour le même besoin.
-- **Nouvel onglet "Portefeuille"** (4ᵉ onglet chauffeur) : solde
+- **Nouvel onglet "Portefeuille"** (4ᵉ onglet conducteur) : solde
   disponible et en attente, historique des transactions (crédits en
   vert, débits en rouge, montant signé fidèle au grand livre immuable
   du backend), retraits récents avec statut.
 - **Demande de retrait** (`POST /payouts`) : montant plafonné côté
   client au solde disponible avant même l'appel serveur, numéro Mobile
-  Money pré-rempli depuis le profil chauffeur s'il existe déjà.
+  Money pré-rempli depuis le profil conducteur s'il existe déjà.
 
 ## Lot 7 (livré) — Messagerie et Notifications (les deux rôles)
 
@@ -213,16 +213,16 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
     principe que les statuts de trajet/réservation/envoi ailleurs dans
     l'app.
 - **Messagerie** : nouvel onglet "Messages" dans les deux espaces (4ᵉ
-  onglet client, 5ᵉ onglet chauffeur), fil de discussion avec bulles
+  onglet client, 5ᵉ onglet conducteur), fil de discussion avec bulles
   alignées selon l'expéditeur, distinction visuelle des interventions du
   support (`isSupportIntervention`). Interrogation périodique (10s)
   plutôt que temps réel — le backend n'expose aucun canal websocket pour
   ça. Boutons "Contacter" ajoutés sur le détail d'une réservation/d'un
-  envoi (client) et sur chaque réservation/l'envoi lui-même (chauffeur),
-  conditionnés à l'existence d'un chauffeur assigné quand c'est pertinent
+  envoi (client) et sur chaque réservation/l'envoi lui-même (conducteur),
+  conditionnés à l'existence d'un conducteur assigné quand c'est pertinent
   (`getOrCreateForShipment` du backend l'exige).
 - **Notifications** : icône cloche (déjà en place côté client depuis le
-  Lot 2, ajoutée pour la première fois côté chauffeur) menant à une boîte
+  Lot 2, ajoutée pour la première fois côté conducteur) menant à une boîte
   de réception avec icône par type, distinction lu/non-lu, "tout marquer
   comme lu". Les notifications push réelles ne sont volontairement pas
   câblées dans ce lot — le fournisseur backend n'est lui-même qu'un
@@ -243,7 +243,7 @@ blanc cassé chaud — jamais de fond sombre. Typographie Inter.
   "Signaler un problème" vit sur le détail d'une réservation ou d'un
   envoi (les deux côtés), jamais comme un flux autonome qui obligerait
   à re-choisir quoi que ce soit — le contexte est déjà là. Côté
-  chauffeur, un trajet ayant plusieurs réservations, le lien est posé
+  conducteur, un trajet ayant plusieurs réservations, le lien est posé
   sur chaque réservation individuellement, pas sur le trajet entier.
 - **Liste des litiges** volontairement en lecture seule (statut,
   priorité, date) — la création se fait ailleurs, comme décrit ci-dessus.
@@ -290,7 +290,7 @@ référencés) — aurait bloqué toute soumission.
   remplacer les `[À COMPLÉTER]` du brouillon de politique de
   confidentialité après relecture juridique.
 
-## Mise à jour transversale — Photo de profil chauffeur
+## Mise à jour transversale — Photo de profil conducteur
 
 - **`ProfilePhotoField`** (nouveau) : avatar rond, recadrage carré imposé
   à la sélection (`allowsEditing` + `aspect: [1,1]`) — contrairement aux
@@ -305,7 +305,7 @@ référencés) — aurait bloqué toute soumission.
 
 ## Mise à jour transversale — Email optionnel à l'inscription
 
-`complete-profile.tsx` (client et chauffeur) gagne un champ email
+`complete-profile.tsx` (client et conducteur) gagne un champ email
 optionnel — validation basique côté client, backend gère le conflit
 d'unicité proprement. Permet de recevoir aussi les notifications par
 email (bienvenue, paiement confirmé, litige...), en plus du push —
@@ -313,7 +313,7 @@ voir le README backend, section "Notifications réelles".
 
 ## Mise à jour transversale — Suivi de position en direct (premier plan + arrière-plan)
 
-- **Côté chauffeur** (`useTripPositionBroadcast`) : demande d'abord la
+- **Côté conducteur** (`useTripPositionBroadcast`) : demande d'abord la
   permission "Utilisation de l'app" (obligatoire), puis tente la
   permission **"Toujours"** — demandée de façon contextuelle, seulement
   quand un trajet démarre réellement, jamais au premier lancement (ce
@@ -324,7 +324,7 @@ voir le README backend, section "Notifications réelles".
     notification persistante s'affiche côté Android tant que le suivi
     tourne — obligatoire dès qu'un service tourne en fond, pas un choix.
   - **Refusée** → repli automatique en premier plan uniquement (l'ancien
-    comportement), plutôt que de bloquer le chauffeur qui refuse ce
+    comportement), plutôt que de bloquer le conducteur qui refuse ce
     niveau d'accès.
   - La tâche de fond n'a accès à aucun état React — elle relit le
     trajet actif depuis `activeTripStorage` (AsyncStorage) à chaque
@@ -388,10 +388,10 @@ justificative ne pouvait être envoyée.
 - **`useDocumentUpload`** : hook générique en 3 étapes (demande d'URL
   signée → PUT direct vers R2 → confirmation auprès du backend), jamais
   de fichier qui transite par le serveur NestJS. Réutilisé pour les
-  documents chauffeur et véhicule sans dupliquer la logique.
+  documents conducteur et véhicule sans dupliquer la logique.
 - **`DocumentUploadField`** : composant UI (galerie ou appareil photo,
   badge de statut, motif affiché si rejeté).
-- **Chauffeur** : `complete-profile.tsx` gagne une seconde étape après
+- **Conducteur** : `complete-profile.tsx` gagne une seconde étape après
   la création du profil — CNI et permis de conduire, avant d'atteindre
   l'accueil.
 - **Véhicule** : `vehicle-new.tsx` gagne la même seconde étape — carte
@@ -423,14 +423,14 @@ nativement.
   formulaires longs en `detail`, tableaux de bord en `content` par
   défaut).
 - **`ResponsiveList`** : les listes à cartes (activité client, résultats
-  de recherche, trajets chauffeur) passent d'une colonne (mobile) à 2-3
+  de recherche, trajets conducteur) passent d'une colonne (mobile) à 2-3
   colonnes (tablette/desktop) — un seul composant plutôt qu'un calcul de
   `numColumns` répété à chaque écran.
 - **Navigation desktop** : `ResponsiveTabBar`, un seul composant qui
   rend soit la barre d'onglets classique en bas d'écran (mobile), soit
   une barre latérale fixe façon application de gestion (desktop) — même
   état de navigation, deux présentations. Branché dans les deux espaces
-  (client en indigo, chauffeur en émeraude, pour les distinguer d'un
+  (client en indigo, conducteur en émeraude, pour les distinguer d'un
   coup d'œil).
 - **Une découverte technique en cours de route, vérifiée dans le code
   source d'Expo Router plutôt que supposée** : `import { Tabs } from

@@ -75,7 +75,7 @@ function UserRolesSection({ userId }: { userId: string }) {
           </Select>
         </div>
         <p className="text-xs leading-relaxed text-text-secondary">
-          Limité à un pays, le rôle ne donne accès qu&apos;aux clients, chauffeurs, trajets, envois et litiges rattachés à ce
+          Limité à un pays, le rôle ne donne accès qu&apos;aux clients, conducteurs, trajets, envois et litiges rattachés à ce
           pays. Les droits de configuration de la plateforme (rôles, paramètres, géographie, journal d&apos;audit, tarification,
           moyens de paiement, promotions, tableau de bord administrateur) ne peuvent pas être limités à un pays : ils sont
           ignorés pour une attribution limitée.

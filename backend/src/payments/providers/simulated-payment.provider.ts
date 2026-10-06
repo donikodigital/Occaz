@@ -12,7 +12,7 @@ import {
  * Adaptateur de simulation — utilisé tant qu'aucune intégration réelle
  * (Orange Money, carte...) n'est branchée. Capture immédiatement chaque
  * paiement (immediateStatus: 'CAPTURED') pour que tout le reste du
- * système (confirmation de réservation, crédit du portefeuille chauffeur)
+ * système (confirmation de réservation, crédit du portefeuille conducteur)
  * soit testable de bout en bout sans dépendre d'un vrai prestataire.
  *
  * ⚠️ Ne jamais utiliser en production : aucune vérification de paiement

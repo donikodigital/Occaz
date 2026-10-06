@@ -20,7 +20,7 @@
 // passager (0 réservation) affichait « Demandez le code de chaque
 // passager » — un texte qui n'a pas de sens sans passager — et le
 // bouton « Annuler le trajet » disparaissait à cette étape (il n'était
-// visible que pour DRAFT/PUBLISHED). Le chauffeur n'avait alors plus
+// visible que pour DRAFT/PUBLISHED). Le conducteur n'avait alors plus
 // aucun moyen d'avancer ni d'annuler. La carte d'étape explique
 // maintenant honnêtement la situation, et le bouton d'annulation reste
 // disponible jusqu'à DRIVER_ARRIVED inclus (pas au-delà : une fois un
@@ -127,7 +127,7 @@ function formatKg(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-/** La couleur du bandeau raconte l'état du trajet au premier coup d'œil — bleu profond pour un trajet actif, comme le reste de l'espace chauffeur. */
+/** La couleur du bandeau raconte l'état du trajet au premier coup d'œil — bleu profond pour un trajet actif, comme le reste de l'espace conducteur. */
 function heroColorFor(status: TripStatus): string {
   switch (status) {
     case 'COMPLETED':

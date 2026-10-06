@@ -17,7 +17,7 @@ export function useMyShipments(page = 1) {
   });
 }
 
-/** Tant que l'envoi n'est pas terminé, l'écran de suivi se met à jour tout seul : « chauffeur trouvé », colis récupéré, livré… */
+/** Tant que l'envoi n'est pas terminé, l'écran de suivi se met à jour tout seul : « conducteur trouvé », colis récupéré, livré… */
 const LIVE_STATUSES = ['CREATED', 'SEARCHING_DRIVER', 'DRIVER_ASSIGNED', 'PICKUP_PENDING', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERY_PENDING'];
 
 export function useShipment(id: string | undefined) {

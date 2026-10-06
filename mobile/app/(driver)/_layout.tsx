@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { colors } from '@/theme';
 
 /**
- * Stack racine de l'espace chauffeur : héberge le groupe (tabs)
+ * Stack racine de l'espace conducteur : héberge le groupe (tabs)
  * (Accueil, Trajets, Profil) ainsi que les écrans qui se superposent
  * aux onglets (création de véhicule/trajet, détail d'un trajet).
  */

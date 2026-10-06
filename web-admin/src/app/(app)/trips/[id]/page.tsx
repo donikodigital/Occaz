@@ -1,7 +1,7 @@
 // web-admin/src/app/(app)/trips/[id]/page.tsx
 //
 // v1 — Détail d'un trajet pour l'équipe : itinéraire complet (avec étapes
-// intermédiaires), chauffeur, véhicule, places, prix, et les réservations
+// intermédiaires), conducteur, véhicule, places, prix, et les réservations
 // (passagers) qui y sont rattachées. Lecture seule : un désaccord se
 // traite depuis « Litiges ». Même structure que le détail Envoi.
 
@@ -91,9 +91,9 @@ export default function TripDetailPage() {
         badge={<Chip tone={TRIP_STATUS_TONE[trip.status]}>{TRIP_STATUS_LABELS[trip.status]}</Chip>}
       />
 
-      <SectionCard title="Prix" description="Le passager paie le prix par place fixé par le chauffeur, plus la commission de la plateforme.">
+      <SectionCard title="Prix" description="Le passager paie le prix par place fixé par le conducteur, plus la commission de la plateforme.">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <MoneyTile label="Prix chauffeur (par place)" value={formatMoney(trip.pricePerSeat, currencyCode)} />
+          <MoneyTile label="Prix conducteur (par place)" value={formatMoney(trip.pricePerSeat, currencyCode)} />
           <MoneyTile label="Prix passager (par place)" value={formatMoney(trip.customerPricePerSeat, currencyCode)} highlight />
         </div>
       </SectionCard>
@@ -111,7 +111,7 @@ export default function TripDetailPage() {
           {trip.allowsLuggage ? <Chip tone="primary">Bagages acceptés</Chip> : null}
           {trip.allowsShipments ? <Chip tone="primary">Envois acceptés</Chip> : null}
         </div>
-        {trip.notes ? <Field label="Notes du chauffeur">{trip.notes}</Field> : null}
+        {trip.notes ? <Field label="Notes du conducteur">{trip.notes}</Field> : null}
       </SectionCard>
 
       {trip.stops.length > 0 ? (
@@ -180,7 +180,7 @@ export default function TripDetailPage() {
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Chauffeur">
+      <SectionCard title="Conducteur">
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-light text-sm font-bold text-primary">
             {`${trip.driver.firstName.charAt(0)}${trip.driver.lastName.charAt(0)}`.toUpperCase()}

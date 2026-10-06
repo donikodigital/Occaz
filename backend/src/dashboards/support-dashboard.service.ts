@@ -73,7 +73,7 @@ export class SupportDashboardService {
 
   /**
    * Même contenu que getOverview(), calculé avec le client Prisma (et non en SQL brut) sur les seuls litiges
-   * du périmètre : les agrégats « chauffeurs / clients les plus concernés » se font en mémoire sur ces litiges.
+   * du périmètre : les agrégats « conducteurs / clients les plus concernés » se font en mémoire sur ces litiges.
    */
   private async getScopedOverview(scope: string[]) {
     const inScope = disputeScopeWhere(scope);

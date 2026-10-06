@@ -16,7 +16,7 @@ export default function DriverTabsLayout() {
 
   return (
     <Tabs
-      tabBar={(props) => <ResponsiveTabBar {...props} accentColor={colors.success} brandLabel="Espace chauffeur" />}
+      tabBar={(props) => <ResponsiveTabBar {...props} accentColor={colors.success} brandLabel="Espace conducteur" />}
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen

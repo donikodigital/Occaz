@@ -22,6 +22,12 @@ const TONE_CLASSES: Record<
   danger: { icon: 'from-danger-light to-danger-light/50 text-danger-dark', iconGlow: 'bg-danger/25', bar: 'bg-danger' },
 };
 
+/** Sépare « 1 055 962 GNF » en { amount: '1 055 962', unit: 'GNF' } ; une valeur sans devise reste telle quelle. */
+function splitCurrency(value: string): { amount: string; unit: string | null } {
+  const match = /^(.*\d)[\s\u00A0\u202F]+([A-Z]{3})$/.exec(value);
+  return match && match[1] && match[2] ? { amount: match[1], unit: match[2] } : { amount: value, unit: null };
+}
+
 /**
  * 3 par ligne dès mobile (demande explicite) : le libellé passe donc sur
  * 2 lignes plutôt que d'être tronqué (qui rendait "Chauffeurs vérifiés"
@@ -31,16 +37,19 @@ const TONE_CLASSES: Record<
  */
 export function StatCard({ label, value, icon: Icon, sublabel, tone = 'primary', index = 0 }: StatCardProps) {
   const { icon, iconGlow, bar } = TONE_CLASSES[tone];
-  // Un grand montant ("1 044 089 GNF") ne tient pas à la même taille
-  // qu'un simple compteur ("4") sur une carte aussi étroite — plutôt
-  // qu'une taille fixe qui les fait passer à la ligne (le montant se
-  // coupait juste avant la devise), la police se réduit par paliers
-  // quand le texte dépasse une longueur raisonnable. Un seul palier ne
-  // suffisait pas pour les montants à 7 chiffres : encore tronqués par
-  // le overflow-hidden de la carte (silencieusement, sans wrap grâce à
-  // whitespace-nowrap — d'où le "GN" au lieu de "GNF").
-  const isVeryLongValue = value.length > 12;
-  const isLongValue = value.length > 9;
+  // Un montant ("1 055 962 GNF") est coupé en deux : le nombre en grand, la
+  // devise en petit à côté. Avant, la taille dépendait de la longueur du
+  // texte entier (devise comprise) : un montant à 7 chiffres dépassait le
+  // seuil et s'affichait plus petit que ses voisins. Maintenant tous les
+  // montants d'une grille ont la même taille ; seul un nombre vraiment
+  // énorme (≥ 10 caractères, soit 10 millions et plus) descend d'un cran.
+  const { amount, unit } = splitCurrency(value);
+  const isHuge = amount.length > 9;
+  const sizeClass = isHuge
+    ? 'text-base sm:text-xl'
+    : unit
+      ? 'text-lg sm:text-2xl'
+      : 'text-lg sm:text-[28px]';
   return (
     <Card
       padded={false}
@@ -64,15 +73,10 @@ export function StatCard({ label, value, icon: Icon, sublabel, tone = 'primary',
           {label}
         </p>
         <p
-          className={`whitespace-nowrap font-semibold leading-tight tracking-tight text-text-primary tabular-nums transition-transform duration-300 group-hover:scale-[1.04] ${
-            isVeryLongValue
-              ? 'text-[11px] sm:text-sm'
-              : isLongValue
-                ? 'text-base sm:text-xl'
-                : 'text-lg sm:text-[28px]'
-          }`}
+          className={`whitespace-nowrap font-semibold leading-tight tracking-tight text-text-primary tabular-nums transition-transform duration-300 group-hover:scale-[1.04] ${sizeClass}`}
         >
-          {value}
+          {amount}
+          {unit ? <span className="ml-1 text-[11px] font-semibold tracking-normal text-text-muted sm:text-sm">{unit}</span> : null}
         </p>
         {sublabel ? <p className="truncate text-[9px] leading-tight text-text-muted sm:text-xs">{sublabel}</p> : null}
       </div>

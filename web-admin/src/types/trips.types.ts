@@ -16,7 +16,7 @@ export type TripStatus =
   | 'DISPUTED'
   | 'REFUNDED';
 
-/** Chauffeur tel que l'API l'expose ici — jamais ses coordonnées de paiement. */
+/** Conducteur tel que l'API l'expose ici — jamais ses coordonnées de paiement. */
 export interface TripDriverSummary {
   id: string;
   firstName: string;
@@ -85,7 +85,7 @@ export interface AdminTripDetail extends AdminTripListItem {
   allowsLuggage: boolean;
   allowsShipments: boolean;
   notes: string | null;
-  /** pricePerSeat + commission plateforme — ce que paie un passager, jamais le prix brut fixé par le chauffeur. */
+  /** pricePerSeat + commission plateforme — ce que paie un passager, jamais le prix brut fixé par le conducteur. */
   customerPricePerSeat: Money;
   /** Places occupées et libres sur chaque tronçon de la route (trajets avec étapes) — un siège libéré à une étape est revendu pour la suite. */
   seatsByLeg?: TripLegSeats[];

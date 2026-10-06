@@ -59,7 +59,7 @@ export default function CompleteProfileScreen() {
             Complétez votre <AppText variant="xxl" weight="bold" color={OCEAN.gold}>profil</AppText>
           </AppText>
           <AppText variant="sm" color={OCEAN.sky}>
-            Ces informations sont partagées avec votre chauffeur au moment de la réservation.
+            Ces informations sont partagées avec votre conducteur au moment de la réservation.
           </AppText>
         </OceanHeroCard>
 

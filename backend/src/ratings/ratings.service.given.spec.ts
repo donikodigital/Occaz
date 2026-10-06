@@ -3,7 +3,7 @@ import { RatingsService } from './ratings.service';
 
 /**
  * "Mes avis" : les notations données par l'utilisateur (fromUserId), pas
- * celles reçues. Le nom affiché vient du profil chauffeur ou client noté
+ * celles reçues. Le nom affiché vient du profil conducteur ou client noté
  * (jamais le téléphone ni les coordonnées de paiement), et le contexte
  * distingue un trajet d'un envoi.
  */
@@ -49,7 +49,7 @@ describe('RatingsService.findGivenByUser', () => {
     expect(prisma.rating.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { fromUserId: 'u1' } }));
   });
 
-  it('transforme une notation de trajet : nom du chauffeur, itinéraire, commentaire', async () => {
+  it('transforme une notation de trajet : nom du conducteur, itinéraire, commentaire', async () => {
     const { service } = createService([tripRating]);
     const result = await service.findGivenByUser('u1', { page: 1, limit: 20 } as never);
     expect(result.data[0]).toEqual(

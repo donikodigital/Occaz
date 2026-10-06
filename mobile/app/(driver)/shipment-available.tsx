@@ -21,7 +21,7 @@
 //
 // v2 — Refonte de l'écran "Envois disponibles" : filtres d'itinéraire
 // lisibles (départ → arrivée), cartes de demandes (composant isolé
-// ShipmentRequestCard) avec le gain net du chauffeur en évidence, et
+// ShipmentRequestCard) avec le gain net du conducteur en évidence, et
 // acceptation en un geste via AcceptShipmentSheet (choix du trajet dans la
 // feuille, plus besoin d'ouvrir un écran de détail avant d'accepter).
 // La liste se rafraîchit toute seule tant que l'écran est visible — en
@@ -440,7 +440,7 @@ function RulesBanner() {
           Premier arrivé, premier servi
         </AppText>
         <AppText variant="xs" color="textSecondary">
-          Dès qu’un chauffeur accepte, l’envoi disparaît de la liste des autres. Tous les chauffeurs validés voient ces
+          Dès qu’un conducteur accepte, l’envoi disparaît de la liste des autres. Tous les conducteurs validés voient ces
           demandes, avec ou sans trajet.
         </AppText>
       </View>

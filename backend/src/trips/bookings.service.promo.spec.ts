@@ -5,7 +5,7 @@ import { BookingsService } from './bookings.service';
  * Code promo à la réservation d'un trajet : même règle que pour les
  * envois (ShipmentsService.create) — la réduction est plafonnée à la
  * commission de la plateforme, jamais au-delà, pour que le gain du
- * chauffeur (Trip.pricePerSeat × places) ne dépende jamais d'un code
+ * conducteur (Trip.pricePerSeat × places) ne dépende jamais d'un code
  * promo.
  */
 const trip = {
@@ -71,7 +71,7 @@ describe('BookingsService.create — code promo', () => {
     );
   });
 
-  it('réduction plafonnée à la commission : le chauffeur touche toujours son montant plein', async () => {
+  it('réduction plafonnée à la commission : le conducteur touche toujours son montant plein', async () => {
     const { tx, service, promoCodes } = createService({ rawDiscount: 50_000n, platformFee: 15_000n });
     await service.create('cust1', { tripId: 'trip1', seatsCount: 1, promoCode: 'GROSPROMO' } as never);
 
@@ -79,7 +79,7 @@ describe('BookingsService.create — code promo', () => {
     expect(tx.booking.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ totalAmount: 100_000n, platformFee: 0n }) }),
     );
-    // Le chauffeur touche toujours 100 000 - 0 = 100 000 (le prix de base, inchangé).
+    // Le conducteur touche toujours 100 000 - 0 = 100 000 (le prix de base, inchangé).
     expect(100_000n - 0n).toBe(trip.pricePerSeat);
     expect(promoCodes.redeem).toHaveBeenCalledWith(
       tx,

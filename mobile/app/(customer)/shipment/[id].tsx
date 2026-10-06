@@ -1,6 +1,6 @@
 // mobile/app/(customer)/shipment/[id].tsx
 // [30/09/2026] v4 — le client voit désormais aussi le code de livraison (DeliveryCodeCard, pendant DELIVERY_PENDING), et pas seulement celui de récupération : le destinataire le reçoit toujours par SMS, mais l'expéditeur peut maintenant le retrouver dans son espace.
-// [21/09/2026] v3 — Habillage bleu océan ; logique inchangée : période, prolongation ou remboursement, montant unique payé, messagerie dès qu'un chauffeur est assigné.
+// [21/09/2026] v3 — Habillage bleu océan ; logique inchangée : période, prolongation ou remboursement, montant unique payé, messagerie dès qu'un conducteur est assigné.
 //
 // Un bandeau sombre porte le statut (avec la couleur qui va avec : bleu en
 // cours, vert livré, rouge annulé), suivi de la période, de la frise de
@@ -46,8 +46,8 @@ import type { ShipmentStatus } from '@/types/shipments.types';
 
 const STATUS_LABELS: Record<ShipmentStatus, string> = {
   CREATED: 'En attente de paiement',
-  SEARCHING_DRIVER: "Recherche d'un chauffeur",
-  DRIVER_ASSIGNED: 'Chauffeur trouvé',
+  SEARCHING_DRIVER: "Recherche d'un conducteur",
+  DRIVER_ASSIGNED: 'Conducteur trouvé',
   PICKUP_PENDING: 'Récupération en cours',
   PICKED_UP: 'Colis récupéré',
   IN_TRANSIT: 'En transit',
@@ -75,7 +75,7 @@ function PickupCodeCard({ shipmentId }: { shipmentId: string }) {
   return (
     <OtpCodeCard
       title="Code de récupération"
-      description="Communiquez-le au chauffeur pour confirmer la remise du colis — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
+      description="Communiquez-le au conducteur pour confirmer la remise du colis — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
       isPending={reveal.isPending}
@@ -93,7 +93,7 @@ function DeliveryCodeCard({ shipmentId }: { shipmentId: string }) {
   return (
     <OtpCodeCard
       title="Code de livraison"
-      description="Envoyé par SMS au destinataire, qui le communique au chauffeur pour confirmer la réception — récupérable ici aussi si besoin (copie directe possible)."
+      description="Envoyé par SMS au destinataire, qui le communique au conducteur pour confirmer la réception — récupérable ici aussi si besoin (copie directe possible)."
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
       isPending={reveal.isPending}
@@ -154,7 +154,7 @@ export default function ShipmentDetailScreen() {
         style: 'destructive',
         onPress: () =>
           cancelShipment.mutate(
-            { reason: 'Aucun chauffeur avant la fin de la période — remboursement demandé par le client.' },
+            { reason: 'Aucun conducteur avant la fin de la période — remboursement demandé par le client.' },
             { onError: () => Alert.alert('Erreur', 'La demande a échoué — réessayez.') },
           ),
       },
@@ -194,7 +194,7 @@ export default function ShipmentDetailScreen() {
         // Affiché juste après la création ou le paiement : une croix qui revient à l'accueil.
         onClose={created ? () => closeToHome('/(customer)/(tabs)/home') : undefined}
         right={
-          // Colis livré sans litige : plus de messagerie avec le chauffeur (comme l'appel et le SMS, retirés par le serveur).
+          // Colis livré sans litige : plus de messagerie avec le conducteur (comme l'appel et le SMS, retirés par le serveur).
           shipment.driverId && shipment.status !== 'DELIVERED' && shipment.status !== 'COMPLETED' ? (
             <Pressable
               onPress={() =>
@@ -203,7 +203,7 @@ export default function ShipmentDetailScreen() {
                 })
               }
               accessibilityRole="button"
-              accessibilityLabel="Contacter le chauffeur"
+              accessibilityLabel="Contacter le conducteur"
               style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
             >
               <IconMessageCircle size={18} color={OCEAN.base} />
@@ -242,7 +242,7 @@ export default function ShipmentDetailScreen() {
       ) : null}
 
       {shipment.driver && shipment.driverPhone ? (
-        <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title="Votre chauffeur">
+        <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title="Votre conducteur">
           <ContactRow phone={shipment.driverPhone} name={`${shipment.driver.firstName} ${shipment.driver.lastName[0]}.`} />
         </OceanSection>
       ) : null}
@@ -254,10 +254,10 @@ export default function ShipmentDetailScreen() {
       {shipment.status === 'SEARCHING_DRIVER' && !needsExtensionAnswer ? (
         <OceanCard style={styles.infoCard}>
           <AppText variant="sm" weight="semibold" color={OCEAN.deep}>
-            Votre demande est visible de tous les chauffeurs
+            Votre demande est visible de tous les conducteurs
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            Le premier à l&apos;accepter la prend en charge. Vous serez prévenu dès qu&apos;un chauffeur est trouvé.
+            Le premier à l&apos;accepter la prend en charge. Vous serez prévenu dès qu&apos;un conducteur est trouvé.
           </AppText>
         </OceanCard>
       ) : null}

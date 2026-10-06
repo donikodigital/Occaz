@@ -23,7 +23,7 @@ export class CreateNotificationTemplateDto {
   subject?: string;
 
   @ApiProperty({
-    example: 'Votre chauffeur {{driverName}} arrive dans {{eta}} minutes.',
+    example: 'Votre conducteur {{driverName}} arrive dans {{eta}} minutes.',
     description: 'Placeholders {{cle}} remplacés depuis le payload au moment de l\'envoi.',
   })
   @IsString()

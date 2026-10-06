@@ -27,7 +27,7 @@ describe('SupportDashboardService (portée par pays)', () => {
     }
   });
 
-  it('compte les litiges actifs et classe chauffeurs et clients par nombre de litiges', async () => {
+  it('compte les litiges actifs et classe conducteurs et clients par nombre de litiges', async () => {
     const { service } = build([
       { id: 'd1', booking: { customer: person('c1'), trip: { driver: person('dr1') } }, shipment: null },
       { id: 'd2', booking: null, shipment: { customer: person('c1'), driver: person('dr1'), trip: null } },
@@ -48,7 +48,7 @@ describe('SupportDashboardService (portée par pays)', () => {
     ]);
   });
 
-  it('sans portée : requêtes d\'origine (SQL brut pour les chauffeurs/clients concernés)', async () => {
+  it('sans portée : requêtes d\'origine (SQL brut pour les conducteurs/clients concernés)', async () => {
     const prisma = {
       dispute: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
       $queryRaw: jest.fn().mockResolvedValue([]),

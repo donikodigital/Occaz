@@ -1,5 +1,5 @@
 // mobile/src/services/api/customerProfiles.api.ts
-// [21/09/2026] v+ — photo de profil (upload-url puis confirmation), comme côté chauffeur.
+// [21/09/2026] v+ — photo de profil (upload-url puis confirmation), comme côté conducteur.
 import { api } from './client';
 import type { RequestUploadUrlPayload, UploadUrlResult } from '@/types/documents.types';
 import type { CreateCustomerProfilePayload, CustomerProfile } from '@/types/profiles.types';

@@ -5,7 +5,7 @@ import type { Trip, TripLocation } from '@/types/trips.types';
 import { formatDateShort } from '@/utils/date';
 
 /**
- * Montant réellement crédité au chauffeur à la livraison : le client paie
+ * Montant réellement crédité au conducteur à la livraison : le client paie
  * un seul montant (`totalAmount`) et la commission de la plateforme
  * (`platformFee`, règle configurée dans l'admin) en est déduite — ex. 150 000
  * payés, 10 % de commission, 135 000 crédités. Même formule que le backend
@@ -90,7 +90,7 @@ type WithCities = {
   recipientLocation?: { cityId: string | null };
 };
 
-/** Le trajet du chauffeur relie exactement les deux villes de l'envoi (départ et arrivée). */
+/** Le trajet du conducteur relie exactement les deux villes de l'envoi (départ et arrivée). */
 export function isSameRoute(trip: Pick<Trip, 'originCityId' | 'destinationCityId'>, shipment: WithCities): boolean {
   const from = shipment.senderLocation?.cityId;
   const to = shipment.recipientLocation?.cityId;
@@ -127,11 +127,11 @@ export function isWithinWindow(trip: Pick<Trip, 'departureAt'>, shipment: Pick<S
 }
 
 /**
- * Trajets du chauffeur sur lesquels l'envoi peut être rattaché : publiés,
+ * Trajets du conducteur sur lesquels l'envoi peut être rattaché : publiés,
  * ouverts aux colis, départ dans la plage du client, assez de capacité
  * restante (mêmes conditions que ShipmentsService.accept). Ceux qui relient
  * exactement les deux villes passent en premier, puis par date de départ.
- * Un chauffeur sans trajet compatible peut quand même accepter, sans trajet.
+ * Un conducteur sans trajet compatible peut quand même accepter, sans trajet.
  */
 export function getEligibleTrips(trips: Trip[], shipment: AvailableShipment): Trip[] {
   const hasCities = Boolean(shipment.senderLocation?.cityId && shipment.recipientLocation?.cityId);

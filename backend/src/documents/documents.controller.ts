@@ -28,7 +28,7 @@ export class DocumentsController {
 
   @Get()
   async findAll(@Query() query: ListDocumentsQueryDto, @CurrentUser() user: AuthenticatedUser) {
-    // Un agent limité à un pays doit cibler un propriétaire (chauffeur, véhicule…) de son périmètre.
+    // Un agent limité à un pays doit cibler un propriétaire (conducteur, véhicule…) de son périmètre.
     await this.scope.assertDocumentListAllowed(user, PERMISSIONS.DOCUMENT_READ, {
       ownerType: query.ownerType,
       ownerId: query.ownerId,

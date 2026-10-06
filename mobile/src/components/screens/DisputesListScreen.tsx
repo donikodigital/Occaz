@@ -1,6 +1,6 @@
 // mobile/src/components/screens/DisputesListScreen.tsx
 //
-// v2 — Habillage bleu océan (partagé client / chauffeur) : en-tête avec
+// v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
 // retour rond et sous-titre, une carte par litige (pastille bleue pour un
 // trajet, dorée pour un envoi, motif, date, statut) et un état vide qui
 // rassure au lieu d'afficher un simple « Aucun litige ».

@@ -82,7 +82,7 @@ export default function NewBookingScreen() {
   const availableSeats = segmentAvailableSeats(trip);
   const isFull = availableSeats <= 0;
   const maxSeats = Math.max(1, Math.min(availableSeats, 8));
-  // Le prix client (commission incluse) — jamais le prix brut du chauffeur, qui ne regarde ni le client ni cet écran.
+  // Le prix client (commission incluse) — jamais le prix brut du conducteur, qui ne regarde ni le client ni cet écran.
   const customerPricePerSeat = Number(trip.customerPricePerSeat ?? trip.pricePerSeat);
   const totalAmount = customerPricePerSeat * seatsCount;
   const discountAmount = promoDiscount ? Number(promoDiscount) : 0;

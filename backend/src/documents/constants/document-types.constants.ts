@@ -10,8 +10,8 @@
  * documents réellement envoyés en production (vus dans le back-office).
  * DRIVER_LICENSE et NATIONAL_ID reprennent la convention documentée dans
  * schema.prisma mais n'ont pas encore été confirmés par un envoi réel côté
- * pièces d'identité chauffeur — à vérifier (Prisma Studio, table
- * documents, colonne type) si un chauffeur reste bloqué à tort.
+ * pièces d'identité conducteur — à vérifier (Prisma Studio, table
+ * documents, colonne type) si un conducteur reste bloqué à tort.
  */
 export const DOCUMENT_TYPES = {
   NATIONAL_ID: 'national_id',

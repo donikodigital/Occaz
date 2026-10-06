@@ -1,5 +1,5 @@
 // web-admin/src/app/(app)/disputes/[id]/page.tsx
-// [21/09/2026] v+ — le chauffeur d'un envoi s'affiche aussi quand il n'a pas de trajet (Shipment.driver).
+// [21/09/2026] v+ — le conducteur d'un envoi s'affiche aussi quand il n'a pas de trajet (Shipment.driver).
 // [02/10/2026] v+ — Les actions suivent les permissions : assigner (dispute.assign), changer le statut / résoudre /
 // clore (dispute.resolve) ; un remboursement exige en plus refund.create et une suspension user.suspend. Un agent
 // qui n'a que dispute.read consulte le dossier et écrit dans la conversation, sans pouvoir trancher.
@@ -149,7 +149,7 @@ function DisputeContext({
   }
 
   if (subjectType === 'SHIPMENT' && shipment.data) {
-    // Le chauffeur d'un envoi est `driver` (il peut ne pas avoir de trajet) ; `trip.driver` ne sert que de repli.
+    // Le conducteur d'un envoi est `driver` (il peut ne pas avoir de trajet) ; `trip.driver` ne sert que de repli.
     const driver = shipment.data.driver ?? shipment.data.trip?.driver;
     return (
       <Panel title="Envoi concerné" icon={<IconPackage size={18} />} delay={80}>
@@ -158,7 +158,7 @@ function DisputeContext({
           <Stat label="Catégorie" value={shipment.data.category?.name ?? '—'} />
           <Stat label="Expéditeur" value={shipment.data.senderName} />
           <Stat label="Destinataire" value={shipment.data.recipientName} />
-          {driver ? <Stat label="Chauffeur" value={`${driver.firstName} ${driver.lastName}`} /> : null}
+          {driver ? <Stat label="Conducteur" value={`${driver.firstName} ${driver.lastName}`} /> : null}
         </div>
       </Panel>
     );

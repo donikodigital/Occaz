@@ -2,9 +2,9 @@
 // [03/10/2026] v5 — colis et villes traversées : « Colis sur mon trajet » (findAvailable avec tripId) ne garde que les envois
 // dont le ramassage précède la livraison sur la route du trajet (étapes comprises), et l'acceptation avec un trajet vérifie
 // la même chose — le passage au ramassage (ex. Kindia) doit tomber dans la plage de dates du client.
-// [21/09/2026] v4 — l'autre partie est prévenue d'une annulation (chauffeur ou client).
-// [21/09/2026] v3 — devise jointe aux listes client et chauffeur ; liste admin avec villes, chauffeur et devise.
-// [21/09/2026] v2 — plage de dates, prix unique, acceptation atomique (premier arrivé), chauffeur sans trajet, annulation remboursée à 100 %, prolongation, expiration ; profil chauffeur limité aux champs publics.
+// [21/09/2026] v4 — l'autre partie est prévenue d'une annulation (conducteur ou client).
+// [21/09/2026] v3 — devise jointe aux listes client et conducteur ; liste admin avec villes, conducteur et devise.
+// [21/09/2026] v2 — plage de dates, prix unique, acceptation atomique (premier arrivé), conducteur sans trajet, annulation remboursée à 100 %, prolongation, expiration ; profil conducteur limité aux champs publics.
 import {
   BadRequestException,
   ConflictException,
@@ -48,7 +48,7 @@ import { SearchAvailableShipmentsDto } from './dto/search-available-shipments.dt
 import { hideContactsOnceDelivered, toAvailableShipmentView } from './shipment-views';
 
 /**
- * Jusqu'à quel statut le client ou le chauffeur peuvent annuler. Une fois
+ * Jusqu'à quel statut le client ou le conducteur peuvent annuler. Une fois
  * le colis récupéré, l'annulation (remboursée à 100 %) permettrait de
  * garder un colis en route et de récupérer son argent : le recours devient
  * un litige (section 21).
@@ -64,9 +64,9 @@ const CANCELLABLE_BY_PARTIES: ShipmentStatus[] = [
 const FULL_REFUND_PERCENTAGE = 100;
 
 /**
- * Champs du profil chauffeur visibles par les parties d'un envoi. Jamais
+ * Champs du profil conducteur visibles par les parties d'un envoi. Jamais
  * `driver: true` : le profil complet contient le numéro Mobile Money et la
- * référence bancaire du chauffeur.
+ * référence bancaire du conducteur.
  */
 const PUBLIC_DRIVER_SELECT = {
   id: true,
@@ -87,17 +87,17 @@ const CURRENCY_SELECT = { select: { id: true, isoCode: true, symbol: true } } as
  *    windowEnd, obligatoires) et paie un seul montant, calculé par le
  *    serveur (PricingService.computeShipmentQuote). CREATED.
  * 2. Le paiement confirmé (confirmPayment), l'envoi passe en
- *    SEARCHING_DRIVER et TOUS les chauffeurs validés sont prévenus à la
+ *    SEARCHING_DRIVER et TOUS les conducteurs validés sont prévenus à la
  *    fois (ShipmentDispatchService). Le premier à accepter l'emporte
  *    (accept : attribution atomique) et reçoit alors les coordonnées du
  *    client ; son gain est retenu sur son portefeuille.
- * 3. Un chauffeur n'a pas besoin d'avoir un trajet établi pour accepter.
- * 4. Sans chauffeur à la fin de la plage, le client est invité à prolonger
+ * 3. Un conducteur n'a pas besoin d'avoir un trajet établi pour accepter.
+ * 4. Sans conducteur à la fin de la plage, le client est invité à prolonger
  *    (extendWindow) ; sans réponse il est remboursé à 100 %
  *    (expireSearch, lancé par ShipmentWindowService).
  * 5. DRIVER_ASSIGNED -> PICKUP_PENDING -> PICKED_UP -> IN_TRANSIT ->
  *    DELIVERY_PENDING -> DELIVERED -> COMPLETED exigent une validation OTP
- *    (ShipmentOtpService) : le chauffeur ne peut jamais s'auto-valider. En
+ *    (ShipmentOtpService) : le conducteur ne peut jamais s'auto-valider. En
  *    cas de désaccord, le recours est un Dispute (section 21).
  */
 @Injectable()
@@ -128,9 +128,9 @@ export class ShipmentsService {
       },
     });
     if (!shipment) throw new NotFoundException('Envoi introuvable.');
-    // Le numéro n'est révélé qu'une fois un chauffeur assigné — même
+    // Le numéro n'est révélé qu'une fois un conducteur assigné — même
     // seuil que "nom/téléphone communiqués dès que vous acceptez" déjà
-    // annoncé au chauffeur côté acceptation d'un envoi.
+    // annoncé au conducteur côté acceptation d'un envoi.
     return { ...shipment, driverPhone: shipment.driver?.user.phone ?? null };
   }
 
@@ -246,7 +246,7 @@ export class ShipmentsService {
 
     // Un seul montant pour le client : c'est le prix calculé. La commission
     // de la plateforme (règle configurée dans l'admin) en est prélevée sur
-    // le gain du chauffeur — voir WalletsService.holdShipmentRevenue.
+    // le gain du conducteur — voir WalletsService.holdShipmentRevenue.
     const totalAmount = quote.price;
     let platformFee = await this.pricing.computeCommission({
       serviceType: ServiceType.SHIPMENT,
@@ -255,9 +255,9 @@ export class ShipmentsService {
     });
 
     // Un code promo réduit ce que le client paie, jamais ce que le
-    // chauffeur touche : le rabais est prélevé sur la commission de la
+    // conducteur touche : le rabais est prélevé sur la commission de la
     // plateforme, plafonné à son montant. Un code à 100% n'annule donc
-    // jamais la course du chauffeur — au pire, la plateforme renonce à
+    // jamais la course du conducteur — au pire, la plateforme renonce à
     // toute sa commission sur cet envoi.
     let promoCodeMatch: Awaited<ReturnType<PromoCodesService['resolveForCheckout']>> | null = null;
     let discountAmount = 0n;
@@ -381,7 +381,7 @@ export class ShipmentsService {
    * confirmé côté serveur — jamais depuis une route publique (règle
    * d'or, section 13). Fait avancer CREATED vers DRIVER_ASSIGNED (si un
    * trajet avait déjà été choisi à la création) ou SEARCHING_DRIVER — auquel
-   * cas tous les chauffeurs validés sont prévenus.
+   * cas tous les conducteurs validés sont prévenus.
    */
   async confirmPayment(id: string): Promise<void> {
     const shipment = await this.prisma.shipment.findUniqueOrThrow({ where: { id } });
@@ -399,11 +399,11 @@ export class ShipmentsService {
   }
 
   // -----------------------------------------------------------------------
-  // Côté chauffeur : voir et accepter
+  // Côté conducteur : voir et accepter
   // -----------------------------------------------------------------------
 
   /**
-   * Tout chauffeur dont le compte est validé (documents acceptés par
+   * Tout conducteur dont le compte est validé (documents acceptés par
    * l'admin, voir DriverProfilesService.verify) peut voir et accepter des
    * envois, qu'il ait ou non un trajet établi. Renvoie l'id du profil.
    */
@@ -412,7 +412,7 @@ export class ShipmentsService {
       where: { userId },
       select: { id: true, status: true },
     });
-    if (!driver) throw new ForbiddenException('Cette action est réservée aux chauffeurs.');
+    if (!driver) throw new ForbiddenException('Cette action est réservée aux conducteurs.');
     if (driver.status !== DriverAccountStatus.VALIDATED) {
       throw new ForbiddenException(
         'Votre compte doit être validé (documents acceptés) pour voir et accepter des envois.',
@@ -422,10 +422,10 @@ export class ShipmentsService {
   }
 
   /**
-   * Envois en recherche de chauffeur dont la plage n'est pas terminée, filtrables par ville — vue sans données personnelles.
-   * Avec `tripId` (un trajet du chauffeur) : seulement les envois « sur ce trajet », c'est-à-dire dont la ville de ramassage
+   * Envois en recherche de conducteur dont la plage n'est pas terminée, filtrables par ville — vue sans données personnelles.
+   * Avec `tripId` (un trajet du conducteur) : seulement les envois « sur ce trajet », c'est-à-dire dont la ville de ramassage
    * précède la ville de livraison sur sa route (départ, villes traversées, arrivée) et dont la plage de dates couvre l'heure
-   * à laquelle le chauffeur passe à la ville de ramassage.
+   * à laquelle le conducteur passe à la ville de ramassage.
    */
   async findAvailable(dto: SearchAvailableShipmentsDto, driverId?: string): Promise<PaginatedResult<unknown>> {
     const include = {
@@ -448,7 +448,7 @@ export class ShipmentsService {
       });
       if (!trip) throw new NotFoundException('Trajet introuvable.');
       if (driverId && trip.driverId !== driverId) {
-        throw new ForbiddenException("Ce trajet n'appartient pas à ce chauffeur.");
+        throw new ForbiddenException("Ce trajet n'appartient pas à ce conducteur.");
       }
       const route = buildRoute(trip);
       const cityIds = route.map((point) => point.cityId).filter((cityId): cityId is string => cityId !== null);
@@ -492,16 +492,16 @@ export class ShipmentsService {
   }
 
   /**
-   * Un chauffeur accepte un envoi en recherche (section 12 : ACCEPTER /
+   * Un conducteur accepte un envoi en recherche (section 12 : ACCEPTER /
    * REFUSER) — avec un de ses trajets publiés (`tripId`) ou sans trajet.
    * "Le premier qui accepte l'emporte" : l'attribution est une mise à jour
    * conditionnelle unique (statut encore SEARCHING_DRIVER), donc deux
-   * chauffeurs simultanés ne peuvent jamais tous les deux réussir — le
+   * conducteurs simultanés ne peuvent jamais tous les deux réussir — le
    * second reçoit une ConflictException.
    *
    * Le paiement est nécessairement déjà capturé à ce stade : un envoi
    * n'atteint SEARCHING_DRIVER qu'après confirmation de paiement (voir
-   * confirmPayment) — le provisionnement du portefeuille chauffeur peut
+   * confirmPayment) — le provisionnement du portefeuille conducteur peut
    * donc se faire ici sans re-vérification.
    */
   async accept(shipmentId: string, userId: string, tripId?: string) {
@@ -509,7 +509,7 @@ export class ShipmentsService {
 
     const shipment = await this.findOne(shipmentId);
     if (shipment.status !== ShipmentStatus.SEARCHING_DRIVER) {
-      throw new ConflictException("Cet envoi n'est plus disponible : un autre chauffeur l'a déjà accepté.");
+      throw new ConflictException("Cet envoi n'est plus disponible : un autre conducteur l'a déjà accepté.");
     }
     const now = new Date();
     if (shipment.windowEnd < now) {
@@ -525,7 +525,7 @@ export class ShipmentsService {
       trip = tripWithStops;
       if (!tripWithStops || !trip) throw new NotFoundException('Trajet introuvable.');
       if (trip.driverId !== driverId) {
-        throw new ForbiddenException("Ce trajet n'appartient pas à ce chauffeur.");
+        throw new ForbiddenException("Ce trajet n'appartient pas à ce conducteur.");
       }
       if (trip.status !== TripStatus.PUBLISHED || !trip.allowsShipments) {
         throw new BadRequestException("Ce trajet n'accepte pas d'envois pour le moment.");
@@ -558,7 +558,7 @@ export class ShipmentsService {
         data: { status: ShipmentStatus.DRIVER_ASSIGNED, driverId, tripId: trip?.id ?? null },
       });
       if (claimed.count === 0) {
-        throw new ConflictException("Cet envoi vient d'être accepté par un autre chauffeur.");
+        throw new ConflictException("Cet envoi vient d'être accepté par un autre conducteur.");
       }
 
       if (trip && trip.availableShipmentWeightKg !== null) {
@@ -585,7 +585,7 @@ export class ShipmentsService {
     // Le client a payé un montant unique (Shipment.totalAmount, déjà net
     // d'un éventuel code promo — voir create()) ; la commission
     // (Shipment.platformFee, déjà réduite du même rabais) en est déduite du
-    // gain du chauffeur : ex. 150 000 payés, 10 % de commission,
+    // gain du conducteur : ex. 150 000 payés, 10 % de commission,
     // 135 000 crédités à la livraison, qu'il y ait eu un code promo ou non.
     await this.wallets.holdShipmentRevenue({
       driverId,
@@ -593,7 +593,7 @@ export class ShipmentsService {
       grossAmount: shipment.totalAmount,
       commission: shipment.platformFee,
       // Devise dans laquelle le client a payé (Shipment.currencyId) — peut
-      // différer de la devise du wallet du chauffeur ; conversion faite
+      // différer de la devise du wallet du conducteur ; conversion faite
       // dans WalletsService.holdShipmentRevenue.
       sourceCurrencyId: shipment.currencyId,
     });
@@ -607,8 +607,8 @@ export class ShipmentsService {
         userId: customer.userId,
         type: NotificationType.DRIVER_ACCEPTED,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
-        fallbackTitle: 'Chauffeur trouvé',
-        fallbackBody: 'Un chauffeur a accepté de transporter votre envoi.',
+        fallbackTitle: 'Conducteur trouvé',
+        fallbackBody: 'Un conducteur a accepté de transporter votre envoi.',
         pushData: { type: 'DRIVER_ACCEPTED', shipmentId },
       });
     }
@@ -622,7 +622,7 @@ export class ShipmentsService {
 
   /**
    * Le client prolonge sa demande (nouvelle fin de plage) : l'envoi
-   * redevient visible des chauffeurs et ils sont prévenus de nouveau.
+   * redevient visible des conducteurs et ils sont prévenus de nouveau.
    */
   async extendWindow(id: string, customerId: string, windowEnd: string) {
     const shipment = await this.findOne(id);
@@ -630,7 +630,7 @@ export class ShipmentsService {
       throw new ForbiddenException("Cet envoi n'appartient pas à ce client.");
     }
     if (shipment.status !== ShipmentStatus.SEARCHING_DRIVER) {
-      throw new BadRequestException('Seul un envoi en recherche de chauffeur peut être prolongé.');
+      throw new BadRequestException('Seul un envoi en recherche de conducteur peut être prolongé.');
     }
 
     const end = new Date(windowEnd);
@@ -660,7 +660,7 @@ export class ShipmentsService {
   /**
    * Le client n'a pas prolongé après la fin de plage : l'envoi est annulé
    * et son paiement intégralement remboursé. Attribution conditionnelle :
-   * si un chauffeur a accepté entre-temps, rien n'est annulé. Renvoie
+   * si un conducteur a accepté entre-temps, rien n'est annulé. Renvoie
    * `true` si l'envoi a bien été expiré.
    */
   async expireSearch(id: string, reason: string): Promise<boolean> {
@@ -753,7 +753,7 @@ export class ShipmentsService {
       throw new ForbiddenException("Cet envoi n'appartient pas à ce client.");
     }
     if (requester?.driverId && shipment.driverId !== requester.driverId) {
-      throw new ForbiddenException("Cet envoi n'est pas assigné à ce chauffeur.");
+      throw new ForbiddenException("Cet envoi n'est pas assigné à ce conducteur.");
     }
     if (
       shipment.status === ShipmentStatus.CANCELLED ||
@@ -813,8 +813,8 @@ export class ShipmentsService {
   }
 
   /**
-   * L'autre partie doit le savoir tout de suite : un chauffeur qui roule vers
-   * un colis annulé, ou un client qui attend un chauffeur qui a renoncé. Le
+   * L'autre partie doit le savoir tout de suite : un conducteur qui roule vers
+   * un colis annulé, ou un client qui attend un conducteur qui a renoncé. Le
    * remboursement du client est notifié séparément (PaymentsService). Jamais
    * bloquant : l'annulation est déjà faite, une notification manquée ne doit
    * pas la faire échouer.
@@ -849,7 +849,7 @@ export class ShipmentsService {
             fallbackTitle: 'Envoi annulé',
             fallbackBody:
               cancelledBy === CancellationInitiator.DRIVER
-                ? 'Le chauffeur a annulé votre envoi. Votre paiement vous est remboursé intégralement.'
+                ? 'Le conducteur a annulé votre envoi. Votre paiement vous est remboursé intégralement.'
                 : 'Votre envoi a été annulé. Votre paiement vous est remboursé intégralement.',
             pushData: { type: 'STATUS_CHANGE', shipmentId },
           });
@@ -888,7 +888,7 @@ export class ShipmentsService {
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 
-  /** Envois attribués à ce chauffeur (avec ou sans trajet). */
+  /** Envois attribués à ce conducteur (avec ou sans trajet). */
   async findAllForDriverTrips(driverId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
     const where: Prisma.ShipmentWhereInput = { OR: [{ driverId }, { trip: { driverId } }] };
     const [data, total] = await Promise.all([
@@ -897,7 +897,7 @@ export class ShipmentsService {
         skip: query.skip,
         take: query.take,
         orderBy: { createdAt: 'desc' },
-        // Villes de ramassage et de livraison : la carte de l'activité du chauffeur affiche « Dakar → Koundara ».
+        // Villes de ramassage et de livraison : la carte de l'activité du conducteur affiche « Dakar → Koundara ».
         include: {
           category: true,
           trip: true,
@@ -908,7 +908,7 @@ export class ShipmentsService {
       }),
       this.prisma.shipment.count({ where }),
     ]);
-    // Colis livré sans litige : les numéros de l'expéditeur et du destinataire ne sont plus communiqués au chauffeur.
+    // Colis livré sans litige : les numéros de l'expéditeur et du destinataire ne sont plus communiqués au conducteur.
     return new PaginatedResult(
       data.map((shipment) => hideContactsOnceDelivered(shipment, 'driver')),
       total,
@@ -948,7 +948,7 @@ export class ShipmentsService {
   // -----------------------------------------------------------------------
   // Preuves photographiques (section 62) — avant/après récupération,
   // livraison. Indépendant de la validation OTP (Lot 6) : une photo peut
-  // être versée au dossier à tout moment par le client ou le chauffeur
+  // être versée au dossier à tout moment par le client ou le conducteur
   // assigné.
   // -----------------------------------------------------------------------
 

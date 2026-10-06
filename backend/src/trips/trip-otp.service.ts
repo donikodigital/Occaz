@@ -10,7 +10,7 @@ import { WalletsService } from '../wallets/wallets.service';
  * pendant que le trajet est EN COURS, avec le même code ; un client qui monte au départ garde le parcours habituel
  * (conducteur arrivé au point de départ). Le code de dépose fonctionne partout, étape comprise.
  *
- * Section 17 : OTP départ (le passager donne le code au chauffeur — sa
+ * Section 17 : OTP départ (le passager donne le code au conducteur — sa
  * saisie confirme la prise en charge) puis OTP arrivée (confirme la fin
  * du trajet pour cette réservation). Un OTP est généré par Booking, pas
  * par TripPassenger individuel : les passagers d'une même réservation
@@ -65,15 +65,15 @@ export class TripOtpService {
     }
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.TRIP_PICKUP, phone: booking.customer.user.phone, bookingId },
-      'Communiquez ce code à votre chauffeur pour confirmer votre prise en charge :',
+      'Communiquez ce code à votre conducteur pour confirmer votre prise en charge :',
     );
   }
 
   /**
    * Même code, déclenché cette fois par le passager lui-même (pas le
-   * chauffeur) — pour le retrouver dans l'app sans avoir à rouvrir le
+   * conducteur) — pour le retrouver dans l'app sans avoir à rouvrir le
    * SMS. Mêmes conditions que requestPickupOtp (réservation confirmée,
-   * chauffeur déjà arrivé) : le code n'a de sens qu'à ce moment-là.
+   * conducteur déjà arrivé) : le code n'a de sens qu'à ce moment-là.
    */
   async revealPickupOtpForCustomer(bookingId: string, customerId: string) {
     const booking = await this.getBookingWithContext(bookingId);
@@ -89,12 +89,12 @@ export class TripOtpService {
       throw new BadRequestException(
         booking.boardingStopId
           ? "Ce code n'est disponible que lorsque le conducteur est arrivé à votre étape."
-          : "Ce code n'est disponible que lorsque le chauffeur est arrivé au point de départ.",
+          : "Ce code n'est disponible que lorsque le conducteur est arrivé au point de départ.",
       );
     }
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.TRIP_PICKUP, phone: booking.customer.user.phone, bookingId },
-      'Communiquez ce code à votre chauffeur pour confirmer votre prise en charge :',
+      'Communiquez ce code à votre conducteur pour confirmer votre prise en charge :',
       { revealCodeToCaller: true },
     );
   }
@@ -113,11 +113,11 @@ export class TripOtpService {
   }
 
   /**
-   * Validation manuelle par le support (jamais par le chauffeur) — même
+   * Validation manuelle par le support (jamais par le conducteur) — même
    * transition d'état que verifyPickupOtp, sans code : réservée aux
    * litiges où le passager reste injoignable ou refuse de communiquer
    * son code. Déclenchée uniquement via DisputesService.resolve (type
-   * OTP_MANUAL_VALIDATION), jamais exposée directement au chauffeur.
+   * OTP_MANUAL_VALIDATION), jamais exposée directement au conducteur.
    */
   async manuallyValidatePickup(bookingId: string) {
     const booking = await this.getBookingWithContext(bookingId);
@@ -154,7 +154,7 @@ export class TripOtpService {
     this.assertDriverOwnsTrip(booking, driverId);
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.TRIP_DROPOFF, phone: booking.customer.user.phone, bookingId },
-      'Communiquez ce code à votre chauffeur pour confirmer la fin de votre trajet :',
+      'Communiquez ce code à votre conducteur pour confirmer la fin de votre trajet :',
     );
   }
 
@@ -169,7 +169,7 @@ export class TripOtpService {
     }
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.TRIP_DROPOFF, phone: booking.customer.user.phone, bookingId },
-      'Communiquez ce code à votre chauffeur pour confirmer la fin de votre trajet :',
+      'Communiquez ce code à votre conducteur pour confirmer la fin de votre trajet :',
       { revealCodeToCaller: true },
     );
   }
@@ -177,9 +177,9 @@ export class TripOtpService {
   /**
    * Confirme la dépose pour CETTE réservation : marque les passagers
    * déposés, clôt la réservation (COMPLETED) et libère les fonds tenus
-   * en attente vers le solde disponible du chauffeur (section 13,
+   * en attente vers le solde disponible du conducteur (section 13,
    * "libération du paiement"). La clôture du trajet lui-même (tous les
-   * passagers déposés) reste une action distincte du chauffeur — voir
+   * passagers déposés) reste une action distincte du conducteur — voir
    * TripsService.completeTrip.
    */
   async verifyDropoffOtp(bookingId: string, driverId: string, code: string) {
@@ -195,7 +195,7 @@ export class TripOtpService {
 
   /**
    * Même principe que manuallyValidatePickup, pour la dépose : réservée
-   * au support via un litige, jamais accessible au chauffeur directement.
+   * au support via un litige, jamais accessible au conducteur directement.
    */
   async manuallyValidateDropoff(bookingId: string) {
     const booking = await this.getBookingWithContext(bookingId);

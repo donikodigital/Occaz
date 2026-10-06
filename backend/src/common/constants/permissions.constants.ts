@@ -19,7 +19,7 @@ export const PERMISSIONS = {
   // Géographie
   GEOGRAPHY_MANAGE: 'geography.manage',
 
-  // Profils / clients / chauffeurs
+  // Profils / clients / conducteurs
   CUSTOMER_READ: 'customer.read',
   DRIVER_READ: 'driver.read',
   DRIVER_VERIFY: 'driver.verify',

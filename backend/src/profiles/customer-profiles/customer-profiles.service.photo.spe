@@ -3,7 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { CustomerProfilesService } from './customer-profiles.service';
 
 /**
- * Photo de profil côté client : même flux en 2 étapes que côté chauffeur
+ * Photo de profil côté client : même flux en 2 étapes que côté conducteur
  * (clé de stockage dédiée « customer-avatar », URL publique et durable).
  */
 function createService(options: { hasProfile?: boolean } = {}) {

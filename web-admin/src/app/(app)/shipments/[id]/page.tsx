@@ -1,7 +1,7 @@
 // web-admin/src/app/(app)/shipments/[id]/page.tsx
 //
-// v1 — Détail d'un envoi pour l'équipe : montants (payé, gain du chauffeur,
-// commission), période demandée, expéditeur et destinataire, colis, chauffeur
+// v1 — Détail d'un envoi pour l'équipe : montants (payé, gain du conducteur,
+// commission), période demandée, expéditeur et destinataire, colis, conducteur
 // et frise de suivi. Lecture seule : un désaccord se traite depuis « Litiges »,
 // qui peut décider d'un remboursement.
 
@@ -25,7 +25,7 @@ import {
 
 const CANCELLED_BY_LABELS: Record<string, string> = {
   CUSTOMER: 'le client',
-  DRIVER: 'le chauffeur',
+  DRIVER: 'le conducteur',
   SUPPORT: 'le support',
   SYSTEM: 'le système (automatique)',
 };
@@ -92,7 +92,7 @@ export default function ShipmentDetailPage() {
 
       {awaitingCustomer ? (
         <Notice>
-          La période s’est terminée sans chauffeur. Le client a été invité à prolonger le {formatDateTime(shipment.extensionRequestedAt!)} ;
+          La période s’est terminée sans conducteur. Le client a été invité à prolonger le {formatDateTime(shipment.extensionRequestedAt!)} ;
           sans réponse dans le délai réglé dans les paramètres, il est remboursé intégralement et automatiquement.
         </Notice>
       ) : null}
@@ -105,11 +105,11 @@ export default function ShipmentDetailPage() {
         </Notice>
       ) : null}
 
-      <SectionCard title="Montants" description="Le client paie un seul montant ; la commission est prélevée sur le gain du chauffeur.">
+      <SectionCard title="Montants" description="Le client paie un seul montant ; la commission est prélevée sur le gain du conducteur.">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <MoneyTile label="Payé par le client" value={formatMoney(shipment.totalAmount, currencyCode)} highlight />
           <MoneyTile
-            label="Gain du chauffeur"
+            label="Gain du conducteur"
             value={formatMoney(driverNet(shipment.totalAmount, shipment.platformFee), currencyCode)}
           />
           <MoneyTile label="Commission" value={formatMoney(shipment.platformFee, currencyCode)} />
@@ -164,7 +164,7 @@ export default function ShipmentDetailPage() {
         {shipment.instructions ? <Field label="Consignes">{shipment.instructions}</Field> : null}
       </SectionCard>
 
-      <SectionCard title="Chauffeur">
+      <SectionCard title="Conducteur">
         {shipment.driver ? (
           <div className="flex flex-wrap items-center gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-light text-sm font-bold text-primary">
@@ -183,7 +183,7 @@ export default function ShipmentDetailPage() {
             <Chip tone={shipment.tripId ? 'primary' : 'neutral'}>{shipment.tripId ? 'Sur un de ses trajets' : 'Sans trajet précis'}</Chip>
           </div>
         ) : (
-          <p className="text-sm text-text-secondary">Aucun chauffeur n’a encore accepté cet envoi.</p>
+          <p className="text-sm text-text-secondary">Aucun conducteur n’a encore accepté cet envoi.</p>
         )}
       </SectionCard>
 

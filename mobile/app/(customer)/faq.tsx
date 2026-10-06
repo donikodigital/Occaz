@@ -22,10 +22,10 @@ const QUESTIONS: { question: string; answer: string }[] = [
   {
     question: 'Qui accepte ma demande d\'envoi ?',
     answer:
-      'Tous les chauffeurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s\'en charge — vous êtes averti dès qu\'un chauffeur est trouvé.',
+      'Tous les conducteurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s\'en charge — vous êtes averti dès qu\'un conducteur est trouvé.',
   },
   {
-    question: 'Que se passe-t-il si aucun chauffeur n\'accepte avant la fin de ma période ?',
+    question: 'Que se passe-t-il si aucun conducteur n\'accepte avant la fin de ma période ?',
     answer:
       'Vous êtes invité à prolonger votre demande. Si vous ne répondez pas, ou si vous préférez annuler, vous êtes remboursé intégralement.',
   },
@@ -34,9 +34,9 @@ const QUESTIONS: { question: string; answer: string }[] = [
     answer: 'Oui, tant que le colis n\'a pas été récupéré ou que le trajet n\'a pas commencé. Le remboursement est intégral.',
   },
   {
-    question: 'Comment le chauffeur valide-t-il la prise en charge ou la livraison ?',
+    question: 'Comment le conducteur valide-t-il la prise en charge ou la livraison ?',
     answer:
-      'Un code à usage unique vous est envoyé par SMS à chaque étape (montée, descente, récupération, livraison) : vous le donnez au chauffeur pour valider.',
+      'Un code à usage unique vous est envoyé par SMS à chaque étape (montée, descente, récupération, livraison) : vous le donnez au conducteur pour valider.',
   },
   {
     question: 'Quels moyens de paiement sont acceptés ?',

@@ -12,25 +12,25 @@ const BATCH_SIZE = 100;
 /**
  * Nettoyage des trajets publiés jamais réservés, dont le départ est
  * dépassé — sans cette tâche, un tel trajet reste indéfiniment PUBLISHED
- * (ou DRIVER_ARRIVED, si le chauffeur a signalé son arrivée), affiché
+ * (ou DRIVER_ARRIVED, si le conducteur a signalé son arrivée), affiché
  * comme actif, sans qu'aucune réservation ne soit possible et sans
- * qu'aucune action ne fasse avancer le chauffeur. C'est exactement ce
- * blocage qui a été identifié le 23/09/2026 : un chauffeur arrivé sur un
+ * qu'aucune action ne fasse avancer le conducteur. C'est exactement ce
+ * blocage qui a été identifié le 23/09/2026 : un conducteur arrivé sur un
  * trajet à 0 réservation n'avait plus aucun moyen d'avancer ni d'annuler
  * depuis l'écran (corrigé côté mobile — trip/[id].tsx v4 — mais ce
- * filet de sécurité empêche le trajet de rester bloqué si le chauffeur
+ * filet de sécurité empêche le trajet de rester bloqué si le conducteur
  * ne remarque jamais qu'il peut l'annuler lui-même).
  *
  * Un trajet expire quand TOUTES ces conditions sont réunies :
  * - statut PUBLISHED ou DRIVER_ARRIVED ;
  * - aucune réservation active (en attente de paiement, payée ou
  *   confirmée) — un trajet avec au moins une réservation reste
- *   entièrement à la main du chauffeur, même en retard ;
+ *   entièrement à la main du conducteur, même en retard ;
  * - le départ est passé depuis plus de `trip.stale_expiry_hours`
  *   (24h par défaut — un délai large, sans urgence puisqu'aucune
  *   réservation ne bloque personne).
  *
- * N'incrémente jamais le compteur d'annulations du chauffeur (voir
+ * N'incrémente jamais le compteur d'annulations du conducteur (voir
  * TripsService.expireStale) : personne n'a été impacté. Même mécanique
  * que les autres tâches planifiées : mise à jour conditionnelle en base,
  * un run concurrent ne traite jamais deux fois le même trajet.

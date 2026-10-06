@@ -25,7 +25,7 @@ function tomorrow(): Date {
 }
 
 /**
- * Affichée quand la plage de dates est terminée sans chauffeur : le client
+ * Affichée quand la plage de dates est terminée sans conducteur : le client
  * prolonge la période ou demande à être remboursé. Sans réponse, le
  * remboursement intégral est déclenché automatiquement au bout du délai.
  */
@@ -44,11 +44,11 @@ export function ShipmentExtensionCard({ onExtend, onRefund, isExtending, isRefun
       <View style={styles.header}>
         <IconAlertTriangle size={18} color={colors.accentDark} />
         <AppText variant="sm" weight="semibold" color={colors.accentDark} style={styles.title}>
-          Aucun chauffeur avant la fin de la période
+          Aucun conducteur avant la fin de la période
         </AppText>
       </View>
       <AppText variant="sm" color={colors.accentDark}>
-        Souhaitez-vous prolonger votre demande ? Les chauffeurs seront prévenus de nouveau. Sinon, votre paiement vous
+        Souhaitez-vous prolonger votre demande ? Les conducteurs seront prévenus de nouveau. Sinon, votre paiement vous
         est remboursé intégralement.
       </AppText>
 

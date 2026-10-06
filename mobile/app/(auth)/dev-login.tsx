@@ -8,7 +8,7 @@
 //
 // Corrections :
 //  - ApiError expose `.statusCode`, pas `.status`.
-//  - La redirection chauffeur pointe vers (driver)/(tabs)/home, pas
+//  - La redirection conducteur pointe vers (driver)/(tabs)/home, pas
 //    (driver)/home — ce dernier est un fichier orphelin hors du groupe
 //    (tabs), sans barre d'onglets, jamais mis à jour depuis le commit
 //    initial (bug identifié le 16/09/2026).

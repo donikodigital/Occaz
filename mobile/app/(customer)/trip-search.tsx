@@ -6,7 +6,7 @@
 //
 // v2 — Refonte bleu océan. L'itinéraire devient un tracé (rond creux au
 // départ, rond plein à l'arrivée) avec un bouton d'inversion, comme sur
-// l'écran « Envois disponibles » côté chauffeur ; la date et les passagers
+// l'écran « Envois disponibles » côté conducteur ; la date et les passagers
 // passent en sections à en-tête soulignée. Logique inchangée.
 
 import React, { useEffect, useRef, useState } from 'react';

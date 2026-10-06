@@ -39,7 +39,7 @@ function createService(options: {
 }
 
 describe('ReferralsService.handleFirstPaymentConfirmed', () => {
-  it('complète le parrainage et crédite le parrain chauffeur à la première prestation confirmée', async () => {
+  it('complète le parrainage et crédite le parrain conducteur à la première prestation confirmée', async () => {
     const { service, prisma, wallets } = createService({ bookingsCount: 1, shipmentsCount: 0, rewardSetting: 20_000 });
     await service.handleFirstPaymentConfirmed('u-filleul');
 
@@ -81,7 +81,7 @@ describe('ReferralsService.handleFirstPaymentConfirmed', () => {
     expect(prisma.referral.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: ReferralStatus.COMPLETED }) }));
   });
 
-  it("ne fait rien si le filleul n'est pas (encore) client — un chauffeur ne paie jamais de prestation", async () => {
+  it("ne fait rien si le filleul n'est pas (encore) client — un conducteur ne paie jamais de prestation", async () => {
     const { service, wallets } = createService({ customer: null });
     await service.handleFirstPaymentConfirmed('u-filleul');
     expect(wallets.adjustBalance).not.toHaveBeenCalled();

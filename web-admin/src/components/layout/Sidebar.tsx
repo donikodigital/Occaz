@@ -5,14 +5,19 @@
 // arrondie en pied de page. Structure et logique inchangées : toujours un
 // tiroir piloté par isOpen/onClose en dessous de lg, fixe au-delà.
 // [02/10/2026] v3 — Le menu ne montre plus que les entrées permises au compte connecté (voir nav-items.ts).
+// v4 — Le vrai logo Occa'Z remplace l'icône générique (public/brand/logo.png), en-tête avec le nom en grand
+// et la pastille « Back-office », entrée active en dégradé, titres de section avec filet, défilement du menu
+// sans barre visible, pied de page aéré : e-mail et rôle en haut, bouton « Se déconnecter » à part en dessous.
 'use client';
 
 import React, { useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { IconLogout, IconRoute, IconX } from '@tabler/icons-react';
+import { IconLogout, IconX } from '@tabler/icons-react';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermissions } from '@/hooks/usePermissions';
+import { ACCOUNT_TYPE_LABELS } from '@/utils/userLabels';
 import { getVisibleSections } from './nav-items';
 
 interface SidebarProps {
@@ -83,30 +88,42 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-5">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-dark text-on-primary shadow-md shadow-primary/25">
-              <IconRoute size={20} />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-base font-bold leading-tight text-text-primary">Back-office</p>
-              <p className="truncate text-xs font-medium text-text-secondary">Occa'Z</p>
-            </div>
+        <div className="relative shrink-0 overflow-hidden border-b border-border px-4 py-4">
+          <span className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-primary-light/70" />
+          <span className="pointer-events-none absolute -bottom-12 right-10 h-20 w-20 rounded-full bg-primary-light/40" />
+          <div className="relative flex items-center justify-between gap-2">
+            <Link href="/dashboard" aria-label="Occa'Z — tableau de bord" className="flex min-w-0 items-center gap-3">
+              <Image
+                src="/brand/logo.png"
+                alt=""
+                width={44}
+                height={44}
+                priority
+                className="h-11 w-11 shrink-0 rounded-2xl shadow-md shadow-primary/30 ring-1 ring-primary-dark/10"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-lg font-extrabold leading-none tracking-tight text-text-primary">Occa&apos;Z</p>
+                <span className="mt-1.5 inline-flex items-center rounded-full bg-primary-light px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-dark">
+                  Back-office
+                </span>
+              </div>
+            </Link>
+            <button
+              onClick={onClose}
+              aria-label="Fermer le menu"
+              className="shrink-0 rounded-xl p-2 text-text-secondary transition-colors hover:bg-surface-muted lg:hidden"
+            >
+              <IconX size={18} />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Fermer le menu"
-            className="shrink-0 rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-muted lg:hidden"
-          >
-            <IconX size={18} />
-          </button>
         </div>
 
-        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {sections.map((section) => (
             <div key={section.title}>
-              <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+              <p className="mb-1.5 flex items-center gap-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-text-muted">
                 {section.title}
+                <span aria-hidden className="h-px flex-1 bg-border" />
               </p>
               <div className="space-y-0.5">
                 {section.items.map((item) => {
@@ -116,17 +133,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     <Link
                       key={item.href}
                       href={item.href}
+                      aria-current={isActive ? 'page' : undefined}
                       className={`group flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all ${
                         isActive
-                          ? 'bg-primary font-semibold text-on-primary shadow-sm shadow-primary/30'
-                          : 'font-medium text-text-primary hover:bg-surface-muted'
+                          ? 'bg-gradient-to-r from-primary to-primary-dark font-semibold text-on-primary shadow-md shadow-primary/30'
+                          : 'font-medium text-text-primary hover:bg-primary-light/50'
                       }`}
                     >
                       <span
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
                           isActive
                             ? 'bg-white/15 text-on-primary'
-                            : 'bg-surface-muted text-text-secondary group-hover:bg-surface group-hover:text-primary'
+                            : 'bg-surface-muted text-text-secondary group-hover:bg-primary-light group-hover:text-primary'
                         }`}
                       >
                         <Icon size={16} />
@@ -141,25 +159,35 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </nav>
 
         <div className="shrink-0 border-t border-border px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="flex items-center gap-3 rounded-xl bg-surface-muted p-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-light text-xs font-bold text-primary-dark">
-              {initialsFor(user)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-text-primary">{user?.email ?? user?.phone}</p>
-              {user?.scopedCountries && user.scopedCountries.length > 0 ? (
-                <p className="truncate text-[11px] font-medium text-text-secondary">
-                  Périmètre : {user.scopedCountries.map((country) => country.name).join(', ')}
+          <div className="rounded-2xl bg-surface-muted p-3 ring-1 ring-border/60">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-dark text-xs font-bold text-on-primary shadow-sm">
+                {initialsFor(user)}
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface-muted bg-success" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold leading-tight text-text-primary" title={user?.email ?? user?.phone}>
+                  {user?.email ?? user?.phone}
                 </p>
-              ) : null}
-              <button
-                onClick={handleLogout}
-                className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-danger transition-colors hover:text-danger-dark"
-              >
-                <IconLogout size={13} />
-                Se déconnecter
-              </button>
+                {user ? (
+                  <p className="mt-0.5 truncate text-xs font-medium text-text-secondary">
+                    {ACCOUNT_TYPE_LABELS[user.accountType]}
+                  </p>
+                ) : null}
+                {user?.scopedCountries && user.scopedCountries.length > 0 ? (
+                  <p className="truncate text-[11px] font-medium text-text-muted">
+                    Périmètre : {user.scopedCountries.map((country) => country.name).join(', ')}
+                  </p>
+                ) : null}
+              </div>
             </div>
+            <button
+              onClick={handleLogout}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm font-semibold text-danger shadow-sm ring-1 ring-danger/20 transition hover:bg-danger-light hover:text-danger-dark active:scale-[0.98]"
+            >
+              <IconLogout size={16} />
+              Se déconnecter
+            </button>
           </div>
         </div>
       </aside>

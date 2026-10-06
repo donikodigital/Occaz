@@ -145,7 +145,7 @@ export interface Trip {
   /**
    * Prix affiché au client (pricePerSeat + commission plateforme) —
    * présent sur les réponses côté client (recherche, détail avant
-   * réservation). Absent sur GET /trips/mine (vue chauffeur), qui doit
+   * réservation). Absent sur GET /trips/mine (vue conducteur), qui doit
    * continuer d'afficher pricePerSeat tel quel : sa propre saisie.
    * Pour un tronçon (ex. Kindia → Labé), c'est le prix de CE tronçon.
    */

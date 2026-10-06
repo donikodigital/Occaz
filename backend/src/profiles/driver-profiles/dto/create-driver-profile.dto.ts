@@ -20,7 +20,7 @@ export class CreateDriverProfileDto {
    * exister avant la création du profil (le storageKey n'existe pas tant
    * qu'aucun upload n'a eu lieu). La vraie photo arrive via le flux en 2
    * temps POST me/photo/upload-url puis POST me/photo, obligatoire avant
-   * que verify() n'accepte de valider ce chauffeur. */
+   * que verify() n'accepte de valider ce conducteur. */
   @ApiPropertyOptional()
   @IsOptional()
   @IsUrl()

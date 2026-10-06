@@ -3,9 +3,9 @@
 // v8 — Même refonte que côté client : cet onglet affiche désormais un menu
 // plutôt que directement la fiche de profil (déménagée sur
 // /(driver)/my-profile, ouverte depuis « Mon profil »). Pas de code promo
-// ici (le chauffeur ne paie aucune prestation) ni de cartes bancaires (le
-// portefeuille chauffeur n'a rien à voir avec un moyen de paiement client)
-// — mais le parrainage y est, puisqu'un chauffeur peut aussi parrainer et
+// ici (le conducteur ne paie aucune prestation) ni de cartes bancaires (le
+// portefeuille conducteur n'a rien à voir avec un moyen de paiement client)
+// — mais le parrainage y est, puisqu'un conducteur peut aussi parrainer et
 // recevoir la récompense sur son portefeuille.
 
 import React from 'react';

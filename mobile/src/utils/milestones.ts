@@ -1,9 +1,9 @@
 // mobile/src/utils/milestones.ts
 //
-// Paliers pour l'anneau "Trajets terminés" du dashboard chauffeur —
+// Paliers pour l'anneau "Trajets terminés" du dashboard conducteur —
 // progression relative entre le palier précédent et le suivant plutôt
 // qu'un pourcentage absolu arbitraire, pour que l'anneau ait du sens à
-// n'importe quel stade (un chauffeur à 3 trajets voit une vraie
+// n'importe quel stade (un conducteur à 3 trajets voit une vraie
 // progression vers 10, pas un anneau quasi vide jusqu'à 100).
 const TRIP_MILESTONES = [10, 25, 50, 100, 250, 500, 1000] as const;
 

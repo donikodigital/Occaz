@@ -40,7 +40,7 @@ const TRIP_INCLUDE_FOR_BOOKING = {
 
 /**
  * Variante de TRIP_INCLUDE_FOR_BOOKING qui charge aussi le téléphone du
- * chauffeur (via User, DriverProfile n'a pas son propre champ phone) —
+ * conducteur (via User, DriverProfile n'a pas son propre champ phone) —
  * seulement là où un numéro peut être révélé (findOne, findAllForTrip),
  * jamais dans les listes génériques (findAll, admin) qui n'en ont pas
  * besoin.
@@ -57,7 +57,7 @@ const TRIP_INCLUDE_WITH_DRIVER_PHONE = {
 } as const;
 
 /**
- * Le numéro du client et celui du chauffeur ne sont révélés qu'une fois
+ * Le numéro du client et celui du conducteur ne sont révélés qu'une fois
  * la relation établie par le paiement — CONFIRMED ou COMPLETED, jamais
  * avant (demande explicite : permettre un contact direct par SMS/appel
  * uniquement "une fois le paiement effectué", à l'image d'Uber). Calculé
@@ -170,7 +170,7 @@ export class BookingsService {
     });
 
     // Un code promo réduit ce que le client paie, jamais ce que le
-    // chauffeur touche : le rabais est prélevé sur la commission de la
+    // conducteur touche : le rabais est prélevé sur la commission de la
     // plateforme, plafonné à son montant — voir ShipmentsService.create
     // pour le même principe, appliqué là aux envois.
     let promoCodeMatch: Awaited<ReturnType<PromoCodesService['resolveForCheckout']>> | null = null;
@@ -303,7 +303,7 @@ export class BookingsService {
       new BookingCancelledEvent(id, reason, refundEligiblePercentage),
     );
 
-    // Seulement si le chauffeur avait déjà été informé de cette réservation
+    // Seulement si le conducteur avait déjà été informé de cette réservation
     // (PAID/CONFIRMED — voir PaymentsService.handleCaptured) : une
     // réservation encore PENDING_PAYMENT ne lui a jamais été signalée, pas
     // la peine de le prévenir de l'annulation de quelque chose qu'il ne
@@ -337,7 +337,7 @@ export class BookingsService {
 
   /**
    * Appelé par TripsService.cancel — bascule toutes les réservations
-   * actives d'un trajet annulé par le chauffeur (ou par le système, ex :
+   * actives d'un trajet annulé par le conducteur (ou par le système, ex :
    * échec de paiement) en CANCELLED et émet un événement par réservation.
    * Remboursement à 100% dans ce cas : l'annulation n'est pas du fait du
    * client, la politique d'annulation habituelle (basée sur le délai) ne
@@ -394,7 +394,7 @@ export class BookingsService {
           type: NotificationType.STATUS_CHANGE,
           channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],
           fallbackTitle: 'Trajet annulé',
-          fallbackBody: `Le trajet ${trip.originCity.name} → ${trip.destinationCity.name} du ${trip.departureAt.toLocaleDateString('fr-FR')} a été annulé par le chauffeur. Vous êtes remboursé intégralement.`,
+          fallbackBody: `Le trajet ${trip.originCity.name} → ${trip.destinationCity.name} du ${trip.departureAt.toLocaleDateString('fr-FR')} a été annulé par le conducteur. Vous êtes remboursé intégralement.`,
           pushData: { type: 'STATUS_CHANGE', tripId },
         }),
       ),

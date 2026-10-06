@@ -1,5 +1,5 @@
 // web-admin/src/types/shipments.types.ts
-// [21/09/2026] v2 — chauffeur direct (avec ou sans trajet), types de la liste et du détail admin des envois.
+// [21/09/2026] v2 — conducteur direct (avec ou sans trajet), types de la liste et du détail admin des envois.
 import type { Money } from '@/services/api/types';
 
 export type ShipmentStatus =
@@ -16,7 +16,7 @@ export type ShipmentStatus =
   | 'DISPUTED'
   | 'REFUNDED';
 
-/** Chauffeur tel que l'API l'expose : jamais ses coordonnées de paiement. */
+/** Conducteur tel que l'API l'expose : jamais ses coordonnées de paiement. */
 export interface ShipmentDriverSummary {
   id: string;
   firstName: string;
@@ -26,7 +26,7 @@ export interface ShipmentDriverSummary {
   ratingsCount: number;
 }
 
-/** Contexte affiché dans un litige. Le chauffeur d'un envoi est `driver` (avec ou sans trajet) ; `trip.driver` ne sert que de repli. */
+/** Contexte affiché dans un litige. Le conducteur d'un envoi est `driver` (avec ou sans trajet) ; `trip.driver` ne sert que de repli. */
 export interface ShipmentContext {
   id: string;
   customerId: string;
@@ -61,11 +61,11 @@ export interface AdminShipmentListItem {
   /** Plage de dates souhaitée par le client. */
   windowStart: string;
   windowEnd: string;
-  /** Renseigné quand la plage est terminée sans chauffeur : le client doit prolonger ou être remboursé. */
+  /** Renseigné quand la plage est terminée sans conducteur : le client doit prolonger ou être remboursé. */
   extensionRequestedAt: string | null;
   /** Ce que le client a payé (un seul montant). */
   totalAmount: Money;
-  /** Commission de la plateforme, prélevée sur le gain du chauffeur. */
+  /** Commission de la plateforme, prélevée sur le gain du conducteur. */
   platformFee: Money;
   driver?: ShipmentDriverSummary | null;
   createdAt: string;

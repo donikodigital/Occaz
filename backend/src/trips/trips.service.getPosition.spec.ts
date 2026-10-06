@@ -34,16 +34,16 @@ describe('TripsService.getPosition', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('autorise le chauffeur propriétaire du trajet', async () => {
+  it('autorise le conducteur propriétaire du trajet', async () => {
     const service = createService(tripWithPosition);
     const result = await service.getPosition('trip-1', { driverProfileId: 'driver-1' });
     expect(result).toEqual({ latitude: 9.641, longitude: -13.578, updatedAt: tripWithPosition.currentPositionUpdatedAt });
   });
 
-  it("rejette un autre chauffeur (pas le sien) — c'est la vérification de sécurité la plus importante ici", async () => {
+  it("rejette un autre conducteur (pas le sien) — c'est la vérification de sécurité la plus importante ici", async () => {
     const service = createService(tripWithPosition);
     await expect(
-      service.getPosition('trip-1', { driverProfileId: 'un-autre-chauffeur' }),
+      service.getPosition('trip-1', { driverProfileId: 'un-autre-conducteur' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -60,7 +60,7 @@ describe('TripsService.getPosition', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it("rejette un appelant qui n'est ni le chauffeur ni un client (aucun identifiant fourni)", async () => {
+  it("rejette un appelant qui n'est ni le conducteur ni un client (aucun identifiant fourni)", async () => {
     const service = createService(tripWithPosition);
     await expect(service.getPosition('trip-1', {})).rejects.toBeInstanceOf(ForbiddenException);
   });

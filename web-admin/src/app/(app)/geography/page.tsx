@@ -498,7 +498,7 @@ function CitiesTab({
             <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${percent}%` }} />
           </div>
           <p className="mt-2 text-xs text-text-muted">
-            Les coordonnées permettent à l’app de retrouver automatiquement la ville d’une adresse choisie par un chauffeur.
+            Les coordonnées permettent à l’app de retrouver automatiquement la ville d’une adresse choisie par un conducteur.
           </p>
         </div>
       ) : null}

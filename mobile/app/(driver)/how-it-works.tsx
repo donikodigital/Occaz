@@ -1,8 +1,8 @@
 // mobile/app/(driver)/how-it-works.tsx
 //
-// v1 — « Comment ça marche ? » côté chauffeur : deux onglets (Trajets /
+// v1 — « Comment ça marche ? » côté conducteur : deux onglets (Trajets /
 // Envois), chacun avec ses 3 étapes réelles. Même structure que la
-// version client, contenu adapté au point de vue du chauffeur.
+// version client, contenu adapté au point de vue du conducteur.
 
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -44,12 +44,12 @@ const SHIPMENT_STEPS: Step[] = [
   {
     icon: IconSpeakerphone,
     title: 'Recevez les demandes',
-    text: 'Dès qu\'un client publie un envoi, tous les chauffeurs validés sont prévenus — avec ou sans trajet établi.',
+    text: 'Dès qu\'un client publie un envoi, tous les conducteurs validés sont prévenus — avec ou sans trajet établi.',
   },
   {
     icon: IconPackage,
     title: 'Acceptez en premier',
-    text: 'Le premier chauffeur à accepter s\'en charge. Vous voyez immédiatement le gain net qui vous reviendra.',
+    text: 'Le premier conducteur à accepter s\'en charge. Vous voyez immédiatement le gain net qui vous reviendra.',
   },
   {
     icon: IconRoute,

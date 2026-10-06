@@ -68,7 +68,7 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
 
 /**
  * Contrairement au profil client, countryId et cityId sont obligatoires
- * ici (DriverProfile, section 5) — un chauffeur opère depuis une ville
+ * ici (DriverProfile, section 5) — un conducteur opère depuis une ville
  * précise, contrairement à un client qui peut réserver depuis n'importe où.
  */
 export default function DriverCompleteProfileScreen() {

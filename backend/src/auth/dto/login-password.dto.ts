@@ -6,7 +6,7 @@ import { DeviceInfoDto } from './device-info.dto';
 
 /**
  * Réservé aux comptes SUPPORT / SUPERADMIN (section 36 : "mot de passe
- * lorsque nécessaire") — clients et chauffeurs s'authentifient uniquement
+ * lorsque nécessaire") — clients et conducteurs s'authentifient uniquement
  * par téléphone + OTP.
  */
 export class LoginPasswordDto {

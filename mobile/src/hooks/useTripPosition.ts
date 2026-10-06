@@ -6,8 +6,8 @@ const POLL_INTERVAL_MS = 10_000;
 
 /**
  * Côté client : interroge périodiquement la dernière position connue du
- * chauffeur (GET /trips/:id/position), plutôt que de lire le GPS de cet
- * appareil — c'est `useTripPositionBroadcast` (côté chauffeur) qui envoie
+ * conducteur (GET /trips/:id/position), plutôt que de lire le GPS de cet
+ * appareil — c'est `useTripPositionBroadcast` (côté conducteur) qui envoie
  * cette position, celui-ci ne fait que la relire. Ne sonde que pendant un
  * trajet réellement en cours.
  */

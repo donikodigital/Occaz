@@ -242,7 +242,7 @@ enum DisputeResolutionType {
   SANCTION
   SUSPENSION
   NO_ACTION
-  /// Valide manuellement une étape OTP bloquée (prise en charge/dépose/récupération/livraison) sans code — support/superadmin uniquement, jamais le chauffeur. Voir ResolveDisputeDto.otpPurpose.
+  /// Valide manuellement une étape OTP bloquée (prise en charge/dépose/récupération/livraison) sans code — support/superadmin uniquement, jamais le conducteur. Voir ResolveDisputeDto.otpPurpose.
   OTP_MANUAL_VALIDATION
 }
 
@@ -268,7 +268,7 @@ enum NotificationType {
   SUPPORT_MESSAGE
   SHIPMENT_REQUEST
   SHIPMENT_EXTENSION
-  // Nouveau message dans une conversation client <-> chauffeur (hors litige, qui reste SUPPORT_MESSAGE).
+  // Nouveau message dans une conversation client <-> conducteur (hors litige, qui reste SUPPORT_MESSAGE).
   CONVERSATION_MESSAGE
 }
 
@@ -519,7 +519,7 @@ model DriverProfile {
   completedTripsCount     Int @default(0)
   completedShipmentsCount Int @default(0)
   // Cache dénormalisé, recalculé à chaque nouvelle note reçue (section 25
-  // "Système de confiance" — le profil chauffeur doit afficher sa note
+  // "Système de confiance" — le profil conducteur doit afficher sa note
   // sans agréger toutes les Rating à chaque affichage).
   averageRating           Float?
   ratingsCount            Int    @default(0)
@@ -731,7 +731,7 @@ model Location {
 // `usageCount` classe les adresses les plus utilisées, `lastUsedAt` alimente
 // la liste "Récentes". Les adresses ne sont jamais partagées entre
 // utilisateurs : une adresse de livraison saisie par un client ne sera
-// jamais proposée à un chauffeur.
+// jamais proposée à un conducteur.
 model SavedLocation {
   id         String   @id @default(uuid())
   userId     String
@@ -790,10 +790,10 @@ model Trip {
 
   notes String?
 
-  // Position en direct du chauffeur pendant IN_PROGRESS — seule la
+  // Position en direct du conducteur pendant IN_PROGRESS — seule la
   // dernière position est conservée (pas d'historique de trajet complet,
   // hors scope MVP ; voir TripsService.updatePosition). Mise à jour par
-  // polling REST côté app chauffeur, pas de WebSocket dans cette V1 —
+  // polling REST côté app conducteur, pas de WebSocket dans cette V1 —
   // largement suffisant pour une fréquence de quelques secondes, plus
   // simple à opérer qu'un canal temps réel tant que le besoin de latence
   // sub-seconde ne se fait pas sentir.
@@ -829,13 +829,13 @@ model TripStop {
   city   City?   @relation(fields: [cityId], references: [id], onDelete: Restrict)
 
   // Prix d'une place depuis le DÉPART du trajet jusqu'à cette étape (même devise que Trip.pricePerSeat).
-  // Calculé automatiquement (au prorata de la distance) puis modifiable par le chauffeur tant que le trajet est
+  // Calculé automatiquement (au prorata de la distance) puis modifiable par le conducteur tant que le trajet est
   // en brouillon. Le prix d'un tronçon A → B est fareFromOrigin(B) − fareFromOrigin(A) : départ = 0, arrivée =
   // Trip.pricePerSeat. Une étape sans prix (anciens trajets) n'est pas réservable.
   fareFromOrigin       BigInt?
   distanceFromOriginKm Float?
 
-  // Le chauffeur peut décocher une ville traversée où il ne prend personne.
+  // Le conducteur peut décocher une ville traversée où il ne prend personne.
   isBookable Boolean   @default(true)
   arrivedAt  DateTime?
 
@@ -949,12 +949,12 @@ model ShipmentCategory {
 model Shipment {
   id         String           @id @default(uuid())
   // Trajet auquel l'envoi est rattaché, s'il y en a un. Nul tant que SEARCHING_DRIVER,
-  // et reste nul si le chauffeur qui accepte n'a pas de trajet établi : tout chauffeur
+  // et reste nul si le conducteur qui accepte n'a pas de trajet établi : tout conducteur
   // validé peut accepter un envoi, avec ou sans trajet.
   tripId     String?
   trip       Trip?            @relation(fields: [tripId], references: [id])
-  // Chauffeur qui a accepté l'envoi — posé à l'acceptation (ou à la création si un
-  // trajet a été choisi d'avance). Source de vérité du "chauffeur de l'envoi", que
+  // Conducteur qui a accepté l'envoi — posé à l'acceptation (ou à la création si un
+  // trajet a été choisi d'avance). Source de vérité du "conducteur de l'envoi", que
   // tripId soit renseigné ou non.
   driverId   String?
   driver     DriverProfile?   @relation(fields: [driverId], references: [id])
@@ -986,11 +986,11 @@ model Shipment {
   isUrgent      Boolean @default(false)
 
   // Plage de dates pendant laquelle le client veut que son colis parte (obligatoire).
-  // Passé windowEnd sans chauffeur, le client doit prolonger ou être remboursé
+  // Passé windowEnd sans conducteur, le client doit prolonger ou être remboursé
   // intégralement (voir ShipmentWindowService).
   windowStart DateTime
   windowEnd   DateTime
-  // Posé quand le client a été invité à prolonger (windowEnd dépassé, aucun chauffeur).
+  // Posé quand le client a été invité à prolonger (windowEnd dépassé, aucun conducteur).
   extensionRequestedAt DateTime?
 
   status ShipmentStatus @default(CREATED)
@@ -1274,7 +1274,7 @@ model SavedCard {
 // CONFIANCE & SÉCURITÉ DE LA PRESTATION — Partie VI
 // =============================================================================
 
-// Le code est généré et transmis côté serveur uniquement — le chauffeur ne
+// Le code est généré et transmis côté serveur uniquement — le conducteur ne
 // peut jamais générer lui-même la validation finale (règle d'or, section 18).
 // `code` stocke un hash, jamais la valeur en clair.
 model OtpCode {
@@ -1513,7 +1513,7 @@ model Notification {
   @@map("notifications")
 }
 
-// Conversation toujours entre un client et un chauffeur ; le support peut
+// Conversation toujours entre un client et un conducteur ; le support peut
 // intervenir sans être "participant" — ses messages sont marqués
 // isSupportIntervention (section 23).
 model Conversation {
@@ -1623,7 +1623,7 @@ model PromoCodeRedemption {
 // seule fois, à son inscription. La récompense n'est créditée qu'une fois
 // le filleul confirmé (status COMPLETED), jamais à l'inscription seule —
 // pour ne récompenser qu'un parrainage qui a réellement fait venir un
-// nouveau client ou chauffeur actif.
+// nouveau client ou conducteur actif.
 model Referral {
   id           String         @id @default(uuid())
   referrerId   String

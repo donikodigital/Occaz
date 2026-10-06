@@ -44,7 +44,7 @@ export class CitiesService {
   }
 
   /**
-   * Bloqué si la ville est encore référencée ailleurs (chauffeurs, trajets,
+   * Bloqué si la ville est encore référencée ailleurs (conducteurs, trajets,
    * clients, localisations) — une suppression physique casserait ces
    * relations en base plutôt que de lever une erreur claire.
    */
@@ -59,7 +59,7 @@ export class CitiesService {
       this.prisma.location.findFirst({ where: { cityId: id } }),
     ]);
 
-    if (driver) throw new ConflictException('Cette ville est associée à au moins un chauffeur — impossible de la supprimer.');
+    if (driver) throw new ConflictException('Cette ville est associée à au moins un conducteur — impossible de la supprimer.');
     if (tripOrigin || tripDestination) {
       throw new ConflictException("Cette ville est utilisée comme origine ou destination d'un trajet — impossible de la supprimer.");
     }

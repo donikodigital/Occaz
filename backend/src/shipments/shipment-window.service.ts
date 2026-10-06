@@ -14,7 +14,7 @@ const BATCH_SIZE = 100;
 /**
  * Tâche planifiée du cycle de vie "plage de dates" d'un envoi :
  *
- * 1. Fin de plage sans chauffeur : le client est invité à prolonger
+ * 1. Fin de plage sans conducteur : le client est invité à prolonger
  *    (extensionRequestedAt posé, notification).
  * 2. Sans réponse après `shipment.extension_grace_hours` (24 h par défaut,
  *    réglable dans PlatformSetting) : envoi annulé, client remboursé à 100 %.
@@ -63,7 +63,7 @@ export class ShipmentWindowService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** 1. Plage terminée sans chauffeur : on demande au client s'il prolonge. */
+  /** 1. Plage terminée sans conducteur : on demande au client s'il prolonge. */
   private async requestExtensions(): Promise<void> {
     const graceHours = await this.pricing.getNumericSetting('shipment.extension_grace_hours', 24);
     const now = new Date();
@@ -85,8 +85,8 @@ export class ShipmentWindowService implements OnModuleInit, OnModuleDestroy {
         userId: shipment.customer.userId,
         type: NotificationType.SHIPMENT_EXTENSION,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
-        fallbackTitle: "Aucun chauffeur pour l'instant",
-        fallbackBody: `La période prévue pour votre envoi est terminée sans qu'un chauffeur l'ait accepté. Prolongez-la dans l'application ; sans réponse de votre part sous ${graceHours} h, vous serez remboursé intégralement.`,
+        fallbackTitle: "Aucun conducteur pour l'instant",
+        fallbackBody: `La période prévue pour votre envoi est terminée sans qu'un conducteur l'ait accepté. Prolongez-la dans l'application ; sans réponse de votre part sous ${graceHours} h, vous serez remboursé intégralement.`,
         pushData: { type: 'SHIPMENT_EXTENSION', shipmentId: shipment.id },
       });
     }
@@ -106,7 +106,7 @@ export class ShipmentWindowService implements OnModuleInit, OnModuleDestroy {
       try {
         await this.shipments.expireSearch(
           shipment.id,
-          'Aucun chauffeur avant la fin de la période et pas de prolongation — remboursement intégral.',
+          'Aucun conducteur avant la fin de la période et pas de prolongation — remboursement intégral.',
         );
       } catch (error) {
         this.logger.error(`Échec de l'expiration de l'envoi ${shipment.id}`, error as Error);

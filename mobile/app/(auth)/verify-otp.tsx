@@ -52,7 +52,7 @@ export default function VerifyOtpScreen() {
       }),
     onSuccess: async (result) => {
       await setSession(result);
-      // Correction : le chauffeur doit aller dans le groupe (tabs) comme le
+      // Correction : le conducteur doit aller dans le groupe (tabs) comme le
       // client, sinon il atterrit sur (driver)/home.tsx — un fichier hors
       // (tabs), orphelin depuis le commit initial, sans barre d'onglets et
       // sans aucun des écrans construits depuis (bug identifié le 16/09/2026).

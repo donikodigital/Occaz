@@ -71,7 +71,7 @@ const ENTITY_NOUNS: Record<string, EntityNoun> = {
   Shipment: { label: 'Envoi', direct: 'un envoi', of: 'd’un envoi' },
   Booking: { label: 'Réservation', direct: 'une réservation', of: 'd’une réservation' },
   Vehicle: { label: 'Véhicule', direct: 'un véhicule', of: 'd’un véhicule' },
-  DriverProfile: { label: 'Profil chauffeur', direct: 'un profil chauffeur', of: 'd’un profil chauffeur' },
+  DriverProfile: { label: 'Profil conducteur', direct: 'un profil conducteur', of: 'd’un profil conducteur' },
   Wallet: { label: 'Portefeuille', direct: 'un portefeuille', of: 'd’un portefeuille' },
 };
 

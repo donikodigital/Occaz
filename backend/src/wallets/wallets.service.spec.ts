@@ -1,5 +1,5 @@
 // backend/src/wallets/wallets.service.spec.ts
-// Garde-fous du portefeuille chauffeur : jamais de double crédit, revenu et commission toujours ensemble.
+// Garde-fous du portefeuille conducteur : jamais de double crédit, revenu et commission toujours ensemble.
 import { WalletTransactionStatus, WalletTransactionType } from '@prisma/client';
 import { WalletsService } from './wallets.service';
 

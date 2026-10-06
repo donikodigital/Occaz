@@ -14,7 +14,7 @@ export interface DriverPositionCardProps {
   isActive: boolean;
 }
 
-/** N'affiche rien tant qu'aucune position n'est encore connue (trajet pas encore démarré, ou chauffeur pas encore localisé) — pas de carte vide trompeuse. */
+/** N'affiche rien tant qu'aucune position n'est encore connue (trajet pas encore démarré, ou conducteur pas encore localisé) — pas de carte vide trompeuse. */
 export function DriverPositionCard({ tripId, isActive }: DriverPositionCardProps) {
   const { data: position } = useTripPosition(tripId, isActive);
 
@@ -28,7 +28,7 @@ export function DriverPositionCard({ tripId, isActive }: DriverPositionCardProps
         </View>
         <View style={{ flex: 1 }}>
           <AppText variant="sm" weight="semibold">
-            Position du chauffeur
+            Position du conducteur
           </AppText>
           <AppText variant="xs" color="textSecondary">
             Mise à jour {formatRelativeTime(position.updatedAt)}

@@ -52,13 +52,13 @@ export default function PrivacyScreen() {
 
       <Article title="1. Données collectées">
         Identité (nom, prénom, date de naissance), coordonnées (téléphone, email), documents d'identité et
-        justificatifs pour les chauffeurs (permis, carte grise, assurance), données de localisation lors d'un trajet
+        justificatifs pour les conducteurs (permis, carte grise, assurance), données de localisation lors d'un trajet
         en cours, historique de réservations et d'envois, données de paiement limitées (référence de transaction —
         jamais le numéro complet d'une carte ni son cryptogramme).
       </Article>
 
       <Article title="2. Finalités du traitement">
-        Ces données servent à créer et sécuriser votre compte, mettre en relation chauffeurs et clients, calculer
+        Ces données servent à créer et sécuriser votre compte, mettre en relation conducteurs et clients, calculer
         les prix, traiter les paiements, assurer le suivi d'un trajet ou d'un envoi, gérer les litiges et notations,
         et respecter nos obligations légales.
       </Article>
@@ -70,7 +70,7 @@ export default function PrivacyScreen() {
       </Article>
 
       <Article title="4. Destinataires des données">
-        Vos données sont accessibles à l'équipe Occaz habilitée, au chauffeur ou au client concerné par une
+        Vos données sont accessibles à l'équipe Occaz habilitée, au conducteur ou au client concerné par une
         prestation donnée (dans la limite nécessaire à son bon déroulement), et à nos sous-traitants techniques
         (hébergement, prestataires de paiement, envoi de SMS). Elles ne sont jamais vendues à des tiers à des fins
         commerciales.

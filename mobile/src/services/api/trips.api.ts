@@ -26,7 +26,7 @@ export const tripsApi = {
       query: { boardingStopId: segment.boardingStopId, alightingStopId: segment.alightingStopId },
     }),
 
-  // --- Côté chauffeur ---
+  // --- Côté conducteur ---
 
   listMine: (params: { page?: number; limit?: number } = {}) =>
     api.get<Paginated<Trip>>('/trips/mine', { query: params }),

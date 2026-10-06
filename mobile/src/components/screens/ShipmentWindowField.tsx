@@ -44,7 +44,7 @@ export function ShipmentWindowField({ startDate, endDate, onChangeStart, onChang
       <View style={styles.note}>
         <IconInfoCircle size={14} color={colors.textSecondary} />
         <AppText variant="xs" color="textSecondary" style={styles.noteText}>
-          Sans chauffeur avant la fin de cette période, nous vous proposons de la prolonger. Si vous ne le souhaitez
+          Sans conducteur avant la fin de cette période, nous vous proposons de la prolonger. Si vous ne le souhaitez
           pas, vous êtes remboursé intégralement.
         </AppText>
       </View>

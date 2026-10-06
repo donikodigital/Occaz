@@ -88,7 +88,7 @@ function withAdapter(service: PaymentsService, status: 'CAPTURED' | 'FAILED') {
 }
 
 describe('PaymentsService — règlement des paiements', () => {
-  it('capture : crédite le chauffeur une fois, confirme la réservation', async () => {
+  it('capture : crédite le conducteur une fois, confirme la réservation', async () => {
     const { service, wallets, bookingsService } = build();
     await expect(withAdapter(service, 'CAPTURED')).resolves.toEqual({ paymentId: 'pay1', status: PaymentStatus.CAPTURED });
     expect(bookingsService.confirmPayment).toHaveBeenCalledWith('b1');
@@ -102,7 +102,7 @@ describe('PaymentsService — règlement des paiements', () => {
     expect(wallets.holdBookingRevenue).not.toHaveBeenCalled();
   });
 
-  it('deux webhooks simultanés : seul celui qui réclame la capture crédite le chauffeur', async () => {
+  it('deux webhooks simultanés : seul celui qui réclame la capture crédite le conducteur', async () => {
     const { service, wallets } = build({ claimTransaction: 0 });
     await withAdapter(service, 'CAPTURED');
     expect(wallets.holdBookingRevenue).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('PaymentsService — règlement des paiements', () => {
     );
   });
 
-  it('paiement arrivé après annulation de la réservation : remboursement intégral, chauffeur non crédité', async () => {
+  it('paiement arrivé après annulation de la réservation : remboursement intégral, conducteur non crédité', async () => {
     const { service, wallets, refundBooking } = build({ confirmOutcome: 'NOT_PAYABLE' });
     await withAdapter(service, 'CAPTURED');
     expect(refundBooking).toHaveBeenCalledWith('b1', 100);
@@ -143,7 +143,7 @@ describe('PaymentsService — règlement des paiements', () => {
     expect(shipmentsService.confirmPayment).not.toHaveBeenCalled();
   });
 
-  it('si le crédit du chauffeur échoue, la transaction repasse en attente pour que le webhook rejoué la reprenne', async () => {
+  it('si le crédit du conducteur échoue, la transaction repasse en attente pour que le webhook rejoué la reprenne', async () => {
     const { service, prisma } = build({ holdFails: true });
     await expect(withAdapter(service, 'CAPTURED')).rejects.toThrow('portefeuille indisponible');
     expect(prisma.paymentTransaction.update).toHaveBeenCalledWith(
@@ -152,15 +152,15 @@ describe('PaymentsService — règlement des paiements', () => {
     expect(prisma.payment.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: PaymentStatus.PENDING } }));
   });
 
-  describe('gain du chauffeur sur un trajet : toujours son prix, promo ou non', () => {
-    // prix du chauffeur = 100 000 ; la commission est payée EN PLUS par le client et un rabais ne réduit qu'elle.
+  describe('gain du conducteur sur un trajet : toujours son prix, promo ou non', () => {
+    // prix du conducteur = 100 000 ; la commission est payée EN PLUS par le client et un rabais ne réduit qu'elle.
     const cases: Array<[string, bigint, bigint]> = [
       ['sans promo', 115_000n, 15_000n],
       ['promo de 10 000 sur la commission', 105_000n, 5_000n],
       ['promo qui annule toute la commission', 100_000n, 0n],
     ];
 
-    it.each(cases)('%s : le chauffeur touche 100 000', async (_label, totalAmount, platformFee) => {
+    it.each(cases)('%s : le conducteur touche 100 000', async (_label, totalAmount, platformFee) => {
       const { service, wallets } = build({ bookingAmounts: { totalAmount, platformFee } });
       await withAdapter(service, 'CAPTURED');
 

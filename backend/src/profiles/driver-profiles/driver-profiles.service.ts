@@ -37,7 +37,7 @@ export class DriverProfilesService {
     });
     if (!profile) {
       throw new NotFoundException(
-        "Aucun profil chauffeur — complétez d'abord votre inscription.",
+        "Aucun profil conducteur — complétez d'abord votre inscription.",
       );
     }
     return profile;
@@ -48,7 +48,7 @@ export class DriverProfilesService {
       where: { id },
       include: { country: true, city: true, vehicles: true, wallet: true },
     });
-    if (!profile) throw new NotFoundException('Profil chauffeur introuvable.');
+    if (!profile) throw new NotFoundException('Profil conducteur introuvable.');
     return profile;
   }
 
@@ -63,14 +63,14 @@ export class DriverProfilesService {
       select: { id: true },
     });
     if (!profile) {
-      throw new NotFoundException('Aucun profil chauffeur pour cet utilisateur.');
+      throw new NotFoundException('Aucun profil conducteur pour cet utilisateur.');
     }
     return profile.id;
   }
 
   /**
    * Crée le profil ET son portefeuille associé dans la même transaction —
-   * un chauffeur ne doit jamais exister sans Wallet (contrainte @unique
+   * un conducteur ne doit jamais exister sans Wallet (contrainte @unique
    * sur Wallet.driverId). La gestion complète du portefeuille (soldes,
    * retraits) arrive au Lot 5 ; ici on ne fait que garantir son existence
    * dès la création du profil, avec la devise par défaut du pays.
@@ -82,19 +82,19 @@ export class DriverProfilesService {
   ) {
     if (accountType !== AccountType.DRIVER) {
       throw new ConflictException(
-        "Seul un compte de type DRIVER peut créer un profil chauffeur.",
+        "Seul un compte de type DRIVER peut créer un profil conducteur.",
       );
     }
     const existing = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (existing) {
-      throw new ConflictException('Un profil chauffeur existe déjà pour ce compte.');
+      throw new ConflictException('Un profil conducteur existe déjà pour ce compte.');
     }
 
     const country = await this.prisma.country.findUnique({ where: { id: dto.countryId } });
     if (!country) throw new NotFoundException('Pays introuvable.');
     if (!country.defaultCurrencyId) {
       throw new BadRequestException(
-        `Le pays "${country.name}" n'a pas de devise par défaut configurée — impossible de créer le portefeuille du chauffeur. Contactez un administrateur.`,
+        `Le pays "${country.name}" n'a pas de devise par défaut configurée — impossible de créer le portefeuille du conducteur. Contactez un administrateur.`,
       );
     }
 
@@ -144,7 +144,7 @@ export class DriverProfilesService {
       type: NotificationType.STATUS_CHANGE,
       channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
       fallbackTitle: "Bienvenue chez Occa'Z",
-      fallbackBody: `Bienvenue ${dto.firstName} ! Votre profil chauffeur est en cours de vérification.`,
+      fallbackBody: `Bienvenue ${dto.firstName} ! Votre profil conducteur est en cours de vérification.`,
     });
 
     return profile;
@@ -220,7 +220,7 @@ export class DriverProfilesService {
   }
 
   /**
-   * Validation d'un chauffeur — attribue le badge "Conducteur vérifié"
+   * Validation d'un conducteur — attribue le badge "Conducteur vérifié"
    * (section 25). Trois pièces sont obligatoires avant validation, pour
    * permettre à l'admin de comparer la photo de profil au permis : la
    * photo, le permis de conduire, et la carte grise d'au moins un
@@ -231,7 +231,7 @@ export class DriverProfilesService {
     const existing = await this.findOne(id);
     if (!existing.photoUrl) {
       throw new BadRequestException(
-        'Ce chauffeur doit avoir une photo de profil avant de pouvoir être validé.',
+        'Ce conducteur doit avoir une photo de profil avant de pouvoir être validé.',
       );
     }
 
@@ -239,13 +239,13 @@ export class DriverProfilesService {
     const hasDriverLicense = driverDocuments.some((doc) => doc.type === DOCUMENT_TYPES.DRIVER_LICENSE);
     if (!hasDriverLicense) {
       throw new BadRequestException(
-        'Ce chauffeur doit avoir envoyé son permis de conduire avant de pouvoir être validé.',
+        'Ce conducteur doit avoir envoyé son permis de conduire avant de pouvoir être validé.',
       );
     }
 
     if (!existing.vehicles || existing.vehicles.length === 0) {
       throw new BadRequestException(
-        'Ce chauffeur doit avoir au moins un véhicule enregistré avant de pouvoir être validé.',
+        'Ce conducteur doit avoir au moins un véhicule enregistré avant de pouvoir être validé.',
       );
     }
 
@@ -257,7 +257,7 @@ export class DriverProfilesService {
     );
     if (!hasVehicleRegistration) {
       throw new BadRequestException(
-        'La carte grise du véhicule doit être envoyée avant de pouvoir valider ce chauffeur.',
+        'La carte grise du véhicule doit être envoyée avant de pouvoir valider ce conducteur.',
       );
     }
 
@@ -276,16 +276,16 @@ export class DriverProfilesService {
       type: NotificationType.STATUS_CHANGE,
       channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
       fallbackTitle: 'Compte validé',
-      fallbackBody: 'Votre profil chauffeur a été vérifié — vous pouvez maintenant proposer des trajets.',
+      fallbackBody: 'Votre profil conducteur a été vérifié — vous pouvez maintenant proposer des trajets.',
     });
     return profile;
   }
 
   /**
-   * Suspend le profil chauffeur ET le compte User associé dans la même
+   * Suspend le profil conducteur ET le compte User associé dans la même
    * transaction — DriverProfile.status et User.isSuspended sont deux
    * champs distincts (voir schema.prisma) ; sans cette synchronisation,
-   * "Suspendre" changeait le badge affiché mais laissait le chauffeur se
+   * "Suspendre" changeait le badge affiché mais laissait le conducteur se
    * reconnecter normalement, car c'est bien User.isSuspended que
    * JwtStrategy revérifie à chaque requête (jwt.strategy.ts), jamais
    * DriverProfile.status. Les sessions actives sont aussi révoquées
@@ -321,7 +321,7 @@ export class DriverProfilesService {
     return profile;
   }
 
-  /** Symétrique de suspend() — lève aussi User.isSuspended, sinon le chauffeur resterait bloqué à la connexion malgré un profil réactivé. */
+  /** Symétrique de suspend() — lève aussi User.isSuspended, sinon le conducteur resterait bloqué à la connexion malgré un profil réactivé. */
   async reactivate(id: string, actorId: string) {
     const existing = await this.findOne(id);
 
@@ -374,7 +374,7 @@ export class DriverProfilesService {
   }
 
   // -----------------------------------------------------------------------
-  // Documents du chauffeur (pièce d'identité, permis...) — section 5.
+  // Documents du conducteur (pièce d'identité, permis...) — section 5.
   // -----------------------------------------------------------------------
 
   /**

@@ -32,7 +32,7 @@ design ci-dessous.
   (QR code généré côté client à partir de `otpAuthUri`, plus le secret
   en repli texte).
 - **Tableau de bord SuperAdmin** (`GET /dashboards/admin`) : utilisateurs,
-  chauffeurs vérifiés, actifs sur 30 jours, trajets/envois, litiges
+  conducteurs vérifiés, actifs sur 30 jours, trajets/envois, litiges
   ouverts avec taux de résolution, finances (revenu brut, commission,
   remboursements) — les vrais chiffres calculés côté backend (Lot 9
   backend), aucune valeur simulée ici non plus.
@@ -43,23 +43,23 @@ design ci-dessous.
   écran, il fallait appeler l'API directement pour qu'un client puisse
   payer quoi que ce soit sur la plateforme.
 
-## Lot 2 (livré) — Utilisateurs, vérification chauffeurs/véhicules
+## Lot 2 (livré) — Utilisateurs, vérification conducteurs/véhicules
 
 Le RBAC prévu dans ce lot a été reporté (voir le tableau ci-dessous) —
 c'est un réglage ponctuel plutôt qu'un besoin opérationnel quotidien,
-moins urgent que la vérification des chauffeurs qui, elle, revient
+moins urgent que la vérification des conducteurs qui, elle, revient
 sans cesse.
 
 - **Utilisateurs** : liste (recherche par téléphone/email, filtre par
   rôle), détail, suspension avec motif obligatoire, réactivation.
-- **Chauffeurs** : liste (recherche, filtre par statut), détail complet
+- **Conducteurs** : liste (recherche, filtre par statut), détail complet
   (profil, statistiques, note moyenne), véhicules avec validation/rejet
-  individuel, validation/suspension/réactivation du chauffeur lui-même.
+  individuel, validation/suspension/réactivation du conducteur lui-même.
 - **Un vrai trou de contrat trouvé en construisant cette page, pas
   supposé** : `GET /documents` (revue admin des pièces justificatives)
   n'accepte aucun paramètre `ownerId` — seulement `ownerType` et
   `status`, sur toute la plateforme. Impossible d'afficher de façon
-  fiable "les documents de ce chauffeur précis" sans une solution de
+  fiable "les documents de ce conducteur précis" sans une solution de
   contournement fragile (tout récupérer puis filtrer côté client, ce qui
   casse dès que la pagination coupe avant d'atteindre le bon
   enregistrement). **La revue de documents n'est donc pas dans cette
@@ -78,12 +78,12 @@ sans cesse.
   trou "documents" trouvé au Lot 2.
 - **Liste** filtrable par statut et priorité.
 - **Fiche complète** : contexte (réservation ou envoi concerné —
-  montant, passagers ou expéditeur/destinataire/chauffeur selon le
+  montant, passagers ou expéditeur/destinataire/conducteur selon le
   type), attribution à un agent (liste tirée des comptes Support déjà
   construite au Lot 2, pas de doublon), changement de statut de
   traitement, fil de messages avec réponse directe, et **résolution
   avec conséquence réelle** : chaque type (remboursement total/partiel,
-  paiement chauffeur, annulation, suspension...) déclenche exactement
+  paiement conducteur, annulation, suspension...) déclenche exactement
   l'action que le backend exécute derrière (voir
   `backend/src/disputes/disputes.service.ts`), avec les champs
   conditionnels qui n'apparaissent que quand le type choisi les exige
@@ -143,10 +143,10 @@ principe que le flux téléphone/OTP déjà en place. Voir le README
 backend pour le détail du mécanisme (réutilise l'infrastructure OTP
 existante, jamais de nouveau système).
 
-## Mise à jour — Photo de profil chauffeur
+## Mise à jour — Photo de profil conducteur
 
 Affichée (ou initiales à défaut) sur la fiche détail et dans la liste
-des chauffeurs — `driver.photoUrl`, alimenté par le nouveau flux
+des conducteurs — `driver.photoUrl`, alimenté par le nouveau flux
 d'upload mobile.
 
 ## Mise à jour — Revue des pièces justificatives
@@ -155,11 +155,11 @@ Ferme le trou signalé au Lot 2 (`GET /documents` n'acceptait pas de
 filtre par propriétaire) — comblé côté backend, exploité ici.
 
 - **`DocumentsPanel`** (nouveau, réutilisable) : liste les documents
-  d'un chauffeur ou d'un véhicule, avec aperçu via URL signée
+  d'un conducteur ou d'un véhicule, avec aperçu via URL signée
   temporaire (jamais d'accès direct au fichier), validation/rejet avec
   motif obligatoire.
-- Ajouté à la fiche chauffeur (Lot 2) : une carte "Pièces d'identité"
-  au niveau du chauffeur, et un panneau dépliable par véhicule.
+- Ajouté à la fiche conducteur (Lot 2) : une carte "Pièces d'identité"
+  au niveau du conducteur, et un panneau dépliable par véhicule.
 
 ## État du projet
 

@@ -1,5 +1,5 @@
 // backend/src/common/events/domain-events.ts
-// [21/09/2026] v2 — événement SHIPMENT_SEARCH_OPENED (un envoi entre en recherche de chauffeur).
+// [21/09/2026] v2 — événement SHIPMENT_SEARCH_OPENED (un envoi entre en recherche de conducteur).
 /**
  * Événements de domaine — découplent les modules Trajets/Envois du
  * module Paiement. Sans ce bus d'événements, TripsModule/ShipmentsModule
@@ -37,7 +37,7 @@ export class ShipmentCancelledEvent {
 
 /**
  * Un envoi vient d'entrer (ou de revenir, après prolongation) en recherche
- * de chauffeur : ShipmentDispatchService prévient alors tous les chauffeurs
+ * de conducteur : ShipmentDispatchService prévient alors tous les conducteurs
  * éligibles. Événement plutôt qu'appel direct, pour que le paiement (qui
  * déclenche la recherche) n'attende jamais la fin des notifications.
  */

@@ -233,7 +233,7 @@ export default function NewTripScreen() {
   }, [locationSelection, consumeLocationSelection]);
 
   // Devise = celle du pays de la ville de DÉPART : c'est là que le passager monte et paie. Plus de choix à faire (ni de risque de se
-  // tromper) ; le serveur applique la même règle. La conversion vers le portefeuille du chauffeur, s'il est dans une autre devise,
+  // tromper) ; le serveur applique la même règle. La conversion vers le portefeuille du conducteur, s'il est dans une autre devise,
   // se fait déjà au crédit (ExchangeRateService).
   const originCountry = useMemo(
     () => (originCity && countries ? countries.find((item) => item.id === originCity.countryId) : undefined),

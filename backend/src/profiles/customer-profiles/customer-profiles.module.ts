@@ -1,5 +1,5 @@
 // backend/src/profiles/customer-profiles/customer-profiles.module.ts
-// [21/09/2026] v+ — StorageModule (photo de profil, comme côté chauffeur).
+// [21/09/2026] v+ — StorageModule (photo de profil, comme côté conducteur).
 import { Module } from '@nestjs/common';
 import { CustomerProfilesController } from './customer-profiles.controller';
 import { CustomerProfilesService } from './customer-profiles.service';

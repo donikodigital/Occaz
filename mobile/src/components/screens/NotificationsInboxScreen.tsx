@@ -5,7 +5,7 @@
 // à retirer, un appui sur la corbeille les supprime après confirmation —
 // jamais de suppression sans ce passage, c'est irréversible.
 //
-// v2 — Habillage bleu océan (partagé client / chauffeur) : en-tête avec
+// v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
 // retour rond, sous-titre « 3 non lues » ou « Tout est à jour » et bouton
 // « Tout marquer lu » en pastille ; une carte par notification avec une
 // pastille de couleur selon le type (doré pour les paiements, rouge pour un

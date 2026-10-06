@@ -24,7 +24,7 @@ type Mode = 'idle' | 'background' | 'foreground';
  * 2. **Premier plan uniquement** (`mode: 'foreground'`) — repli
  *    automatique si la permission "Toujours" est refusée. S'arrête dès
  *    que l'app est minimisée ; mieux que rien plutôt que de bloquer le
- *    chauffeur qui refuse "Toujours".
+ *    conducteur qui refuse "Toujours".
  */
 export function useTripPositionBroadcast(tripId: string, isActive: boolean) {
   const [mode, setMode] = useState<Mode>('idle');
@@ -68,9 +68,9 @@ export function useTripPositionBroadcast(tripId: string, isActive: boolean) {
       }
 
       // "Toujours" refusé — on continue quand même, en repli premier plan,
-      // plutôt que de bloquer le chauffeur qui ne veut pas de ce niveau
+      // plutôt que de bloquer le conducteur qui ne veut pas de ce niveau
       // d'accès. Le passager verra juste des mises à jour qui s'arrêtent
-      // si le chauffeur minimise l'app.
+      // si le conducteur minimise l'app.
       if (!cancelled) setMode('foreground');
     }
 

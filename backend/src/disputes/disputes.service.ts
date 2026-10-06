@@ -43,9 +43,9 @@ const SAFE_USER_SELECT = { id: true, phone: true, email: true } as const;
 
 /**
  * Section 21/22. Un point important, confirmé explicitement : un
- * désaccord chauffeur/client à n'importe quelle étape d'un trajet ou
+ * désaccord conducteur/client à n'importe quelle étape d'un trajet ou
  * d'un envoi passe par ici, jamais par une validation manuelle côté
- * chauffeur — voir les notes de cycle de vie dans TripsService et
+ * conducteur — voir les notes de cycle de vie dans TripsService et
  * ShipmentsService (Lots 3/4/6).
  *
  * Décision de conception : l'ouverture d'un litige ne modifie PAS
@@ -183,7 +183,7 @@ export class DisputesService {
     }
   }
 
-  /** Vérifie l'accès : ouvreur, chauffeur/client concerné, agent assigné, ou permission support. */
+  /** Vérifie l'accès : ouvreur, conducteur/client concerné, agent assigné, ou permission support. */
   async assertCanAccess(disputeId: string, userId: string, hasReadPermission: boolean): Promise<void> {
     if (hasReadPermission) return;
     const dispute = await this.prisma.dispute.findUnique({
@@ -265,7 +265,7 @@ export class DisputesService {
     return created;
   }
 
-  /** Notifie toutes les parties du litige (client, chauffeur, agent assigné) sauf l'auteur du message. */
+  /** Notifie toutes les parties du litige (client, conducteur, agent assigné) sauf l'auteur du message. */
   private async notifyOtherParties(
     dispute: Awaited<ReturnType<DisputesService['findOne']>>,
     excludeUserId: string,
@@ -603,7 +603,7 @@ export class DisputesService {
     return shipment?.driverId ?? undefined;
   }
 
-  /** Notifie client et chauffeur de l'issue du litige (section 22). */
+  /** Notifie client et conducteur de l'issue du litige (section 22). */
   private async notifyResolutionParties(
     dispute: Awaited<ReturnType<DisputesService['findOne']>>,
     resolutionType: DisputeResolutionType,

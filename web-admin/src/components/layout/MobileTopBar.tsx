@@ -4,9 +4,11 @@
 // et un avatar à droite qui ouvre le même tiroir que le menu burger — le
 // compte (email, déconnexion) reste dans le pied de la Sidebar, cet avatar
 // n'est qu'un second accès, symétrique du burger.
+// v3 — Le logo Occa'Z s'affiche entre le burger et le titre de la page.
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { IconMenu2 } from '@tabler/icons-react';
 import { useAuthStore } from '@/stores/authStore';
@@ -38,7 +40,7 @@ export function MobileTopBar({ onOpenMenu }: MobileTopBarProps) {
   const activeItem = getActiveNavItem(pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-surface px-4 py-3.5 shadow-sm lg:hidden">
+    <header className="sticky top-0 z-30 flex items-center gap-2.5 border-b border-border bg-surface px-3 py-3 shadow-sm lg:hidden">
       <button
         onClick={onOpenMenu}
         aria-label="Ouvrir le menu"
@@ -46,6 +48,15 @@ export function MobileTopBar({ onOpenMenu }: MobileTopBarProps) {
       >
         <IconMenu2 size={20} />
       </button>
+
+      <Image
+        src="/brand/logo.png"
+        alt="Occa'Z"
+        width={36}
+        height={36}
+        priority
+        className="h-9 w-9 shrink-0 rounded-xl shadow-sm shadow-primary/30 ring-1 ring-primary-dark/10"
+      />
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-base font-bold leading-tight text-text-primary">

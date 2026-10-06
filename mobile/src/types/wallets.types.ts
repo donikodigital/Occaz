@@ -34,7 +34,7 @@ export type WalletTransactionSubject =
 
 export interface WalletTransaction {
   id: string;
-  /** Absent sur l'historique chauffeur (lignes fusionnées au net) : ne pas s'y fier. */
+  /** Absent sur l'historique conducteur (lignes fusionnées au net) : ne pas s'y fier. */
   walletId?: string;
   type: WalletTransactionType;
   status: WalletTransactionStatus;

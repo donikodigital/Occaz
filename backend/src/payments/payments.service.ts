@@ -33,7 +33,7 @@ import { InitiatePaymentDto } from './dto/initiate-payment.dto';
  *
  * Ce service orchestre trois briques qui restent chacune indépendantes :
  *   - PaymentProviderRegistry : QUEL prestataire, COMMENT lui parler
- *   - WalletsService : où va l'argent côté chauffeur (hold / release)
+ *   - WalletsService : où va l'argent côté conducteur (hold / release)
  *   - BookingsService / ShipmentsService : confirmation du côté métier
  * Les annulations sont gérées par événements (@OnEvent), pas par appel
  * direct depuis Trips/Shipments, pour éviter tout cycle de modules —
@@ -250,7 +250,7 @@ export class PaymentsService {
     });
     if (claimedPayment.count === 0) {
       // Une autre tentative a déjà capturé ce paiement : le client a été débité deux fois chez le prestataire.
-      // On ne recrédite surtout pas le chauffeur une seconde fois.
+      // On ne recrédite surtout pas le conducteur une seconde fois.
       this.logger.error(
         `Double capture sur le paiement ${transaction.paymentId} (transaction ${transaction.id}, réf. ${externalReference}) — le client a été débité deux fois : remboursement manuel à prévoir.`,
       );
@@ -291,7 +291,7 @@ export class PaymentsService {
       const outcome = await this.bookingsService.confirmPayment(booking.id);
       if (outcome === 'NOT_PAYABLE') {
         // Paiement arrivé après l'annulation / l'expiration de la réservation (mobile money asynchrone) : la place
-        // n'est plus réservée. On rembourse intégralement le client et on ne crédite pas le chauffeur.
+        // n'est plus réservée. On rembourse intégralement le client et on ne crédite pas le conducteur.
         this.logger.warn(`Paiement reçu pour la réservation ${booking.id} déjà annulée — remboursement intégral.`);
         await this.refundBooking(booking.id, 100);
         return;
@@ -300,15 +300,15 @@ export class PaymentsService {
         driverId: booking.trip.driverId,
         bookingId: booking.id,
         // Même formule que pour les envois : le client paie un seul montant (totalAmount), la commission de la
-        // plateforme (platformFee) en est retirée, le reste revient au chauffeur — soit exactement le prix qu'il a
+        // plateforme (platformFee) en est retirée, le reste revient au conducteur — soit exactement le prix qu'il a
         // fixé (pricePerSeat × places), quel que soit le code promo : un rabais ne réduit que platformFee, donc
-        // totalAmount baisse du même montant et le net du chauffeur ne bouge pas (ex. 115 000 payés − 15 000 = 100 000 ;
+        // totalAmount baisse du même montant et le net du conducteur ne bouge pas (ex. 115 000 payés − 15 000 = 100 000 ;
         // avec 10 000 de rabais : 105 000 − 5 000 = 100 000).
         grossAmount: booking.totalAmount as bigint,
         commission: booking.platformFee,
         // Devise dans laquelle le client a payé — Booking.currencyId,
         // déjà disponible sans requête supplémentaire. Peut différer de
-        // la devise du portefeuille du chauffeur (trajet transfrontalier)
+        // la devise du portefeuille du conducteur (trajet transfrontalier)
         // ; WalletsService.holdBookingRevenue convertit si besoin.
         sourceCurrencyId: booking.currencyId,
       });
@@ -343,11 +343,11 @@ export class PaymentsService {
       }
       await this.shipmentsService.confirmPayment(shipment.id);
       if (shipment.driverId) {
-        // Un chauffeur était déjà choisi avant le paiement : on peut
+        // Un conducteur était déjà choisi avant le paiement : on peut
         // provisionner tout de suite. Sinon (SEARCHING_DRIVER), le hold
         // est différé jusqu'à ShipmentsService.accept. Le client a payé un
         // montant unique (totalAmount) ; la commission en est déduite du gain
-        // du chauffeur, une seule fois.
+        // du conducteur, une seule fois.
         await this.wallets.holdShipmentRevenue({
           driverId: shipment.driverId,
           shipmentId: shipment.id,
@@ -361,7 +361,7 @@ export class PaymentsService {
         type: NotificationType.PAYMENT,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: 'Paiement confirmé',
-        fallbackBody: 'Votre paiement a été confirmé — nous recherchons un chauffeur pour votre envoi.',
+        fallbackBody: 'Votre paiement a été confirmé — nous recherchons un conducteur pour votre envoi.',
       });
       await this.notifyReferralOfFirstPayment(shipment.customer.userId);
     }
@@ -440,7 +440,7 @@ export class PaymentsService {
       include: { customer: true, trip: { select: { driverId: true } } },
     });
     if (refundPercentage >= 100) {
-      // Client remboursé en totalité : le chauffeur ne doit plus toucher cette course (si ses fonds sont encore en
+      // Client remboursé en totalité : le conducteur ne doit plus toucher cette course (si ses fonds sont encore en
       // attente). S'ils sont déjà libérés, c'est au support de les ajuster (wallet.adjust) — on le signale.
       await this.wallets.reverseHeldFunds({
         driverId: booking.trip.driverId,
@@ -488,7 +488,7 @@ export class PaymentsService {
     });
   }
 
-  /** Signale au support un remboursement intégral dont l'argent est déjà dans le solde disponible du chauffeur. */
+  /** Signale au support un remboursement intégral dont l'argent est déjà dans le solde disponible du conducteur. */
   private async warnIfFundsAlreadyReleased(
     reference: { bookingId: string } | { shipmentId: string },
     label: string,
@@ -502,7 +502,7 @@ export class PaymentsService {
     });
     if (released > 0) {
       this.logger.warn(
-        `Remboursement intégral d'une ${label} dont les gains du chauffeur sont déjà libérés (${JSON.stringify(reference)}) — ajustement manuel du portefeuille à prévoir (wallet.adjust).`,
+        `Remboursement intégral d'une ${label} dont les gains du conducteur sont déjà libérés (${JSON.stringify(reference)}) — ajustement manuel du portefeuille à prévoir (wallet.adjust).`,
       );
     }
   }

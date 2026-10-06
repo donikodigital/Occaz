@@ -10,7 +10,7 @@ import { QuoteShipmentDto } from './quote-shipment.dto';
 export class CreateShipmentDto extends QuoteShipmentDto {
   @ApiPropertyOptional({
     description:
-      "Trajet choisi à l'avance (issu de GET /trips/search?requiresShipmentCapacity=true). Si omis, l'envoi passe en recherche de chauffeur (SEARCHING_DRIVER) : tous les chauffeurs validés sont prévenus, le premier à accepter l'emporte.",
+      "Trajet choisi à l'avance (issu de GET /trips/search?requiresShipmentCapacity=true). Si omis, l'envoi passe en recherche de conducteur (SEARCHING_DRIVER) : tous les conducteurs validés sont prévenus, le premier à accepter l'emporte.",
   })
   @IsOptional()
   @IsString()
@@ -26,7 +26,7 @@ export class CreateShipmentDto extends QuoteShipmentDto {
   @ApiProperty({
     example: '2026-09-27T18:00:00.000Z',
     description:
-      "Fin de la plage (obligatoire). Passée cette date sans chauffeur, le client est invité à prolonger, sinon il est remboursé intégralement.",
+      "Fin de la plage (obligatoire). Passée cette date sans conducteur, le client est invité à prolonger, sinon il est remboursé intégralement.",
   })
   @IsDateString()
   windowEnd: string;

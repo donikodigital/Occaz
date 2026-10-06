@@ -6,7 +6,7 @@ import { ShipmentsService } from './shipments.service';
 
 /**
  * Fin de vie d'un envoi : annulation remboursée à 100 %, prolongation par
- * le client, expiration sans chauffeur, nettoyage des envois impayés.
+ * le client, expiration sans conducteur, nettoyage des envois impayés.
  * Dépendances mockées à la main (même approche que les autres specs).
  */
 const future = new Date(Date.now() + 3 * 86_400_000);
@@ -60,7 +60,7 @@ function createService(options: { shipment?: Record<string, unknown>; claimCount
 }
 
 describe('ShipmentsService.cancel', () => {
-  it('rembourse 100 % quand le client annule après qu\'un chauffeur a accepté', async () => {
+  it('rembourse 100 % quand le client annule après qu\'un conducteur a accepté', async () => {
     const { service, eventEmitter } = createService({ shipment: shipment({ status: ShipmentStatus.DRIVER_ASSIGNED, driverId: 'd1' }) });
     const result = await service.cancel('s1', 'Changement de plan', CancellationInitiator.CUSTOMER, { customerId: 'c1' });
 
@@ -71,7 +71,7 @@ describe('ShipmentsService.cancel', () => {
     );
   });
 
-  it('prévient le chauffeur quand le client annule (il ne se déplace pas pour rien)', async () => {
+  it('prévient le conducteur quand le client annule (il ne se déplace pas pour rien)', async () => {
     const { service, notifications } = createService({ shipment: shipment({ status: ShipmentStatus.DRIVER_ASSIGNED, driverId: 'd1' }) });
     await service.cancel('s1', 'Changement de plan', CancellationInitiator.CUSTOMER, { customerId: 'c1' });
 
@@ -79,7 +79,7 @@ describe('ShipmentsService.cancel', () => {
     expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u-driver' }));
   });
 
-  it('prévient le client quand le chauffeur annule, en lui rappelant le remboursement', async () => {
+  it('prévient le client quand le conducteur annule, en lui rappelant le remboursement', async () => {
     const { service, notifications } = createService({ shipment: shipment({ status: ShipmentStatus.DRIVER_ASSIGNED, driverId: 'd1' }) });
     await service.cancel('s1', 'Empêchement', CancellationInitiator.DRIVER, { driverId: 'd1' });
 
@@ -105,7 +105,7 @@ describe('ShipmentsService.cancel', () => {
     expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 
-  it('refuse aussi au chauffeur d\'annuler un colis en transit', async () => {
+  it('refuse aussi au conducteur d\'annuler un colis en transit', async () => {
     const { service } = createService({ shipment: shipment({ status: ShipmentStatus.IN_TRANSIT, driverId: 'd1' }) });
     await expect(
       service.cancel('s1', 'Panne', CancellationInitiator.DRIVER, { driverId: 'd1' }),
@@ -138,7 +138,7 @@ describe('ShipmentsService.cancel', () => {
 });
 
 describe('ShipmentsService.extendWindow', () => {
-  it('prolonge, efface la demande de prolongation et prévient de nouveau les chauffeurs', async () => {
+  it('prolonge, efface la demande de prolongation et prévient de nouveau les conducteurs', async () => {
     const { service, tx, eventEmitter } = createService({ shipment: shipment({ extensionRequestedAt: new Date() }) });
     const newEnd = new Date(Date.now() + 7 * 86_400_000).toISOString();
     await service.extendWindow('s1', 'c1', newEnd);
@@ -176,7 +176,7 @@ describe('ShipmentsService.expireSearch', () => {
     );
   });
 
-  it('ne fait rien si un chauffeur a accepté entre-temps (aucun remboursement)', async () => {
+  it('ne fait rien si un conducteur a accepté entre-temps (aucun remboursement)', async () => {
     const { service, tx, eventEmitter } = createService({ claimCount: 0 });
     await expect(service.expireSearch('s1', 'Sans prolongation')).resolves.toBe(false);
     expect(tx.shipmentTracking.create).not.toHaveBeenCalled();

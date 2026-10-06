@@ -84,7 +84,7 @@ export class PricingService {
     }
 
     // Garde-fou : une commission ne peut jamais dépasser le montant sur lequel elle porte (une règle mal
-    // configurée, ex. montant fixe supérieur au prix, ferait sinon verser un revenu négatif au chauffeur).
+    // configurée, ex. montant fixe supérieur au prix, ferait sinon verser un revenu négatif au conducteur).
     if (fee > baseAmount) fee = baseAmount;
     if (fee < 0n) fee = 0n;
 

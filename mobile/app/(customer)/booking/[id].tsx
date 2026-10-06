@@ -16,7 +16,7 @@
 // v4 — Le code de dépose disparaissait exactement au moment de l'arrivée :
 // TripOtpService.markPickedUp génère et envoie ce code dès la prise en
 // charge (trip.status encore à PASSENGER_PICKED_UP), mais quand le
-// chauffeur signale ensuite son arrivée (TripsService.markArrived),
+// conducteur signale ensuite son arrivée (TripsService.markArrived),
 // trip.status passe à ARRIVED — valeur absente de la condition
 // d'affichage de DropoffCodeCard, qui se refermait donc juste avant que
 // le client en ait le plus besoin. ARRIVED est désormais inclus.
@@ -71,7 +71,7 @@ function PickupCodeCard({ bookingId }: { bookingId: string }) {
   return (
     <OtpCodeCard
       title="Code de prise en charge"
-      description="Communiquez-le à votre chauffeur pour confirmer votre prise en charge — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
+      description="Communiquez-le à votre conducteur pour confirmer votre prise en charge — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
       isPending={reveal.isPending}
@@ -87,7 +87,7 @@ function DropoffCodeCard({ bookingId }: { bookingId: string }) {
   return (
     <OtpCodeCard
       title="Code de dépose"
-      description="Communiquez-le à votre chauffeur pour confirmer la fin de votre trajet — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
+      description="Communiquez-le à votre conducteur pour confirmer la fin de votre trajet — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
       isPending={reveal.isPending}
@@ -161,7 +161,7 @@ export default function BookingDetailScreen() {
                 })
               }
               accessibilityRole="button"
-              accessibilityLabel="Contacter le chauffeur"
+              accessibilityLabel="Contacter le conducteur"
               style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
             >
               <IconMessageCircle size={18} color={OCEAN.base} />

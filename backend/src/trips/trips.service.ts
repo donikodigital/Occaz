@@ -75,9 +75,9 @@ const CURRENCY_SELECT = { select: { id: true, isoCode: true, symbol: true } } as
 /**
  * NB sur le cycle de vie (section 20) : ce Lot implémente les transitions
  * DRAFT -> PUBLISHED et -> CANCELLED, entièrement sous le contrôle du
- * chauffeur/admin. Les étapes DRIVER_ARRIVED / PASSENGER_PICKED_UP /
+ * conducteur/admin. Les étapes DRIVER_ARRIVED / PASSENGER_PICKED_UP /
  * IN_PROGRESS / ARRIVED / COMPLETED nécessitent une validation OTP
- * (section 18, "le chauffeur ne génère jamais lui-même la validation") et
+ * (section 18, "le conducteur ne génère jamais lui-même la validation") et
  * sont donc implémentées au Lot 6, une fois OtpCode disponible. Les
  * statuts BOOKING_PENDING / CONFIRMED restent disponibles dans l'enum
  * pour un usage administratif manuel en attendant l'automatisation
@@ -135,7 +135,7 @@ export class TripsService {
   /**
    * Ajoute à CÔTÉ des champs du trajet (jamais à leur place) :
    *  - customerPricePerSeat : prix du tronçon + commission plateforme — ce que le client paiera. Le client ne doit jamais
-   *    voir le prix brut fixé par le chauffeur ; le chauffeur, lui, continue de lire pricePerSeat tel quel (sa propre
+   *    voir le prix brut fixé par le conducteur ; le conducteur, lui, continue de lire pricePerSeat tel quel (sa propre
    *    saisie). GET /trips/:id sert les deux publics, d'où cet ajout plutôt qu'une transformation du champ existant ;
    *  - segment : le tronçon (montée, descente, heure de passage à la montée, prix avant commission, places libres sur ce
    *    tronçon) ;
@@ -221,7 +221,7 @@ export class TripsService {
   private async assertOwnership(id: string, driverId: string) {
     const trip = await this.findOne(id);
     if (trip.driverId !== driverId) {
-      throw new ForbiddenException("Ce trajet n'appartient pas à ce chauffeur.");
+      throw new ForbiddenException("Ce trajet n'appartient pas à ce conducteur.");
     }
     return trip;
   }
@@ -302,8 +302,8 @@ export class TripsService {
 
   /**
    * Devise du trajet = devise par défaut du pays de la ville de DÉPART : c'est là que le passager monte et paie, donc la devise
-   * qu'il attend. Départ au Sénégal → XOF, en Guinée → GNF — le chauffeur n'a pas à la choisir (et ne peut pas se tromper). La
-   * conversion vers le portefeuille du chauffeur, s'il est dans une autre devise, se fait déjà au crédit (ExchangeRateService).
+   * qu'il attend. Départ au Sénégal → XOF, en Guinée → GNF — le conducteur n'a pas à la choisir (et ne peut pas se tromper). La
+   * conversion vers le portefeuille du conducteur, s'il est dans une autre devise, se fait déjà au crédit (ExchangeRateService).
    * `requested` (ancienne version de l'app) ne sert que si ce pays n'a pas de devise par défaut configurée.
    */
   private async currencyForOriginCity(originCityId: string, requested?: string): Promise<string> {
@@ -441,9 +441,9 @@ export class TripsService {
   }
 
   /**
-   * Annulation par le chauffeur : bascule le trajet et toutes ses
+   * Annulation par le conducteur : bascule le trajet et toutes ses
    * réservations actives en CANCELLED, et incrémente le compteur
-   * d'annulations du chauffeur (section 26). Le remboursement effectif
+   * d'annulations du conducteur (section 26). Le remboursement effectif
    * des paiements déjà capturés est déclenché par le Lot 5.
    */
   async cancel(id: string, driverId: string, reason: string) {
@@ -473,7 +473,7 @@ export class TripsService {
 
   // -----------------------------------------------------------------------
   // Cycle de vie opérationnel (Lot 6) — transitions déclenchées par le
-  // chauffeur, sans validation OTP (le pickup/dropoff par réservation,
+  // conducteur, sans validation OTP (le pickup/dropoff par réservation,
   // lui, passe par TripOtpService). Voir la note de cycle de vie en tête
   // de fichier pour l'articulation complète des statuts (section 20).
   // -----------------------------------------------------------------------
@@ -481,7 +481,7 @@ export class TripsService {
   async markDriverArrived(id: string, driverId: string) {
     const trip = await this.assertOwnership(id, driverId);
     if (trip.status !== TripStatus.PUBLISHED) {
-      throw new BadRequestException('Seul un trajet PUBLISHED peut passer à "chauffeur arrivé".');
+      throw new BadRequestException('Seul un trajet PUBLISHED peut passer à "conducteur arrivé".');
     }
     const updated = await this.prisma.trip.update({
       where: { id },
@@ -499,8 +499,8 @@ export class TripsService {
           userId: booking.customer.userId,
           type: NotificationType.DEPARTURE_IMMINENT,
           channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
-          fallbackTitle: 'Le chauffeur est arrivé',
-          fallbackBody: `Votre chauffeur vous attend au point de départ de ${trip.originCity.name} → ${trip.destinationCity.name}. Tenez votre code de prise en charge prêt à lui communiquer.`,
+          fallbackTitle: 'Le conducteur est arrivé',
+          fallbackBody: `Votre conducteur vous attend au point de départ de ${trip.originCity.name} → ${trip.destinationCity.name}. Tenez votre code de prise en charge prêt à lui communiquer.`,
           pushData: { type: 'DEPARTURE_IMMINENT', tripId: id },
         }),
       ),
@@ -542,7 +542,7 @@ export class TripsService {
   }
 
   /**
-   * Appelé par polling depuis l'app chauffeur pendant IN_PROGRESS (toutes
+   * Appelé par polling depuis l'app conducteur pendant IN_PROGRESS (toutes
    * les quelques secondes) — pas de canal temps réel dans cette V1, voir
    * la note du schéma sur Trip.currentLatitude/currentLongitude.
    */
@@ -563,7 +563,7 @@ export class TripsService {
   }
 
   /**
-   * Accessible au chauffeur du trajet (confirme que ses propres mises à
+   * Accessible au conducteur du trajet (confirme que ses propres mises à
    * jour arrivent bien) ou à un client ayant une réservation active dessus
    * — jamais à un tiers, même authentifié. La visibilité Support/
    * SuperAdmin (utile pour l'instruction d'un litige) n'est volontairement
@@ -608,7 +608,7 @@ export class TripsService {
    * Clôture le trajet — exige que toutes les réservations actives aient
    * déjà été closes individuellement (dépose OTP vérifiée pour chacune,
    * voir TripOtpService.verifyDropoffOtp). Incrémente le compteur de
-   * réputation du chauffeur une fois pour le trajet entier, pas par
+   * réputation du conducteur une fois pour le trajet entier, pas par
    * réservation (section 25).
    */
   async completeTrip(id: string, driverId: string) {
@@ -638,10 +638,10 @@ export class TripsService {
   }
 
   /**
-   * Trajet publié (ou dont le chauffeur a signalé son arrivée) sans
+   * Trajet publié (ou dont le conducteur a signalé son arrivée) sans
    * aucune réservation, dont le départ est passé depuis longtemps —
    * appelée par TripExpiryService. Contrairement à cancel() (annulation
-   * volontaire du chauffeur), n'incrémente jamais le compteur
+   * volontaire du conducteur), n'incrémente jamais le compteur
    * d'annulations : aucun passager n'a été impacté, personne n'a
    * concrètement annulé quoi que ce soit. Sans effet si une réservation
    * a été prise entre-temps, ou si le trajet a déjà changé de statut.
@@ -815,7 +815,7 @@ export class TripsService {
     }
 
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Le trajet est vérifié dans la condition : un chauffeur ne peut pas supprimer l'étape d'un autre trajet.
+      // Le trajet est vérifié dans la condition : un conducteur ne peut pas supprimer l'étape d'un autre trajet.
       const removed = await tx.tripStop.deleteMany({ where: { id: stopId, tripId } });
       if (removed.count === 0) throw new NotFoundException('Étape introuvable sur ce trajet.');
 

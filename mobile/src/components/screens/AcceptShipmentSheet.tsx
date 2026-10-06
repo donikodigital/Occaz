@@ -21,16 +21,16 @@ export interface AcceptShipmentSheetProps {
   onClose: () => void;
   /** Appelé une fois l'envoi attribué — l'écran de détail affiche alors les coordonnées du client. */
   onAccepted: (shipmentId: string) => void;
-  /** Appelé si l'acceptation échoue (souvent : un autre chauffeur a été plus rapide) — sert à rafraîchir la liste. */
+  /** Appelé si l'acceptation échoue (souvent : un autre conducteur a été plus rapide) — sert à rafraîchir la liste. */
   onAttemptFailed?: () => void;
-  /** Trajet sur lequel le chauffeur cherche des colis (liste « Colis sur ce trajet ») : retenu d'office s'il convient. */
+  /** Trajet sur lequel le conducteur cherche des colis (liste « Colis sur ce trajet ») : retenu d'office s'il convient. */
   preferredTripId?: string;
 }
 
 /** Valeur de choix "sans trajet" — jamais un identifiant réel de trajet. */
 const NO_TRIP = 'no-trip';
 
-/** Un chauffeur validé peut accepter sans avoir de trajet établi : il récupère et livre le colis dans la période demandée. */
+/** Un conducteur validé peut accepter sans avoir de trajet établi : il récupère et livre le colis dans la période demandée. */
 function NoTripOption({ shipment, selected, onPress }: { shipment: AvailableShipment; selected: boolean; onPress: () => void }) {
   return (
     <Pressable

@@ -18,7 +18,7 @@ import { CreateRatingDto } from './dto/create-rating.dto';
  * Section 24 : notation mutuelle après chaque prestation. Le sens de la
  * notation (qui note qui) est déduit de l'identité de l'appelant par
  * rapport à la réservation/l'envoi — jamais fourni par le client, pour
- * empêcher un chauffeur de se faire passer pour le client ou inversement.
+ * empêcher un conducteur de se faire passer pour le client ou inversement.
  */
 @Injectable()
 export class RatingsService {
@@ -88,7 +88,7 @@ export class RatingsService {
       throw new BadRequestException('Seul un envoi terminé peut être noté.');
     }
     if (!shipment.driver) {
-      throw new BadRequestException('Aucun chauffeur associé à cet envoi.');
+      throw new BadRequestException('Aucun conducteur associé à cet envoi.');
     }
 
     const { role, fromUserId, toUserId } = this.resolveDirection(
@@ -137,7 +137,7 @@ export class RatingsService {
    * "Mes avis" (écran client) : les notations que CET utilisateur a
    * données, pas celles qu'il a reçues (findForUser ci-dessus). `toUser`
    * n'est jamais renvoyé en entier — seuls prénom/nom/photo, jamais le
-   * téléphone ni les coordonnées de paiement du chauffeur noté.
+   * téléphone ni les coordonnées de paiement du conducteur noté.
    */
   async findGivenByUser(userId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
     const [data, total] = await Promise.all([
@@ -254,7 +254,7 @@ export class RatingsService {
     if (raterUserId === driverUserId) {
       return { role: RatingRole.DRIVER_TO_CUSTOMER, fromUserId: driverUserId, toUserId: customerUserId };
     }
-    throw new ForbiddenException("Vous n'êtes ni le client ni le chauffeur de cette prestation.");
+    throw new ForbiddenException("Vous n'êtes ni le client ni le conducteur de cette prestation.");
   }
 
   private async assertNotAlreadyRated(
@@ -278,7 +278,7 @@ export class RatingsService {
     );
   }
 
-  /** Recalcule le cache de note moyenne du chauffeur (section 25). */
+  /** Recalcule le cache de note moyenne du conducteur (section 25). */
   private async refreshDriverRatingCache(driverId: string): Promise<void> {
     const driver = await this.prisma.driverProfile.findUnique({
       where: { id: driverId },

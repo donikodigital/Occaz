@@ -15,7 +15,7 @@ export interface CalendarPickerProps {
   /**
    * Si fourni, affiche une option "Dates flexibles" en plus du calendrier
    * — pertinent pour une recherche de trajet client (pas de date précise
-   * exigée), pas pour la création d'un trajet chauffeur (départ à date
+   * exigée), pas pour la création d'un trajet conducteur (départ à date
    * fixe, toujours obligatoire), qui omet simplement cette prop.
    */
   flexibleLabel?: string;

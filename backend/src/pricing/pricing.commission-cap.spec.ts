@@ -14,7 +14,7 @@ describe('PricingService.computeCommission — plafond', () => {
     expect(await compute(build({ percentage: 10 }), 150_000n)).toBe(15_000n);
   });
 
-  it('un montant fixe supérieur au prix est ramené au prix : jamais de revenu négatif pour le chauffeur', async () => {
+  it('un montant fixe supérieur au prix est ramené au prix : jamais de revenu négatif pour le conducteur', async () => {
     expect(await compute(build({ fixedAmount: 500_000n }), 150_000n)).toBe(150_000n);
   });
 

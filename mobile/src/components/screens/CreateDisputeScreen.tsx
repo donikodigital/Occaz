@@ -1,6 +1,6 @@
 // mobile/src/components/screens/CreateDisputeScreen.tsx
 //
-// v2 — Habillage bleu océan (partagé client / chauffeur) : en-tête avec
+// v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
 // retour, encadré qui rassure (le support répond ici), saisie dans une
 // section à en-tête soulignée, bouton plein. Logique inchangée.
 import React, { useState } from 'react';

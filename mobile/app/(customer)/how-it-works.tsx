@@ -37,7 +37,7 @@ const TRIP_STEPS: Step[] = [
   {
     icon: IconRoute,
     title: 'Voyagez',
-    text: "Le jour J, un code vous est envoyé : donnez-le au chauffeur pour valider votre montée, puis votre descente à l'arrivée.",
+    text: "Le jour J, un code vous est envoyé : donnez-le au conducteur pour valider votre montée, puis votre descente à l'arrivée.",
   },
 ];
 
@@ -49,13 +49,13 @@ const SHIPMENT_STEPS: Step[] = [
   },
   {
     icon: IconTruckDelivery,
-    title: 'Un chauffeur accepte',
-    text: "Tous les chauffeurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s'en charge.",
+    title: 'Un conducteur accepte',
+    text: "Tous les conducteurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s'en charge.",
   },
   {
     icon: IconMapPin,
     title: "Suivi jusqu'à la livraison",
-    text: 'Un code valide la récupération, un autre la livraison. Sans chauffeur avant la fin de la période, vous êtes remboursé à 100 %.',
+    text: 'Un code valide la récupération, un autre la livraison. Sans conducteur avant la fin de la période, vous êtes remboursé à 100 %.',
   },
 ];
 

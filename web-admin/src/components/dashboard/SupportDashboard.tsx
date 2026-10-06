@@ -1,6 +1,6 @@
 // web-admin/src/components/dashboard/SupportDashboard.tsx
 // [02/10/2026] Tableau de bord du compte Support : la file de litiges à traiter (nouveaux, urgents), les
-// chauffeurs et clients les plus concernés, et les raccourcis permis par ses rôles. Remplace l'erreur
+// conducteurs et clients les plus concernés, et les raccourcis permis par ses rôles. Remplace l'erreur
 // « DASHBOARD_ADMIN_READ » que voyait un Support, le tableau de bord administrateur lui étant réservé.
 // Données : GET /dashboards/support (permission dispute.read). Que des cartes, jamais de tableau.
 'use client';
@@ -187,7 +187,7 @@ export function SupportDashboard() {
         <div className="grid gap-5 lg:grid-cols-2">
           {data.flaggedDrivers.length > 0 ? (
             <div>
-              <SectionTitle>Chauffeurs les plus concernés</SectionTitle>
+              <SectionTitle>Conducteurs les plus concernés</SectionTitle>
               <div className="space-y-2.5">
                 {data.flaggedDrivers.map((driver) => (
                   <PartyCard

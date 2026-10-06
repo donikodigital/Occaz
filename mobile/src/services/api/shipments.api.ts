@@ -21,7 +21,7 @@ export const shipmentsApi = {
   /** Prix affiché avant paiement — calculé par le serveur, identique à celui qui sera facturé. */
   quote: (payload: QuoteShipmentPayload) => api.post<ShipmentQuote>('/shipments/quote', payload),
 
-  /** Prolonge la plage de dates d'un envoi resté sans chauffeur. */
+  /** Prolonge la plage de dates d'un envoi resté sans conducteur. */
   extend: (id: string, payload: ExtendShipmentPayload) => api.post<Shipment>(`/shipments/${id}/extend`, payload),
 
   listMine: (params: { page?: number; limit?: number } = {}) =>
@@ -32,7 +32,7 @@ export const shipmentsApi = {
   cancel: (id: string, payload: CancelShipmentPayload) =>
     api.post<Shipment>(`/shipments/${id}/cancel`, payload),
 
-  // --- Côté chauffeur ---
+  // --- Côté conducteur ---
 
   listAvailable: (params: SearchAvailableShipmentsParams) =>
     api.get<Paginated<AvailableShipment>>('/shipments/available', {
@@ -55,7 +55,7 @@ export const shipmentsApi = {
   requestPickupOtp: (id: string) =>
     api.post<{ expiresInSeconds: number; smsSent: boolean }>(`/shipments/${id}/otp/pickup/request`),
 
-  /** Pour l'expéditeur : revoir son propre code dans l'app (renvoie le code en clair, contrairement à requestPickupOtp destiné au chauffeur). */
+  /** Pour l'expéditeur : revoir son propre code dans l'app (renvoie le code en clair, contrairement à requestPickupOtp destiné au conducteur). */
   revealPickupOtpForSender: (id: string) =>
     api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean }>(
       `/shipments/${id}/otp/pickup/reveal-for-sender`,
@@ -69,7 +69,7 @@ export const shipmentsApi = {
   markDeliveryPending: (id: string) => api.post<Shipment>(`/shipments/${id}/delivery-pending`),
 
   // Le SMS de ce code part sur le téléphone du DESTINATAIRE, qui n'a pas
-  // de compte dans l'app — c'est lui qui doit le communiquer au chauffeur
+  // de compte dans l'app — c'est lui qui doit le communiquer au conducteur
   // à la livraison. revealDeliveryOtpForSender ci-dessous permet
   // seulement à l'expéditeur de le retrouver dans son propre espace
   // (utile si le SMS n'est pas arrivé au destinataire, ou pour le lui

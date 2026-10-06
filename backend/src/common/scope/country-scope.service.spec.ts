@@ -117,7 +117,7 @@ describe('CountryScopeService', () => {
       ).resolves.toBeUndefined();
     });
 
-    it('un document dont le chauffeur propriétaire est hors pays est introuvable', async () => {
+    it('un document dont le conducteur propriétaire est hors pays est introuvable', async () => {
       const { service, prisma } = build();
       prisma.document.findUnique.mockResolvedValue({ ownerType: DocumentOwnerType.DRIVER, ownerId: 'dr1' });
       prisma.driverProfile.count.mockResolvedValue(0);

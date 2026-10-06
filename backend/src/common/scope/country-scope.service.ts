@@ -80,7 +80,7 @@ export class CountryScopeService {
   }
 
   /**
-   * Filtre de la liste des utilisateurs : clients et chauffeurs du pays, plus les comptes d'équipe (sans pays,
+   * Filtre de la liste des utilisateurs : clients et conducteurs du pays, plus les comptes d'équipe (sans pays,
    * nécessaires par exemple pour choisir un agent à qui assigner un litige — leur visibilité est réglée par
    * UsersService.visibleAccountTypes).
    */
@@ -134,7 +134,7 @@ export class CountryScopeService {
     if ((await count) === 0) throw new NotFoundException(message);
   }
 
-  /** Compte client/chauffeur du pays. Les comptes d'équipe n'ont pas de pays : leur gestion suit d'autres règles (UsersService). */
+  /** Compte client/conducteur du pays. Les comptes d'équipe n'ont pas de pays : leur gestion suit d'autres règles (UsersService). */
   async assertUser(actor: Actor, permission: PermissionKey, userId: string): Promise<void> {
     const ids = scopeOf(actor, permission);
     if (!ids) return;
@@ -163,7 +163,7 @@ export class CountryScopeService {
     if (!ids) return;
     await this.mustExist(
       this.prisma.driverProfile.count({ where: { id: driverId, ...driverScopeWhere(ids) } }),
-      'Chauffeur introuvable.',
+      'Conducteur introuvable.',
     );
   }
 
@@ -239,7 +239,7 @@ export class CountryScopeService {
     );
   }
 
-  /** Le propriétaire d'un document (chauffeur, véhicule, client, litige, envoi) relève-t-il du périmètre ? */
+  /** Le propriétaire d'un document (conducteur, véhicule, client, litige, envoi) relève-t-il du périmètre ? */
   private async ownerInScope(ownerType: DocumentOwnerType, ownerId: string, ids: string[]): Promise<boolean> {
     switch (ownerType) {
       case DocumentOwnerType.DRIVER:
@@ -283,7 +283,7 @@ export class CountryScopeService {
   /**
    * Une liste de documents sans propriétaire précisé ne peut pas être filtrée proprement par pays (le
    * propriétaire est polymorphe) : un agent limité doit donc cibler un propriétaire — c'est ce que fait le
-   * back-office depuis les fiches chauffeur et véhicule.
+   * back-office depuis les fiches conducteur et véhicule.
    */
   async assertDocumentListAllowed(
     actor: Actor,

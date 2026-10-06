@@ -8,9 +8,9 @@ import type { DisputePriority, DisputeStatus } from '@/types/disputes.types';
 /* ------------------------------------------------------------------ */
 /* Police                                                              */
 /* Alignée sur la police globale du superadmin (voir globals.css) —     */
-/* elle-même Inter, la même que côté chauffeur et client sur mobile.   */
+/* elle-même Inter, la même que côté conducteur et client sur mobile.   */
 /* Le nom "disputeFont" est resté tel quel : il est réutilisé par les   */
-/* pages disputes, chauffeurs et moyens de paiement, pas seulement les  */
+/* pages disputes, conducteurs et moyens de paiement, pas seulement les  */
 /* litiges.                                                             */
 /* ------------------------------------------------------------------ */
 

@@ -5,9 +5,9 @@
 // déconnexion ont suivi le même mouvement, vers le menu — pour ne pas les
 // dupliquer à deux endroits.
 //
-// v5 — badge caméra sur l'avatar, ouvre la modification du profil (photo modifiable, comme côté chauffeur).
+// v5 — badge caméra sur l'avatar, ouvre la modification du profil (photo modifiable, comme côté conducteur).
 //
-// v4 — Profil client construit sur le profil chauffeur : bandeau sombre aux
+// v4 — Profil client construit sur le profil conducteur : bandeau sombre aux
 // reflets bleus avec la photo, la pastille de statut et le nom (nom de
 // famille en doré), bouton « Modifier mon profil » pleine largeur, puis des
 // sections à en-tête soulignée (Identité & contact, Localisation).

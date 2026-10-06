@@ -4,8 +4,8 @@ import type { AdminShipmentListItem, ShipmentStatus } from '@/types/shipments.ty
 
 export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
   CREATED: 'En attente de paiement',
-  SEARCHING_DRIVER: 'Recherche de chauffeur',
-  DRIVER_ASSIGNED: 'Chauffeur trouvé',
+  SEARCHING_DRIVER: 'Recherche de conducteur',
+  DRIVER_ASSIGNED: 'Conducteur trouvé',
   PICKUP_PENDING: 'Récupération en cours',
   PICKED_UP: 'Colis récupéré',
   IN_TRANSIT: 'En transit',
@@ -66,7 +66,7 @@ export function groupOf(shipment: Pick<AdminShipmentListItem, 'status' | 'extens
   }
 }
 
-/** Gain net du chauffeur : le client paie un seul montant, la commission en est déduite (ex. 150 000 − 10 % = 135 000). */
+/** Gain net du conducteur : le client paie un seul montant, la commission en est déduite (ex. 150 000 − 10 % = 135 000). */
 export function driverNet(totalAmount: string, platformFee: string): string {
   try {
     const net = BigInt(totalAmount) - BigInt(platformFee);

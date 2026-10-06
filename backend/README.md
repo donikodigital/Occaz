@@ -15,7 +15,7 @@ seulement rédigé.
   utilitaires argent (BigInt) et OTP.
 - `PrismaService` avec middleware de soft delete automatique (Partie VII).
 - `AuditService` générique, utilisé par tous les modules sensibles.
-- Authentification complète : OTP par téléphone (Client/Chauffeur), mot de
+- Authentification complète : OTP par téléphone (Client/Conducteur), mot de
   passe + 2FA TOTP (Support/SuperAdmin), refresh token avec rotation,
   révocation de session (une ou toutes), gestion des appareils.
 - RBAC complet : rôles, permissions, attribution scoped par pays, seed des
@@ -30,12 +30,12 @@ seulement rédigé.
   admin paginés.
 - Création d'un `DriverProfile` = création transactionnelle du `Wallet`
   associé (devise = devise par défaut du pays), conformément à la
-  contrainte `@unique` du schéma — aucun chauffeur ne peut exister sans
+  contrainte `@unique` du schéma — aucun conducteur ne peut exister sans
   portefeuille.
-- Workflow de vérification chauffeur (`verify` / `suspend` / `reactivate`,
+- Workflow de vérification conducteur (`verify` / `suspend` / `reactivate`,
   section 25) et compteurs de réputation (`completedTripsCount`,
   `cancellationCount`...) exposés pour incrémentation par les Lots 3/4.
-- `Vehicle` : CRUD chauffeur (propriété vérifiée sur chaque écriture),
+- `Vehicle` : CRUD conducteur (propriété vérifiée sur chaque écriture),
   workflow de vérification admin (`verify` / `reject`).
 - `Document` : modèle polymorphique générique (section 43) — upload via
   les routes des modules propriétaires (`driver-profiles/me/documents`,
@@ -72,8 +72,8 @@ seulement rédigé.
   d'annulation (section 26/63) directement depuis `CommissionRule` /
   `CancellationPolicy` — la gestion admin de ces tables arrive au Lot 5,
   mais le calcul, lui, est nécessaire dès qu'une réservation existe.
-- Annulation d'un trajet par le chauffeur → cascade automatique sur ses
-  réservations actives + incrément du compteur d'annulations chauffeur.
+- Annulation d'un trajet par le conducteur → cascade automatique sur ses
+  réservations actives + incrément du compteur d'annulations conducteur.
 - L'exécution réelle des paiements/remboursements (webhook prestataire,
   écritures de portefeuille) est explicitement laissée au Lot 5 —
   `BookingsService.confirmPayment()` est prêt à être appelé par ce
@@ -89,7 +89,7 @@ seulement rédigé.
   `GET /trips/search?requiresShipmentCapacity=true`, déjà supporté
   depuis le Lot 3) et l'envoi passe en `DRIVER_ASSIGNED` immédiatement,
   soit aucun trajet n'est précisé et l'envoi passe en
-  `SEARCHING_DRIVER` en attendant qu'un chauffeur l'accepte
+  `SEARCHING_DRIVER` en attendant qu'un conducteur l'accepte
   (`POST /shipments/:id/assign`, section 12 : ACCEPTER/REFUSER).
 - Décompte de capacité (`availableShipmentWeightKg`) **atomique**, même
   principe que les places de `Booking` — transaction avec condition dans
@@ -109,7 +109,7 @@ seulement rédigé.
 - Même principe que les Trajets pour le cycle de vie : les étapes
   PICKUP_PENDING → ... → COMPLETED, qui exigent une validation OTP, sont
   au Lot 6 — confirmé dans notre échange, avec le rappel que tout
-  désaccord chauffeur/client passe par un `Dispute` (Lot 7), jamais une
+  désaccord conducteur/client passe par un `Dispute` (Lot 7), jamais une
   validation manuelle.
 
 ## Lot 5 (livré) — Paiement, Portefeuille/Ledger, Payout, Commission, Annulation
@@ -170,7 +170,7 @@ seulement rédigé.
   `DRIVER_ARRIVED → PASSENGER_PICKED_UP → IN_PROGRESS → ARRIVED →
   COMPLETED`. Le code OTP est généré par réservation (pas par passager
   individuel — un groupe voyage et est pris en charge ensemble),
-  transmis au client, jamais au chauffeur (règle d'or, section 18).
+  transmis au client, jamais au conducteur (règle d'or, section 18).
   `TripsService.completeTrip` exige que toutes les réservations actives
   soient déjà closes individuellement.
 - **Cycle de vie Envoi complété** (`PICKUP_PENDING → PICKED_UP →
@@ -182,7 +182,7 @@ seulement rédigé.
 - **`WalletsService.releaseHeldFunds` et
   `DriverProfilesService.incrementCompletedTrips/Shipments` enfin
   appelés** — les fonds tenus en attente depuis le Lot 5 rejoignent le
-  solde disponible du chauffeur exactement à la validation OTP de fin de
+  solde disponible du conducteur exactement à la validation OTP de fin de
   prestation, jamais avant.
 - `Verification` : suivi du processus de vérification documentaire
   (identité, permis, carte grise — PHONE reste couvert par
@@ -197,16 +197,16 @@ seulement rédigé.
 
 ## Lot 7 (livré) — Litiges
 
-- `Dispute` : ouverture par le client OU le chauffeur, à n'importe quelle
+- `Dispute` : ouverture par le client OU le conducteur, à n'importe quelle
   étape d'un trajet ou d'un envoi (pas seulement après complétion) —
   c'est précisément le point que tu avais soulevé : le recours en cas de
   désaccord passe par ici, jamais par une validation manuelle côté
-  chauffeur.
+  conducteur.
 - Décision de conception documentée dans le code : ouvrir un litige ne
   modifie **pas** le statut de la réservation/l'envoi (qui garde sa
   valeur, y compris `COMPLETED`) — seule la **résolution**, quand son
   type a une conséquence concrète, le modifie.
-- `DisputeMessage` (accessible à l'ouvreur, au chauffeur/client concerné,
+- `DisputeMessage` (accessible à l'ouvreur, au conducteur/client concerné,
   à l'agent assigné, ou à tout agent support) et `DisputeEvidence`
   (réutilise le `Document` polymorphique du Lot 2).
 - Triage : assignation à un agent (`DISPUTE_ASSIGN`), changement de
@@ -242,12 +242,12 @@ seulement rédigé.
   client mobile.
 - **Câblage réel dans les services existants** plutôt qu'une
   infrastructure qui resterait théorique : paiement confirmé, remboursement
-  (push + SMS, "événement critique"), chauffeur trouvé pour un envoi,
-  colis livré, fonds reçus par le chauffeur, nouveau message ou
+  (push + SMS, "événement critique"), conducteur trouvé pour un envoi,
+  colis livré, fonds reçus par le conducteur, nouveau message ou
   résolution de litige. D'autres points de déclenchement (départ
   imminent, arrivée...) s'ajoutent trivialement de la même façon —
   l'infrastructure ne demande plus de travail supplémentaire.
-- `ConversationsModule` (section 23) : chat Client ↔ Chauffeur par
+- `ConversationsModule` (section 23) : chat Client ↔ Conducteur par
   réservation ou par envoi. L'intervention support est gouvernée par la
   permission `CONVERSATION_READ` (déjà posée au Lot 1) plutôt que par le
   type de compte brut — corrigé en cours de route pour rester cohérent
@@ -272,13 +272,13 @@ code source (y compris les écritures via `tx.` en transaction et les
   n'avait encore aucune surface de lecture — corrigé ici.
 - **Quatre tableaux de bord (sections 45-48), chacun avec de vraies
   requêtes d'agrégation** — aucune valeur simulée :
-  - **SuperAdmin** : utilisateurs/chauffeurs/clients, actifs sur 30
+  - **SuperAdmin** : utilisateurs/conducteurs/clients, actifs sur 30
     jours, trajets/réservations/envois, litiges et taux de résolution,
     volume par pays (SQL brut, jointure trajet→ville→pays) et par
     devise, revenu de commission en série temporelle
     (`date_trunc`, seule façon propre d'obtenir un histogramme
     quotidien/hebdo/mensuel/annuel en SQL).
-  - **Chauffeur** : prochain trajet, places réservées, envois à
+  - **Conducteur** : prochain trajet, places réservées, envois à
     récupérer/en cours, solde portefeuille, note, statistiques.
   - **Client** : prochaine réservation, réservations/envois actifs,
     litiges ouverts, paiements récents. "Favoris" (section 47) est
@@ -287,7 +287,7 @@ code source (y compris les écritures via `tx.` en transaction et les
     plus dans le MVP du cahier des charges (Partie XIV) — l'ajouter
     aurait exigé une nouvelle table sans besoin confirmé.
   - **Support** : nouveaux litiges, litiges urgents (priorité
-    HIGH/CRITICAL), litiges en attente, chauffeurs et clients "signalés"
+    HIGH/CRITICAL), litiges en attente, conducteurs et clients "signalés"
     (comptage de litiges actifs par SQL brut).
 
 ## Le projet est maintenant complet — 9 lots, 48 modèles, 222 fichiers `.ts`
@@ -355,16 +355,16 @@ Prochaines étapes naturelles, hors périmètre de ce backend :
   (pas d'historique complet du trajet, hors scope MVP). **Nécessite une
   migration** (`npm run prisma:migrate`) avant de fonctionner.
 - **Polling REST, pas de WebSocket** — `PATCH /trips/:id/position`
-  (chauffeur, uniquement pendant `IN_PROGRESS`) et
-  `GET /trips/:id/position` (le chauffeur du trajet, ou un client avec
+  (conducteur, uniquement pendant `IN_PROGRESS`) et
+  `GET /trips/:id/position` (le conducteur du trajet, ou un client avec
   une réservation `PAID`/`CONFIRMED` dessus — jamais un tiers). Un choix
   d'architecture assumé : suffisant pour une fréquence de quelques
   secondes, beaucoup plus simple à opérer qu'un canal temps réel tant
   que le besoin de latence sub-seconde ne se fait pas sentir.
 - **7 tests unitaires** sur `getPosition` — c'est la vérification
   d'autorisation la plus sensible de ce lot (qui peut voir la position
-  d'un chauffeur), testée explicitement : propriétaire autorisé, autre
-  chauffeur rejeté, client avec/sans réservation active, aucun
+  d'un conducteur), testée explicitement : propriétaire autorisé, autre
+  conducteur rejeté, client avec/sans réservation active, aucun
   identifiant fourni.
 - Visibilité Support/SuperAdmin (utile pour l'instruction d'un litige)
   volontairement pas couverte — à ajouter via une permission dédiée si
@@ -500,11 +500,11 @@ par mot de passe.
   fonctionne dès que `RESEND_API_KEY`/`RESEND_FROM_EMAIL` sont
   renseignées.
 
-## Photo de profil chauffeur (obligatoire avant validation)
+## Photo de profil conducteur (obligatoire avant validation)
 
 - `photoUrl` reste optionnel dans `CreateDriverProfileDto` (aucune photo
   ne peut exister avant l'upload), mais **`DriverProfilesService.verify()`
-  refuse désormais de valider un chauffeur sans photo** — c'est le vrai
+  refuse désormais de valider un conducteur sans photo** — c'est le vrai
   point d'obligation, pas une contrainte de formulaire à la création.
 - Même flux en 2 temps que les documents d'identité
   (`POST /driver-profiles/me/photo/upload-url` puis
@@ -536,23 +536,23 @@ seul point d'entrée `.notify()`, choix du modèle actif, traçabilité
   normalement, seul l'envoi réel échoue proprement (`failedReason`
   enregistré, jamais de crash).
 - **Canal email ajouté à 8 notifications déjà existantes** : paiement
-  confirmé (trajet + colis), remboursement (x2), paiement chauffeur
-  reçu, colis livré, chauffeur trouvé, litige résolu/nouveau message.
+  confirmé (trajet + colis), remboursement (x2), paiement conducteur
+  reçu, colis livré, conducteur trouvé, litige résolu/nouveau message.
 - **Deux vrais trous comblés au passage**, pas seulement l'ajout du
   canal email :
-  - La validation/le rejet d'un chauffeur ou d'un véhicule
+  - La validation/le rejet d'un conducteur ou d'un véhicule
     (`DriverProfilesService.verify`, `VehiclesService.verify`/`reject`)
     **ne notifiait rien du tout** avant — corrigé (push + email,
     `NotificationType.STATUS_CHANGE`).
   - **Aucun message de bienvenue à la création d'un compte** —
-    ajouté pour client et chauffeur.
+    ajouté pour client et conducteur.
 - **Champ email désormais collectable** : `CreateCustomerProfileDto`/
   `CreateDriverProfileDto` acceptent un `email` optionnel, qui écrit sur
   `User.email` (conflit d'unicité géré proprement — `ConflictException`
   plutôt qu'une erreur Prisma brute qui remonterait telle quelle). Le
   point d'architecture ci-dessus est donc résolu : les emails de
   bienvenue et autres notifications email ont maintenant un vrai
-  destinataire pour les clients/chauffeurs qui en renseignent une.
+  destinataire pour les clients/conducteurs qui en renseignent une.
 
 ## Démarrage
 

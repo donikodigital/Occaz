@@ -1,6 +1,6 @@
 // mobile/src/components/screens/ConversationThreadScreen.tsx
 //
-// v2 — Habillage bleu océan (partagé client / chauffeur) : en-tête avec
+// v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
 // bouton de retour rond, avatar aux initiales et contexte (trajet ou envoi),
 // bulles bleues pour soi et claires pour l'autre, message du support en
 // doré, zone de saisie arrondie avec un bouton d'envoi bleu. Logique
@@ -53,7 +53,7 @@ function initialsOf(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
-/** Nom du correspondant + contexte (trajet/envoi) à partir du détail — déduit selon si l'utilisateur courant est le client ou le chauffeur de cette conversation. */
+/** Nom du correspondant + contexte (trajet/envoi) à partir du détail — déduit selon si l'utilisateur courant est le client ou le conducteur de cette conversation. */
 function useThreadHeader(detail: ConversationDetail | undefined, currentUserId: string | undefined) {
   if (!detail) return { name: 'Conversation', initials: '…', subtitle: undefined, isShipment: false };
 
@@ -63,7 +63,7 @@ function useThreadHeader(detail: ConversationDetail | undefined, currentUserId: 
     ? detail.driver
     : iAmDriver
       ? detail.customer
-      : null; // vue support : ni client ni chauffeur
+      : null; // vue support : ni client ni conducteur
 
   const name = correspondent
     ? `${correspondent.firstName} ${correspondent.lastName}`

@@ -1,5 +1,5 @@
 // mobile/src/components/screens/ShipmentRequestCard.tsx
-// [21/09/2026] v1 — carte d'une demande d'envoi pour le chauffeur.
+// [21/09/2026] v1 — carte d'une demande d'envoi pour le conducteur.
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { IconBolt, IconCalendarEvent, IconClock, IconPackage, IconRuler2, IconWeight } from '@tabler/icons-react-native';
@@ -18,7 +18,7 @@ export interface ShipmentRequestCardProps {
 
 /**
  * Une demande d'envoi ouverte, lisible d'un coup d'œil : d'où à où, quoi,
- * combien le chauffeur touchera. Aucune coordonnée de client ici — elles ne
+ * combien le conducteur touchera. Aucune coordonnée de client ici — elles ne
  * sont communiquées qu'après l'acceptation.
  */
 export function ShipmentRequestCard({ shipment, onAccept }: ShipmentRequestCardProps) {

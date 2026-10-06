@@ -20,7 +20,7 @@ export default function DriverDetailPage() {
         className="dispute-fade-up inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
       >
         <IconArrowLeft size={16} />
-        Retour aux chauffeurs
+        Retour aux conducteurs
       </Link>
 
       <DriverProfile key={id} driverId={id} />

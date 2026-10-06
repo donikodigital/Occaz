@@ -27,7 +27,7 @@ function createService(options: { dueForExtension?: unknown[]; claimCount?: numb
 }
 
 describe('ShipmentWindowService.runOnce', () => {
-  it('invite le client à prolonger quand la plage est terminée sans chauffeur', async () => {
+  it('invite le client à prolonger quand la plage est terminée sans conducteur', async () => {
     const { service, prisma, notifications } = createService({
       dueForExtension: [{ id: 's1', customer: { userId: 'u-customer' } }],
     });

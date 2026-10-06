@@ -42,7 +42,7 @@ export class CreateRatingDto {
   @Max(5)
   reliability?: number;
 
-  @ApiPropertyOptional({ minimum: 1, maximum: 5, description: 'Uniquement pertinent pour une note client -> chauffeur' })
+  @ApiPropertyOptional({ minimum: 1, maximum: 5, description: 'Uniquement pertinent pour une note client -> conducteur' })
   @IsOptional()
   @IsInt()
   @Min(1)

@@ -1,6 +1,6 @@
 // mobile/app/(driver)/faq.tsx
 //
-// v1 — Questions fréquentes côté chauffeur : accordéon simple, contenu
+// v1 — Questions fréquentes côté conducteur : accordéon simple, contenu
 // reflétant les règles réellement codées (commission unique, premier
 // arrivé premier servi, retrait du portefeuille) — à ajuster librement.
 
@@ -17,7 +17,7 @@ const QUESTIONS: { question: string; answer: string }[] = [
   {
     question: 'Comment savoir si je suis éligible pour accepter des envois ?',
     answer:
-      'Dès que vos documents (pièce d\'identité, permis, carte grise, assurance) sont vérifiés et acceptés, votre compte passe "Chauffeur validé" — vous pouvez alors accepter des envois, avec ou sans trajet établi.',
+      'Dès que vos documents (pièce d\'identité, permis, carte grise, assurance) sont vérifiés et acceptés, votre compte passe "Conducteur validé" — vous pouvez alors accepter des envois, avec ou sans trajet établi.',
   },
   {
     question: 'Comment est calculée ma commission ?',
@@ -27,7 +27,7 @@ const QUESTIONS: { question: string; answer: string }[] = [
   {
     question: 'Pourquoi je n\'ai pas pu accepter cet envoi ?',
     answer:
-      'Toutes les demandes sont envoyées à tous les chauffeurs validés en même temps : le premier à accepter l\'emporte. Si quelqu\'un a été plus rapide, la demande disparaît de votre liste.',
+      'Toutes les demandes sont envoyées à tous les conducteurs validés en même temps : le premier à accepter l\'emporte. Si quelqu\'un a été plus rapide, la demande disparaît de votre liste.',
   },
   {
     question: 'Comment je retire l\'argent de mon portefeuille ?',

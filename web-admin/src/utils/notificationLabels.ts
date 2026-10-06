@@ -5,8 +5,8 @@ import type { NotificationChannel, NotificationType } from '@/types/notification
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   BOOKING: 'Réservation',
   PAYMENT: 'Paiement confirmé',
-  DRIVER_ACCEPTED: 'Chauffeur trouvé',
-  DRIVER_REJECTED: 'Chauffeur indisponible',
+  DRIVER_ACCEPTED: 'Conducteur trouvé',
+  DRIVER_REJECTED: 'Conducteur indisponible',
   DEPARTURE_IMMINENT: 'Départ imminent',
   ARRIVAL: 'Arrivée à destination',
   OTP: 'Code de vérification',

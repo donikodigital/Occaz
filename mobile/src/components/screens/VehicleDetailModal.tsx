@@ -1,5 +1,5 @@
 // mobile/src/components/screens/VehicleDetailModal.tsx
-// [21/09/2026] v2 — habillage bleu Ocean : bandeau, sections et bouton Enregistrer comme le reste du profil chauffeur.
+// [21/09/2026] v2 — habillage bleu Ocean : bandeau, sections et bouton Enregistrer comme le reste du profil conducteur.
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

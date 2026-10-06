@@ -4,8 +4,8 @@ import { IsOptional, IsString } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 /**
- * Envois en attente de chauffeur (section 12) — filtrable par ville de
- * départ/arrivée pour que le chauffeur retrouve les envois compatibles
+ * Envois en attente de conducteur (section 12) — filtrable par ville de
+ * départ/arrivée pour que le conducteur retrouve les envois compatibles
  * avec ses trajets publiés.
  */
 export class SearchAvailableShipmentsDto extends PaginationQueryDto {

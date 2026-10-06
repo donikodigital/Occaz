@@ -3,7 +3,7 @@ import { DriverAccountStatus, NotificationChannel, NotificationType, ShipmentSta
 import { SHIPMENT_REQUEST_CHANNEL_ID, ShipmentDispatchService } from './shipment-dispatch.service';
 
 /**
- * Annonce d'une demande d'envoi : tous les chauffeurs validés, en même
+ * Annonce d'une demande d'envoi : tous les conducteurs validés, en même
  * temps, avec ou sans trajet — sans jamais divulguer de donnée du client.
  */
 function createService(options: { status?: ShipmentStatus; emailSetting?: number; driverCount?: number } = {}) {
@@ -37,7 +37,7 @@ function createService(options: { status?: ShipmentStatus; emailSetting?: number
 }
 
 describe('ShipmentDispatchService.dispatch', () => {
-  it('prévient tous les chauffeurs validés et non suspendus, avec ou sans trajet', async () => {
+  it('prévient tous les conducteurs validés et non suspendus, avec ou sans trajet', async () => {
     const { service, prisma, notifications } = createService({ driverCount: 3 });
     await expect(service.dispatch('s1')).resolves.toBe(3);
 
@@ -91,7 +91,7 @@ describe('ShipmentDispatchService.dispatch', () => {
     expect(notifications.notify).not.toHaveBeenCalled();
   });
 
-  it('continue d\'annoncer aux autres chauffeurs quand une notification échoue', async () => {
+  it('continue d\'annoncer aux autres conducteurs quand une notification échoue', async () => {
     const { service, notifications } = createService({ driverCount: 3 });
     notifications.notify.mockRejectedValueOnce(new Error('push indisponible'));
     await expect(service.dispatch('s1')).resolves.toBe(3);

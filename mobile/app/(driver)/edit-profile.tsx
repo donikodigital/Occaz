@@ -51,7 +51,7 @@ export default function DriverEditProfileScreen() {
       },
       {
         onSuccess: () => {
-          // Le profil chauffeur invalidé par le hook ne contient pas
+          // Le profil conducteur invalidé par le hook ne contient pas
           // l'email (voir plus haut) — sans ça, l'écran continuerait
           // d'afficher l'ancienne adresse jusqu'à la prochaine connexion.
           if (trimmedEmail && authUser) {
@@ -68,7 +68,7 @@ export default function DriverEditProfileScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader title="Modifier le profil" subtitle="Compte chauffeur" onBack={() => router.back()} />
+      <OceanScreenHeader title="Modifier le profil" subtitle="Compte conducteur" onBack={() => router.back()} />
 
       <ProfilePhotoField
         photoUrl={photoUrl}

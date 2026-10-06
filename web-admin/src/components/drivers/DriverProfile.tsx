@@ -74,7 +74,7 @@ export function DriverProfile({ driverId, showFullPageLink = false }: DriverProf
   if (isError) {
     return (
       <div className="rounded-2xl bg-rose-50 p-5 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
-        Impossible de charger ce chauffeur.
+        Impossible de charger ce conducteur.
       </div>
     );
   }
@@ -114,13 +114,13 @@ export function DriverProfile({ driverId, showFullPageLink = false }: DriverProf
             onPhotoError={() => setPhotoFailed(true)}
           />
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-wider text-white/80">Chauffeur</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-white/80">Conducteur</p>
             <h2 className="mt-0.5 flex flex-wrap items-center gap-x-2 text-2xl font-extrabold leading-tight tracking-tight">
               <span className="break-words">
                 {driver.firstName} {driver.lastName}
               </span>
               {driver.isVerifiedBadge ? (
-                <IconRosetteDiscountCheck size={22} className="shrink-0" aria-label="Chauffeur vérifié" />
+                <IconRosetteDiscountCheck size={22} className="shrink-0" aria-label="Conducteur vérifié" />
               ) : null}
             </h2>
             <p className="mt-1 flex items-center gap-1 text-sm font-medium text-white/90">
@@ -154,7 +154,7 @@ export function DriverProfile({ driverId, showFullPageLink = false }: DriverProf
               onClick={handleVerify}
               loading={verifyDriver.isPending}
             >
-              Valider le chauffeur
+              Valider le conducteur
             </ToneButton>
           ) : null}
 

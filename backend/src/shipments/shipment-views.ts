@@ -12,7 +12,7 @@ export type AvailableShipmentSource = Prisma.ShipmentGetPayload<{
 }>;
 
 /**
- * Vue d'une demande d'envoi telle que la voit un chauffeur AVANT d'avoir
+ * Vue d'une demande d'envoi telle que la voit un conducteur AVANT d'avoir
  * accepté. Liste blanche explicite : ni noms, ni téléphones, ni consignes
  * du client (elles ne sont communiquées qu'après l'acceptation, via
  * GET /shipments/:id), et les adresses sont réduites à leur ville — un
@@ -58,17 +58,17 @@ function maskLocation(location: AvailableShipmentSource['senderLocation']) {
 // Contacts une fois le colis livré
 // ---------------------------------------------------------------------------
 
-/** Statuts où la prestation est terminée sans litige : plus aucun appel ni SMS entre le chauffeur et les clients. */
+/** Statuts où la prestation est terminée sans litige : plus aucun appel ni SMS entre le conducteur et les clients. */
 const CONTACT_CLOSED_STATUSES: ReadonlySet<string> = new Set(['DELIVERED', 'COMPLETED']);
 
 export type ShipmentViewer = 'customer' | 'driver';
 
 /**
  * Une fois le colis livré SANS litige (DELIVERED / COMPLETED), les numéros de téléphone ne sont plus communiqués :
- *  - au chauffeur : ceux de l'expéditeur et du destinataire (il n'a plus de raison de les appeler) ;
- *  - au client : celui du chauffeur.
+ *  - au conducteur : ceux de l'expéditeur et du destinataire (il n'a plus de raison de les appeler) ;
+ *  - au client : celui du conducteur.
  * Si un litige s'ouvre ensuite (statut DISPUTED), les numéros reviennent le temps de le régler. Le personnel du support
- * n'est jamais concerné (il garde tout) : cette fonction ne s'applique qu'aux vues client et chauffeur.
+ * n'est jamais concerné (il garde tout) : cette fonction ne s'applique qu'aux vues client et conducteur.
  *
  * C'est la vraie protection : l'application ne fait que ne rien afficher quand le serveur ne renvoie rien.
  */

@@ -3,7 +3,7 @@
 // sur un aplat doux à étincelles (AuthIllustration) au lieu du carré plein
 // indigo, cartes de rôle arrondies avec ombre douce, typographie plus
 // généreuse. Logique inchangée.
-// [02/10/2026] v3 — « Chauffeur » devient « Conducteur » sur tout l'écran.
+// [02/10/2026] v3 — « Conducteur » devient « Conducteur » sur tout l'écran.
 // Le lien du bas « Déjà inscrit ? Se connecter » faisait exactement la même
 // chose que les deux cartes de rôle : il est remplacé par « Pas encore client
 // ou conducteur ? Créer votre compte », qui ouvre une modale pour choisir son

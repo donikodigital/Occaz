@@ -15,7 +15,7 @@ const SHORTCUTS: {
   tone: 'primary' | 'danger' | 'accent' | 'success';
   permission: PermissionKey;
 }[] = [
-  { href: '/drivers', label: 'Chauffeurs', icon: IconSteeringWheel, tone: 'primary', permission: PERMISSIONS.DRIVER_READ },
+  { href: '/drivers', label: 'Conducteurs', icon: IconSteeringWheel, tone: 'primary', permission: PERMISSIONS.DRIVER_READ },
   { href: '/disputes', label: 'Litiges', icon: IconAlertTriangle, tone: 'danger', permission: PERMISSIONS.DISPUTE_READ },
   { href: '/users', label: 'Utilisateurs', icon: IconUsers, tone: 'accent', permission: PERMISSIONS.USER_READ },
   { href: '/geography', label: 'Géographie', icon: IconWorld, tone: 'success', permission: PERMISSIONS.GEOGRAPHY_MANAGE },

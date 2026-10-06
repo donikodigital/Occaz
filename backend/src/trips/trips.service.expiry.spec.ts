@@ -3,7 +3,7 @@ import { BookingStatus, TripStatus } from '@prisma/client';
 import { TripsService } from './trips.service';
 
 /**
- * expireStale : annule un trajet publié (ou "chauffeur arrivé") sans
+ * expireStale : annule un trajet publié (ou "conducteur arrivé") sans
  * aucune réservation active, dont le départ est passé — la mise à jour
  * conditionnelle (status + aucune réservation active) garantit qu'un
  * trajet qui vient d'être réservé entre-temps n'est jamais annulé par

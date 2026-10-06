@@ -1,63 +1,330 @@
 // web-admin/src/app/(app)/settings/page.tsx
 //
-// v2 — Refonte complète (réservée au SuperAdmin : SETTINGS_UPDATE n'est
+// v3 — Refonte « sans jargon » (réservée au SuperAdmin : SETTINGS_UPDATE n'est
 // accordée à aucun des rôles Support du seed, voir rbac.seed.ts).
-//   - Les réglages sont groupés par domaine (« trip.… » → Trajets), chacun
-//     sur une carte : titre lisible (la description, sinon le nom du
-//     paramètre), clé technique, et la valeur affichée selon son type
-//     (nombre en grand, Oui/Non, texte, bloc JSON) ;
-//   - ajout et modification en modale, avec un choix de type (Nombre,
-//     Texte, Oui / Non, JSON) : plus besoin d'écrire du JSON à la main pour
-//     une simple valeur ;
-//   - la clé ne se modifie pas (elle identifie le paramètre) ; suppression
-//     en deux temps avec un avertissement, car le backend lit ces valeurs
-//     à l'exécution.
+//   - Plus de clés techniques (booking.unpaid_expiry_minutes), de police
+//     « code » ni de JSON à l'écran : chaque réglage connu a un nom clair, une
+//     phrase d'explication et une unité (minutes, heures, km, %, montant…).
+//   - Tous les réglages que le backend sait lire sont présents d'emblée, avec
+//     leur valeur par défaut tant qu'ils n'ont pas été personnalisés : il n'y a
+//     plus rien à « ajouter » pour les modifier, on clique sur la carte.
+//   - Regroupés par thème (Réservations, Trajets, Tarifs des envois, Retraits…)
+//     avec recherche et pastilles de navigation.
+//   - Modification en modale : champ avec son unité et boutons − / +, bouton
+//     « Rétablir la valeur par défaut », interrupteur pour les options
+//     Oui / Non. Les options Oui / Non sont enregistrées dans le format
+//     attendu par le backend (true/false ou 1/0).
+//   - Les réglages inconnus (ajoutés à la main) restent gérables dans
+//     « Autres réglages » ; le bouton « Avancé » permet d'en créer un.
+//   - Les taux de change ont leur propre page : une carte y renvoie.
+// v2 — Refonte complète : groupes par domaine, valeurs typées, modale d'ajout.
 
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { IconAdjustments, IconArrowRight, IconChevronRight, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
+import {
+  IconAdjustments,
+  IconArrowBackUp,
+  IconArrowsExchange,
+  IconCash,
+  IconChevronRight,
+  IconClockHour4,
+  IconGauge,
+  IconGift,
+  IconHash,
+  IconMinus,
+  IconPackage,
+  IconPercentage,
+  IconPlus,
+  IconRoute,
+  IconRuler2,
+  IconScale,
+  IconSettings,
+  IconTicket,
+  IconToggleRight,
+  IconTrash,
+  IconWallet,
+} from '@tabler/icons-react';
 import { Button, Modal, TextArea, TextField } from '@/components/ui';
 import {
   Chip,
   EmptyState,
+  FilterChips,
   FormError,
   FormSection,
+  IconTile,
+  ListCard,
   ListSkeleton,
   Notice,
   PageHero,
+  SavedNotice,
+  SearchField,
   SegmentedControl,
   ToggleRow,
+  type Tone,
 } from '@/components/admin/AdminUi';
 import { usePlatformSettings, useRemovePlatformSetting, useUpsertPlatformSetting } from '@/hooks/usePlatformSettings';
 import { ApiError } from '@/services/api/ApiError';
+import { formatNumber } from '@/utils/money';
 
 type SettingItem = NonNullable<ReturnType<typeof usePlatformSettings>['data']>[number];
-/**
- * Une paire de taux de change n'a qu'un seul sens réellement enregistré
- * (voir ExchangeRateService) — `computed: true` marque une carte
- * synthétisée pour l'affichage (l'inverse calculé), jamais une vraie
- * ligne PlatformSetting : elle ne s'ouvre pas dans la modale d'édition
- * générique, qui écrirait une clé qui n'a pas lieu d'exister.
- */
-type DisplayItem = SettingItem & { computed?: boolean };
-type ValueType = 'number' | 'text' | 'boolean' | 'json';
+type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
 
-const KEY_PATTERN = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/;
+// ---------------------------------------------------------------------------
+// Catalogue des réglages connus du backend
+// ---------------------------------------------------------------------------
 
-const VALUE_TYPE_OPTIONS: { value: ValueType; label: string }[] = [
-  { value: 'number', label: 'Nombre' },
-  { value: 'text', label: 'Texte' },
-  { value: 'boolean', label: 'Oui / Non' },
-  { value: 'json', label: 'JSON' },
+type Kind = 'number' | 'money' | 'percent' | 'hours' | 'minutes' | 'km' | 'kmh' | 'factor' | 'flag' | 'flag01';
+
+/** Unité affichée, pas de variation des boutons − / +, icône de la carte. */
+const KIND_INFO: Record<Kind, { unit: string; step: number; icon: IconComponent }> = {
+  number: { unit: '', step: 100, icon: IconHash },
+  money: { unit: '', step: 500, icon: IconCash },
+  percent: { unit: '%', step: 1, icon: IconPercentage },
+  hours: { unit: 'h', step: 1, icon: IconClockHour4 },
+  minutes: { unit: 'min', step: 5, icon: IconClockHour4 },
+  km: { unit: 'km', step: 1, icon: IconRuler2 },
+  kmh: { unit: 'km/h', step: 5, icon: IconGauge },
+  factor: { unit: '×', step: 0.1, icon: IconScale },
+  flag: { unit: '', step: 1, icon: IconToggleRight },
+  flag01: { unit: '', step: 1, icon: IconToggleRight },
+};
+
+type GroupId =
+  | 'reservations'
+  | 'trips'
+  | 'shipmentPrices'
+  | 'shipmentCalc'
+  | 'shipmentDelays'
+  | 'payouts'
+  | 'referral'
+  | 'other';
+
+const GROUPS: { id: GroupId; title: string; description: string; icon: IconComponent }[] = [
+  { id: 'reservations', title: 'Réservations', description: 'Paiement et expiration des réservations.', icon: IconTicket },
+  { id: 'trips', title: 'Trajets', description: 'Recherche, expiration et calcul des étapes.', icon: IconRoute },
+  { id: 'shipmentPrices', title: 'Tarifs des envois', description: 'Prix de base, poids, distance et options.', icon: IconCash },
+  { id: 'shipmentCalc', title: 'Calcul des envois', description: 'Poids volumétrique et distances.', icon: IconPackage },
+  { id: 'shipmentDelays', title: 'Délais et alertes des envois', description: 'Durées d’attente et notifications.', icon: IconClockHour4 },
+  { id: 'payouts', title: 'Retraits', description: 'Retraits des conducteurs vers leur compte Mobile Money.', icon: IconWallet },
+  { id: 'referral', title: 'Parrainage', description: 'Récompense des parrains.', icon: IconGift },
+  { id: 'other', title: 'Autres réglages', description: 'Réglages ajoutés manuellement.', icon: IconSettings },
 ];
 
-const DOMAIN_LABELS: Record<string, string> = {
-  trip: 'Trajets',
-  shipment: 'Envois',
-  exchange_rate: 'Taux de change',
-};
+interface Known {
+  key: string;
+  title: string;
+  help: string;
+  kind: Kind;
+  group: GroupId;
+  /** Valeur appliquée par le backend tant que le réglage n'est pas personnalisé. */
+  defaultValue: number | boolean;
+  /** Texte affiché à la place de la valeur quand elle vaut zéro (ex. « Aucun plafond »). */
+  zeroLabel?: string;
+  /** Minimum accepté (0 par défaut). */
+  min?: number;
+  /** Explications des deux états d'une option Oui / Non. */
+  onText?: string;
+  offText?: string;
+}
+
+const KNOWN: Known[] = [
+  {
+    key: 'booking.unpaid_expiry_minutes',
+    title: 'Délai pour payer une réservation',
+    help: 'Une réservation non payée est annulée automatiquement après ce délai, ou au départ du trajet si celui-ci arrive avant.',
+    kind: 'minutes',
+    group: 'reservations',
+    defaultValue: 15,
+    min: 1,
+  },
+  {
+    key: 'trip.search_radius_km',
+    title: 'Rayon de recherche des trajets',
+    help: 'Distance autour du lieu choisi dans laquelle l’application cherche des trajets pour le client.',
+    kind: 'km',
+    group: 'trips',
+    defaultValue: 5,
+    min: 1,
+  },
+  {
+    key: 'trip.stale_expiry_hours',
+    title: 'Expiration des trajets sans réservation',
+    help: 'Un trajet publié sans aucune réservation est annulé automatiquement ce nombre d’heures après son heure de départ.',
+    kind: 'hours',
+    group: 'trips',
+    defaultValue: 24,
+    min: 1,
+  },
+  {
+    key: 'trip.segment_price_rounding',
+    title: 'Arrondi du prix des étapes',
+    help: 'Le prix d’une étape intermédiaire est arrondi à ce montant près.',
+    kind: 'money',
+    group: 'trips',
+    defaultValue: 500,
+    min: 1,
+  },
+  {
+    key: 'trip.segment_min_price',
+    title: 'Prix minimum d’une étape',
+    help: 'Une étape très courte ne coûte jamais moins que ce montant.',
+    kind: 'money',
+    group: 'trips',
+    defaultValue: 500,
+    min: 1,
+  },
+  {
+    key: 'trip.average_speed_kmh',
+    title: 'Vitesse moyenne estimée',
+    help: 'Sert à estimer la durée du trajet et les heures de passage dans chaque ville.',
+    kind: 'kmh',
+    group: 'trips',
+    defaultValue: 55,
+    min: 1,
+  },
+  {
+    key: 'trip.road_distance_factor',
+    title: 'Coefficient de distance par la route',
+    help: 'Multiplie la distance à vol d’oiseau pour approcher la distance réelle par la route (trajets).',
+    kind: 'factor',
+    group: 'trips',
+    defaultValue: 1.3,
+    min: 1,
+  },
+  {
+    key: 'shipment.base_price',
+    title: 'Prix de base d’un envoi',
+    help: 'Montant de départ de tout envoi, avant d’ajouter le poids et la distance.',
+    kind: 'money',
+    group: 'shipmentPrices',
+    defaultValue: 2000,
+  },
+  {
+    key: 'shipment.price_per_kg',
+    title: 'Prix par kilo',
+    help: 'Facturé sur le plus grand du poids réel et du poids volumétrique.',
+    kind: 'money',
+    group: 'shipmentPrices',
+    defaultValue: 1000,
+  },
+  {
+    key: 'shipment.price_per_km',
+    title: 'Prix par kilomètre',
+    help: 'Montant facturé pour chaque kilomètre parcouru.',
+    kind: 'money',
+    group: 'shipmentPrices',
+    defaultValue: 300,
+  },
+  {
+    key: 'shipment.urgent_surcharge',
+    title: 'Supplément pour un envoi urgent',
+    help: 'Montant ajouté au prix quand le client demande une livraison urgente.',
+    kind: 'money',
+    group: 'shipmentPrices',
+    defaultValue: 5000,
+  },
+  {
+    key: 'shipment.declared_value_rate_percent',
+    title: 'Frais sur la valeur déclarée',
+    help: 'Pourcentage de la valeur déclarée d’un colis, ajouté au prix pour couvrir sa manutention et son assurance.',
+    kind: 'percent',
+    group: 'shipmentPrices',
+    defaultValue: 1,
+  },
+  {
+    key: 'shipment.declared_value_min_fee',
+    title: 'Frais minimum sur la valeur déclarée',
+    help: 'Les frais sur la valeur déclarée ne sont jamais inférieurs à ce montant.',
+    kind: 'money',
+    group: 'shipmentPrices',
+    defaultValue: 0,
+    zeroLabel: 'Aucun minimum',
+  },
+  {
+    key: 'shipment.volumetric_divisor',
+    title: 'Diviseur du poids volumétrique',
+    help: 'Longueur × largeur × hauteur du colis (en cm) divisée par ce nombre donne son poids volumétrique en kilos.',
+    kind: 'number',
+    group: 'shipmentCalc',
+    defaultValue: 5000,
+    min: 1,
+  },
+  {
+    key: 'shipment.road_distance_factor',
+    title: 'Coefficient de distance par la route',
+    help: 'Multiplie la distance à vol d’oiseau pour approcher la distance réelle par la route (envois).',
+    kind: 'factor',
+    group: 'shipmentCalc',
+    defaultValue: 1.3,
+    min: 1,
+  },
+  {
+    key: 'shipment.min_distance_km',
+    title: 'Distance minimale facturée',
+    help: 'Une livraison dans une même ville est facturée comme si elle faisait au moins cette distance.',
+    kind: 'km',
+    group: 'shipmentCalc',
+    defaultValue: 2,
+  },
+  {
+    key: 'shipment.extension_grace_hours',
+    title: 'Délai de prolongation d’une demande',
+    help: 'Temps laissé au client pour prolonger une demande restée sans conducteur, avant son remboursement automatique.',
+    kind: 'hours',
+    group: 'shipmentDelays',
+    defaultValue: 24,
+    min: 1,
+  },
+  {
+    key: 'shipment.unpaid_expiry_hours',
+    title: 'Délai pour payer un envoi',
+    help: 'Un envoi jamais payé est annulé automatiquement après ce délai.',
+    kind: 'hours',
+    group: 'shipmentDelays',
+    defaultValue: 24,
+    min: 1,
+  },
+  {
+    key: 'shipment.dispatch_email_enabled',
+    title: 'E-mail aux conducteurs pour un nouvel envoi',
+    help: 'Prévenir aussi les conducteurs par e-mail lorsqu’une nouvelle demande d’envoi est publiée.',
+    kind: 'flag01',
+    group: 'shipmentDelays',
+    defaultValue: true,
+    onText: 'Les conducteurs reçoivent une notification et un e-mail.',
+    offText: 'Les conducteurs reçoivent seulement la notification dans l’application.',
+  },
+  {
+    key: 'payout.auto_enabled',
+    title: 'Retraits automatiques',
+    help: 'Choisis si les retraits des conducteurs sont envoyés tout de suite ou validés par le support.',
+    kind: 'flag',
+    group: 'payouts',
+    defaultValue: true,
+    onText: 'Le retrait est envoyé tout de suite sur le compte Mobile Money du conducteur, sans validation du support.',
+    offText: 'Chaque retrait attend la validation de l’équipe support.',
+  },
+  {
+    key: 'payout.auto_max_amount',
+    title: 'Plafond des retraits automatiques',
+    help: 'Au-dessus de ce montant, le retrait attend la validation de l’équipe. Mets zéro pour ne fixer aucune limite.',
+    kind: 'money',
+    group: 'payouts',
+    defaultValue: 0,
+    zeroLabel: 'Aucun plafond',
+  },
+  {
+    key: 'referral.reward_amount',
+    title: 'Récompense d’un parrainage',
+    help: 'Montant crédité au parrain (conducteur) à la première prestation payée de son filleul.',
+    kind: 'money',
+    group: 'referral',
+    defaultValue: 10000,
+  },
+];
+
+const KNOWN_BY_KEY = new Map(KNOWN.map((item) => [item.key, item]));
 
 // ---------------------------------------------------------------------------
 // Aides
@@ -68,30 +335,358 @@ function capitalize(value: string): string {
 }
 
 function humanize(code: string): string {
-  return capitalize(code.replace(/[_-]+/g, ' ').toLowerCase().trim());
+  return capitalize(code.replace(/[_.-]+/g, ' ').toLowerCase().trim());
 }
 
-function domainOf(key: string): string {
-  return key.split('.')[0] ?? key;
+function isFlag(kind: Kind): boolean {
+  return kind === 'flag' || kind === 'flag01';
 }
 
-function paramOf(key: string): string {
-  const [, ...rest] = key.split('.');
-  return rest.join('.') || key;
+/** Une option Oui / Non est activée sauf si elle vaut explicitement false ou 0 (comme le lit le backend). */
+function isOn(value: unknown): boolean {
+  return value !== false && value !== 0;
 }
 
-function domainLabel(domain: string): string {
-  return DOMAIN_LABELS[domain] ?? humanize(domain);
+function sameValue(kind: Kind, a: unknown, b: unknown): boolean {
+  if (isFlag(kind)) return isOn(a) === isOn(b);
+  return a === b;
 }
 
-function typeOfValue(value: unknown): ValueType {
+function formatKnownValue(known: Known, value: unknown): string {
+  if (isFlag(known.kind)) return isOn(value) ? 'Activé' : 'Désactivé';
+  if (typeof value !== 'number') return 'À vérifier';
+  if (value === 0 && known.zeroLabel) return known.zeroLabel;
+  const text = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 8 }).format(value);
+  const unit = KIND_INFO[known.kind].unit;
+  return unit ? `${text} ${unit}` : text;
+}
+
+function formatPlainValue(value: unknown): string {
+  if (typeof value === 'number') return formatNumber(value);
+  if (typeof value === 'boolean') return value ? 'Activé' : 'Désactivé';
+  if (typeof value === 'string') return value;
+  return 'Valeur avancée';
+}
+
+function roundTo(value: number, decimals = 8): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function parseNumber(raw: string): number | null {
+  const cleaned = raw.trim().replace(/[\s  ]/g, '').replace(',', '.');
+  if (!cleaned) return null;
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+// ---------------------------------------------------------------------------
+// Lignes affichées
+// ---------------------------------------------------------------------------
+
+interface Row {
+  id: string;
+  key: string;
+  known: Known | null;
+  stored: SettingItem | null;
+  value: unknown;
+  title: string;
+  help: string;
+  group: GroupId;
+  isDefault: boolean;
+}
+
+function buildRows(items: SettingItem[]): Row[] {
+  const byKey = new Map(items.map((item) => [item.key, item]));
+  const rows: Row[] = KNOWN.map((known) => {
+    const stored = byKey.get(known.key) ?? null;
+    const value = stored ? stored.value : known.defaultValue;
+    return {
+      id: known.key,
+      key: known.key,
+      known,
+      stored,
+      value,
+      title: known.title,
+      help: known.help,
+      group: known.group,
+      isDefault: sameValue(known.kind, value, known.defaultValue),
+    };
+  });
+
+  for (const item of items) {
+    // Les taux de change ont leur propre page ; les réglages connus sont déjà ci-dessus.
+    if (KNOWN_BY_KEY.has(item.key) || item.key.startsWith('exchange_rate.')) continue;
+    rows.push({
+      id: item.key,
+      key: item.key,
+      known: null,
+      stored: item,
+      value: item.value,
+      title: item.description?.trim() || humanize(item.key),
+      help: 'Réglage ajouté manuellement.',
+      group: 'other',
+      isDefault: false,
+    });
+  }
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// Carte
+// ---------------------------------------------------------------------------
+
+function SettingCard({ row, onClick }: { row: Row; onClick: () => void }) {
+  const known = row.known;
+  const kindInfo = known ? KIND_INFO[known.kind] : null;
+  const Icon = kindInfo ? kindInfo.icon : IconSettings;
+  const flag = known ? isFlag(known.kind) : false;
+  const on = isOn(row.value);
+  const tone: Tone = flag ? (on ? 'success' : 'neutral') : 'primary';
+
+  return (
+    <ListCard onClick={onClick} tone={tone}>
+      <div className="flex items-start gap-3">
+        <IconTile tone={tone}>
+          <Icon size={20} />
+        </IconTile>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold leading-snug text-text-primary">{row.title}</p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-text-secondary">{row.help}</p>
+        </div>
+        <IconChevronRight size={18} className="mt-1 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5" />
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-surface-muted/70 px-3 py-2">
+        {flag ? (
+          <Chip tone={on ? 'success' : 'neutral'}>{on ? 'Activé' : 'Désactivé'}</Chip>
+        ) : (
+          <span className="truncate text-lg font-bold leading-tight text-text-primary">
+            {known ? formatKnownValue(known, row.value) : formatPlainValue(row.value)}
+          </span>
+        )}
+        {known ? (
+          row.isDefault ? (
+            <span className="shrink-0 text-xs font-medium text-text-muted">Par défaut</span>
+          ) : (
+            <Chip tone="accent">Personnalisé</Chip>
+          )
+        ) : null}
+      </div>
+    </ListCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Modale de modification d'un réglage connu
+// ---------------------------------------------------------------------------
+
+function KnownSettingModal({
+  open,
+  onClose,
+  row,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  row: Row | null;
+  onSaved: (message: string) => void;
+}) {
+  const upsert = useUpsertPlatformSetting();
+  const known = row?.known ?? null;
+
+  const [raw, setRaw] = useState('');
+  const [flag, setFlag] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (!open || !row || !row.known) return;
+    if (isFlag(row.known.kind)) {
+      setFlag(isOn(row.value));
+      setRaw('');
+    } else {
+      setRaw(typeof row.value === 'number' ? String(row.value) : '');
+    }
+    setErrorMessage(undefined);
+  }, [open, row]);
+
+  if (!row || !known) return null;
+
+  const info = KIND_INFO[known.kind];
+  const flagMode = isFlag(known.kind);
+  const minimum = known.min ?? 0;
+  const parsed = parseNumber(raw);
+  const defaultNumber = typeof known.defaultValue === 'number' ? known.defaultValue : null;
+  const differsFromDefault = flagMode ? flag !== isOn(known.defaultValue) : parsed !== defaultNumber;
+  const hasChanged = flagMode ? flag !== isOn(row.value) : parsed !== (typeof row.value === 'number' ? row.value : null);
+
+  function nudge(direction: 1 | -1) {
+    const current = parsed ?? 0;
+    const next = Math.max(minimum, roundTo(current + direction * info.step));
+    setRaw(String(next));
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!known || !row) return;
+    setErrorMessage(undefined);
+
+    let value: unknown;
+    if (flagMode) {
+      value = known.kind === 'flag01' ? (flag ? 1 : 0) : flag;
+    } else {
+      if (parsed === null) {
+        setErrorMessage('Saisis un nombre, par exemple 25 ou 1,5.');
+        return;
+      }
+      if (parsed < minimum) {
+        setErrorMessage(minimum === 0 ? 'La valeur ne peut pas être négative.' : `La valeur doit être d’au moins ${formatNumber(minimum)}.`);
+        return;
+      }
+      if (known.kind === 'percent' && parsed > 100) {
+        setErrorMessage('Un pourcentage ne peut pas dépasser 100.');
+        return;
+      }
+      value = parsed;
+    }
+
+    try {
+      await upsert.mutateAsync({
+        key: known.key,
+        value,
+        // La description n'est écrite qu'à la création : un réglage déjà présent garde la sienne.
+        description: row.stored ? undefined : known.help,
+      });
+      onSaved(`« ${known.title} » est enregistré.`);
+      onClose();
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={known.title}
+      description={known.help}
+      zIndex={60}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Fermer
+          </Button>
+          <Button type="submit" form="setting-form" loading={upsert.isPending} disabled={!hasChanged}>
+            Enregistrer
+          </Button>
+        </>
+      }
+    >
+      <form id="setting-form" onSubmit={handleSubmit} className="space-y-5">
+        {flagMode ? (
+          <>
+            <ToggleRow
+              checked={flag}
+              onChange={setFlag}
+              label={flag ? 'Activé' : 'Désactivé'}
+              description={flag ? known.onText : known.offText}
+            />
+            {differsFromDefault ? (
+              <button
+                type="button"
+                onClick={() => setFlag(isOn(known.defaultValue))}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition hover:text-primary-dark"
+              >
+                <IconArrowBackUp size={16} />
+                Rétablir la valeur par défaut ({isOn(known.defaultValue) ? 'activé' : 'désactivé'})
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <FormSection title="Valeur">
+            <div className="flex items-stretch gap-2">
+              <button
+                type="button"
+                onClick={() => nudge(-1)}
+                aria-label="Diminuer"
+                className="flex w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-text-secondary transition hover:border-primary/40 hover:text-primary active:scale-95"
+              >
+                <IconMinus size={18} />
+              </button>
+              <div className="relative min-w-0 flex-1">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={raw}
+                  onChange={(e) => setRaw(e.target.value)}
+                  aria-label="Valeur"
+                  className="h-11 w-full rounded-xl border border-border bg-surface px-3.5 pr-16 text-center text-lg font-bold text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                {info.unit ? (
+                  <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-text-muted">
+                    {info.unit}
+                  </span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => nudge(1)}
+                aria-label="Augmenter"
+                className="flex w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-text-secondary transition hover:border-primary/40 hover:text-primary active:scale-95"
+              >
+                <IconPlus size={18} />
+              </button>
+            </div>
+            {known.kind === 'money' ? (
+              <p className="text-xs text-text-muted">Montant dans la monnaie du pays concerné, sans espace ni virgule.</p>
+            ) : null}
+            {defaultNumber !== null ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="text-text-secondary">Valeur par défaut : {formatKnownValue(known, defaultNumber)}</span>
+                {differsFromDefault ? (
+                  <button
+                    type="button"
+                    onClick={() => setRaw(String(defaultNumber))}
+                    className="inline-flex items-center gap-1.5 font-semibold text-primary transition hover:text-primary-dark"
+                  >
+                    <IconArrowBackUp size={16} />
+                    Rétablir
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </FormSection>
+        )}
+
+        <FormError message={errorMessage} />
+      </form>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Modale d'un réglage avancé (ajout manuel ou réglage inconnu)
+// ---------------------------------------------------------------------------
+
+type CustomType = 'number' | 'text' | 'boolean' | 'json';
+
+const CUSTOM_TYPE_OPTIONS: { value: CustomType; label: string }[] = [
+  { value: 'number', label: 'Nombre' },
+  { value: 'text', label: 'Texte' },
+  { value: 'boolean', label: 'Oui / Non' },
+  { value: 'json', label: 'Avancé' },
+];
+
+const KEY_PATTERN = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/;
+
+function customTypeOf(value: unknown): CustomType {
   if (typeof value === 'number') return 'number';
   if (typeof value === 'boolean') return 'boolean';
   if (typeof value === 'string') return 'text';
   return 'json';
 }
 
-function valueToEditor(value: unknown, type: ValueType): string {
+function customValueToEditor(value: unknown, type: CustomType): string {
   if (type === 'json') return JSON.stringify(value, null, 2) ?? '';
   if (type === 'boolean') return '';
   return value === null || value === undefined ? '' : String(value);
@@ -99,11 +694,11 @@ function valueToEditor(value: unknown, type: ValueType): string {
 
 type ParsedValue = { ok: true; value: unknown } | { ok: false; error: string };
 
-function buildValue(type: ValueType, raw: string, flag: boolean): ParsedValue {
+function buildCustomValue(type: CustomType, raw: string, flag: boolean): ParsedValue {
   if (type === 'boolean') return { ok: true, value: flag };
   if (type === 'number') {
-    const parsed = Number(raw.trim().replace(',', '.'));
-    if (!raw.trim() || !Number.isFinite(parsed)) return { ok: false, error: 'Saisis un nombre valide (ex. 25 ou 1.5).' };
+    const parsed = parseNumber(raw);
+    if (parsed === null) return { ok: false, error: 'Saisis un nombre valide, par exemple 25 ou 1,5.' };
     return { ok: true, value: parsed };
   }
   if (type === 'text') {
@@ -113,70 +708,27 @@ function buildValue(type: ValueType, raw: string, flag: boolean): ParsedValue {
   try {
     return { ok: true, value: JSON.parse(raw) };
   } catch {
-    return { ok: false, error: 'Le JSON n’est pas valide (ex. {"a": 1} ou [1, 2]).' };
+    return { ok: false, error: 'Cette valeur avancée n’est pas valide. Vérifie les guillemets et les accolades.' };
   }
 }
 
-function SettingValue({ value }: { value: unknown }) {
-  if (typeof value === 'number') return <span className="text-3xl font-bold text-text-primary">{value}</span>;
-  if (typeof value === 'boolean') return <Chip tone={value ? 'success' : 'neutral'}>{value ? 'Oui' : 'Non'}</Chip>;
-  if (typeof value === 'string') return <span className="break-words text-base font-semibold text-text-primary">{value}</span>;
-  return (
-    <pre className="max-h-32 overflow-auto rounded-xl bg-primary-light/30 p-3 font-mono text-xs text-text-primary">
-      {JSON.stringify(value, null, 2)}
-    </pre>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Carte
-// ---------------------------------------------------------------------------
-
-function SettingCard({ setting, onClick }: { setting: DisplayItem; onClick: () => void }) {
-  const title = setting.description?.trim() || humanize(paramOf(setting.key));
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group flex w-full flex-col gap-3 rounded-2xl border p-4 text-left shadow-md transition hover:-translate-y-0.5 hover:shadow-lg ${
-        setting.computed
-          ? 'border-dashed border-border bg-primary-light/20 hover:border-primary/40'
-          : 'border-border bg-surface hover:border-primary/40'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="font-semibold text-text-primary">{title}</p>
-            {setting.computed ? <Chip tone="neutral">Calculé</Chip> : null}
-          </div>
-          <p className="mt-1 break-all font-mono text-[11px] text-text-muted">{setting.key}</p>
-        </div>
-        {setting.computed ? (
-          <IconArrowRight size={18} className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5" />
-        ) : (
-          <IconChevronRight size={18} className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5" />
-        )}
-      </div>
-      <SettingValue value={setting.value} />
-      {setting.computed ? (
-        <p className="text-xs text-text-muted">Déduit automatiquement de l&apos;autre sens — modifiable sur Taux de change.</p>
-      ) : null}
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Modale d'ajout / modification
-// ---------------------------------------------------------------------------
-
-function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () => void; setting: DisplayItem | null }) {
+function CustomSettingModal({
+  open,
+  onClose,
+  row,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  row: Row | null;
+  onSaved: (message: string) => void;
+}) {
   const upsert = useUpsertPlatformSetting();
   const remove = useRemovePlatformSetting();
 
   const [key, setKey] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState<ValueType>('number');
+  const [type, setType] = useState<CustomType>('number');
   const [raw, setRaw] = useState('');
   const [flag, setFlag] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -184,13 +736,13 @@ function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () =
 
   useEffect(() => {
     if (!open) return;
-    if (setting) {
-      const initialType = typeOfValue(setting.value);
-      setKey(setting.key);
-      setDescription(setting.description ?? '');
+    if (row?.stored) {
+      const initialType = customTypeOf(row.stored.value);
+      setKey(row.stored.key);
+      setDescription(row.stored.description ?? '');
       setType(initialType);
-      setRaw(valueToEditor(setting.value, initialType));
-      setFlag(setting.value === true);
+      setRaw(customValueToEditor(row.stored.value, initialType));
+      setFlag(row.stored.value === true);
     } else {
       setKey('');
       setDescription('');
@@ -200,19 +752,21 @@ function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () =
     }
     setConfirmingDelete(false);
     setErrorMessage(undefined);
-  }, [open, setting]);
+  }, [open, row]);
+
+  const editing = row?.stored ?? null;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setErrorMessage(undefined);
 
     const trimmedKey = key.trim();
-    if (!setting && !KEY_PATTERN.test(trimmedKey)) {
-      setErrorMessage('La clé doit suivre le format « domaine.parametre » (ex. trip.search_radius_km).');
+    if (!editing && !KEY_PATTERN.test(trimmedKey)) {
+      setErrorMessage('Le nom technique doit suivre le format « domaine.parametre », en minuscules.');
       return;
     }
 
-    const parsed = buildValue(type, raw, flag);
+    const parsed = buildCustomValue(type, raw, flag);
     if (!parsed.ok) {
       setErrorMessage(parsed.error);
       return;
@@ -220,11 +774,12 @@ function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () =
 
     try {
       await upsert.mutateAsync({
-        key: setting ? setting.key : trimmedKey,
+        key: editing ? editing.key : trimmedKey,
         value: parsed.value,
         // En modification, une description vidée doit pouvoir s'effacer : on envoie la chaîne vide.
-        description: setting ? description.trim() : description.trim() || undefined,
+        description: editing ? description.trim() : description.trim() || undefined,
       });
+      onSaved('Le réglage est enregistré.');
       onClose();
     } catch (error) {
       setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
@@ -232,10 +787,11 @@ function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () =
   }
 
   async function handleDelete() {
-    if (!setting) return;
+    if (!editing) return;
     setErrorMessage(undefined);
     try {
-      await remove.mutateAsync(setting.key);
+      await remove.mutateAsync(editing.key);
+      onSaved('Le réglage est supprimé.');
       onClose();
     } catch (error) {
       setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
@@ -247,15 +803,20 @@ function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () =
     <Modal
       open={open}
       onClose={onClose}
-      title={setting ? 'Modifier le paramètre' : 'Ajouter un paramètre'}
+      title={editing ? 'Modifier le réglage' : 'Nouveau réglage avancé'}
+      description={
+        editing
+          ? undefined
+          : 'Réservé aux réglages demandés par l’équipe technique : un réglage n’a d’effet que si la plateforme sait le lire.'
+      }
       zIndex={60}
       footer={
         <>
-          {setting ? (
+          {editing ? (
             confirmingDelete ? (
               <div className="flex flex-1 flex-wrap items-center justify-between gap-2 rounded-2xl bg-danger-light/40 px-4 py-3">
                 <span className="text-sm font-medium text-danger-dark">
-                  Supprimer ce paramètre ? Le backend le lit à l’exécution : son comportement peut changer.
+                  Supprimer ce réglage ? La plateforme peut le lire en direct : son comportement peut changer.
                 </span>
                 <div className="flex gap-2">
                   <Button variant="ghost" onClick={() => setConfirmingDelete(false)}>
@@ -282,51 +843,42 @@ function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () =
               <Button variant="ghost" onClick={onClose}>
                 Fermer
               </Button>
-              <Button type="submit" form="setting-form" loading={upsert.isPending}>
-                {setting ? 'Enregistrer' : 'Ajouter le paramètre'}
+              <Button type="submit" form="custom-setting-form" loading={upsert.isPending}>
+                {editing ? 'Enregistrer' : 'Ajouter le réglage'}
               </Button>
             </>
           ) : null}
         </>
       }
     >
-      <form id="setting-form" onSubmit={handleSubmit} className="space-y-6">
-        <FormSection title="Paramètre">
-          {setting ? (
-            <div className="rounded-2xl bg-primary-light/50 p-4">
-              <p className="text-xs font-semibold text-text-secondary">Clé (elle identifie le paramètre, elle ne change pas)</p>
-              <p className="mt-1 break-all font-mono text-sm text-text-primary">{setting.key}</p>
-            </div>
-          ) : (
+      <form id="custom-setting-form" onSubmit={handleSubmit} className="space-y-6">
+        <FormSection title="Réglage">
+          {editing ? null : (
             <TextField
-              label="Clé"
+              label="Nom technique"
               value={key}
               onChange={(e) => setKey(e.target.value)}
-              placeholder="trip.search_radius_km"
-              hint="Format « domaine.parametre », en minuscules, avec des tirets bas."
+              placeholder="domaine.parametre"
+              hint="En minuscules, avec un point entre le domaine et le paramètre."
             />
           )}
           <TextField
-            label="Description (optionnel)"
+            label="Nom affiché (optionnel)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Rayon de recherche des trajets, en km"
-            hint="Elle sert de titre à la carte."
+            placeholder="Rayon de recherche, en kilomètres"
+            hint="Il sert de titre à la carte."
           />
         </FormSection>
 
         <FormSection title="Valeur" description="Choisis le type de la valeur, puis saisis-la.">
-          <SegmentedControl value={type} onChange={setType} options={VALUE_TYPE_OPTIONS} ariaLabel="Type de la valeur" />
-          {type === 'number' ? (
-            <TextField label="Nombre" value={raw} onChange={(e) => setRaw(e.target.value)} placeholder="25" />
-          ) : null}
+          <SegmentedControl value={type} onChange={setType} options={CUSTOM_TYPE_OPTIONS} ariaLabel="Type de la valeur" />
+          {type === 'number' ? <TextField label="Nombre" value={raw} onChange={(e) => setRaw(e.target.value)} placeholder="25" /> : null}
           {type === 'text' ? <TextField label="Texte" value={raw} onChange={(e) => setRaw(e.target.value)} placeholder="Une valeur" /> : null}
           {type === 'boolean' ? (
-            <ToggleRow checked={flag} onChange={setFlag} label={flag ? 'Oui' : 'Non'} description="Active ou désactive cette option." />
+            <ToggleRow checked={flag} onChange={setFlag} label={flag ? 'Activé' : 'Désactivé'} description="Active ou désactive cette option." />
           ) : null}
-          {type === 'json' ? (
-            <TextArea label="JSON" value={raw} onChange={(e) => setRaw(e.target.value)} rows={6} placeholder='{"a": 1}' />
-          ) : null}
+          {type === 'json' ? <TextArea label="Valeur avancée" value={raw} onChange={(e) => setRaw(e.target.value)} rows={6} /> : null}
         </FormSection>
 
         <FormError message={errorMessage} />
@@ -339,156 +891,157 @@ function SettingModal({ open, onClose, setting }: { open: boolean; onClose: () =
 // Page
 // ---------------------------------------------------------------------------
 
-// Un générique multi-lignes passé directement à useState<...> commençant par
-// une accolade sur une nouvelle ligne fait planter le parseur SWC/Next.js en
-// .tsx — d'où cet alias nommé sur une seule ligne.
-type ModalState = { setting: DisplayItem | null } | null;
-
-/**
- * Synthétise l'entrée inverse d'une paire exchange_rate.<a>_<b> pour
- * l'affichage — jamais si l'inverse existe déjà réellement en base (cas
- * where l'admin l'aurait entré à la main dans les deux sens) et jamais
- * pour une valeur non numérique (donnée corrompue : mieux vaut ne rien
- * afficher qu'un calcul faux).
- */
-function withComputedReverseRates(items: SettingItem[]): DisplayItem[] {
-  const byKey = new Map(items.map((item) => [item.key, item]));
-  const extra: DisplayItem[] = [];
-
-  for (const item of items) {
-    const match = /^exchange_rate\.([a-z0-9]+)_([a-z0-9]+)$/.exec(item.key);
-    if (!match) continue;
-    const [, from, to] = match;
-    const reverseKey = `exchange_rate.${to}_${from}`;
-    if (byKey.has(reverseKey)) continue;
-    if (typeof item.value !== 'number' || item.value === 0) continue;
-
-    // Arrondi à 8 décimales — sans ça, la division flottante affiche
-    // souvent un bruit du type 0.06199999999999999 (SettingValue montre
-    // le nombre brut, contrairement à la page Taux de change qui passe
-    // par Intl.NumberFormat).
-    extra.push({
-      key: reverseKey,
-      value: Math.round((1 / item.value) * 1e8) / 1e8,
-      description: `Taux de change ${to.toUpperCase()} → ${from.toUpperCase()}`,
-      updatedAt: item.updatedAt,
-      updatedById: null,
-      computed: true,
-    });
-  }
-
-  return [...items, ...extra];
-}
+type ModalState = { row: Row | null; custom: boolean } | null;
 
 export default function PlatformSettingsPage() {
-  const router = useRouter();
   const { data: settings, isLoading, isError } = usePlatformSettings();
   const [search, setSearch] = useState('');
+  const [groupFilter, setGroupFilter] = useState<GroupId | ''>('');
   const [modal, setModal] = useState<ModalState>(null);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
-  const all = settings ?? [];
+  const rows = useMemo(() => buildRows(settings ?? []), [settings]);
 
-  const groups = useMemo(() => {
+  // Le message de confirmation disparaît tout seul.
+  useEffect(() => {
+    if (!savedMessage) return;
+    const timeout = setTimeout(() => setSavedMessage(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [savedMessage]);
+
+  const searched = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const filtered = withComputedReverseRates(all).filter(
-      (setting) =>
-        !query ||
-        setting.key.toLowerCase().includes(query) ||
-        (setting.description ?? '').toLowerCase().includes(query),
-    );
-    const byDomain = new Map<string, DisplayItem[]>();
-    for (const setting of filtered) {
-      const domain = domainOf(setting.key);
-      byDomain.set(domain, [...(byDomain.get(domain) ?? []), setting]);
-    }
-    return [...byDomain.entries()]
-      .map(([domain, items]) => ({ domain, items: [...items].sort((a, b) => a.key.localeCompare(b.key)) }))
-      .sort((a, b) => domainLabel(a.domain).localeCompare(domainLabel(b.domain)));
-  }, [all, search]);
+    if (!query) return rows;
+    return rows.filter((row) => {
+      const groupTitle = GROUPS.find((group) => group.id === row.group)?.title ?? '';
+      return [row.title, row.help, groupTitle].join(' ').toLowerCase().includes(query);
+    });
+  }, [rows, search]);
 
-  const domainsCount = new Set(all.map((setting) => domainOf(setting.key))).size;
+  const sections = useMemo(
+    () =>
+      GROUPS.map((group) => ({ ...group, items: searched.filter((row) => row.group === group.id) })).filter(
+        (group) => group.items.length > 0,
+      ),
+    [searched],
+  );
+
+  const visibleSections = groupFilter ? sections.filter((section) => section.id === groupFilter) : sections;
+  const groupOptions = sections.map((section) => ({ value: section.id, label: `${section.title} (${section.items.length})` }));
+
+  const customizedCount = rows.filter((row) => row.known && row.stored && !row.isDefault).length;
+  const themesCount = new Set(rows.map((row) => row.group)).size;
+  const showExchangeCard = !search.trim() || 'taux de change devises'.includes(search.trim().toLowerCase());
+
+  function openRow(row: Row) {
+    setModal({ row, custom: row.known === null });
+  }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHero
         eyebrow="Système"
-        title="Paramètres plateforme"
-        description="Les réglages que le backend lit à l’exécution : rayon de recherche, seuils, tarifs… Une valeur modifiée ici s’applique sans redéploiement."
+        title="Paramètres"
+        description="Les réglages appliqués en direct par la plateforme : délais, tarifs, retraits… Une modification s’applique tout de suite, sans redéploiement."
         stats={[
-          { value: settings ? String(all.length) : '…', label: all.length > 1 ? 'paramètres' : 'paramètre' },
-          { value: settings ? String(domainsCount) : '…', label: domainsCount > 1 ? 'domaines' : 'domaine' },
+          { value: settings ? String(rows.length) : '…', label: rows.length > 1 ? 'réglages' : 'réglage' },
+          { value: settings ? String(customizedCount) : '…', label: customizedCount > 1 ? 'personnalisés' : 'personnalisé' },
+          { value: settings ? String(themesCount) : '…', label: themesCount > 1 ? 'thèmes' : 'thème' },
         ]}
       />
 
       <div className="flex items-center gap-2">
-        {all.length > 6 ? (
-          <div className="relative min-w-0 flex-1">
-            <IconSearch size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher un paramètre…"
-              aria-label="Rechercher un paramètre"
-              className="w-full rounded-xl border border-border bg-surface py-2.5 pl-10 pr-3 text-sm text-text-primary shadow-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </div>
-        ) : (
-          <div className="flex-1" />
-        )}
-        <Button type="button" onClick={() => setModal({ setting: null })} className="shrink-0">
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher un réglage…"
+          ariaLabel="Rechercher un réglage"
+          className="flex-1"
+        />
+        <Button type="button" variant="secondary" onClick={() => setModal({ row: null, custom: true })} className="h-11 shrink-0">
           <IconPlus size={16} />
-          Ajouter
+          Avancé
         </Button>
       </div>
 
+      {groupOptions.length > 1 ? (
+        <FilterChips value={groupFilter} onChange={setGroupFilter} options={groupOptions} allLabel="Tous les thèmes" />
+      ) : null}
+
+      {savedMessage ? <SavedNotice>{savedMessage}</SavedNotice> : null}
+
       {isError ? (
-        <Notice tone="danger">
-          Impossible de charger les paramètres — cette section exige la permission SETTINGS_UPDATE (SuperAdmin).
-        </Notice>
+        <Notice tone="danger">Impossible de charger les réglages. Cette section est réservée au SuperAdmin.</Notice>
       ) : isLoading ? (
-        <ListSkeleton count={4} heightClass="h-28" />
-      ) : groups.length === 0 ? (
-        <EmptyState
-          icon={<IconAdjustments size={26} />}
-          title={search.trim() ? 'Aucun paramètre ne correspond' : 'Aucun paramètre'}
-          text={
-            search.trim()
-              ? 'Essaie un autre mot-clé.'
-              : 'Ajoute un réglage lu par le backend, par exemple le rayon de recherche des trajets (trip.search_radius_km).'
-          }
-          action={
-            search.trim() ? undefined : (
-              <Button type="button" onClick={() => setModal({ setting: null })}>
-                <IconPlus size={16} />
-                Ajouter un paramètre
-              </Button>
-            )
-          }
-        />
+        <ListSkeleton count={6} heightClass="h-36" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
+      ) : visibleSections.length === 0 && !showExchangeCard ? (
+        <EmptyState icon={<IconAdjustments size={26} />} title="Aucun réglage ne correspond" text="Essaie un autre mot-clé." />
       ) : (
-        <div className="space-y-6">
-          {groups.map((group) => (
-            <section key={group.domain} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-text-primary">{domainLabel(group.domain)}</h2>
-                <Chip tone="primary">{group.items.length}</Chip>
+        <div className="space-y-7">
+          {visibleSections.map((section) => {
+            const SectionIcon = section.icon;
+            return (
+              <section key={section.id} className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <IconTile tone="primary">
+                    <SectionIcon size={20} />
+                  </IconTile>
+                  <div className="min-w-0">
+                    <h2 className="font-bold leading-tight text-text-primary">{section.title}</h2>
+                    <p className="text-xs text-text-secondary">{section.description}</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {section.items.map((row) => (
+                    <SettingCard key={row.id} row={row} onClick={() => openRow(row)} />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+
+          {showExchangeCard && !groupFilter ? (
+            <section className="space-y-3">
+              <div className="flex items-center gap-3">
+                <IconTile tone="accent">
+                  <IconArrowsExchange size={20} />
+                </IconTile>
+                <div className="min-w-0">
+                  <h2 className="font-bold leading-tight text-text-primary">Taux de change</h2>
+                  <p className="text-xs text-text-secondary">Les taux entre les devises se règlent dans leur propre page.</p>
+                </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {group.items.map((setting) => (
-                  <SettingCard
-                    key={setting.key}
-                    setting={setting}
-                    onClick={() => (setting.computed ? router.push('/exchange-rates') : setModal({ setting }))}
-                  />
-                ))}
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <ListCard href="/exchange-rates" tone="accent">
+                  <div className="flex items-center gap-3">
+                    <IconTile tone="accent">
+                      <IconArrowsExchange size={20} />
+                    </IconTile>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-text-primary">Gérer les taux de change</p>
+                      <p className="text-xs text-text-secondary">Ouvrir la page Taux de change</p>
+                    </div>
+                    <IconChevronRight size={18} className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </ListCard>
               </div>
             </section>
-          ))}
+          ) : null}
         </div>
       )}
 
-      <SettingModal open={modal !== null} onClose={() => setModal(null)} setting={modal?.setting ?? null} />
+      <KnownSettingModal
+        open={modal !== null && !modal.custom}
+        onClose={() => setModal(null)}
+        row={modal && !modal.custom ? modal.row : null}
+        onSaved={setSavedMessage}
+      />
+      <CustomSettingModal
+        open={modal !== null && modal.custom}
+        onClose={() => setModal(null)}
+        row={modal && modal.custom ? modal.row : null}
+        onSaved={setSavedMessage}
+      />
     </div>
   );
 }

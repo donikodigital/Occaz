@@ -1,5 +1,5 @@
 // backend/src/shipments/shipment-contacts.spec.ts
-// Colis livré sans litige : plus de numéros de téléphone entre le chauffeur et les clients.
+// Colis livré sans litige : plus de numéros de téléphone entre le conducteur et les clients.
 import { hideContactsOnceDelivered } from './shipment-views';
 
 const shipment = (status: string) => ({
@@ -11,7 +11,7 @@ const shipment = (status: string) => ({
 });
 
 describe('hideContactsOnceDelivered', () => {
-  it.each(['DELIVERED', 'COMPLETED'])('chauffeur : plus les numéros de l\'expéditeur ni du destinataire (%s)', (status) => {
+  it.each(['DELIVERED', 'COMPLETED'])('conducteur : plus les numéros de l\'expéditeur ni du destinataire (%s)', (status) => {
     const view = hideContactsOnceDelivered(shipment(status), 'driver');
     expect(view.senderPhone).toBeNull();
     expect(view.recipientPhone).toBeNull();
@@ -20,7 +20,7 @@ describe('hideContactsOnceDelivered', () => {
     expect(view.status).toBe(status);
   });
 
-  it.each(['DELIVERED', 'COMPLETED'])('client : plus le numéro du chauffeur (%s)', (status) => {
+  it.each(['DELIVERED', 'COMPLETED'])('client : plus le numéro du conducteur (%s)', (status) => {
     const view = hideContactsOnceDelivered(shipment(status), 'customer');
     expect(view.driverPhone).toBeNull();
     // le client garde les numéros qu'il a lui-même saisis

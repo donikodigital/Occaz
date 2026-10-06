@@ -322,7 +322,7 @@ export default function ExchangeRatesPage() {
       <PageHero
         eyebrow="Finance"
         title="Taux de change"
-        description="Convertit automatiquement le montant crédité à un chauffeur quand un trajet ou un envoi est payé dans une autre devise que son portefeuille — sans redéploiement. Renseigne un seul sens par paire, l'autre se calcule tout seul."
+        description="Convertit automatiquement le montant crédité à un conducteur quand un trajet ou un envoi est payé dans une autre devise que son portefeuille — sans redéploiement. Renseigne un seul sens par paire, l'autre se calcule tout seul."
         stats={
           currencies
             ? [

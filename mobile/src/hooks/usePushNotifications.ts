@@ -25,7 +25,7 @@ Notifications.setNotificationHandler({
  * Canal Android des nouvelles demandes d'envoi — même identifiant que
  * SHIPMENT_REQUEST_CHANNEL_ID côté backend (shipment-dispatch.service.ts),
  * qui l'indique dans chaque push. Importance maximale : l'alerte sonne, vibre
- * et s'affiche en bandeau même écran verrouillé, pour que le premier chauffeur
+ * et s'affiche en bandeau même écran verrouillé, pour que le premier conducteur
  * disponible puisse accepter tout de suite. Sur Android 8+ le son et
  * l'importance se règlent uniquement par canal, jamais par notification.
  */
@@ -88,7 +88,7 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
     register();
 
     // Toucher une notification ouvre directement l'écran concerné : la liste
-    // des demandes pour un chauffeur, le suivi de l'envoi pour un client.
+    // des demandes pour un conducteur, le suivi de l'envoi pour un client.
     const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as { type?: string; shipmentId?: string } | undefined;
       if (data?.type === 'SHIPMENT_REQUEST') {

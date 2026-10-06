@@ -34,7 +34,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   shipment: 'Envois',
   dispute: 'Litiges',
   refund: 'Remboursements',
-  driver: 'Chauffeurs',
+  driver: 'Conducteurs',
   geography: 'Géographie',
   audit: 'Journal d’audit',
   settings: 'Paramètres',

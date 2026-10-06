@@ -5,6 +5,9 @@
 // même bandeau, mêmes états vides, mêmes filtres, onglets, cartes de
 // formulaire, pastilles et interrupteurs — pour ne plus recopier ces blocs
 // dans chaque page. Règle de design : des cartes ombrées, jamais de tableaux.
+// v2 — Bandeau compact (toutes les statistiques sur une seule ligne), champ de
+// recherche et liste déroulante communs, pastilles de filtre sans barre de
+// défilement visible, cartes de liste (CardShell, ListCard, IconTile, MetaItem).
 // Les blancs du bandeau sont des valeurs arbitraires (text-[#ffffff]) pour
 // ne dépendre d'aucune couleur « white » du thème Tailwind.
 
@@ -12,7 +15,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { IconAlertTriangle, IconArrowLeft } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowLeft, IconChevronDown, IconSearch, IconX } from '@tabler/icons-react';
 
 /** Drapeau emoji à partir d'un code pays ISO à 2 lettres ; 🏳️ si le code est invalide. */
 export function isoToFlagEmoji(isoCode: string): string {
@@ -42,21 +45,34 @@ export function PageHero({
   description: string;
   stats?: HeroStat[];
 }) {
+  // Au plus 4 statistiques, toujours sur une seule ligne : la grille se
+  // découpe en autant de colonnes égales que de statistiques, même sur mobile.
+  const visibleStats = (stats ?? []).slice(0, 4);
+  const count = visibleStats.length;
+
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/75 p-5 shadow-lg sm:p-6">
-      <span className="pointer-events-none absolute -right-12 -top-16 h-52 w-52 rounded-full bg-[rgba(255,255,255,0.10)]" />
-      <span className="pointer-events-none absolute -bottom-20 left-8 h-44 w-44 rounded-full bg-[rgba(255,255,255,0.07)]" />
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/75 p-4 shadow-lg sm:p-5">
+      <span className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-[rgba(255,255,255,0.10)]" />
+      <span className="pointer-events-none absolute -bottom-20 left-8 h-40 w-40 rounded-full bg-[rgba(255,255,255,0.07)]" />
       <div className="relative">
-        <p className="text-sm font-medium text-[rgba(255,255,255,0.75)]">{eyebrow}</p>
-        <h1 className="mt-1 text-2xl font-bold text-[#ffffff] sm:text-3xl">{title}</h1>
-        <p className="mt-1.5 max-w-xl text-sm text-[rgba(255,255,255,0.82)]">{description}</p>
+        <p className="text-xs font-medium text-[rgba(255,255,255,0.75)] sm:text-sm">{eyebrow}</p>
+        <h1 className="text-xl font-bold leading-tight text-[#ffffff] sm:text-2xl">{title}</h1>
+        <p className="mt-1 line-clamp-2 max-w-xl text-xs text-[rgba(255,255,255,0.82)] sm:text-sm">{description}</p>
       </div>
-      {stats && stats.length > 0 ? (
-        <div className="relative mt-4 flex flex-wrap gap-2">
-          {stats.map((stat) => (
-            <div key={stat.label} className="rounded-2xl bg-[rgba(255,255,255,0.14)] px-4 py-2.5 backdrop-blur-sm">
-              <p className="text-xl font-bold leading-none text-[#ffffff]">{stat.value}</p>
-              <p className="mt-1 text-[11px] font-medium text-[rgba(255,255,255,0.8)]">{stat.label}</p>
+      {count > 0 ? (
+        <div
+          className="relative mt-3 grid gap-2"
+          style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`, maxWidth: `${count * 12}rem` }}
+        >
+          {visibleStats.map((stat) => (
+            <div
+              key={stat.label}
+              className="min-w-0 rounded-xl bg-[rgba(255,255,255,0.14)] px-2 py-2 text-center backdrop-blur-sm sm:px-3"
+            >
+              <p className="truncate text-lg font-bold leading-none text-[#ffffff] sm:text-xl">{stat.value}</p>
+              <p className="mt-1 text-[10px] font-medium leading-tight text-[rgba(255,255,255,0.8)] sm:text-[11px]">
+                {stat.label}
+              </p>
             </div>
           ))}
         </div>
@@ -100,9 +116,17 @@ export function EmptyState({
   );
 }
 
-export function ListSkeleton({ count = 4, heightClass = 'h-32' }: { count?: number; heightClass?: string }) {
+export function ListSkeleton({
+  count = 4,
+  heightClass = 'h-32',
+  gridClass = 'lg:grid-cols-2',
+}: {
+  count?: number;
+  heightClass?: string;
+  gridClass?: string;
+}) {
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
+    <div className={`grid gap-3 ${gridClass}`}>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index} className={`${heightClass} animate-pulse rounded-2xl bg-border/50`} />
       ))}
@@ -132,8 +156,9 @@ export function FilterChips<T extends string>({
   allLabel: string;
 }) {
   const all: { value: T | ''; label: string }[] = [{ value: '', label: allLabel }, ...options];
+  // Défilement horizontal au doigt, sans barre visible (elle collait aux pastilles).
   return (
-    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {all.map((option) => {
         const isActive = option.value === value;
         return (
@@ -152,6 +177,81 @@ export function FilterChips<T extends string>({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** Champ de recherche compact avec bouton d'effacement. */
+export function SearchField({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+  className = '',
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+  className?: string;
+}) {
+  return (
+    <div className={`relative min-w-0 ${className}`}>
+      <IconSearch size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        className="h-11 w-full rounded-xl border border-border bg-surface pl-10 pr-9 text-sm text-text-primary shadow-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+      />
+      {value ? (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          aria-label="Effacer la recherche"
+          className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition hover:bg-border/40 hover:text-text-primary"
+        >
+          <IconX size={14} />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** Liste déroulante compacte (select natif habillé) pour un filtre qui n'a pas sa place dans les pastilles. */
+export function FilterSelect<T extends string>({
+  value,
+  onChange,
+  options,
+  allLabel,
+  ariaLabel,
+  className = '',
+}: {
+  value: T | '';
+  onChange: (value: T | '') => void;
+  options: Option<T>[];
+  allLabel: string;
+  ariaLabel: string;
+  className?: string;
+}) {
+  return (
+    <div className={`relative min-w-0 ${className}`}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as T | '')}
+        aria-label={ariaLabel}
+        className="h-11 w-full appearance-none truncate rounded-xl border border-border bg-surface pl-3.5 pr-9 text-sm text-text-primary shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+      >
+        <option value="">{allLabel}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <IconChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted" />
     </div>
   );
 }
@@ -368,6 +468,113 @@ export function ToggleRow({
         />
       </span>
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cartes de liste
+// ---------------------------------------------------------------------------
+
+export type Tone = 'primary' | 'success' | 'accent' | 'danger' | 'neutral';
+
+const TONE_BAR: Record<Tone, string> = {
+  primary: 'bg-primary',
+  success: 'bg-success',
+  accent: 'bg-accent',
+  danger: 'bg-danger',
+  neutral: 'bg-border-strong',
+};
+
+const TONE_TILE: Record<Tone, string> = {
+  primary: 'bg-primary-light text-primary',
+  success: 'bg-success-light text-success-dark',
+  accent: 'bg-accent-light text-accent-dark',
+  danger: 'bg-danger-light text-danger-dark',
+  neutral: 'bg-border/40 text-text-secondary',
+};
+
+const CARD_SURFACE =
+  'relative overflow-hidden rounded-2xl bg-surface shadow-[0_8px_24px_-12px_rgba(8,58,99,0.28)] ring-1 ring-border/70';
+
+/** Carte ombrée avec une barre de couleur à gauche (couleur = situation). Le remplissage est à la charge de l'appelant. */
+export function CardShell({
+  tone = 'primary',
+  muted = false,
+  className = '',
+  children,
+}: {
+  tone?: Tone;
+  muted?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`${CARD_SURFACE} ${muted ? 'opacity-75' : ''} ${className}`}>
+      <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${TONE_BAR[tone]}`} />
+      {children}
+    </div>
+  );
+}
+
+/** Carte cliquable (lien ou bouton) : même rendu que CardShell, avec un léger soulèvement au survol. */
+export function ListCard({
+  href,
+  onClick,
+  tone = 'primary',
+  children,
+}: {
+  href?: string;
+  onClick?: () => void;
+  tone?: Tone;
+  children: React.ReactNode;
+}) {
+  const classes = `${CARD_SURFACE} group block h-full w-full p-3.5 pl-5 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-12px_rgba(8,58,99,0.38)] hover:ring-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary`;
+  const bar = <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${TONE_BAR[tone]}`} />;
+
+  if (href) {
+    return (
+      <Link href={href} className={classes}>
+        {bar}
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className={classes}>
+      {bar}
+      {children}
+    </button>
+  );
+}
+
+/** Pastille d'icône (ou d'initiales) à fond pastel, en tête de carte. */
+export function IconTile({
+  tone = 'primary',
+  round = false,
+  children,
+}: {
+  tone?: Tone;
+  round?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={`flex h-11 w-11 shrink-0 items-center justify-center text-sm font-bold ${
+        round ? 'rounded-full' : 'rounded-xl'
+      } ${TONE_TILE[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Ligne d'information avec petite icône (conducteur, places, date…). */
+export function MetaItem({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-sm text-text-secondary">
+      <span className="shrink-0 text-text-muted">{icon}</span>
+      <span className="truncate">{children}</span>
+    </span>
   );
 }
 

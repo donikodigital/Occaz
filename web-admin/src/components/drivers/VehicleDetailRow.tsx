@@ -51,7 +51,7 @@ type VehicleDetailRowProps = {
   defaultOpen?: boolean;
 };
 
-/** Carte véhicule : infos complètes, validation/rejet et documents. Utilisée dans la fiche chauffeur. */
+/** Carte véhicule : infos complètes, validation/rejet et documents. Utilisée dans la fiche conducteur. */
 export function VehicleDetailRow({ vehicle, driverId, defaultOpen = true }: VehicleDetailRowProps) {
   const verifyVehicle = useVerifyVehicle(driverId);
   const rejectVehicle = useRejectVehicle(driverId);

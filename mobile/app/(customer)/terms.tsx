@@ -47,19 +47,19 @@ export default function TermsScreen() {
 
       <Article title="1. Objet">
         Les présentes conditions générales régissent l'utilisation de l'application Occaz, plateforme de mise en
-        relation entre chauffeurs et particuliers pour le covoiturage de personnes et le transport de colis en
+        relation entre conducteurs et particuliers pour le covoiturage de personnes et le transport de colis en
         République de Guinée. En créant un compte, vous acceptez ces conditions.
       </Article>
 
       <Article title="2. Nature du service">
         Occaz agit en tant qu'intermédiaire technique. La société n'est ni transporteur, ni loueur de véhicules :
-        chaque trajet et chaque envoi sont assurés directement entre le chauffeur et le client, dans le cadre d'un
+        chaque trajet et chaque envoi sont assurés directement entre le conducteur et le client, dans le cadre d'un
         contrat de transport conclu entre eux via la plateforme.
       </Article>
 
       <Article title="3. Inscription et compte">
         L'inscription requiert un numéro de téléphone valide, vérifié par code SMS. Chaque utilisateur est
-        responsable de l'exactitude des informations fournies et de la confidentialité de son accès. Les chauffeurs
+        responsable de l'exactitude des informations fournies et de la confidentialité de son accès. Les conducteurs
         doivent en outre transmettre les documents requis (pièce d'identité, permis, carte grise, assurance) avant
         toute activité.
       </Article>
@@ -68,7 +68,7 @@ export default function TermsScreen() {
         Le prix d'une réservation ou d'un envoi est calculé et affiché avant paiement. Le paiement s'effectue par les
         moyens proposés dans l'application (mobile money, carte bancaire selon disponibilité), conformément à la
         réglementation guinéenne relative aux transactions électroniques. Une commission, dont le taux est fixé par
-        Occaz, est prélevée sur le montant versé au chauffeur.
+        Occaz, est prélevée sur le montant versé au conducteur.
       </Article>
 
       <Article title="5. Annulation et remboursement">
@@ -85,7 +85,7 @@ export default function TermsScreen() {
       <Article title="7. Responsabilité">
         Occaz met en œuvre des moyens raisonnables pour assurer la fiabilité de la plateforme, sans garantir
         l'absence d'interruption ou d'erreur. La responsabilité de la société ne saurait être engagée au titre du
-        déroulement du trajet ou de la livraison, qui relève de la relation directe entre le chauffeur et le client.
+        déroulement du trajet ou de la livraison, qui relève de la relation directe entre le conducteur et le client.
       </Article>
 
       <Article title="8. Propriété intellectuelle">

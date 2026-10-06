@@ -3,7 +3,7 @@ import type { TripStatus } from '@/types/trips.types';
 import type { BookingStatus } from '@/types/bookings.types';
 import type { ShipmentStatus } from '@/types/shipments.types';
 
-/** Labels français partagés entre la liste des trajets et le détail d'un trajet (espace chauffeur). */
+/** Labels français partagés entre la liste des trajets et le détail d'un trajet (espace conducteur). */
 export const TRIP_STATUS_LABELS: Record<TripStatus, string> = {
   DRAFT: 'Brouillon',
   PUBLISHED: 'Publié',
@@ -46,7 +46,7 @@ export const DRIVER_BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
 
 export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
   CREATED: 'En attente de paiement',
-  SEARCHING_DRIVER: "Recherche d'un chauffeur",
+  SEARCHING_DRIVER: "Recherche d'un conducteur",
   DRIVER_ASSIGNED: 'Assigné',
   PICKUP_PENDING: 'Récupération en cours',
   PICKED_UP: 'Colis récupéré',

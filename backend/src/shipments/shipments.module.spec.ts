@@ -14,9 +14,9 @@ import { ShipmentsService } from './shipments.service';
 
 /**
  * Câblage du module Envois : tous les services se résolvent (sans quoi
- * l'application ne démarre pas) et l'événement « recherche de chauffeur
+ * l'application ne démarre pas) et l'événement « recherche de conducteur
  * ouverte » — émis à la confirmation du paiement et à la prolongation —
- * déclenche bien l'annonce aux chauffeurs.
+ * déclenche bien l'annonce aux conducteurs.
  */
 describe('ShipmentsModule', () => {
   const previousJobSetting = process.env.SHIPMENT_WINDOW_JOB;
@@ -40,14 +40,14 @@ describe('ShipmentsModule', () => {
       .compile();
   }
 
-  it('résout tous les services, y compris l\'annonce aux chauffeurs et la tâche de fin de plage', async () => {
+  it('résout tous les services, y compris l\'annonce aux conducteurs et la tâche de fin de plage', async () => {
     const moduleRef = await buildModule();
     expect(moduleRef.get(ShipmentsService)).toBeDefined();
     expect(moduleRef.get(ShipmentDispatchService)).toBeDefined();
     expect(moduleRef.get(ShipmentWindowService)).toBeDefined();
   });
 
-  it('annonce l\'envoi aux chauffeurs quand la recherche de chauffeur s\'ouvre', async () => {
+  it('annonce l\'envoi aux conducteurs quand la recherche de conducteur s\'ouvre', async () => {
     const moduleRef = await buildModule();
     const dispatch = jest.spyOn(moduleRef.get(ShipmentDispatchService), 'dispatch').mockResolvedValue(0);
     await moduleRef.init();

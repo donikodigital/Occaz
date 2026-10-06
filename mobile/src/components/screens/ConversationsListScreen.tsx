@@ -1,6 +1,6 @@
 // mobile/src/components/screens/ConversationsListScreen.tsx
 //
-// v2 — Habillage bleu océan (partagé client / chauffeur) : titre avec
+// v2 — Habillage bleu océan (partagé client / conducteur) : titre avec
 // sous-titre, cartes ombrées avec une pastille de couleur par type
 // (bleu pour un trajet, doré pour un envoi), et un état vide qui explique
 // quand une conversation apparaît. Logique inchangée.

@@ -1,26 +1,30 @@
 // web-admin/src/app/(app)/payment-providers/page.tsx
+//
+// v2 — Même structure que les autres pages d'administration : bandeau compact
+// avec 3 statistiques sur une ligne (total, actifs, à configurer), alerte si
+// aucun moyen n'est actif, cartes à barre de couleur (bleue si actif, grise
+// sinon) avec l'interrupteur en pied de carte.
 'use client';
 
 import React from 'react';
 import Link from 'next/link';
-import {
-  IconAlertTriangle,
-  IconChevronRight,
-  IconCreditCard,
-  IconInfoCircle,
-  IconPlus,
-  IconWorld,
-} from '@tabler/icons-react';
+import { IconChevronRight, IconCreditCard, IconPlus, IconWorld } from '@tabler/icons-react';
 import { usePaymentProviders, useTogglePaymentProviderActive } from '@/hooks/usePaymentProviders';
 import { useCountries } from '@/hooks/useGeography';
 import { PAYMENT_PROVIDER_TYPE_LABELS } from '@/utils/paymentProviderLabels';
-import { DisputeMotionStyles, Skeleton, disputeFont } from '@/components/disputes/disputeUi';
+import {
+  CardShell,
+  EmptyState,
+  LinkButton,
+  ListSkeleton,
+  MetaItem,
+  Notice,
+  PageHero,
+} from '@/components/admin/AdminUi';
 import {
   ActiveBadge,
   ConfigChip,
-  LinkButton,
   ProviderIcon,
-  SummaryTile,
   ToggleSwitch,
   configKeyCount,
 } from '@/components/paymentProviders/paymentUi';
@@ -29,67 +33,58 @@ import type { PaymentProvider } from '@/types/paymentProviders.types';
 type ProviderCardProps = {
   provider: PaymentProvider;
   countryLabel: string;
-  index: number;
 };
 
-function ProviderCard({ provider, countryLabel, index }: ProviderCardProps) {
+function ProviderCard({ provider, countryLabel }: ProviderCardProps) {
   const toggle = useTogglePaymentProviderActive(provider.id);
   const typeLabel = PAYMENT_PROVIDER_TYPE_LABELS[provider.type] ?? provider.type;
 
   return (
-    <div className="dispute-fade-up h-full" style={{ animationDelay: `${Math.min(index, 10) * 70 + 120}ms` }}>
-      <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary-dark/20">
-        <span
-          className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${
-            provider.isActive ? 'from-[#0b62a3] to-[#083a63]' : 'from-slate-300 to-slate-400'
-          }`}
-        />
-
-        <Link
-          href={`/payment-providers/${provider.id}`}
-          className="block flex-1 p-4 pl-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
-        >
-          <div className="flex items-start gap-3">
-            <div className={`shrink-0 ${provider.isActive ? '' : 'opacity-60 grayscale'}`}>
-              <ProviderIcon type={provider.type} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="break-words text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-primary-dark">
-                {provider.name}
-              </h2>
-              <p className="mt-0.5 text-xs font-semibold text-slate-400">{typeLabel}</p>
-            </div>
-            <IconChevronRight
-              size={20}
-              className="mt-1 shrink-0 text-slate-300 transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary"
-            />
+    <CardShell tone={provider.isActive ? 'primary' : 'neutral'} className="group flex h-full flex-col">
+      <Link
+        href={`/payment-providers/${provider.id}`}
+        className="block flex-1 p-3.5 pl-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`shrink-0 ${provider.isActive ? '' : 'opacity-60 grayscale'}`}>
+            <ProviderIcon type={provider.type} />
           </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-              <IconWorld size={13} />
-              {countryLabel}
-            </span>
-            <ConfigChip config={provider.config} />
+          <div className="min-w-0 flex-1">
+            <h2 className="break-words font-semibold leading-snug text-text-primary transition-colors group-hover:text-primary">
+              {provider.name}
+            </h2>
+            <p className="text-xs text-text-muted">{typeLabel}</p>
           </div>
-        </Link>
+          <IconChevronRight
+            size={18}
+            className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
+          />
+        </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 py-3 pl-6 pr-4">
-          <ActiveBadge active={provider.isActive} />
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-semibold text-slate-500">
-              {provider.isActive ? 'Proposé aux clients' : 'Masqué'}
-            </span>
-            <ToggleSwitch
-              checked={provider.isActive}
-              disabled={toggle.isPending}
-              onChange={(next) => toggle.mutate(next)}
-              label={`${provider.isActive ? 'Désactiver' : 'Activer'} ${provider.name}`}
-            />
-          </div>
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface-muted px-2 py-1 text-xs font-semibold text-text-secondary">
+            <IconWorld size={13} />
+            {countryLabel}
+          </span>
+          <ConfigChip config={provider.config} />
+        </div>
+      </Link>
+
+      <div className="flex items-center justify-between gap-3 border-t border-border/70 bg-surface-muted/50 py-2.5 pl-5 pr-3.5">
+        <ActiveBadge active={provider.isActive} />
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-semibold text-text-secondary">
+            {provider.isActive ? 'Proposé aux clients' : 'Masqué'}
+          </span>
+          <ToggleSwitch
+            checked={provider.isActive}
+            disabled={toggle.isPending}
+            onChange={(next) => toggle.mutate(next)}
+            label={`${provider.isActive ? 'Désactiver' : 'Activer'} ${provider.name}`}
+          />
         </div>
       </div>
-    </div>
+    </CardShell>
   );
 }
 
@@ -109,107 +104,68 @@ export default function PaymentProvidersPage() {
   const unconfiguredCount = list.filter((provider) => configKeyCount(provider.config) === 0).length;
 
   return (
-    <div className={`${disputeFont.className} space-y-6`}>
-      <DisputeMotionStyles />
+    <div className="space-y-4">
+      <PageHero
+        eyebrow="Finance"
+        title="Moyens de paiement"
+        description="Les moyens de paiement proposés aux clients au moment de payer."
+        stats={[
+          { value: providers ? String(list.length) : '…', label: list.length > 1 ? 'moyens' : 'moyen' },
+          { value: providers ? String(activeCount) : '…', label: activeCount > 1 ? 'actifs' : 'actif' },
+          { value: providers ? String(unconfiguredCount) : '…', label: 'à configurer' },
+        ]}
+      />
 
-      <header className="dispute-fade-up flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-ocean text-white shadow-lg shadow-primary-dark/30">
-            <IconCreditCard size={24} />
-          </span>
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Moyens de paiement</h1>
-            <p className="text-sm font-medium text-slate-500">
-              {providers
-                ? `${list.length} moyen${list.length > 1 ? 's' : ''} · ${activeCount} actif${activeCount > 1 ? 's' : ''}`
-                : '\u00A0'}
-            </p>
-          </div>
-        </div>
-        <LinkButton href="/payment-providers/new" icon={<IconPlus size={16} />} className="w-full sm:w-auto">
-          Ajouter un moyen de paiement
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 text-xs text-text-secondary sm:text-sm">
+          Un client ne peut payer que si au moins un moyen actif existe ici.
+        </p>
+        <LinkButton href="/payment-providers/new" icon={<IconPlus size={16} />}>
+          Ajouter
         </LinkButton>
-      </header>
+      </div>
+
+      {providers && activeCount === 0 && list.length > 0 ? (
+        <Notice>Aucun moyen actif : les clients ne peuvent actuellement pas payer.</Notice>
+      ) : null}
 
       {isError ? (
-        <div className="rounded-2xl bg-rose-50 p-5 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
-          Impossible de charger les moyens de paiement.
-        </div>
+        <Notice tone="danger">Impossible de charger les moyens de paiement.</Notice>
       ) : isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
-          <Skeleton className="hidden h-40 sm:block" />
-        </div>
+        <ListSkeleton count={3} heightClass="h-36" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
       ) : list.length === 0 ? (
-        <div className="dispute-pop flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-12 text-center">
-          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-primary-light text-primary">
-            <IconCreditCard size={28} />
-          </span>
-          <p className="mt-4 text-base font-bold text-slate-900">Aucun moyen de paiement</p>
-          <p className="mt-1 max-w-sm text-sm text-slate-500">
-            Aucun moyen de paiement configuré : les paiements sont actuellement impossibles sur la plateforme.
-          </p>
-          <LinkButton href="/payment-providers/new" icon={<IconPlus size={16} />} className="mt-5">
-            Ajouter le premier moyen de paiement
-          </LinkButton>
-        </div>
+        <EmptyState
+          icon={<IconCreditCard size={26} />}
+          title="Aucun moyen de paiement"
+          text="Aucun moyen de paiement configuré : les paiements sont actuellement impossibles sur la plateforme."
+          action={
+            <LinkButton href="/payment-providers/new" icon={<IconPlus size={16} />}>
+              Ajouter le premier moyen de paiement
+            </LinkButton>
+          }
+        />
       ) : (
-        <>
-          <div className="dispute-fade-up grid grid-cols-3 gap-3" style={{ animationDelay: '60ms' }}>
-            <SummaryTile label="Total" value={list.length} tone="indigo" />
-            <SummaryTile label="Actifs" value={activeCount} tone="blue" />
-            <SummaryTile label="À configurer" value={unconfiguredCount} tone="amber" />
-          </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {list.map((provider) => (
+            <ProviderCard
+              key={provider.id}
+              provider={provider}
+              countryLabel={
+                provider.countryId ? (countryNameById.get(provider.countryId) ?? 'Pays spécifique') : 'Tous pays'
+              }
+            />
+          ))}
 
-          {activeCount === 0 ? (
-            <div
-              className="dispute-fade-up flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800 ring-1 ring-inset ring-amber-200"
-              style={{ animationDelay: '100ms' }}
-            >
-              <IconAlertTriangle size={20} className="mt-0.5 shrink-0" />
-              Aucun moyen actif : les clients ne peuvent actuellement pas payer.
-            </div>
-          ) : (
-            <div
-              className="dispute-fade-up flex items-start gap-3 rounded-2xl bg-white/70 p-4 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-200"
-              style={{ animationDelay: '100ms' }}
-            >
-              <IconInfoCircle size={20} className="mt-0.5 shrink-0 text-primary" />
-              Un client ne peut payer que si au moins un moyen actif existe ici.
-            </div>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {list.map((provider, index) => (
-              <ProviderCard
-                key={provider.id}
-                provider={provider}
-                index={index}
-                countryLabel={
-                  provider.countryId
-                    ? (countryNameById.get(provider.countryId) ?? 'Pays spécifique')
-                    : 'Tous pays'
-                }
-              />
-            ))}
-
-            <div
-              className="dispute-fade-up h-full"
-              style={{ animationDelay: `${Math.min(list.length, 10) * 70 + 120}ms` }}
-            >
-              <Link
-                href="/payment-providers/new"
-                className="group flex h-full min-h-[9rem] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-white/50 p-4 text-center text-sm font-bold text-slate-500 transition-all duration-300 hover:-translate-y-1 hover:border-primary/60 hover:bg-white hover:text-primary hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              >
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-slate-100 text-slate-400 transition-colors group-hover:bg-primary-light group-hover:text-primary">
-                  <IconPlus size={22} />
-                </span>
-                Ajouter un moyen de paiement
-              </Link>
-            </div>
-          </div>
-        </>
+          <Link
+            href="/payment-providers/new"
+            className="group flex min-h-[7rem] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-strong bg-surface/50 p-4 text-center text-sm font-semibold text-text-secondary transition hover:-translate-y-0.5 hover:border-primary/60 hover:bg-surface hover:text-primary hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-surface-muted text-text-muted transition-colors group-hover:bg-primary-light group-hover:text-primary">
+              <IconPlus size={20} />
+            </span>
+            Ajouter un moyen de paiement
+          </Link>
+        </div>
       )}
     </div>
   );

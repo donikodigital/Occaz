@@ -1,5 +1,5 @@
 // backend/src/profiles/customer-profiles/customer-profiles.service.ts
-// [21/09/2026] v3 — photo de profil : upload-url puis confirmation, même flux que le chauffeur (storageKey 'customer-avatar', URL publique).
+// [21/09/2026] v3 — photo de profil : upload-url puis confirmation, même flux que le conducteur (storageKey 'customer-avatar', URL publique).
 //
 // v2 — Ajout du champ address (texte libre, même esprit que Location.label)
 // sur CustomerProfile. Seul createForUser change : il liste ses champs
@@ -134,8 +134,8 @@ export class CustomerProfilesService {
 
   /**
    * Même flux en 2 étapes et même distinction `customer-avatar` que côté
-   * chauffeur (DriverProfilesService.requestPhotoUploadUrlForUser) : une
-   * photo de profil est vue en permanence dans l'app (par le chauffeur qui
+   * conducteur (DriverProfilesService.requestPhotoUploadUrlForUser) : une
+   * photo de profil est vue en permanence dans l'app (par le conducteur qui
    * accepte l'envoi ou la course), contrairement à une pièce d'identité.
    */
   async requestPhotoUploadUrlForUser(userId: string, dto: RequestUploadUrlDto) {
@@ -145,7 +145,7 @@ export class CustomerProfilesService {
     return { storageKey, uploadUrl, expiresInSeconds };
   }
 
-  /** `{ public: true }` — même choix que côté chauffeur (voir StorageService.createDownloadUrl) : une photo de profil doit rester affichable durablement, pas seulement 5 minutes. */
+  /** `{ public: true }` — même choix que côté conducteur (voir StorageService.createDownloadUrl) : une photo de profil doit rester affichable durablement, pas seulement 5 minutes. */
   async confirmPhotoForUser(userId: string, dto: ConfirmPhotoDto) {
     const customerId = await this.getProfileIdForUser(userId);
     const photoUrl = await this.storageService.createDownloadUrl(dto.storageKey, { public: true });

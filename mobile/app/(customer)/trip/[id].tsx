@@ -1,10 +1,10 @@
 // mobile/app/(customer)/trip/[id].tsx
 //
-// v2 — Refonte bleu océan, sur le modèle de l'écran détail côté chauffeur :
+// v2 — Refonte bleu océan, sur le modèle de l'écran détail côté conducteur :
 //   - bandeau sombre avec la date, l'heure de départ et l'itinéraire en frise
 //     verticale (adresse choisie quand elle existe, sinon la ville) ;
-//   - carte « Chauffeur » (photo, badge vérifié, note, véhicule et plaque) ;
-//   - carte « Détails » : places, colis acceptés, note du chauffeur ;
+//   - carte « Conducteur » (photo, badge vérifié, note, véhicule et plaque) ;
+//   - carte « Détails » : places, colis acceptés, note du conducteur ;
 //   - pied de page fixe : le prix par place et « Réserver ».
 // [04/10/2026] v4 — Choix de la ville de montée et de descente : sur un trajet qui traverse des villes, le client choisit où il
 // monte et où il descend (puces) ; le prix, l'heure et les places s'adaptent. Utile surtout après une recherche sans ville de
@@ -238,7 +238,7 @@ export default function TripDetailScreen() {
         </OceanSection>
       ) : null}
 
-      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Chauffeur">
+      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Conducteur">
         <View style={styles.driverRow}>
           <Avatar initials={initials} imageUri={trip.driver.photoUrl} size={52} />
           <View style={styles.driverText}>
@@ -261,7 +261,7 @@ export default function TripDetailScreen() {
               </View>
             ) : (
               <AppText variant="sm" color="textSecondary">
-                Nouveau chauffeur
+                Nouveau conducteur
               </AppText>
             )}
           </View>

@@ -1,13 +1,13 @@
 // mobile/app/(customer)/(tabs)/home.tsx
 //
-// v2 — Accueil client construit sur le même modèle que l'accueil chauffeur :
+// v2 — Accueil client construit sur le même modèle que l'accueil conducteur :
 // même en-tête (avatar, salutation, cloche avec compteur), mêmes tuiles
 // illustrées, même rythme. Les couleurs passent au bleu océan du profil
-// chauffeur ; la tuile « Envoyer un colis » garde le jaune des envois, comme
-// « Envois disponibles » côté chauffeur.
+// conducteur ; la tuile « Envoyer un colis » garde le jaune des envois, comme
+// « Envois disponibles » côté conducteur.
 //   - une grande barre « Où allez-vous ? » : l'action principale ;
 //   - les recherches récentes en cartes, avec la date ;
-//   - trois repères de confiance (chauffeurs vérifiés, codes de remise,
+//   - trois repères de confiance (conducteurs vérifiés, codes de remise,
 //     paiement dans l'app).
 
 import React, { useCallback, useState } from 'react';
@@ -36,7 +36,7 @@ import { recentSearchesStorage, formatRecentSearch, RecentSearch } from '@/servi
 import { formatDateShort } from '@/utils/date';
 
 const TRUST_POINTS = [
-  { icon: IconRosetteDiscountCheck, title: 'Chauffeurs vérifiés', text: 'Un badge signale les profils validés par notre équipe.' },
+  { icon: IconRosetteDiscountCheck, title: 'Conducteurs vérifiés', text: 'Un badge signale les profils validés par notre équipe.' },
   { icon: IconKey, title: 'Remise sécurisée', text: 'Chaque récupération et chaque livraison se valide par un code.' },
   { icon: IconWallet, title: 'Paiement dans l’app', text: 'Vous payez depuis l’application, sans argent à remettre en main propre.' },
 ];
@@ -45,7 +45,7 @@ export default function CustomerHomeScreen() {
   const user = useAuthStore((state) => state.user);
   const { data: profile } = useCustomerProfile();
   // Pas d'endpoint compteur dédié — approximation à partir de la première
-  // page de notifications, comme sur l'accueil chauffeur.
+  // page de notifications, comme sur l'accueil conducteur.
   const { data: notificationsPage } = useMyNotifications(1);
   const messageAlert = useLatestMessageAlert();
   const markNotificationRead = useMarkNotificationRead();

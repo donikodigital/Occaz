@@ -1,5 +1,5 @@
 // backend/src/conversations/conversations.service.ts
-// [21/09/2026] v2 — conversation d'un envoi via Shipment.driverId (chauffeur avec ou sans trajet).
+// [21/09/2026] v2 — conversation d'un envoi via Shipment.driverId (conducteur avec ou sans trajet).
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationChannel, NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,14 +8,14 @@ import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 
 /**
- * Section 23 : chat Client <-> Chauffeur, avec possibilité d'intervention
+ * Section 23 : chat Client <-> Conducteur, avec possibilité d'intervention
  * du support. Une Conversation appartient toujours exactement à un
- * client et un chauffeur (champs directs sur le modèle, pas de table de
+ * client et un conducteur (champs directs sur le modèle, pas de table de
  * participants — décision Lot 1) ; l'accès support est gouverné par la
  * permission CONVERSATION_READ (RBAC, Lot 1) plutôt que par le type de
  * compte brut — cohérent avec le reste de l'application (BOOKING_READ,
  * SHIPMENT_READ...). Un message envoyé par un titulaire de cette
- * permission qui n'est ni le client ni le chauffeur est marqué
+ * permission qui n'est ni le client ni le conducteur est marqué
  * isSupportIntervention.
  */
 @Injectable()
@@ -52,7 +52,7 @@ export class ConversationsService {
     });
     if (!shipment) throw new NotFoundException('Envoi introuvable.');
     if (!shipment.driver) {
-      throw new ForbiddenException("Aucun chauffeur n'est encore assigné à cet envoi.");
+      throw new ForbiddenException("Aucun conducteur n'est encore assigné à cet envoi.");
     }
     this.assertParty(requesterUserId, shipment.customer.userId, shipment.driver.userId);
 
@@ -207,7 +207,7 @@ export class ConversationsService {
    * ordinaire, pas un événement métier critique — le push suffit pour
    * l'alerte "à l'écran d'accueil, avec son" demandée côté client. Une
    * intervention support (l'expéditeur n'est ni le client ni le
-   * chauffeur) prévient les deux parties à la fois.
+   * conducteur) prévient les deux parties à la fois.
    */
   private async notifyOtherParty(
     conversation: {

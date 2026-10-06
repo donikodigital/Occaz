@@ -82,11 +82,11 @@ function AdminDashboardView() {
             label="Utilisateurs"
             value={formatNumber(data.users.total)}
             icon={IconUsers}
-            sublabel={`${formatNumber(data.users.drivers)} ${plural(data.users.drivers, 'chauffeur')} · ${formatNumber(data.users.customers)} ${plural(data.users.customers, 'client')}`}
+            sublabel={`${formatNumber(data.users.drivers)} ${plural(data.users.drivers, 'conducteur')} · ${formatNumber(data.users.customers)} ${plural(data.users.customers, 'client')}`}
           />
           <StatCard
             index={1}
-            label="Chauffeurs vérifiés"
+            label="Conducteurs vérifiés"
             value={formatNumber(data.users.verifiedDrivers)}
             icon={IconUserCheck}
             tone="success"
@@ -98,7 +98,7 @@ function AdminDashboardView() {
             value={formatNumber(data.active.drivers + data.active.customers)}
             icon={IconUsers}
             tone="accent"
-            sublabel={`${formatNumber(data.active.drivers)} ${plural(data.active.drivers, 'chauffeur')} · ${formatNumber(data.active.customers)} ${plural(data.active.customers, 'client')}`}
+            sublabel={`${formatNumber(data.active.drivers)} ${plural(data.active.drivers, 'conducteur')} · ${formatNumber(data.active.customers)} ${plural(data.active.customers, 'client')}`}
           />
           <StatCard
             index={3}

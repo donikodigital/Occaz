@@ -1,6 +1,6 @@
 // mobile/src/components/ocean/OceanKit.tsx
 //
-// Briques de l'identité « bleu océan » du profil chauffeur, utilisées par
+// Briques de l'identité « bleu océan » du profil conducteur, utilisées par
 // tous les écrans de l'espace client : même bandeau sombre aux reflets, même
 // bouton plein, mêmes sections à en-tête soulignée, mêmes champs clairs.
 // Seul le contenu change d'un espace à l'autre, pas le langage visuel.

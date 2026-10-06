@@ -38,7 +38,7 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
       className={`${disputeFont.className} fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-6`}
       role="dialog"
       aria-modal="true"
-      aria-label="Fiche chauffeur"
+      aria-label="Fiche conducteur"
     >
       <DisputeMotionStyles />
       <style>{`
@@ -58,7 +58,7 @@ export function DriverDetailModal({ open, onClose, driverId }: DriverDetailModal
 
       <div className="driver-sheet relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/10 sm:max-w-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 bg-white px-5 py-3.5">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">Fiche chauffeur</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-primary">Fiche conducteur</p>
           <button
             type="button"
             autoFocus

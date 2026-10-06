@@ -44,7 +44,7 @@ export class VehiclesService {
   async assertOwnership(id: string, driverId: string) {
     const vehicle = await this.findOne(id);
     if (vehicle.driverId !== driverId) {
-      throw new ForbiddenException("Ce véhicule n'appartient pas à ce chauffeur.");
+      throw new ForbiddenException("Ce véhicule n'appartient pas à ce conducteur.");
     }
     return vehicle;
   }

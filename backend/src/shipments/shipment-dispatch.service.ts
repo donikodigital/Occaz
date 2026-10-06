@@ -1,6 +1,6 @@
 // backend/src/shipments/shipment-dispatch.service.ts
-// [21/09/2026] v1 — annonce d'un envoi à tous les chauffeurs validés (push avec son + e-mail), sans donnée client.
-// [21/09/2026] v2 — e-mail aux chauffeurs désactivable (shipment.dispatch_email_enabled).
+// [21/09/2026] v1 — annonce d'un envoi à tous les conducteurs validés (push avec son + e-mail), sans donnée client.
+// [21/09/2026] v2 — e-mail aux conducteurs désactivable (shipment.dispatch_email_enabled).
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { DriverAccountStatus, NotificationChannel, NotificationType, ShipmentStatus } from '@prisma/client';
@@ -13,15 +13,15 @@ import { formatMoneyWithCurrency } from '../common/utils/money.util';
 /** Identifiant du canal Android (créé côté app, importance maximale) qui fait sonner l'alerte. */
 export const SHIPMENT_REQUEST_CHANNEL_ID = 'shipment-requests';
 
-/** Nombre de chauffeurs notifiés en parallèle — évite de saturer la base et le fournisseur de push. */
+/** Nombre de conducteurs notifiés en parallèle — évite de saturer la base et le fournisseur de push. */
 const NOTIFY_BATCH_SIZE = 25;
 
 /**
- * Annonce d'un envoi aux chauffeurs : quand une demande passe en recherche
- * de chauffeur (ou est prolongée), TOUS les chauffeurs validés sont prévenus
+ * Annonce d'un envoi aux conducteurs : quand une demande passe en recherche
+ * de conducteur (ou est prolongée), TOUS les conducteurs validés sont prévenus
  * en même temps par push (avec son) et, par défaut, par e-mail — avec ou sans
  * trajet établi. L'e-mail se coupe dans les paramètres
- * (`shipment.dispatch_email_enabled` = 0) : il part à chaque chauffeur pour
+ * (`shipment.dispatch_email_enabled` = 0) : il part à chaque conducteur pour
  * chaque demande, ce qui peut dépasser le quota d'un fournisseur d'e-mails.
  * Le premier qui accepte l'emporte (ShipmentsService.accept). Le message ne
  * contient jamais de donnée personnelle du client : villes, poids et gain
@@ -93,7 +93,7 @@ export class ShipmentDispatchService {
       );
     }
 
-    this.logger.log(`Envoi ${shipmentId} annoncé à ${drivers.length} chauffeur(s).`);
+    this.logger.log(`Envoi ${shipmentId} annoncé à ${drivers.length} conducteur(s).`);
     return drivers.length;
   }
 }

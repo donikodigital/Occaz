@@ -99,7 +99,7 @@ export class PromoCodesService {
    * réduction BRUTE, telle que définie par le code — c'est à l'appelant de
    * la plafonner à sa commission avant de l'appliquer (voir le commentaire
    * dans ShipmentsService.create : la réduction ne doit jamais réduire ce
-   * que touche le chauffeur, seulement la commission de la plateforme).
+   * que touche le conducteur, seulement la commission de la plateforme).
    * Ne consacre rien — l'appelant doit ensuite appeler redeem() dans SA
    * propre transaction, une fois la réservation/l'envoi effectivement créé.
    */

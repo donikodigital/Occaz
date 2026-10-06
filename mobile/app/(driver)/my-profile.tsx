@@ -161,7 +161,7 @@ export default function MyDriverProfileScreen() {
             Mon profil
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            Compte chauffeur
+            Compte conducteur
           </AppText>
         </View>
       </View>
@@ -191,7 +191,7 @@ export default function MyDriverProfileScreen() {
               <View style={styles.rolePill}>
                 {isValidated ? <IconShieldCheck size={12} color={OCEAN.gold} /> : null}
                 <AppText variant="xs" weight="bold" color={OCEAN.white} style={styles.roleLabel}>
-                  {isValidated ? 'Chauffeur validé' : 'Chauffeur'}
+                  {isValidated ? 'Conducteur validé' : 'Conducteur'}
                 </AppText>
               </View>
 

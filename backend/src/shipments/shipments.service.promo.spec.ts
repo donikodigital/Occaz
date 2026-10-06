@@ -5,7 +5,7 @@ import { ShipmentsService } from './shipments.service';
 /**
  * Code promo à la création d'un envoi : la réduction est toujours
  * plafonnée à la commission de la plateforme — jamais au-delà, pour que
- * le gain du chauffeur ne dépende jamais d'un code promo (voir le
+ * le gain du conducteur ne dépende jamais d'un code promo (voir le
  * commentaire dans ShipmentsService.create).
  */
 const senderLocation = {
@@ -99,7 +99,7 @@ describe('ShipmentsService.create — code promo', () => {
         data: expect.objectContaining({ totalAmount: 145_000n, platformFee: 10_000n, price: 150_000n }),
       }),
     );
-    // Le chauffeur touche toujours 150 000 - 15 000 = 135 000 (145 000 - 10 000).
+    // Le conducteur touche toujours 150 000 - 15 000 = 135 000 (145 000 - 10 000).
     expect(145_000n - 10_000n).toBe(150_000n - 15_000n);
     expect(promoCodes.redeem).toHaveBeenCalledWith(
       tx,
@@ -108,7 +108,7 @@ describe('ShipmentsService.create — code promo', () => {
     );
   });
 
-  it('réduction supérieure à la commission : plafonnée, jamais au-delà — le chauffeur ne perd jamais rien', async () => {
+  it('réduction supérieure à la commission : plafonnée, jamais au-delà — le conducteur ne perd jamais rien', async () => {
     const { service, tx, promoCodes } = createService({ rawDiscount: 50_000n, platformFee: 15_000n });
     await service.create('cust1', { ...baseDto, promoCode: 'GROSPROMO' } as never);
 
@@ -118,7 +118,7 @@ describe('ShipmentsService.create — code promo', () => {
         data: expect.objectContaining({ totalAmount: 135_000n, platformFee: 0n, price: 150_000n }),
       }),
     );
-    // Le chauffeur touche encore 150 000 - 15 000 = 135 000 (135 000 - 0).
+    // Le conducteur touche encore 150 000 - 15 000 = 135 000 (135 000 - 0).
     expect(135_000n - 0n).toBe(150_000n - 15_000n);
     expect(promoCodes.redeem).toHaveBeenCalledWith(
       tx,

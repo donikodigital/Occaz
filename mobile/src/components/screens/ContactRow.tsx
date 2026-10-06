@@ -4,7 +4,7 @@
 // construire, le téléphone de l'utilisateur (et le réseau GSM) s'en
 // chargent déjà. Le numéro lui-même n'est révélé par le backend qu'une
 // fois le paiement effectué (réservation CONFIRMED/COMPLETED, envoi
-// avec chauffeur assigné) — ce composant se contente d'afficher ce
+// avec conducteur assigné) — ce composant se contente d'afficher ce
 // qu'on lui donne ; la vraie protection est côté serveur.
 import React from 'react';
 import { Linking, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';

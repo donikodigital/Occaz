@@ -2,7 +2,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { vehiclesApi } from '@/services/api/vehicles.api';
 
-/** Invalide le détail du chauffeur (qui inclut ses véhicules) plutôt qu'une liste de véhicules à part — voir drivers.types.ts. */
+/** Invalide le détail du conducteur (qui inclut ses véhicules) plutôt qu'une liste de véhicules à part — voir drivers.types.ts. */
 export function useVerifyVehicle(driverId: string) {
   const queryClient = useQueryClient();
   return useMutation({

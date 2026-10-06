@@ -1,10 +1,10 @@
 // backend/src/wallets/wallet-history.ts
 //
-// Historique du portefeuille tel que le CHAUFFEUR le voit : fusion du revenu et de sa commission en une seule ligne au montant net,
+// Historique du portefeuille tel que le CONDUCTEUR le voit : fusion du revenu et de sa commission en une seule ligne au montant net,
 // classement par catégorie (trajets, envois, retraits, autres) et totaux par catégorie. Ce fichier est pur (ni base ni réseau) ; les
 // lectures en base et l'enrichissement des lignes (itinéraire, statut du retrait) sont dans wallets.service.ts.
 //
-// Règle de confidentialité (demande explicite) : le chauffeur ne voit jamais le montant brut payé par le client ni la commission de
+// Règle de confidentialité (demande explicite) : le conducteur ne voit jamais le montant brut payé par le client ni la commission de
 // la plateforme comme lignes séparées — seulement sa part. Rien de ce qui sort d'ici ne permet de les retrouver : la conversion de
 // devise n'expose que les devises et le taux, jamais les montants d'origine.
 import { WalletTransactionStatus, WalletTransactionType } from '@prisma/client';

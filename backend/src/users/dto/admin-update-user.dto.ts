@@ -7,7 +7,7 @@ import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
  * USER_UPDATE) — distinct de UpdateUserDto (PATCH /users/me, self-service)
  * pour ne jamais mélanger les deux surfaces de validation. firstName/
  * lastName ne s'appliquent qu'aux comptes avec un profil client ou
- * chauffeur (voir UsersService.adminUpdate) — envoyés sur un compte
+ * conducteur (voir UsersService.adminUpdate) — envoyés sur un compte
  * Support/SuperAdmin, ils sont refusés.
  */
 export class AdminUpdateUserDto {

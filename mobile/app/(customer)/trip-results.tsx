@@ -2,7 +2,7 @@
 //
 // v2 — Refonte bleu océan. Bandeau d'itinéraire (départ → arrivée, date,
 // passagers), filtre « Vérifiés » en puce, et une carte par trajet : le
-// chauffeur (photo, badge vérifié, note), le prix en grand — avec sa devise
+// conducteur (photo, badge vérifié, note), le prix en grand — avec sa devise
 // telle que renvoyée par l'API, plus aucune devise écrite en dur — puis
 // l'heure de départ, les places (formulation commune « 2 places libres » /
 // « Complet ») et « Colis ok ».
@@ -75,7 +75,7 @@ function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => voi
             </View>
           ) : (
             <AppText variant="xs" color="textSecondary">
-              Nouveau chauffeur
+              Nouveau conducteur
             </AppText>
           )}
           {isPartial ? (
@@ -206,7 +206,7 @@ export default function TripResultsScreen() {
       title="Aucun trajet pour le moment"
       text={
         verifiedOnly
-          ? 'Aucun chauffeur vérifié ne correspond. Retirez le filtre « Vérifiés » pour voir tous les trajets.'
+          ? 'Aucun conducteur vérifié ne correspond. Retirez le filtre « Vérifiés » pour voir tous les trajets.'
           : 'Aucun trajet ne correspond à cette recherche. Essayez une autre date ou revenez plus tard.'
       }
     />

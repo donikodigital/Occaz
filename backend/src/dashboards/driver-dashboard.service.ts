@@ -14,7 +14,7 @@ export class DriverDashboardService {
       where: { id: driverId },
       include: { wallet: true },
     });
-    if (!driver) throw new NotFoundException('Profil chauffeur introuvable.');
+    if (!driver) throw new NotFoundException('Profil conducteur introuvable.');
 
     const [nextTrip, reservedSeatsAgg, shipmentsToPickup, shipmentsInProgress] = await Promise.all([
       this.prisma.trip.findFirst({

@@ -45,7 +45,7 @@ describe('UsersService.deleteSelf', () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
-  it('refuse à un chauffeur avec un trajet en cours', async () => {
+  it('refuse à un conducteur avec un trajet en cours', async () => {
     const { service, prisma } = createService({ tripCount: 1 });
     await expect(service.deleteSelf('u1', {})).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.user.update).not.toHaveBeenCalled();

@@ -12,11 +12,11 @@ export function useMyBookings(page = 1) {
 
 /**
  * Tant que la réservation est active, l'écran se met à jour tout seul :
- * chauffeur arrivé, pris en charge, dépose… (même principe que
+ * conducteur arrivé, pris en charge, dépose… (même principe que
  * useShipment). Sans ce polling, `trip.status` reste figé à sa valeur
  * du chargement de l'écran — la carte "Code de dépose" par exemple ne
  * peut jamais apparaître pour un client qui a ouvert l'écran avant que
- * le chauffeur valide la prise en charge, même après un rafraîchissement
+ * le conducteur valide la prise en charge, même après un rafraîchissement
  * manuel classique (pull-to-refresh), tant que l'écran n'est pas
  * réellement rechargé.
  */
@@ -55,7 +55,7 @@ export function useCancelBooking(id: string) {
   });
 }
 
-// --- Côté chauffeur : validation OTP de prise en charge / dépose ---
+// --- Côté conducteur : validation OTP de prise en charge / dépose ---
 
 export function useRequestPickupOtp(bookingId: string, tripId: string) {
   const queryClient = useQueryClient();
