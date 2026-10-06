@@ -58,8 +58,19 @@ export function RouteMap({ origin, destination, onRouteInfo, height = 320 }: Rou
         const coords = `${origin!.longitude},${origin!.latitude};${destination!.longitude},${destination!.latitude}`;
         const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&access_token=${token}`;
         const response = await fetch(url);
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
         if (cancelled) return;
+
+        // Un jeton refusé (401/403) ne doit pas passer pour « aucun itinéraire » : le message dit la vraie cause.
+        if (!response.ok) {
+          setErrorMessage(
+            response.status === 401 || response.status === 403
+              ? `Carte indisponible : jeton Mapbox refusé (${response.status}). Vérifie EXPO_PUBLIC_MAPBOX_TOKEN dans EAS.`
+              : `Mapbox a répondu une erreur (${response.status}).`,
+          );
+          onRouteInfo?.(null);
+          return;
+        }
 
         const route = data?.routes?.[0];
         if (!route) {
@@ -111,7 +122,16 @@ export function RouteMap({ origin, destination, onRouteInfo, height = 320 }: Rou
 
   return (
     <View style={[styles.container, { height }]}>
-      <MapView style={styles.mapSurface} scaleBarEnabled={false} logoEnabled={false}>
+      <MapView
+        style={styles.mapSurface}
+        scaleBarEnabled={false}
+        logoEnabled={false}
+        onMapLoadingError={() =>
+          setErrorMessage(
+            'Fond de carte non chargé : jeton Mapbox refusé ou réseau indisponible (vérifie EXPO_PUBLIC_MAPBOX_TOKEN).',
+          )
+        }
+      >
         <Camera
           ref={cameraRef}
           defaultSettings={{
