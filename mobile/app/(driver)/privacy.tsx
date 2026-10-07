@@ -1,4 +1,5 @@
 // mobile/app/(driver)/privacy.tsx
+// [07/10/2026] Le titre de la page passe en bandeau (hero) bleu océan : OceanHeroHeader. Le reste de l'écran est inchangé.
 //
 // v1 — Protection des données : brouillon à remplacer par Doniko (ou un
 // juriste), basé sur la Loi L/2016/037/AN relative à la cyber-sécurité et
@@ -9,9 +10,10 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconAlertTriangle } from '@tabler/icons-react-native';
+import { IconAlertTriangle, IconShieldCheck } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
 import { OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 
@@ -31,7 +33,7 @@ function Article({ title, children }: { title: string; children: React.ReactNode
 export default function PrivacyScreen() {
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Protection des données" onBack={() => router.back()} />
+      <OceanHeroHeader title="Protection des données" icon={<IconShieldCheck />} onBack={() => router.back()} />
 
       <View style={styles.warning}>
         <IconAlertTriangle size={16} color={colors.dangerDark} />

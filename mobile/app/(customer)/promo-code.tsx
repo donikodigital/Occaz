@@ -1,4 +1,5 @@
 // mobile/app/(customer)/promo-code.tsx
+// [07/10/2026] Le titre de la page passe en bandeau (hero) bleu océan : OceanHeroHeader. Le reste de l'écran est inchangé.
 //
 // v1 — Simulateur de code promo : le code est vérifié et l'économie
 // calculée pour un montant donné, mais n'est pas encore appliqué
@@ -10,7 +11,8 @@ import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconDiscount2 } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
-import { OceanButton, OceanCard, OceanChip, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard, OceanChip } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useValidatePromoCode } from '@/hooks/usePromotions';
@@ -42,7 +44,7 @@ export default function PromoCodeScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Saisir un code promo" onBack={() => router.back()} />
+      <OceanHeroHeader title="Saisir un code promo" icon={<IconDiscount2 />} onBack={() => router.back()} />
 
       <View style={styles.hero}>
         <IconDiscount2 size={22} color={OCEAN.base} />

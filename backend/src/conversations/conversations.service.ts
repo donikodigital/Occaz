@@ -74,20 +74,63 @@ export class ConversationsService {
     }
   }
 
+  /**
+   * Liste des conversations de l'utilisateur. Pour que l'écran « Messages » parle autrement que par « Trajet » / « Envoi », chaque
+   * ligne porte, EN PLUS des champs historiques (qui restent, pour les anciennes versions de l'app) :
+   *  - `counterpart` : prénom et nom de l'autre personne (jamais son identifiant ni son téléphone) ;
+   *  - `lastMessage` : aperçu du dernier message, `fromMe` dit si c'est l'utilisateur qui l'a écrit ;
+   *  - `unreadCount` : messages de l'autre partie pas encore lus (même critère que markRead) ;
+   *  - `booking.trip` / `shipment.trip` : villes de départ et d'arrivée, pour afficher l'itinéraire.
+   */
   async findMine(userId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
     const where = {
       OR: [{ customer: { userId } }, { driver: { userId } }],
     };
-    const [data, total] = await Promise.all([
+    const tripCities = {
+      select: {
+        originCity: { select: { name: true } },
+        destinationCity: { select: { name: true } },
+      },
+    };
+    const [rows, total] = await Promise.all([
       this.prisma.conversation.findMany({
         where,
         skip: query.skip,
         take: query.take,
         orderBy: { createdAt: 'desc' },
-        include: { booking: true, shipment: true },
+        include: {
+          booking: { include: { trip: tripCities } },
+          shipment: { include: { trip: tripCities } },
+          customer: { select: { userId: true, firstName: true, lastName: true } },
+          driver: { select: { userId: true, firstName: true, lastName: true } },
+          messages: {
+            orderBy: { sentAt: 'desc' },
+            take: 1,
+            select: { content: true, sentAt: true, senderId: true, isSupportIntervention: true },
+          },
+          _count: { select: { messages: { where: { senderId: { not: userId }, readAt: null } } } },
+        },
       }),
       this.prisma.conversation.count({ where }),
     ]);
+
+    const data = rows.map(({ customer, driver, messages, _count, ...conversation }) => {
+      const other = driver.userId === userId ? customer : driver;
+      const last = messages[0];
+      return {
+        ...conversation,
+        counterpart: { firstName: other.firstName, lastName: other.lastName },
+        lastMessage: last
+          ? {
+              content: last.content,
+              sentAt: last.sentAt,
+              fromMe: last.senderId === userId,
+              isSupportIntervention: last.isSupportIntervention,
+            }
+          : null,
+        unreadCount: _count.messages,
+      };
+    });
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 

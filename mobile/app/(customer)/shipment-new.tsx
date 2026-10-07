@@ -1,4 +1,6 @@
 // mobile/app/(customer)/shipment-new.tsx
+// [07/10/2026] v6.1 — Les titres d'étape (Expéditeur, Destinataire, Colis, Période) passent en bandeau « hero » : voir
+// FormAccordion.tsx. Seule modification ici : chaque étape reçoit `total` pour afficher « ÉTAPE n SUR 4 ».
 // [04/10/2026] v6 — Formulaire en étapes repliables : une seule étape ouverte à la fois, les autres tiennent sur une ligne avec un
 // résumé de ce qui est saisi (pastille numéro / coche / alerte). Les informations du profil et les détails facultatifs du colis
 // sont repliés par défaut ; le code promo et le détail du prix aussi. Le prix à payer et « Confirmer l'envoi » restent fixes en
@@ -441,6 +443,7 @@ export default function NewShipmentScreen() {
       {/* 1 — Expéditeur : l'adresse de récupération d'abord ; les informations du profil, repliées */}
       <FormAccordionSection
         step={1}
+        total={SECTION_ORDER.length}
         icon={<IconUser size={15} color={OCEAN.base} />}
         title="Expéditeur"
         summary={summaries.sender}
@@ -512,6 +515,7 @@ export default function NewShipmentScreen() {
       {/* 2 — Destinataire */}
       <FormAccordionSection
         step={2}
+        total={SECTION_ORDER.length}
         icon={<IconUserCheck size={15} color={OCEAN.base} />}
         title="Destinataire"
         summary={summaries.recipient}
@@ -539,6 +543,7 @@ export default function NewShipmentScreen() {
       {/* 3 — Colis : l'essentiel d'abord ; dimensions, valeur et description, repliées */}
       <FormAccordionSection
         step={3}
+        total={SECTION_ORDER.length}
         icon={<IconPackage size={15} color={OCEAN.base} />}
         title="Colis"
         summary={summaries.parcel}
@@ -631,6 +636,7 @@ export default function NewShipmentScreen() {
       {/* 4 — Période */}
       <FormAccordionSection
         step={4}
+        total={SECTION_ORDER.length}
         icon={<IconCalendarEvent size={15} color={OCEAN.base} />}
         title="Période"
         summary={summaries.window}

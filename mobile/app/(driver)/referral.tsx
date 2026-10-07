@@ -1,5 +1,8 @@
 // mobile/app/(driver)/referral.tsx
 //
+// [07/10/2026] v1.1 — Le message de partage contient le lien d'invitation (page /rejoindre du site) et le code : voir
+// utils/referralShare.ts.
+//
 // v1 — Parrainage : votre code (à partager), un champ pour saisir celui
 // d'un ami, et la liste de vos filleuls avec leur statut. La récompense
 // n'est pas encore créditée automatiquement (voir ReferralsService,
@@ -16,6 +19,7 @@ import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useApplyReferralCode, useMyReferralCode, useMyReferrals } from '@/hooks/usePromotions';
 import { formatDateShort } from '@/utils/date';
+import { buildReferralShareMessage } from '@/utils/referralShare';
 import { ApiError } from '@/services/api/ApiError';
 import type { Referral, ReferralStatus } from '@/types/promotions.types';
 
@@ -62,7 +66,7 @@ export default function ReferralScreen() {
 
   async function handleShare() {
     if (!myCode) return;
-    await Share.share({ message: `Rejoins-moi sur Occaz avec mon code de parrainage : ${myCode.code}` });
+    await Share.share({ message: buildReferralShareMessage(myCode.code) });
   }
 
   function handleApply() {

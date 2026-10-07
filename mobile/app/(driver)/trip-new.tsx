@@ -1,5 +1,7 @@
 // mobile/app/(driver)/trip-new.tsx
 //
+// [07/10/2026] v6.1 — Les titres d'étape (Itinéraire, Date et heure, Véhicule, Places et tarif) passent en bandeau « hero » : voir
+// FormAccordion.tsx. Seule modification ici : chaque étape reçoit `total` pour afficher « ÉTAPE n SUR 4 ».
 // [04/10/2026] v6 — Formulaire en 4 étapes repliables (Itinéraire, Date et heure, Véhicule, Places et tarif) : une seule étape
 // ouverte à la fois, les autres tiennent sur une ligne avec leur résumé. Les villes traversées et les notes sont des détails
 // repliés. L'aperçu bleu disparaît sur téléphone (les résumés disent la même chose), il reste sur grand écran. La devise n'est plus
@@ -495,6 +497,7 @@ export default function NewTripScreen() {
           {/* 1 — Itinéraire : départ et arrivée d'abord ; les villes traversées, repliées */}
           <FormAccordionSection
             step={1}
+            total={SECTION_ORDER.length}
             icon={<IconRoute size={15} color={colors.primary} />}
             title="Itinéraire"
             summary={summaries.route}
@@ -620,6 +623,7 @@ export default function NewTripScreen() {
           {/* 2 — Date et heure */}
           <FormAccordionSection
             step={2}
+            total={SECTION_ORDER.length}
             icon={<IconCalendarEvent size={15} color={colors.primary} />}
             title="Date et heure"
             summary={summaries.date}
@@ -661,6 +665,7 @@ export default function NewTripScreen() {
           {/* 3 — Véhicule */}
           <FormAccordionSection
             step={3}
+            total={SECTION_ORDER.length}
             icon={<IconCar size={15} color={colors.primary} />}
             title="Véhicule"
             summary={summaries.vehicle}
@@ -711,6 +716,7 @@ export default function NewTripScreen() {
           {/* 4 — Places et tarif : l'essentiel d'abord ; les notes, repliées */}
           <FormAccordionSection
             step={4}
+            total={SECTION_ORDER.length}
             icon={<IconUsers size={15} color={colors.primary} />}
             title="Places et tarif"
             summary={summaries.price}

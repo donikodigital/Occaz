@@ -1,4 +1,5 @@
 // mobile/src/components/screens/DisputesListScreen.tsx
+// [07/10/2026] Le titre de la page passe en bandeau (hero) bleu océan : OceanHeroHeader. Le reste de l'écran est inchangé.
 //
 // v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
 // retour rond et sous-titre, une carte par litige (pastille bleue pour un
@@ -7,9 +8,10 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconChevronRight, IconPackage, IconRoute, IconShieldCheck } from '@tabler/icons-react-native';
+import { IconAlertTriangle, IconChevronRight, IconPackage, IconRoute, IconShieldCheck } from '@tabler/icons-react-native';
 import { AppText, ResponsiveList, ScreenContainer } from '@/components/ui';
-import { OceanCard, OceanEmpty, OceanPill, OceanScreenHeader, type OceanPillTone } from '@/components/ocean/OceanKit';
+import { OceanCard, OceanEmpty, OceanPill, type OceanPillTone } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useMyDisputes } from '@/hooks/useDisputes';
@@ -57,7 +59,7 @@ export function DisputesListScreen({ basePath }: DisputesListScreenProps) {
   const { data: disputes, isLoading } = useMyDisputes();
 
   const header = (
-    <OceanScreenHeader title="Mes litiges" subtitle="Le suivi de vos signalements" onBack={() => router.back()} />
+    <OceanHeroHeader title="Mes litiges" subtitle="Le suivi de vos signalements" icon={<IconAlertTriangle />} onBack={() => router.back()} />
   );
 
   return (

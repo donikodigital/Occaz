@@ -1,5 +1,7 @@
 // mobile/app/(customer)/trip-search.tsx
 //
+// [07/10/2026] v3.1 — Les trois blocs (Itinéraire, Date, Passagers) prennent le bandeau « hero » des formulaires de création de trajet
+// et d'envoi de colis (HeroSection) : icône, « ÉTAPE n SUR 3 », titre et résumé de ce qui est choisi. Logique inchangée.
 // [04/10/2026] v3 — Une seule ville suffit : sans départ, le client voit tous les trajets qui mènent à sa destination (arrivée ou
 // ville traversée), d'où qu'ils partent ; sans arrivée, tous ceux qui partent de sa ville. Le départ détecté par GPS peut être
 // effacé (croix), et n'est pas remis ensuite.
@@ -18,18 +20,20 @@ import {
   IconCalendarEvent,
   IconChevronRight,
   IconInfoCircle,
+  IconRoute,
   IconSearch,
   IconUsers,
   IconX,
 } from '@tabler/icons-react-native';
 import { AppText, CalendarPicker, ScreenContainer } from '@/components/ui';
-import { OceanButton, OceanCard, OceanScreenHeader, OceanSection, OceanStepper } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanScreenHeader, OceanStepper } from '@/components/ocean/OceanKit';
+import { HeroSection } from '@/components/screens/FormAccordion';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { recentSearchesStorage } from '@/services/storage/recentSearches';
 import { locationsApi } from '@/services/api/locations.api';
-import { toDateOnly } from '@/utils/date';
+import { formatDateLong, toDateOnly } from '@/utils/date';
 import type { City } from '@/types/geography.types';
 
 /** Hauteur d'une ligne de l'itinéraire : le tracé est positionné à partir d'elle. */
@@ -183,6 +187,20 @@ export default function TripSearchScreen() {
     router.push('/(customer)/select-city');
   }
 
+  // Résumés affichés sous le titre de chaque bandeau.
+  const routeSummary =
+    origin && destination
+      ? `${origin.name} → ${destination.name}`
+      : origin
+        ? `Depuis ${origin.name}`
+        : destination
+          ? `Vers ${destination.name}`
+          : 'Départ ou arrivée à choisir';
+  const dateSummary = selectedDate
+    ? formatDateLong(selectedDate.toISOString()).replace(/^./, (letter) => letter.toUpperCase())
+    : 'Dates flexibles';
+  const passengersSummary = `${passengersCount} passager${passengersCount > 1 ? 's' : ''}`;
+
   const firstDotTop = ROW_HEIGHT / 2 - DOT / 2;
   const secondDotTop = ROW_HEIGHT + ROW_GAP + ROW_HEIGHT / 2 - DOT / 2;
 
@@ -190,7 +208,15 @@ export default function TripSearchScreen() {
     <ScreenContainer scroll maxWidth="detail">
       <OceanScreenHeader title="Rechercher un trajet" subtitle="Où allez-vous ?" onBack={() => router.back()} />
 
-      <OceanCard style={styles.routeCard}>
+      <HeroSection
+        step={1}
+        total={3}
+        icon={<IconRoute size={22} color={OCEAN.base} />}
+        title="Itinéraire"
+        summary={routeSummary}
+        status={canSearch ? 'done' : 'todo'}
+        style={styles.routeCard}
+      >
         <View style={[styles.routeBox, { height: ROW_HEIGHT * 2 + ROW_GAP }]}>
           <View style={[styles.railDot, styles.railDotStart, { top: firstDotTop }]} />
           <View style={[styles.railLine, { top: firstDotTop + DOT, height: secondDotTop - firstDotTop - DOT }]} />
@@ -226,7 +252,7 @@ export default function TripSearchScreen() {
             </Pressable>
           ) : null}
         </View>
-      </OceanCard>
+      </HeroSection>
 
       <View style={styles.hint}>
         <IconInfoCircle size={15} color={OCEAN.base} />
@@ -239,11 +265,25 @@ export default function TripSearchScreen() {
         </AppText>
       </View>
 
-      <OceanSection icon={<IconCalendarEvent size={17} color={OCEAN.base} />} title="Date">
+      <HeroSection
+        step={2}
+        total={3}
+        icon={<IconCalendarEvent size={22} color={OCEAN.base} />}
+        title="Date"
+        summary={dateSummary}
+        status={selectedDate ? 'done' : 'todo'}
+      >
         <CalendarPicker label="" selectedDate={selectedDate} onSelectDate={setSelectedDate} flexibleLabel="Dates flexibles" />
-      </OceanSection>
+      </HeroSection>
 
-      <OceanSection icon={<IconUsers size={17} color={OCEAN.base} />} title="Passagers">
+      <HeroSection
+        step={3}
+        total={3}
+        icon={<IconUsers size={22} color={OCEAN.base} />}
+        title="Passagers"
+        summary={passengersSummary}
+        status="done"
+      >
         <View style={styles.passengersRow}>
           <View style={styles.passengersText}>
             <AppText variant="sm" weight="semibold">
@@ -255,7 +295,7 @@ export default function TripSearchScreen() {
           </View>
           <OceanStepper value={passengersCount} onChange={setPassengersCount} min={1} max={8} label="passager" />
         </View>
-      </OceanSection>
+      </HeroSection>
 
       <OceanButton
         label="Rechercher"
@@ -273,7 +313,6 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   routeCard: {
-    padding: spacing.md,
     marginBottom: spacing.md,
   },
   routeBox: {

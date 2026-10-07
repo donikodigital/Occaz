@@ -1,10 +1,16 @@
 // mobile/src/components/screens/FormAccordion.tsx
 //
+// [07/10/2026] v2 — Le titre de chaque étape devient un « hero » : bandeau bleu océan avec une grosse icône dans une tuile, la
+// pastille d'état (numéro / coche / alerte) en badge sur l'icône, « ÉTAPE 2 SUR 4 » au-dessus du titre et le résumé dessous. Replié,
+// le bandeau est clair ; ouvert, il passe au bleu profond aux reflets. Même bandeau (StepHero) pour la recherche de trajets, qui
+// n'a pas d'accordéon : voir HeroSection.
+//
 // Briques d'un long formulaire qui ne montre que ce qui sert sur le moment :
 //
-//  - FormAccordionSection : une étape du formulaire. Repliée, elle tient sur une ligne (pastille d'état, titre, résumé de ce
-//    qui est déjà saisi) ; dépliée, elle montre ses champs. Pastille : numéro (à faire), coche verte (complète), alerte rouge
-//    (à corriger).
+//  - StepHero : le bandeau de titre d'une étape (utilisé par les deux composants ci-dessous).
+//  - FormAccordionSection : une étape du formulaire. Repliée, elle tient sur un bandeau (titre + résumé de ce qui est déjà saisi) ;
+//    dépliée, elle montre ses champs sous un bandeau profond.
+//  - HeroSection : une étape toujours ouverte (pas d'accordéon), avec le même bandeau.
 //  - Disclosure : un détail secondaire repliable à l'intérieur d'une étape (« Mes informations », « Plus de détails »…), avec
 //    un aperçu en face du libellé quand il est replié.
 //  - StepProgress : barre segmentée « 2 sur 4 étapes ».
@@ -12,7 +18,7 @@
 // Les ouvertures et fermetures sont animées (LayoutAnimation). Rien ici ne connaît le formulaire d'envoi : tout est piloté par
 // les props, pour servir aussi à la réservation d'un trajet ou à la création d'un trajet.
 import React, { useState } from 'react';
-import { LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, View } from 'react-native';
+import { LayoutAnimation, Platform, Pressable, StyleProp, StyleSheet, UIManager, View, ViewStyle } from 'react-native';
 import { IconAlertTriangle, IconCheck, IconChevronDown } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, spacing } from '@/theme';
@@ -34,8 +40,98 @@ export function animateNextLayout(): void {
 
 export type StepStatus = 'todo' | 'done' | 'error';
 
+/** `deep` : bleu profond aux reflets (étape ouverte). `soft` : bandeau clair (étape repliée). */
+export type StepHeroTone = 'deep' | 'soft';
+
+const ERROR_ON_DEEP = '#FFC9C9';
+
+/** Les icônes passées par les écrans ont chacune leur couleur : le bandeau les remet à la sienne, et à sa taille. */
+function tintIcon(icon: React.ReactNode, color: string): React.ReactNode {
+  if (!React.isValidElement(icon)) return icon;
+  return React.cloneElement(icon as React.ReactElement<{ color?: string; size?: number }>, { color, size: 22 });
+}
+
+export function StepHero({
+  tone,
+  step,
+  total,
+  icon,
+  title,
+  summary,
+  status,
+  chevron,
+}: {
+  tone: StepHeroTone;
+  /** Numéro affiché dans le badge tant que l'étape n'est pas complète. */
+  step: number;
+  /** Nombre d'étapes : sert au « ÉTAPE 2 SUR 4 » au-dessus du titre (omis : pas de ligne au-dessus). */
+  total?: number;
+  icon: React.ReactNode;
+  title: string;
+  summary?: string | null;
+  status: StepStatus;
+  /** Présent : affiche le chevron d'ouverture (`open` = étape ouverte). Absent : étape non repliable. */
+  chevron?: { open: boolean };
+}) {
+  const deep = tone === 'deep';
+  const summaryColor = status === 'error' ? (deep ? ERROR_ON_DEEP : colors.danger) : deep ? OCEAN.sky : colors.textSecondary;
+
+  return (
+    <View style={[styles.hero, deep ? styles.heroDeep : styles.heroSoft]}>
+      <View style={[styles.heroCircleLarge, deep ? styles.circleOnDeep : styles.circleOnSoft]} />
+      <View style={[styles.heroCircleSmall, deep ? styles.circleOnDeep : styles.circleOnSoft]} />
+
+      <View style={styles.tileWrap}>
+        <View style={[styles.tile, deep ? styles.tileDeep : styles.tileSoft]}>{tintIcon(icon, deep ? OCEAN.onDark : OCEAN.base)}</View>
+        <View
+          style={[
+            styles.statusBadge,
+            { borderColor: deep ? OCEAN.deep : OCEAN.mist },
+            status === 'todo' && (deep ? styles.statusTodoDeep : styles.statusTodoSoft),
+            status === 'done' && styles.statusDone,
+            status === 'error' && styles.statusError,
+          ]}
+        >
+          {status === 'done' ? (
+            <IconCheck size={12} color={colors.onPrimary} strokeWidth={3} />
+          ) : status === 'error' ? (
+            <IconAlertTriangle size={12} color={colors.onPrimary} />
+          ) : (
+            <AppText variant="xs" weight="bold" color={deep ? OCEAN.deep : OCEAN.onDark} style={styles.statusNumber}>
+              {step}
+            </AppText>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.heroText}>
+        {total ? (
+          <AppText variant="xs" weight="bold" color={deep ? OCEAN.gold : OCEAN.bright} style={styles.eyebrow}>
+            {`ÉTAPE ${step} SUR ${total}`}
+          </AppText>
+        ) : null}
+        <AppText variant="md" weight="bold" color={deep ? OCEAN.onDark : OCEAN.deep} numberOfLines={1}>
+          {title}
+        </AppText>
+        {summary ? (
+          <AppText variant="xs" color={summaryColor} numberOfLines={1}>
+            {summary}
+          </AppText>
+        ) : null}
+      </View>
+
+      {chevron ? (
+        <View style={[styles.heroChevron, deep ? styles.heroChevronDeep : styles.heroChevronSoft, chevron.open && styles.chevronOpen]}>
+          <IconChevronDown size={18} color={deep ? OCEAN.onDark : OCEAN.base} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export function FormAccordionSection({
   step,
+  total,
   icon,
   title,
   summary,
@@ -44,11 +140,13 @@ export function FormAccordionSection({
   onToggle,
   children,
 }: {
-  /** Numéro affiché dans la pastille tant que l'étape n'est pas complète. */
+  /** Numéro affiché dans le badge tant que l'étape n'est pas complète. */
   step: number;
+  /** Nombre d'étapes du formulaire : affiche « ÉTAPE 2 SUR 4 » au-dessus du titre. */
+  total?: number;
   icon: React.ReactNode;
   title: string;
-  /** Ce qui est déjà saisi, en une ligne, visible quand l'étape est repliée. */
+  /** Ce qui est déjà saisi, en une ligne, sous le titre. */
   summary?: string | null;
   status: StepStatus;
   expanded: boolean;
@@ -62,40 +160,49 @@ export function FormAccordionSection({
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         accessibilityLabel={`${title}${summary ? `, ${summary}` : ''}${status === 'done' ? ', complète' : status === 'error' ? ', à corriger' : ''}`}
-        style={({ pressed }) => [styles.header, pressed && styles.pressed]}
+        style={({ pressed }) => pressed && styles.pressed}
       >
-        <View style={[styles.badge, status === 'done' && styles.badgeDone, status === 'error' && styles.badgeError]}>
-          {status === 'done' ? (
-            <IconCheck size={17} color={colors.successDark} />
-          ) : status === 'error' ? (
-            <IconAlertTriangle size={17} color={colors.danger} />
-          ) : (
-            <AppText variant="sm" weight="bold" color={OCEAN.base}>
-              {step}
-            </AppText>
-          )}
-        </View>
-
-        <View style={styles.headerText}>
-          <View style={styles.titleRow}>
-            <View style={styles.titleIcon}>{icon}</View>
-            <AppText variant="base" weight="semibold" numberOfLines={1} style={styles.title}>
-              {title}
-            </AppText>
-          </View>
-          {!expanded && summary ? (
-            <AppText variant="xs" color={status === 'error' ? 'danger' : 'textSecondary'} numberOfLines={1}>
-              {summary}
-            </AppText>
-          ) : null}
-        </View>
-
-        <View style={[styles.chevron, expanded && styles.chevronOpen]}>
-          <IconChevronDown size={18} color={OCEAN.base} />
-        </View>
+        <StepHero
+          tone={expanded ? 'deep' : 'soft'}
+          step={step}
+          total={total}
+          icon={icon}
+          title={title}
+          summary={summary}
+          status={status}
+          chevron={{ open: expanded }}
+        />
       </Pressable>
 
       {expanded ? <View style={styles.body}>{children}</View> : null}
+    </View>
+  );
+}
+
+/** Une étape toujours ouverte (écran sans accordéon, comme la recherche de trajets) sous le même bandeau. */
+export function HeroSection({
+  step,
+  total,
+  icon,
+  title,
+  summary,
+  status = 'todo',
+  style,
+  children,
+}: {
+  step: number;
+  total?: number;
+  icon: React.ReactNode;
+  title: string;
+  summary?: string | null;
+  status?: StepStatus;
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={[styles.card, styles.cardExpanded, style]}>
+      <StepHero tone="deep" step={step} total={total} icon={icon} title={title} summary={summary} status={status} />
+      <View style={styles.body}>{children}</View>
     </View>
   );
 }
@@ -178,7 +285,7 @@ export function StepProgress({ done, total }: { done: number; total: number }) {
 
 const styles = StyleSheet.create({
   pressed: {
-    opacity: 0.75,
+    opacity: 0.8,
   },
   hidden: {
     display: 'none',
@@ -200,46 +307,119 @@ const styles = StyleSheet.create({
   },
   cardExpanded: {
     borderColor: OCEAN.sky,
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     elevation: 3,
   },
   cardError: {
     borderColor: colors.danger,
   },
-  header: {
+  body: {
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+
+  // Bandeau (hero) d'une étape
+  hero: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
+    gap: spacing.sm + 4,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    overflow: 'hidden',
   },
-  badge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+  heroDeep: {
+    backgroundColor: OCEAN.deep,
+  },
+  heroSoft: {
     backgroundColor: OCEAN.mist,
   },
-  badgeDone: {
-    backgroundColor: colors.successLight,
+  heroCircleLarge: {
+    position: 'absolute',
+    top: -46,
+    right: -26,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
   },
-  badgeError: {
-    backgroundColor: '#FDECEC',
+  heroCircleSmall: {
+    position: 'absolute',
+    bottom: -34,
+    left: 70,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
   },
-  headerText: {
-    flex: 1,
-    gap: 2,
+  circleOnDeep: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  titleRow: {
-    flexDirection: 'row',
+  circleOnSoft: {
+    backgroundColor: 'rgba(11,107,168,0.07)',
+  },
+  tileWrap: {
+    width: 48,
+    height: 48,
+  },
+  tile: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
   },
-  titleIcon: {
-    opacity: 0.9,
+  tileDeep: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
   },
-  title: {
-    flexShrink: 1,
+  tileSoft: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: OCEAN.line,
+  },
+  statusBadge: {
+    position: 'absolute',
+    right: -6,
+    bottom: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusTodoDeep: {
+    backgroundColor: OCEAN.gold,
+  },
+  statusTodoSoft: {
+    backgroundColor: OCEAN.base,
+  },
+  statusDone: {
+    backgroundColor: colors.success,
+  },
+  statusError: {
+    backgroundColor: colors.danger,
+  },
+  statusNumber: {
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  heroText: {
+    flex: 1,
+    gap: 1,
+  },
+  eyebrow: {
+    letterSpacing: 0.8,
+  },
+  heroChevron: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroChevronDeep: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  heroChevronSoft: {
+    backgroundColor: colors.surface,
   },
   chevron: {
     width: 28,
@@ -251,14 +431,6 @@ const styles = StyleSheet.create({
   },
   chevronOpen: {
     transform: [{ rotate: '180deg' }],
-  },
-  body: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: OCEAN.line,
-    paddingTop: spacing.md,
   },
 
   // Détail repliable

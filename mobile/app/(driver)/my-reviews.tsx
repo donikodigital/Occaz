@@ -1,4 +1,5 @@
 // mobile/app/(driver)/my-reviews.tsx
+// [07/10/2026] Le titre de la page passe en bandeau (hero) bleu océan : OceanHeroHeader. Le reste de l'écran est inchangé.
 //
 // v1 — « Mes avis » : les notations que le client a données (pas reçues),
 // une carte par avis avec la personne notée, le contexte (trajet ou envoi)
@@ -7,9 +8,10 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconMessageStar, IconRoute, IconStarFilled, IconPackage } from '@tabler/icons-react-native';
+import { IconMessageStar, IconPackage, IconRoute, IconStar, IconStarFilled } from '@tabler/icons-react-native';
 import { AppText, Avatar, ResponsiveList, ScreenContainer } from '@/components/ui';
-import { OceanButton, OceanCard, OceanEmpty, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard, OceanEmpty } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useGivenRatings } from '@/hooks/useRatings';
@@ -78,7 +80,7 @@ export default function MyReviewsScreen() {
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.headerWrap}>
-        <OceanScreenHeader title="Mes avis" subtitle="Les notes que vous avez données" onBack={() => router.back()} />
+        <OceanHeroHeader title="Mes avis" subtitle="Les notes que vous avez données" icon={<IconStar />} onBack={() => router.back()} />
       </View>
 
       {isLoading ? (

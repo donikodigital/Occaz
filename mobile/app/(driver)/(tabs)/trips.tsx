@@ -1,4 +1,6 @@
 // mobile/app/(driver)/(tabs)/trips.tsx
+// [07/10/2026] v4 — « Mon activité » et sa phrase passent dans un bandeau (hero) bleu océan ; le reste de l'écran est inchangé.
+//
 //
 // [03/10/2026] v3 — La carte d'un envoi montre « ville de départ → ville d'arrivée » et la période, plus le nom du destinataire ;
 // le gain net passe à droite, au-dessus du statut.
@@ -11,9 +13,9 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconPackage, IconRoute } from '@tabler/icons-react-native';
+import { IconActivity, IconPackage, IconRoute } from '@tabler/icons-react-native';
 import { AppText, ResponsiveList, ScreenContainer } from '@/components/ui';
-import { OceanButton, OceanCard, OceanEmpty, OceanPill, type OceanPillTone } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard, OceanEmpty, OceanHeroCard, OceanPill, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useMyTrips } from '@/hooks/useDriverTrips';
@@ -127,14 +129,19 @@ export default function DriverActivityScreen() {
 
   const header = (
     <View>
-      <View style={styles.titleBlock}>
-        <AppText variant="xxl" weight="bold" color={OCEAN.deep}>
-          Mon activité
-        </AppText>
-        <AppText variant="sm" color="textSecondary">
-          Vos trajets et les envois que vous avez acceptés.
-        </AppText>
-      </View>
+      <OceanHeroCard style={styles.hero}>
+        <View style={styles.heroBadge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <IconActivity size={28} color={OCEAN.onDark} />
+        </View>
+        <View style={styles.heroTitles}>
+          <AppText variant="xl" weight="bold" color={OCEAN.onDark}>
+            Mon activité
+          </AppText>
+          <AppText variant="xs" color={OCEAN.sky}>
+            Vos trajets et les envois que vous avez acceptés.
+          </AppText>
+        </View>
+      </OceanHeroCard>
 
       <Segmented
         value={segment}
@@ -204,9 +211,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
-  titleBlock: {
-    paddingTop: spacing.sm,
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    marginTop: spacing.sm,
     marginBottom: spacing.md,
+  },
+  heroBadge: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  heroTitles: {
+    flex: 1,
     gap: 2,
   },
   segmented: {

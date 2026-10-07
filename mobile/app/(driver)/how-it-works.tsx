@@ -1,4 +1,5 @@
 // mobile/app/(driver)/how-it-works.tsx
+// [07/10/2026] Le titre de la page passe en bandeau (hero) bleu océan : OceanHeroHeader. Le reste de l'écran est inchangé.
 //
 // v1 — « Comment ça marche ? » côté conducteur : deux onglets (Trajets /
 // Envois), chacun avec ses 3 étapes réelles. Même structure que la
@@ -7,9 +8,10 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconCash, IconCheck, IconPackage, IconRoute, IconSpeakerphone, IconUpload } from '@tabler/icons-react-native';
+import { IconCash, IconCheck, IconInfoCircle, IconPackage, IconRoute, IconSpeakerphone, IconUpload } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
-import { OceanCard, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanCard } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 
@@ -110,7 +112,7 @@ export default function DriverHowItWorksScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Comment ça marche ?" onBack={() => router.back()} />
+      <OceanHeroHeader title="Comment ça marche ?" icon={<IconInfoCircle />} onBack={() => router.back()} />
 
       <Segmented value={segment} onChange={setSegment} />
 
