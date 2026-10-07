@@ -23,7 +23,7 @@ function createService(options: { dueForExtension?: unknown[]; claimCount?: numb
     expireUnpaid: jest.fn().mockResolvedValue(true),
   };
   const service = new ShipmentWindowService(prisma as never, pricing as never, notifications as never, shipments as never);
-  return { service, prisma, notifications, shipments };
+  return { service, prisma, pricing, notifications, shipments };
 }
 
 describe('ShipmentWindowService.runOnce', () => {
@@ -68,5 +68,16 @@ describe('ShipmentWindowService.runOnce', () => {
     shipments.expireSearch.mockRejectedValueOnce(new Error('boom'));
     await service.runOnce();
     expect(shipments.expireSearch).toHaveBeenCalledTimes(2);
+  });
+
+  it('interrupteur de l\'administration coupé (jobs.shipment_window_enabled = 0) : aucun envoi n\'est examiné ni notifié', async () => {
+    const { service, prisma, pricing, notifications } = createService({
+      dueForExtension: [{ id: 's1', customer: { userId: 'u-customer' } }],
+    });
+    pricing.getNumericSetting.mockImplementation((key: string) => Promise.resolve(key === 'jobs.shipment_window_enabled' ? 0 : 24));
+    await service.runOnce();
+    expect(pricing.getNumericSetting).toHaveBeenCalledWith('jobs.shipment_window_enabled', 1);
+    expect(prisma.shipment.findMany).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 });

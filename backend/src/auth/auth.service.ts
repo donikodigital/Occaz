@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
   HttpException,
   HttpStatus,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -21,7 +22,8 @@ import { SessionsService } from './sessions.service';
 import { TwoFactorService } from './two-factor.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
 import { EMAIL_PROVIDER, EmailProvider } from '../integrations/email/email-provider.interface';
-import { generateOtpCode, hashOtpCode, verifyOtpCode } from '../common/utils/otp.util';
+import { generateOtpCode, hashOtpCode, maskPhone, verifyOtpCode } from '../common/utils/otp.util';
+import { OtpSettings, OtpSettingsService } from '../otp/otp-settings.service';
 import { addDuration } from '../common/utils/duration.util';
 import { JwtAccessPayload, JwtRefreshPayload } from '../common/types/jwt-payload.interface';
 import { RequestOtpDto } from './dto/request-otp.dto';
@@ -29,6 +31,8 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginPasswordDto } from './dto/login-password.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
+
+const DAY_MS = 24 * 3_600_000;
 
 export interface AuthTokens {
   accessToken: string;
@@ -55,6 +59,7 @@ export class AuthService {
     private readonly audit: AuditService,
     @Inject(SMS_PROVIDER) private readonly smsProvider: SmsProvider,
     @Inject(EMAIL_PROVIDER) private readonly emailProvider: EmailProvider,
+    private readonly otpSettings: OtpSettingsService,
   ) {}
 
   /**
@@ -65,23 +70,54 @@ export class AuthService {
    * quel autre compte suit le parcours normal, sans exception.
    */
   /**
-   * Chaque demande de code envoie un SMS payant : au plus 5 par numéro et par fenêtre de 15 minutes. Évite qu'un
-   * script (ou un utilisateur qui s'impatiente) vide le crédit SMS ou harcèle un numéro. Les numéros de test sont exemptés.
+   * Chaque demande de code envoie un SMS payant. Trois plafonds, tous modifiables dans l'administration
+   * (Paramètres → Connexion et SMS) : au plus `requestLimit` demandes par numéro et par fenêtre de `requestWindowMinutes`
+   * (5 par 15 minutes par défaut), et au plus `dailyLimitPerPhone` par numéro et par période de 24 h. Évite qu'un script
+   * (ou un utilisateur qui s'impatiente) vide le crédit SMS ou harcèle un numéro. Les numéros de test sont exemptés.
    */
-  private async assertOtpRequestAllowed(userId: string): Promise<void> {
-    const windowMinutes = Number(process.env.OTP_REQUEST_WINDOW_MINUTES ?? 15);
-    const maxRequests = Number(process.env.OTP_REQUEST_LIMIT ?? 5);
-    const recent = await this.prisma.otpCode.count({
-      where: {
-        userId,
-        purpose: OtpPurpose.LOGIN,
-        createdAt: { gte: new Date(Date.now() - windowMinutes * 60_000) },
-      },
-    });
-    if (recent >= maxRequests) {
+  private async assertOtpRequestAllowed(userId: string, settings: OtpSettings): Promise<void> {
+    const now = Date.now();
+    const base = { userId, purpose: OtpPurpose.LOGIN };
+    const [recent, today] = await Promise.all([
+      this.prisma.otpCode.count({
+        where: { ...base, createdAt: { gte: new Date(now - settings.requestWindowMinutes * 60_000) } },
+      }),
+      settings.dailyLimitPerPhone > 0
+        ? this.prisma.otpCode.count({ where: { ...base, createdAt: { gte: new Date(now - DAY_MS) } } })
+        : Promise.resolve(0),
+    ]);
+    if (recent >= settings.requestLimit) {
       throw new HttpException(
-        `Trop de demandes de code. Patientez ${windowMinutes} minutes avant de réessayer.`,
+        `Trop de demandes de code. Patientez ${settings.requestWindowMinutes} minutes avant de réessayer.`,
         HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    if (settings.dailyLimitPerPhone > 0 && today >= settings.dailyLimitPerPhone) {
+      throw new HttpException(
+        'Trop de codes demandés aujourd’hui pour ce numéro. Réessayez demain ou contactez le support.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  /**
+   * Garde-fous qui ne dépendent pas du compte, appliqués AVANT de le créer : un script qui essaie des numéros au hasard
+   * (fraude au SMS surtaxé) ne crée donc aucun compte et ne déclenche aucun SMS.
+   *  - indicatif absent de la liste autorisée → refus clair ;
+   *  - plafond quotidien de toute la plateforme atteint → 503 et alerte dans les journaux (l'équipe doit le voir).
+   */
+  private async assertPlatformAllowsOtp(phone: string, settings: OtpSettings): Promise<void> {
+    this.otpSettings.assertPhoneAllowed(phone, settings);
+    if (settings.dailyLimitGlobal <= 0) return;
+    const today = await this.prisma.otpCode.count({
+      where: { purpose: OtpPurpose.LOGIN, createdAt: { gte: new Date(Date.now() - DAY_MS) } },
+    });
+    if (today >= settings.dailyLimitGlobal) {
+      this.logger.error(
+        `Plafond quotidien de codes de connexion atteint (${settings.dailyLimitGlobal}) : nouvelles demandes refusées. Vérifiez l'activité, puis relevez le plafond dans Paramètres → Connexion et SMS si elle est légitime.`,
+      );
+      throw new ServiceUnavailableException(
+        'Le service de connexion par SMS est momentanément saturé. Réessayez dans quelques heures.',
       );
     }
   }
@@ -149,6 +185,10 @@ export class AuthService {
    * (web-admin, dev-login) ne sont pas concernés.
    */
   async requestOtp(dto: RequestOtpDto): Promise<{ expiresInSeconds: number }> {
+    const isTestPhone = this.isTestPhone(dto.phone);
+    const settings = await this.otpSettings.get();
+    if (!isTestPhone) await this.assertPlatformAllowsOtp(dto.phone, settings);
+
     let user = await this.usersService.findByPhone(dto.phone);
 
     if (!user) {
@@ -169,14 +209,12 @@ export class AuthService {
       throw new BadRequestException('Ce compte est suspendu.');
     }
 
-    if (!this.isTestPhone(dto.phone)) await this.assertOtpRequestAllowed(user.id);
+    if (!isTestPhone) await this.assertOtpRequestAllowed(user.id, settings);
 
-    const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
-    const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;
-    const isTestPhone = this.isTestPhone(dto.phone);
+    const { expirySeconds, maxAttempts } = settings;
     const code = isTestPhone ? '000000' : generateOtpCode();
 
-    await this.prisma.otpCode.create({
+    const otp = await this.prisma.otpCode.create({
       data: {
         userId: user.id,
         code: hashOtpCode(code),
@@ -189,16 +227,46 @@ export class AuthService {
 
     if (isTestPhone) {
       this.logger.warn(
-        `[MODE TEST] Code fixe pour ${dto.phone} : 000000 — aucun SMS envoyé. Ne jamais laisser AUTH_TEST_MODE_ENABLED=true en production réelle.`,
+        `[MODE TEST] Code fixe pour ${maskPhone(dto.phone)} : 000000 — aucun SMS envoyé. Ne jamais laisser AUTH_TEST_MODE_ENABLED=true en production réelle.`,
       );
     } else {
-      await this.smsProvider.send(
-        dto.phone,
-        `Votre code de connexion est ${code}. Il expire dans ${Math.round(expirySeconds / 60)} minutes.`,
-      );
+      try {
+        await this.smsProvider.send(
+          dto.phone,
+          `Votre code de connexion est ${code}. Il expire dans ${Math.round(expirySeconds / 60)} minutes.`,
+        );
+      } catch (error) {
+        // Le SMS n'est pas parti : ce code ne servirait à rien et ne doit pas compter dans les plafonds de la personne. On le
+        // retire (un code précédent encore valable reste utilisable), on journalise sans exposer le numéro en clair, et on
+        // répond clairement au lieu d'une erreur 500 sans explication.
+        await this.prisma.otpCode.delete({ where: { id: otp.id } }).catch(() => undefined);
+        this.logger.error(`SMS de connexion non envoyé vers ${maskPhone(dto.phone)} : ${(error as Error).message}`);
+        throw new ServiceUnavailableException("Le SMS n'a pas pu être envoyé. Réessayez dans un instant.");
+      }
     }
 
     return { expiresInSeconds: expirySeconds };
+  }
+
+  /**
+   * Consomme un essai de façon atomique : l'incrément n'a lieu que si le code est encore en attente ET sous son nombre
+   * d'essais maximum. Renvoie false si ce n'est plus le cas (essais épuisés, ou code utilisé par une requête parallèle).
+   */
+  private async claimOtpAttempt(otp: { id: string; maxAttempts: number }): Promise<boolean> {
+    const claimed = await this.prisma.otpCode.updateMany({
+      where: { id: otp.id, status: OtpStatus.PENDING, attempts: { lt: otp.maxAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    return claimed.count > 0;
+  }
+
+  /** Marque le code comme utilisé, une seule fois : renvoie false si une autre requête l'a déjà consommé. */
+  private async consumeOtp(id: string): Promise<boolean> {
+    const consumed = await this.prisma.otpCode.updateMany({
+      where: { id, status: OtpStatus.PENDING },
+      data: { status: OtpStatus.VERIFIED, verifiedAt: new Date() },
+    });
+    return consumed.count > 0;
   }
 
   async verifyOtpAndLogin(
@@ -226,18 +294,18 @@ export class AuthService {
       throw new UnauthorizedException('Trop de tentatives, veuillez redemander un code.');
     }
 
+    // L'essai est consommé AVANT la comparaison, en une seule opération atomique : des requêtes envoyées en parallèle ne
+    // peuvent plus dépasser le nombre d'essais autorisés (avant : lecture puis incrément, donc plusieurs essais « gratuits »).
+    if (!(await this.claimOtpAttempt(otp))) {
+      throw new UnauthorizedException('Trop de tentatives, veuillez redemander un code.');
+    }
     if (!verifyOtpCode(dto.code, otp.code)) {
-      await this.prisma.otpCode.update({
-        where: { id: otp.id },
-        data: { attempts: { increment: 1 } },
-      });
       throw new UnauthorizedException('Code invalide.');
     }
-
-    await this.prisma.otpCode.update({
-      where: { id: otp.id },
-      data: { status: OtpStatus.VERIFIED, verifiedAt: new Date() },
-    });
+    // Usage unique : si deux requêtes portent le bon code en même temps, une seule ouvre une session.
+    if (!(await this.consumeOtp(otp.id))) {
+      throw new UnauthorizedException('Ce code a déjà été utilisé, veuillez en redemander un.');
+    }
 
     if (!user.isPhoneVerified) {
       await this.prisma.user.update({
@@ -364,8 +432,7 @@ export class AuthService {
       return genericResponse;
     }
 
-    const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
-    const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;
+    const { expirySeconds, maxAttempts } = await this.otpSettings.get();
     const code = generateOtpCode();
 
     await this.prisma.otpCode.create({
@@ -406,23 +473,22 @@ export class AuthService {
       await this.prisma.otpCode.update({ where: { id: otp.id }, data: { status: OtpStatus.FAILED } });
       throw new UnauthorizedException('Trop de tentatives, veuillez redemander un code.');
     }
+    if (!(await this.claimOtpAttempt(otp))) {
+      throw new UnauthorizedException('Trop de tentatives, veuillez redemander un code.');
+    }
     if (!verifyOtpCode(dto.code, otp.code)) {
-      await this.prisma.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
       throw new UnauthorizedException('Code invalide.');
+    }
+    if (!(await this.consumeOtp(otp.id))) {
+      throw new UnauthorizedException('Ce code a déjà été utilisé, veuillez en redemander un.');
     }
 
     const newPasswordHash = await bcrypt.hash(dto.newPassword, 12);
 
-    await this.prisma.$transaction([
-      this.prisma.otpCode.update({
-        where: { id: otp.id },
-        data: { status: OtpStatus.VERIFIED, verifiedAt: new Date() },
-      }),
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash: newPasswordHash },
-      }),
-    ]);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: newPasswordHash },
+    });
 
     // Un changement de mot de passe est aussi traité comme un signal de
     // compromission potentielle — toutes les sessions actives sont

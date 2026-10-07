@@ -24,6 +24,7 @@ import { VehiclesService } from '../vehicles/vehicles.service';
 import { LocationsService } from '../locations/locations.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { PricingService } from '../pricing/pricing.service';
+import { TripPricingService } from '../trip-pricing/trip-pricing.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
@@ -94,6 +95,7 @@ export class TripsService {
     private readonly bookingsService: BookingsService,
     private readonly pricing: PricingService,
     private readonly notifications: NotificationsService,
+    private readonly tripPricing: TripPricingService,
   ) {}
 
   /** Calculs de route qui demandent la base (distances, prix automatiques) — sans changer le constructeur injecté. */
@@ -251,9 +253,16 @@ export class TripsService {
       throw new BadRequestException("La date de départ doit être dans le futur.");
     }
 
-    const pricePerSeat = toMoneyBigInt(dto.pricePerSeat);
     const departureAt = new Date(dto.departureAt);
     const currencyId = await this.currencyForOriginCity(dto.originCityId, dto.currencyId);
+    // Prix selon le mode choisi par le SuperAdmin (manuel / semi-automatique / automatique) : voir TripPricingService.
+    const decision = await this.tripPricing.decidePrice({
+      originLocationId: dto.originLocationId,
+      destinationLocationId: dto.destinationLocationId,
+      currencyId,
+      requested: dto.pricePerSeat ? toMoneyBigInt(dto.pricePerSeat) : undefined,
+    });
+    const pricePerSeat = decision.pricePerSeat;
     const plannedStops = await this.planner.planStops({
       departureAt,
       pricePerSeat,
@@ -262,7 +271,9 @@ export class TripsService {
       stops: orderedStops.map((stop, index) => ({
         locationId: stop.locationId,
         cityId: stopLocations[index].cityId as string,
-        fareFromOrigin: stop.fareFromOrigin !== undefined ? toMoneyBigInt(stop.fareFromOrigin) : undefined,
+        // Prix fixés par Occa'Z : les prix d'étapes saisis par le conducteur sont ignorés, ils se calculent au prorata.
+        fareFromOrigin:
+          !decision.locked && stop.fareFromOrigin !== undefined ? toMoneyBigInt(stop.fareFromOrigin) : undefined,
         estimatedArrivalAt: stop.estimatedArrivalAt ? new Date(stop.estimatedArrivalAt) : undefined,
         isBookable: stop.isBookable,
       })),
@@ -362,6 +373,20 @@ export class TripsService {
     if (dto.originLocationId) await this.locationsService.findOne(dto.originLocationId);
     if (dto.destinationLocationId) await this.locationsService.findOne(dto.destinationLocationId);
 
+    // Le prix n'est revu que si le conducteur le change ou change le trajet (les distances changent) ; une simple
+    // modification de l'heure ou des notes ne doit pas être bloquée par un réglage modifié entre-temps (la publication
+    // revérifie de toute façon le prix).
+    let pricePerSeat: bigint | undefined;
+    if (dto.pricePerSeat || dto.originLocationId || dto.destinationLocationId) {
+      const decision = await this.tripPricing.decidePrice({
+        originLocationId: dto.originLocationId ?? trip.originLocationId,
+        destinationLocationId: dto.destinationLocationId ?? trip.destinationLocationId,
+        currencyId: trip.currencyId,
+        requested: dto.pricePerSeat ? toMoneyBigInt(dto.pricePerSeat) : trip.pricePerSeat,
+      });
+      pricePerSeat = decision.pricePerSeat;
+    }
+
     return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const updated = await tx.trip.update({
         where: { id },
@@ -376,7 +401,7 @@ export class TripsService {
           allowsShipments: dto.allowsShipments,
           maxShipmentWeightKg: dto.maxShipmentWeightKg,
           availableShipmentWeightKg: dto.maxShipmentWeightKg,
-          pricePerSeat: dto.pricePerSeat ? toMoneyBigInt(dto.pricePerSeat) : undefined,
+          pricePerSeat,
           // La devise ne se modifie pas : elle suit le pays de la ville de départ, qui ne change pas en brouillon.
           notes: dto.notes,
         },
@@ -434,9 +459,28 @@ export class TripsService {
     if (trip.status !== TripStatus.DRAFT) {
       throw new BadRequestException('Seul un trajet DRAFT peut être publié.');
     }
-    return this.prisma.trip.update({
-      where: { id },
-      data: { status: TripStatus.PUBLISHED },
+
+    // Le brouillon peut dater : le prix est revérifié avec la configuration du jour. Mode automatique : remis au prix
+    // actuel (les étapes suivent) ; mode semi-automatique : un prix devenu trop élevé bloque la publication.
+    const priceOnPublish = await this.tripPricing.priceToApplyOnPublish({
+      originLocationId: trip.originLocationId,
+      destinationLocationId: trip.destinationLocationId,
+      currencyId: trip.currencyId,
+      pricePerSeat: trip.pricePerSeat,
+    });
+    if (priceOnPublish === null) {
+      return this.prisma.trip.update({
+        where: { id },
+        data: { status: TripStatus.PUBLISHED },
+      });
+    }
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const published = await tx.trip.update({
+        where: { id },
+        data: { status: TripStatus.PUBLISHED, pricePerSeat: priceOnPublish },
+      });
+      if (trip.stops.length > 0) await this.realignStopsAfterTripUpdate(tx, trip, published);
+      return published;
     });
   }
 
@@ -737,8 +781,14 @@ export class TripsService {
     const previous = insertIndex > 0 ? existing[insertIndex - 1] : null;
     const next = insertIndex < existing.length ? existing[insertIndex] : null;
     const thisKm = geometry ? geometry.cumulativeKm[insertIndex] : null;
+    // Prix fixés par Occa'Z (mode automatique) : le prix saisi est ignoré, l'étape prend le prix calculé au prorata.
+    const priceLocked = await this.tripPricing.isPriceLocked({
+      originLocationId: trip.originLocationId,
+      destinationLocationId: trip.destinationLocationId,
+      currencyId: trip.currencyId,
+    });
     const fare =
-      dto.fareFromOrigin !== undefined
+      dto.fareFromOrigin !== undefined && !priceLocked
         ? toMoneyBigInt(dto.fareFromOrigin)
         : this.planner.interpolateInsertedFare({
             previousFare: previous?.fareFromOrigin ?? 0n,
@@ -795,6 +845,14 @@ export class TripsService {
     const stop = trip.stops.find((candidate) => candidate.id === stopId);
     if (!stop) throw new NotFoundException('Étape introuvable sur ce trajet.');
 
+    if (dto.fareFromOrigin !== undefined) {
+      const priceLocked = await this.tripPricing.isPriceLocked({
+        originLocationId: trip.originLocationId,
+        destinationLocationId: trip.destinationLocationId,
+        currencyId: trip.currencyId,
+      });
+      if (priceLocked) throw new BadRequestException("Les prix des étapes sont fixés automatiquement par Occa'Z.");
+    }
     const fare = dto.fareFromOrigin !== undefined ? toMoneyBigInt(dto.fareFromOrigin) : undefined;
     if (fare !== undefined) this.planner.assertFareWithinNeighbours(trip, stopId, fare);
 

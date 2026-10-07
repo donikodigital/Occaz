@@ -1,9 +1,18 @@
 // backend/src/platform-settings/platform-settings.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { UpsertPlatformSettingDto } from './dto/upsert-platform-setting.dto';
+
+/** Réglages gérés par leur propre page, avec validation : l'API générique n'y touche pas. */
+const MANAGED_PREFIX = 'trip_pricing.';
+
+function assertNotManaged(key: string): void {
+  if (key.startsWith(MANAGED_PREFIX)) {
+    throw new BadRequestException('Ce réglage se modifie depuis la page « Configuration frais trajets ».');
+  }
+}
 
 /**
  * Interface d'administration de la table clé/valeur déjà lue en
@@ -29,6 +38,7 @@ export class PlatformSettingsService {
   }
 
   async upsert(dto: UpsertPlatformSettingDto, actorId: string) {
+    assertNotManaged(dto.key);
     const setting = await this.prisma.platformSetting.upsert({
       where: { key: dto.key },
       update: { value: dto.value as never, description: dto.description, updatedById: actorId },
@@ -50,6 +60,7 @@ export class PlatformSettingsService {
   }
 
   async remove(key: string, actorId: string) {
+    assertNotManaged(key);
     const setting = await this.findOne(key);
     await this.prisma.platformSetting.delete({ where: { key } });
     await this.audit.log({

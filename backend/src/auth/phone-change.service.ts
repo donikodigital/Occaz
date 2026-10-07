@@ -8,7 +8,9 @@
 //  - le nouveau numéro ne doit appartenir à aucun autre compte (un numéro = un compte) ;
 //  - limites d'envoi par compte ET par numéro destinataire : un script ne peut pas inonder de SMS le numéro de quelqu'un d'autre ;
 //  - 3 essais par code ; un nouveau code annule le précédent ;
-//  - délai entre deux changements (PHONE_CHANGE_COOLDOWN_DAYS, 30 par défaut, 0 pour désactiver) ;
+//  - délai entre deux changements (30 jours par défaut, 0 pour désactiver) et limites d'envoi : réglables dans l'administration
+//    (Paramètres → Connexion et SMS), avec repli sur les variables d'environnement (PHONE_CHANGE_COOLDOWN_DAYS, OTP_REQUEST_LIMIT…) ;
+//  - seuls les indicatifs autorisés (liste réglable dans l'administration) peuvent recevoir un code ;
 //  - l'ANCIEN numéro est prévenu par SMS : si le changement n'est pas de la personne (session volée), elle le sait aussitôt ;
 //  - chaque changement est journalisé (audit), avec l'ancien et le nouveau numéro.
 import {
@@ -22,13 +24,13 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { AccountType, OtpStatus, Prisma, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { UsersService, SafeUser } from '../users/users.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
-import { generateOtpCode, hashOtpCode, verifyOtpCode } from '../common/utils/otp.util';
+import { generateOtpCode, hashOtpCode, maskPhone, verifyOtpCode } from '../common/utils/otp.util';
+import { OtpSettings, OtpSettingsService } from '../otp/otp-settings.service';
 import { addDuration } from '../common/utils/duration.util';
 
 const DAY_MS = 24 * 3_600_000;
@@ -47,7 +49,7 @@ export class PhoneChangeService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
+    private readonly otpSettings: OtpSettingsService,
     private readonly usersService: UsersService,
     private readonly audit: AuditService,
     @Inject(SMS_PROVIDER) private readonly smsProvider: SmsProvider,
@@ -60,11 +62,6 @@ export class PhoneChangeService {
       .split(',')
       .map((candidate) => candidate.trim())
       .includes(phone);
-  }
-
-  private get cooldownDays(): number {
-    const value = Number(process.env.PHONE_CHANGE_COOLDOWN_DAYS ?? 30);
-    return Number.isFinite(value) && value > 0 ? value : 0;
   }
 
   /** Étape 1 : vérifie que le changement est possible, puis envoie un code par SMS au nouveau numéro. */
@@ -80,13 +77,16 @@ export class PhoneChangeService {
     const owner = await this.usersService.findByPhone(newPhone);
     if (owner) throw new ConflictException('Ce numéro est déjà utilisé par un autre compte.');
 
-    await this.assertCooldownOver(userId);
+    const settings = await this.otpSettings.get();
+    await this.assertCooldownOver(userId, settings.phoneChangeCooldownDays);
 
     const isTest = this.isTestPhone(newPhone);
-    if (!isTest) await this.assertRequestAllowed(userId, newPhone);
+    if (!isTest) {
+      this.otpSettings.assertPhoneAllowed(newPhone, settings);
+      await this.assertRequestAllowed(userId, newPhone, settings);
+    }
 
-    const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
-    const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;
+    const { expirySeconds, maxAttempts } = settings;
     const code = isTest ? TEST_CODE : generateOtpCode();
 
     // Un nouveau code annule le précédent : un seul code valable à la fois.
@@ -115,7 +115,7 @@ export class PhoneChangeService {
         );
       } catch (error) {
         await this.prisma.phoneChangeRequest.update({ where: { id: created.id }, data: { status: OtpStatus.FAILED } });
-        this.logger.warn(`SMS de changement de numéro non envoyé : ${(error as Error).message}`);
+        this.logger.error(`SMS de changement de numéro non envoyé vers ${maskPhone(newPhone)} : ${(error as Error).message}`);
         throw new ServiceUnavailableException("Le SMS n'a pas pu être envoyé. Réessayez dans un instant.");
       }
     }
@@ -145,12 +145,21 @@ export class PhoneChangeService {
       await this.prisma.phoneChangeRequest.update({ where: { id: pending.id }, data: { status: OtpStatus.FAILED } });
       throw new BadRequestException('Trop de tentatives — demandez un nouveau code.');
     }
+    // L'essai est consommé AVANT la comparaison, de façon atomique : des requêtes parallèles ne peuvent pas dépasser le
+    // nombre d'essais autorisés.
+    const claimed = await this.prisma.phoneChangeRequest.updateMany({
+      where: { id: pending.id, status: OtpStatus.PENDING, attempts: { lt: pending.maxAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    if (claimed.count === 0) throw new BadRequestException('Trop de tentatives — demandez un nouveau code.');
     if (!verifyOtpCode(code, pending.codeHash)) {
       const attempts = pending.attempts + 1;
-      await this.prisma.phoneChangeRequest.update({
-        where: { id: pending.id },
-        data: { attempts, ...(attempts >= pending.maxAttempts ? { status: OtpStatus.FAILED } : {}) },
-      });
+      if (attempts >= pending.maxAttempts) {
+        await this.prisma.phoneChangeRequest.updateMany({
+          where: { id: pending.id, status: OtpStatus.PENDING },
+          data: { status: OtpStatus.FAILED },
+        });
+      }
       const remaining = pending.maxAttempts - attempts;
       throw new BadRequestException(
         remaining > 0 ? `Code invalide (${remaining} essai${remaining > 1 ? 's' : ''} restant${remaining > 1 ? 's' : ''}).` : 'Code invalide — demandez un nouveau code.',
@@ -209,9 +218,8 @@ export class PhoneChangeService {
     return this.usersService.getSafeById(userId);
   }
 
-  private async assertCooldownOver(userId: string): Promise<void> {
-    const days = this.cooldownDays;
-    if (days === 0) return;
+  private async assertCooldownOver(userId: string, days: number): Promise<void> {
+    if (days <= 0) return;
     const last = await this.prisma.phoneChangeRequest.findFirst({
       where: { userId, status: OtpStatus.VERIFIED },
       orderBy: { verifiedAt: 'desc' },
@@ -227,12 +235,13 @@ export class PhoneChangeService {
   }
 
   /**
-   * Chaque demande envoie un SMS payant : au plus OTP_REQUEST_LIMIT (5) par compte et par fenêtre, et autant vers un même
-   * numéro destinataire, quel que soit le compte demandeur — sinon on pourrait inonder le numéro de quelqu'un d'autre.
+   * Chaque demande envoie un SMS payant : au plus `requestLimit` (5 par défaut, réglable dans l'administration) par compte et
+   * par fenêtre, et autant vers un même numéro destinataire, quel que soit le compte demandeur — sinon on pourrait inonder
+   * le numéro de quelqu'un d'autre.
    */
-  private async assertRequestAllowed(userId: string, newPhone: string): Promise<void> {
-    const windowMinutes = Number(process.env.OTP_REQUEST_WINDOW_MINUTES ?? 15);
-    const maxRequests = Number(process.env.OTP_REQUEST_LIMIT ?? 5);
+  private async assertRequestAllowed(userId: string, newPhone: string, settings: OtpSettings): Promise<void> {
+    const windowMinutes = settings.requestWindowMinutes;
+    const maxRequests = settings.requestLimit;
     const since = new Date(Date.now() - windowMinutes * 60_000);
     const [byUser, byPhone] = await Promise.all([
       this.prisma.phoneChangeRequest.count({ where: { userId, createdAt: { gte: since } } }),

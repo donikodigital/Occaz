@@ -4,6 +4,7 @@
 // les pages ne montrent plus que ce que le compte connecté a le droit d'utiliser (un Support ne voit plus
 // la finance, la configuration ni le système sans le rôle qui va avec). Pas de `permissions` = ouvert à tous.
 import {
+  IconAdjustmentsDollar,
   IconAlertTriangle,
   IconArrowsExchange,
   IconBooks,
@@ -65,6 +66,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/payment-providers', label: 'Moyens de paiement', icon: IconCreditCard, permissions: [PERMISSIONS.PAYMENT_PROVIDER_MANAGE] },
       { href: '/payouts', label: 'Retraits', icon: IconWallet, permissions: [PERMISSIONS.PAYOUT_MANAGE] },
       { href: '/pricing', label: 'Tarification', icon: IconCash, permissions: [PERMISSIONS.COMMISSION_MANAGE, PERMISSIONS.CANCELLATION_POLICY_MANAGE] },
+      { href: '/trip-pricing', label: 'Configuration frais trajets', icon: IconAdjustmentsDollar, permissions: [PERMISSIONS.SETTINGS_UPDATE] },
       { href: '/exchange-rates', label: 'Taux de change', icon: IconArrowsExchange, permissions: [PERMISSIONS.SETTINGS_UPDATE] },
     ],
   },

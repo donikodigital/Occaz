@@ -24,7 +24,7 @@ const BATCH_SIZE = 100;
  * Volontairement sans dépendance de planification externe : un simple
  * minuteur, et chaque étape est une mise à jour conditionnelle en base —
  * si plusieurs instances tournent, un envoi n'est traité qu'une fois.
- * Désactivable avec SHIPMENT_WINDOW_JOB=off (tests, scripts).
+ * Désactivable avec SHIPMENT_WINDOW_JOB=off (arrêt complet : tests, scripts) ou depuis l'administration (réglage « jobs.shipment_window_enabled »).
  */
 @Injectable()
 export class ShipmentWindowService implements OnModuleInit, OnModuleDestroy {
@@ -53,6 +53,8 @@ export class ShipmentWindowService implements OnModuleInit, OnModuleDestroy {
     if (this.running) return;
     this.running = true;
     try {
+      // Interrupteur de l'administration (Paramètres → Tâches automatiques) : lu à chaque passage, aucun redémarrage requis.
+      if ((await this.pricing.getNumericSetting('jobs.shipment_window_enabled', 1)) === 0) return;
       await this.requestExtensions();
       await this.expireUnextended();
       await this.expireUnpaid();

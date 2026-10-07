@@ -34,7 +34,7 @@ const BATCH_SIZE = 100;
  * TripsService.expireStale) : personne n'a été impacté. Même mécanique
  * que les autres tâches planifiées : mise à jour conditionnelle en base,
  * un run concurrent ne traite jamais deux fois le même trajet.
- * Désactivable avec TRIP_EXPIRY_JOB=off.
+ * Désactivable avec TRIP_EXPIRY_JOB=off (arrêt complet) ou depuis l'administration (réglage « jobs.trip_expiry_enabled »).
  */
 @Injectable()
 export class TripExpiryService implements OnModuleInit, OnModuleDestroy {
@@ -62,6 +62,8 @@ export class TripExpiryService implements OnModuleInit, OnModuleDestroy {
     if (this.running) return;
     this.running = true;
     try {
+      // Interrupteur de l'administration (Paramètres → Tâches automatiques) : lu à chaque passage, aucun redémarrage requis.
+      if ((await this.pricing.getNumericSetting('jobs.trip_expiry_enabled', 1)) === 0) return;
       await this.expireStaleTrips();
     } catch (error) {
       this.logger.error('Échec de la vérification des trajets sans réservation', error as Error);

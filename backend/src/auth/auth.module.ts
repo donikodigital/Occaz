@@ -14,6 +14,7 @@ import { DevicesModule } from '../devices/devices.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { SmsModule } from '../integrations/sms/sms.module';
 import { EmailModule } from '../integrations/email/email.module';
+import { OtpModule } from '../otp/otp.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { EmailModule } from '../integrations/email/email.module';
     RbacModule,
     SmsModule,
     EmailModule,
+    OtpModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

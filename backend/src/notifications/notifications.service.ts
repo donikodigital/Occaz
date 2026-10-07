@@ -9,6 +9,7 @@ import { PUSH_PROVIDER, PushOptions, PushProvider } from '../integrations/push/p
 import { EMAIL_PROVIDER, EmailProvider } from '../integrations/email/email-provider.interface';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
+import { OtpSettingsService } from '../otp/otp-settings.service';
 
 export interface NotifyParams {
   userId: string;
@@ -42,6 +43,7 @@ export class NotificationsService {
     @Inject(SMS_PROVIDER) private readonly smsProvider: SmsProvider,
     @Inject(PUSH_PROVIDER) private readonly pushProvider: PushProvider,
     @Inject(EMAIL_PROVIDER) private readonly emailProvider: EmailProvider,
+    private readonly otpSettings: OtpSettingsService,
   ) {}
 
   async notify(params: NotifyParams): Promise<void> {
@@ -117,12 +119,34 @@ export class NotificationsService {
         return;
       }
       case NotificationChannel.SMS:
+        await this.assertSmsBudget(userId);
         await this.smsProvider.send(user.phone, body);
         return;
       case NotificationChannel.EMAIL:
         if (!user.email) throw new Error("L'utilisateur n'a pas d'adresse email.");
         await this.emailProvider.send(user.email, title, body);
         return;
+    }
+  }
+
+  /**
+   * Plafond de SMS de notification par utilisateur et par 24 h (réglable dans l'administration, 0 = illimité). Un SMS refusé
+   * ici est tracé comme un échec de ce canal (failedReason) ; la notification reste lisible dans l'application et le push
+   * part normalement. Les SMS de codes (connexion, remise) ont leurs propres plafonds : ils ne passent pas par ici.
+   */
+  private async assertSmsBudget(userId: string): Promise<void> {
+    const { notificationSmsDailyLimitPerUser: limit } = await this.otpSettings.get();
+    if (limit <= 0) return;
+    const sentToday = await this.prisma.notification.count({
+      where: {
+        userId,
+        channel: NotificationChannel.SMS,
+        sentAt: { not: null },
+        createdAt: { gte: new Date(Date.now() - 24 * 3_600_000) },
+      },
+    });
+    if (sentToday >= limit) {
+      throw new Error(`Plafond quotidien de SMS de notification atteint (${limit}) — SMS non envoyé.`);
     }
   }
 

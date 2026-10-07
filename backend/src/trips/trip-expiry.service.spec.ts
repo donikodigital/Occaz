@@ -52,4 +52,13 @@ describe('TripExpiryService.runOnce', () => {
     await Promise.all([first, second]);
     expect(prisma.trip.findMany).toHaveBeenCalledTimes(1);
   });
+
+  it('interrupteur de l\'administration coupé (jobs.trip_expiry_enabled = 0) : aucun trajet n\'est examiné ni expiré', async () => {
+    const { service, prisma, pricing, trips } = createService({ staleTrips: [{ id: 't1' }] });
+    pricing.getNumericSetting.mockImplementation((key: string) => Promise.resolve(key === 'jobs.trip_expiry_enabled' ? 0 : 24));
+    await service.runOnce();
+    expect(pricing.getNumericSetting).toHaveBeenCalledWith('jobs.trip_expiry_enabled', 1);
+    expect(prisma.trip.findMany).not.toHaveBeenCalled();
+    expect(trips.expireStale).not.toHaveBeenCalled();
+  });
 });

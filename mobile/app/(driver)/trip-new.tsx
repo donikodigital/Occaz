@@ -26,6 +26,7 @@ import {
   IconCalendarEvent,
   IconCar,
   IconCheck,
+  IconLock,
   IconMapPin,
   IconMinus,
   IconPackage,
@@ -57,6 +58,7 @@ import { useMyVehicles } from '@/hooks/useVehicles';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { useCity, useCountries } from '@/hooks/useCities';
 import { useCreateTrip } from '@/hooks/useDriverTrips';
+import { useTripPriceGuidance } from '@/hooks/useTripPriceGuidance';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import { formatDateLong, formatTime, upcomingDays } from '@/utils/date';
@@ -204,6 +206,8 @@ export default function NewTripScreen() {
   const [departureTime, setDepartureTime] = useState<TimeValue>({ hour: 8, minute: 0 });
   const [totalSeats, setTotalSeats] = useState(3);
   const [pricePerSeat, setPricePerSeat] = useState('');
+  // Tant que le conducteur n'a pas touché au prix, le prix conseillé (mode semi-automatique) le remplace à chaque changement d'adresse.
+  const [priceTouched, setPriceTouched] = useState(false);
   const [allowsShipments, setAllowsShipments] = useState(true);
   const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
@@ -219,6 +223,7 @@ export default function NewTripScreen() {
   const { data: originCity } = useCity(origin?.cityId ?? null);
   const { data: countries } = useCountries();
   const createTrip = useCreateTrip();
+  const { data: guidance, isPending: guidancePending } = useTripPriceGuidance(origin?.id, destination?.id);
   const { isDesktop } = useResponsive();
 
   const locationSelection = useLocationSelectionStore((state) => state.selection);
@@ -289,9 +294,34 @@ export default function NewTripScreen() {
   // Villes traversées rangées dans l'ordre de la route : de la plus proche du départ à la plus éloignée.
   const orderedStops = useMemo(() => sortByDistanceFrom(origin, stops), [stops, origin]);
 
-  const priceNumber = Number(pricePerSeat.replace(',', '.'));
+  // --- Prix : le mode choisi par Occa’Z (manuel / semi-automatique / automatique) décide de ce que le conducteur peut faire. ---
+  const pricingMode = guidance?.mode ?? 'MANUAL';
+  const guided = Boolean(guidance?.applicable);
+  const suggestedPrice = guided && guidance?.suggestedPrice ? Number(guidance.suggestedPrice) : null;
+  const minPrice = guided && guidance?.minPrice ? Number(guidance.minPrice) : null;
+  const maxPrice = guided && guidance?.maxPrice ? Number(guidance.maxPrice) : null;
+  // Automatique : pas de champ de prix. (Devise non configurée : le serveur laisse le prix libre, le champ reste donc affiché.)
+  const priceLocked =
+    pricingMode === 'AUTO' && (guided || guidance?.reason === 'NO_ROUTE' || guidance?.reason === 'NO_DISTANCE');
+  const lockedPrice = priceLocked && guided ? suggestedPrice : null;
+
+  // Semi-automatique : le prix conseillé est proposé d'office, tant que le conducteur n'a pas saisi le sien.
+  const proposedPrice = pricingMode === 'SEMI_AUTO' && !priceTouched ? suggestedPrice : null;
+  React.useEffect(() => {
+    if (proposedPrice !== null) setPricePerSeat(String(proposedPrice));
+  }, [proposedPrice]);
+
+  const enteredPrice = Number(pricePerSeat.replace(',', '.'));
+  const priceNumber = priceLocked ? (lockedPrice ?? 0) : enteredPrice;
   const hasValidPrice = Number.isFinite(priceNumber) && priceNumber > 0;
-  const showRecap = Boolean(origin && destination && vehicleId && hasValidPrice);
+  // Un prix au-dessus du maximum est refusé tout de suite (le serveur le refuse aussi). Un prix sous le minimum reste permis.
+  const overMax = pricingMode === 'SEMI_AUTO' && maxPrice !== null && hasValidPrice && priceNumber > maxPrice;
+  const priceDisplayUnit = guidance?.currency?.isoCode ?? currency?.isoCode ?? '';
+  const overMaxMessage =
+    maxPrice !== null
+      ? `Prix trop élevé pour ce trajet : le maximum autorisé est ${formatMoney(maxPrice, priceDisplayUnit)} par place.`
+      : '';
+  const showRecap = Boolean(origin && destination && vehicleId && hasValidPrice && !overMax);
   const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
 
   const departureAt = useMemo(() => {
@@ -302,7 +332,7 @@ export default function NewTripScreen() {
 
   const routeDone = Boolean(origin && destination && origin.cityId && destination.cityId);
   const vehicleDone = vehicleId !== null;
-  const priceDone = hasValidPrice;
+  const priceDone = hasValidPrice && !overMax;
   const done: Record<SectionKey, boolean> = { route: routeDone, date: dateConfirmed, vehicle: vehicleDone, price: priceDone };
   const doneCount = SECTION_ORDER.filter((key) => done[key]).length;
   const statusOf = (key: SectionKey): StepStatus =>
@@ -348,8 +378,16 @@ export default function NewTripScreen() {
       fail('vehicle', 'Choisissez un véhicule.');
       return;
     }
+    if (priceLocked && lockedPrice === null) {
+      fail('price', "Le prix de ce trajet est calculé par Occa'Z à partir de la distance : choisissez des adresses localisées sur la carte.");
+      return;
+    }
     if (!hasValidPrice) {
       fail('price', 'Indiquez le prix par place.');
+      return;
+    }
+    if (overMax) {
+      fail('price', overMaxMessage);
       return;
     }
 
@@ -362,7 +400,8 @@ export default function NewTripScreen() {
         destinationLocationId: destination.id,
         departureAt: departureAt.toISOString(),
         totalSeats,
-        pricePerSeat: String(Math.round(priceNumber)),
+        // Automatique : le prix n'est pas envoyé, Occa'Z le fixe.
+        pricePerSeat: priceLocked ? undefined : String(Math.round(priceNumber)),
         // Pas de devise envoyée : le serveur applique celle du pays de départ.
         allowsShipments,
         notes: notes.trim() || undefined,
@@ -705,29 +744,95 @@ export default function NewTripScreen() {
                 <AppText variant="sm" weight="medium" color="textSecondary" style={styles.fieldLabel}>
                   Prix par place
                 </AppText>
-                <View style={styles.priceRow}>
-                  <View style={{ flex: 1 }}>
-                    <TextField
-                      value={pricePerSeat}
-                      onChangeText={setPricePerSeat}
-                      keyboardType="numeric"
-                      placeholder="Ex : 50000"
-                    />
-                  </View>
-                  {/* Devise imposée par le pays de départ : un repère, pas un choix. */}
-                  {currency ? (
-                    <View style={styles.currencyBadge} accessibilityLabel={`Devise : ${currency.isoCode}`}>
-                      <AppText variant="sm" weight="semibold" color="primary">
-                        {currency.isoCode}
-                      </AppText>
+
+                {priceLocked ? (
+                  // Automatique : le prix est fixé par Occa'Z, le conducteur le voit mais ne peut pas le changer.
+                  <View style={styles.lockedCard} accessibilityLabel="Prix fixé par Occa'Z">
+                    <IconLock size={18} color={colors.primary} />
+                    <View style={styles.lockedBody}>
+                      {lockedPrice !== null ? (
+                        <>
+                          <AppText variant="lg" weight="bold" color="primary">
+                            {formatMoney(lockedPrice, priceDisplayUnit)}
+                          </AppText>
+                          <AppText variant="xs" color="textSecondary">
+                            Prix par place fixé par Occa&apos;Z pour ce trajet. Vous n&apos;avez rien à saisir.
+                          </AppText>
+                        </>
+                      ) : guidance?.reason === 'NO_DISTANCE' ? (
+                        <AppText variant="sm" color="textSecondary">
+                          Le prix est calculé par Occa&apos;Z à partir de la distance. Choisissez des adresses localisées sur la carte.
+                        </AppText>
+                      ) : (
+                        <AppText variant="sm" color="textSecondary">
+                          Le prix de ce trajet sera fixé automatiquement par Occa&apos;Z une fois le départ et l&apos;arrivée choisis.
+                        </AppText>
+                      )}
                     </View>
-                  ) : null}
-                </View>
-                <AppText variant="xs" color="textMuted" style={styles.currencyHint}>
-                  {currency
-                    ? `Devise du pays de départ${originCountry ? ` (${originCountry.name})` : ''}.`
-                    : 'La devise est celle du pays de départ : choisissez d’abord le départ.'}
-                </AppText>
+                  </View>
+                ) : guidancePending && origin && destination ? (
+                  <AppText variant="xs" color="textMuted">
+                    Calcul du prix conseillé…
+                  </AppText>
+                ) : (
+                  <>
+                    <View style={styles.priceRow}>
+                      <View style={{ flex: 1 }}>
+                        <TextField
+                          value={pricePerSeat}
+                          onChangeText={(value) => {
+                            setPriceTouched(true);
+                            setPricePerSeat(value);
+                          }}
+                          keyboardType="numeric"
+                          placeholder="Ex : 50000"
+                          error={overMax ? overMaxMessage : undefined}
+                        />
+                      </View>
+                      {/* Devise imposée par le pays de départ : un repère, pas un choix. */}
+                      {currency ? (
+                        <View style={styles.currencyBadge} accessibilityLabel={`Devise : ${currency.isoCode}`}>
+                          <AppText variant="sm" weight="semibold" color="primary">
+                            {currency.isoCode}
+                          </AppText>
+                        </View>
+                      ) : null}
+                    </View>
+
+                    {pricingMode === 'SEMI_AUTO' && suggestedPrice !== null ? (
+                      <View style={styles.guidanceCard}>
+                        <AppText variant="sm" weight="semibold" color="primary">
+                          Prix conseillé : {formatMoney(suggestedPrice, priceDisplayUnit)}
+                        </AppText>
+                        {minPrice !== null && maxPrice !== null ? (
+                          <AppText variant="xs" color="textSecondary">
+                            Fourchette habituelle : de {formatMoney(minPrice, '')} à {formatMoney(maxPrice, priceDisplayUnit)}. Au-delà du
+                            maximum, le prix est refusé.
+                          </AppText>
+                        ) : null}
+                        {hasValidPrice && priceNumber !== suggestedPrice ? (
+                          <Pressable
+                            onPress={() => {
+                              setPriceTouched(false);
+                              setPricePerSeat(String(suggestedPrice));
+                            }}
+                            accessibilityRole="button"
+                          >
+                            <AppText variant="xs" weight="semibold" color="primary">
+                              Utiliser le prix conseillé
+                            </AppText>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    ) : null}
+
+                    <AppText variant="xs" color="textMuted" style={styles.currencyHint}>
+                      {currency
+                        ? `Devise du pays de départ${originCountry ? ` (${originCountry.name})` : ''}.`
+                        : 'La devise est celle du pays de départ : choisissez d’abord le départ.'}
+                    </AppText>
+                  </>
+                )}
               </View>
 
               <Pressable onPress={() => setAllowsShipments((value) => !value)} style={styles.switchRow}>
@@ -1027,5 +1132,24 @@ const styles = StyleSheet.create({
   },
   currencyHint: {
     marginTop: spacing.xs,
+  },
+  lockedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryLight,
+  },
+  lockedBody: {
+    flex: 1,
+    gap: 2,
+  },
+  guidanceCard: {
+    marginTop: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryLight,
+    gap: 2,
   },
 });

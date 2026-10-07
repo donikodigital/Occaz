@@ -3,6 +3,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { AccountType, OtpStatus, Prisma } from '@prisma/client';
 import { hashOtpCode } from '../common/utils/otp.util';
+import { OtpSettingsService } from '../otp/otp-settings.service';
 import { PhoneChangeService } from './phone-change.service';
 
 const OLD = '+224620000001';
@@ -20,6 +21,8 @@ function build(options: {
   lastChange?: Date | null;
   smsFails?: boolean;
   updateFails?: unknown;
+  /** Réglages enregistrés dans l'administration (PlatformSetting), par clé. */
+  settings?: Record<string, unknown>;
 } = {}) {
   const user = options.user === undefined
     ? { id: 'u1', phone: OLD, accountType: AccountType.CUSTOMER, isSuspended: false }
@@ -40,13 +43,17 @@ function build(options: {
       findFirst: jest.fn().mockImplementation(({ where }) =>
         Promise.resolve(where.status === OtpStatus.VERIFIED ? (options.lastChange ? { verifiedAt: options.lastChange } : null) : pending),
       ),
-      updateMany: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       create: jest.fn().mockResolvedValue({ id: 'r-new' }),
       update: jest.fn().mockResolvedValue({}),
     },
     $transaction: jest.fn().mockImplementation((callback: (client: unknown) => unknown) => callback(tx)),
   };
-  const config = { get: jest.fn().mockImplementation((key: string) => (key === 'otp.expirySeconds' ? 300 : 3)) };
+  const otpSettings = new OtpSettingsService({
+    platformSetting: {
+      findMany: jest.fn().mockResolvedValue(Object.entries(options.settings ?? {}).map(([key, value]) => ({ key, value }))),
+    },
+  } as never);
   const users = {
     findById: jest.fn().mockResolvedValue(user),
     findByPhone: jest.fn().mockResolvedValue(options.owner ?? null),
@@ -56,7 +63,7 @@ function build(options: {
   const sms = {
     send: jest.fn().mockImplementation(() => (options.smsFails ? Promise.reject(new Error('gateway down')) : Promise.resolve())),
   };
-  const service = new PhoneChangeService(prisma as never, config as never, users as never, audit as never, sms as never);
+  const service = new PhoneChangeService(prisma as never, otpSettings as never, users as never, audit as never, sms as never);
   return { service, prisma, tx, users, audit, sms };
 }
 
@@ -64,6 +71,7 @@ afterEach(() => {
   delete process.env.AUTH_TEST_MODE_ENABLED;
   delete process.env.AUTH_TEST_PHONE_NUMBERS;
   delete process.env.PHONE_CHANGE_COOLDOWN_DAYS;
+  delete process.env.OTP_ALLOWED_PHONE_PREFIXES;
 });
 
 describe('PhoneChangeService.request — étape 1', () => {
@@ -126,6 +134,30 @@ describe('PhoneChangeService.request — étape 1', () => {
     expect(prisma.phoneChangeRequest.update).toHaveBeenCalledWith({ where: { id: 'r-new' }, data: { status: OtpStatus.FAILED } });
   });
 
+  it('liste d\'indicatifs de l\'administration : un numéro hors liste est refusé sans SMS ni demande créée', async () => {
+    const { service, sms, prisma } = build({ settings: { 'otp.allowed_phone_prefixes': '+33, +221' } });
+    await expect(service.request('u1', NEW)).rejects.toThrow(/\+33, \+221/);
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(prisma.phoneChangeRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('numéro dans la liste d\'indicatifs : accepté', async () => {
+    const { service, sms } = build({ settings: { 'otp.allowed_phone_prefixes': '+224' } });
+    await expect(service.request('u1', NEW)).resolves.toBeDefined();
+    expect(sms.send).toHaveBeenCalled();
+  });
+
+  it('les réglages de l\'administration l\'emportent sur les variables d\'environnement (délai, limite d\'envoi)', async () => {
+    process.env.PHONE_CHANGE_COOLDOWN_DAYS = '30';
+    const tenDaysAgo = new Date(Date.now() - 10 * 86_400_000);
+    await expect(
+      build({ lastChange: tenDaysAgo, settings: { 'auth.phone_change_cooldown_days': 7 } }).service.request('u1', NEW),
+    ).resolves.toBeDefined();
+    await expect(
+      build({ recentByUser: 2, settings: { 'otp.request_limit': 2 } }).service.request('u1', NEW),
+    ).rejects.toMatchObject({ status: HttpStatus.TOO_MANY_REQUESTS });
+  });
+
   it('mode test : numéro listé = code 000000 sans SMS ; ailleurs, parcours normal', async () => {
     process.env.AUTH_TEST_MODE_ENABLED = 'true';
     process.env.AUTH_TEST_PHONE_NUMBERS = NEW;
@@ -181,14 +213,28 @@ describe('PhoneChangeService.confirm — étape 2', () => {
   it('mauvais code : compté, avec le nombre d\'essais restants ; le numéro ne change pas', async () => {
     const { service, prisma, tx } = build();
     await expect(service.confirm('u1', NEW, '999999')).rejects.toThrow(/2 essais restants/);
-    expect(prisma.phoneChangeRequest.update).toHaveBeenCalledWith({ where: { id: 'r1' }, data: { attempts: 1 } });
+    // Essai consommé atomiquement, avant la comparaison.
+    expect(prisma.phoneChangeRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: 'r1', status: OtpStatus.PENDING, attempts: { lt: 3 } },
+      data: { attempts: { increment: 1 } },
+    });
+    expect(tx.user.update).not.toHaveBeenCalled();
+  });
+
+  it('essais consommés en parallèle : refusé même avec le bon code, le numéro ne change pas', async () => {
+    const { service, prisma, tx } = build();
+    prisma.phoneChangeRequest.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.confirm('u1', NEW, '123456')).rejects.toThrow(/Trop de tentatives/);
     expect(tx.user.update).not.toHaveBeenCalled();
   });
 
   it('3e mauvais essai : la demande est bloquée', async () => {
     const { service, prisma } = build({ pending: { attempts: 2 } });
     await expect(service.confirm('u1', NEW, '999999')).rejects.toThrow(/demandez un nouveau code/);
-    expect(prisma.phoneChangeRequest.update).toHaveBeenCalledWith({ where: { id: 'r1' }, data: { attempts: 3, status: OtpStatus.FAILED } });
+    expect(prisma.phoneChangeRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: 'r1', status: OtpStatus.PENDING },
+      data: { status: OtpStatus.FAILED },
+    });
   });
 
   it('demande déjà épuisée, expirée ou absente : refusé sans toucher au compte', async () => {

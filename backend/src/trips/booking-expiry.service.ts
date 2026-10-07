@@ -26,7 +26,7 @@ const BATCH_SIZE = 100;
  *
  * Même mécanique que ShipmentWindowService : un simple minuteur, mise à
  * jour conditionnelle en base (un run concurrent ne traite jamais deux
- * fois la même réservation). Désactivable avec BOOKING_EXPIRY_JOB=off.
+ * fois la même réservation). Désactivable avec BOOKING_EXPIRY_JOB=off (arrêt complet) ou depuis l'administration (réglage « jobs.booking_expiry_enabled »).
  */
 @Injectable()
 export class BookingExpiryService implements OnModuleInit, OnModuleDestroy {
@@ -54,6 +54,8 @@ export class BookingExpiryService implements OnModuleInit, OnModuleDestroy {
     if (this.running) return;
     this.running = true;
     try {
+      // Interrupteur de l'administration (Paramètres → Tâches automatiques) : lu à chaque passage, aucun redémarrage requis.
+      if ((await this.pricing.getNumericSetting('jobs.booking_expiry_enabled', 1)) === 0) return;
       await this.expireStaleBookings();
     } catch (error) {
       this.logger.error('Échec de la vérification des réservations impayées', error as Error);

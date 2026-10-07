@@ -45,12 +45,14 @@ export class CreateTripDto {
   @Min(1)
   totalSeats!: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '50000',
-    description: 'Prix par place, en plus petite unité de la devise (chaîne pour éviter toute perte de précision)',
+    description:
+      "Prix par place, en plus petite unité de la devise (chaîne pour éviter toute perte de précision). Obligatoire en mode de prix manuel ; en mode semi-automatique, le prix conseillé est retenu s'il est omis ; en mode automatique, il est ignoré (le prix est fixé par Occa'Z).",
   })
+  @IsOptional()
   @IsString()
-  pricePerSeat!: string;
+  pricePerSeat?: string;
 
   @ApiPropertyOptional({
     deprecated: true,

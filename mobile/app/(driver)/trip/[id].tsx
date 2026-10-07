@@ -62,6 +62,7 @@ import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useTrip } from '@/hooks/useTripSearch';
 import { useTripPositionBroadcast } from '@/hooks/useTripPositionBroadcast';
+import { useTripPriceGuidance } from '@/hooks/useTripPriceGuidance';
 import {
   useAddTripStop,
   useCancelTrip,
@@ -566,6 +567,9 @@ function TripStopsSection({ trip, bookings }: { trip: Trip; bookings: Booking[] 
   const updateStop = useUpdateTripStop(trip.id);
   const removeStop = useRemoveTripStop(trip.id);
   const markArrivedAtStop = useMarkArrivedAtStop(trip.id);
+  // Mode automatique : les prix des étapes sont fixés par Occa'Z, le conducteur ne peut pas les modifier.
+  const { data: priceGuidance } = useTripPriceGuidance(trip.originLocationId, trip.destinationLocationId);
+  const farePriceLocked = priceGuidance?.mode === 'AUTO' && priceGuidance.applicable;
 
   const [editingStopId, setEditingStopId] = useState<string | null>(null);
   const [fareText, setFareText] = useState('');
@@ -745,16 +749,22 @@ function TripStopsSection({ trip, bookings }: { trip: Trip; bookings: Booking[] 
                   </View>
                 ) : (
                   <View style={styles.stopActionsRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => startEditing(stop)}
-                      style={({ pressed }) => [styles.stopEditLink, pressed && styles.pressed]}
-                    >
-                      <IconPencil size={14} color={OCEAN.base} />
-                      <AppText variant="xs" weight="semibold" color={OCEAN.base}>
-                        Modifier le prix
+                    {farePriceLocked ? (
+                      <AppText variant="xs" color="textSecondary">
+                        Prix fixé par Occa&apos;Z
                       </AppText>
-                    </Pressable>
+                    ) : (
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => startEditing(stop)}
+                        style={({ pressed }) => [styles.stopEditLink, pressed && styles.pressed]}
+                      >
+                        <IconPencil size={14} color={OCEAN.base} />
+                        <AppText variant="xs" weight="semibold" color={OCEAN.base}>
+                          Modifier le prix
+                        </AppText>
+                      </Pressable>
+                    )}
                     <View style={styles.stopSwitch}>
                       <AppText variant="xs" color="textSecondary">
                         Je prends des passagers ici

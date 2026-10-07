@@ -7,9 +7,10 @@ import { NotificationsService } from './notifications.service';
 import { SmsModule } from '../integrations/sms/sms.module';
 import { PushModule } from '../integrations/push/push.module';
 import { EmailModule } from '../integrations/email/email.module';
+import { OtpModule } from '../otp/otp.module';
 
 @Module({
-  imports: [SmsModule, PushModule, EmailModule],
+  imports: [SmsModule, PushModule, EmailModule, OtpModule],
   controllers: [NotificationTemplatesController, NotificationsController],
   providers: [NotificationTemplatesService, NotificationsService],
   exports: [NotificationsService],

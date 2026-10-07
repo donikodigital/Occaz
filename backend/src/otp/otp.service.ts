@@ -1,11 +1,13 @@
 // backend/src/otp/otp.service.ts
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { OtpPurpose, OtpStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
 import { generateOtpCode, hashOtpCode, verifyOtpCode } from '../common/utils/otp.util';
 import { addDuration } from '../common/utils/duration.util';
+import { OtpSettingsService } from './otp-settings.service';
+
+const DAY_MS = 24 * 3_600_000;
 
 export interface GenerateOtpParams {
   purpose: OtpPurpose;
@@ -41,7 +43,7 @@ export class OtpService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
+    private readonly otpSettings: OtpSettingsService,
     @Inject(SMS_PROVIDER) private readonly smsProvider: SmsProvider,
   ) {}
 
@@ -73,8 +75,8 @@ export class OtpService {
     message: string,
     options?: { revealCodeToCaller?: boolean },
   ): Promise<{ expiresInSeconds: number; code?: string; smsSent: boolean }> {
-    const expirySeconds = this.configService.get<number>('otp.expirySeconds')!;
-    const maxAttempts = this.configService.get<number>('otp.maxAttempts')!;
+    const { expirySeconds, maxAttempts, handoverSmsDailyLimit } = await this.otpSettings.get();
+    const smsAllowed = await this.isHandoverSmsAllowed(params, handoverSmsDailyLimit);
     const code = generateOtpCode();
 
     await this.prisma.otpCode.create({
@@ -90,9 +92,9 @@ export class OtpService {
       },
     });
 
-    let smsSent = true;
+    let smsSent = smsAllowed;
     try {
-      await this.smsProvider.send(params.phone, `${message} ${code}`);
+      if (smsAllowed) await this.smsProvider.send(params.phone, `${message} ${code}`);
     } catch (error) {
       smsSent = false;
       this.logger.warn(
@@ -101,6 +103,29 @@ export class OtpService {
     }
 
     return { expiresInSeconds: expirySeconds, code: options?.revealCodeToCaller ? code : undefined, smsSent };
+  }
+
+  /**
+   * Plafond de SMS de remise : au plus `handoverSmsDailyLimit` (5 par défaut, réglable dans l'administration, 0 = illimité)
+   * par réservation ou par envoi, pour chaque étape et par période de 24 h. Chaque appel à generateAndSend crée une ligne
+   * OtpCode : on compte ces lignes. Au-delà, le code est TOUJOURS généré et reste visible dans l'application — seul le
+   * SMS payant est coupé, jamais la remise elle-même.
+   */
+  private async isHandoverSmsAllowed(params: GenerateOtpParams, limit: number): Promise<boolean> {
+    if (limit <= 0 || (!params.bookingId && !params.shipmentId)) return true;
+    const sentToday = await this.prisma.otpCode.count({
+      where: {
+        purpose: params.purpose,
+        bookingId: params.bookingId,
+        shipmentId: params.shipmentId,
+        createdAt: { gte: new Date(Date.now() - DAY_MS) },
+      },
+    });
+    if (sentToday < limit) return true;
+    this.logger.warn(
+      `Plafond de SMS de remise atteint (${limit}/24 h) pour ${params.purpose}${params.bookingId ? `, booking ${params.bookingId}` : ''}${params.shipmentId ? `, shipment ${params.shipmentId}` : ''} — code généré et visible dans l'application, SMS non envoyé.`,
+    );
+    return false;
   }
 
   /**
@@ -137,27 +162,39 @@ export class OtpService {
       throw new UnauthorizedException('Trop de tentatives — demandez un nouveau code.');
     }
 
+    // L'essai est consommé AVANT la comparaison, de façon atomique : des requêtes parallèles ne peuvent pas dépasser le
+    // nombre d'essais autorisés.
+    const claimed = await this.prisma.otpCode.updateMany({
+      where: { id: latest.id, status: OtpStatus.PENDING, attempts: { lt: latest.maxAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    if (claimed.count === 0) {
+      throw new UnauthorizedException('Trop de tentatives — demandez un nouveau code.');
+    }
+
     const now = new Date();
     const match = candidates.find((candidate) => candidate.expiresAt >= now && verifyOtpCode(params.code, candidate.code));
-
     if (!match) {
-      await this.prisma.otpCode.update({
-        where: { id: latest.id },
-        data: { attempts: { increment: 1 } },
-      });
       throw new UnauthorizedException('Code invalide.');
     }
 
-    // On invalide tout le lot (y compris les autres candidats non
-    // utilisés) : une fois un code de ce lot vérifié, les éventuels
+    // Usage unique : si le conducteur envoie deux fois le bon code en même temps, une seule validation passe.
+    const consumed = await this.prisma.otpCode.updateMany({
+      where: { id: match.id, status: OtpStatus.PENDING },
+      data: { status: OtpStatus.VERIFIED, verifiedAt: new Date() },
+    });
+    if (consumed.count === 0) {
+      throw new UnauthorizedException('Ce code a déjà été utilisé — demandez-en un nouveau.');
+    }
+
+    // On invalide le reste du lot : une fois un code vérifié, les éventuels
     // codes générés entre-temps ne doivent plus pouvoir resservir.
     await this.prisma.otpCode.updateMany({
-      where: { id: { in: candidates.map((candidate) => candidate.id) }, status: OtpStatus.PENDING },
+      where: {
+        id: { in: candidates.filter((candidate) => candidate.id !== match.id).map((candidate) => candidate.id) },
+        status: OtpStatus.PENDING,
+      },
       data: { status: OtpStatus.EXPIRED },
-    });
-    await this.prisma.otpCode.update({
-      where: { id: match.id },
-      data: { status: OtpStatus.VERIFIED, verifiedAt: new Date() },
     });
   }
 }

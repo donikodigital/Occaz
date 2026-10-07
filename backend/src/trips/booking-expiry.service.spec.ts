@@ -55,4 +55,13 @@ describe('BookingExpiryService.runOnce', () => {
     await Promise.all([first, second]);
     expect(prisma.booking.findMany).toHaveBeenCalledTimes(1);
   });
+
+  it('interrupteur de l\'administration coupé (jobs.booking_expiry_enabled = 0) : aucune réservation n\'est examinée ni expirée', async () => {
+    const { service, prisma, pricing, bookings } = createService({ staleBookings: [{ id: 'b1' }] });
+    pricing.getNumericSetting.mockImplementation((key: string) => Promise.resolve(key === 'jobs.booking_expiry_enabled' ? 0 : 15));
+    await service.runOnce();
+    expect(pricing.getNumericSetting).toHaveBeenCalledWith('jobs.booking_expiry_enabled', 1);
+    expect(prisma.booking.findMany).not.toHaveBeenCalled();
+    expect(bookings.expireUnpaid).not.toHaveBeenCalled();
+  });
 });

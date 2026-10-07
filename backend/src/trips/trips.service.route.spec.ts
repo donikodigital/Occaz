@@ -29,6 +29,7 @@ function tripRow(overrides: Record<string, unknown> = {}) {
     status: TripStatus.PUBLISHED,
     departureAt: DEPARTURE,
     pricePerSeat: 100_000n,
+    currencyId: 'cur-gnf',
     availableSeats: 3,
     totalSeats: 4,
     bookings: [] as Array<{ seatsCount: number; boardingStopId: string | null; alightingStopId: string | null }>,
@@ -50,11 +51,18 @@ function build(
     distances?: Array<number | null>;
     /** Devise par défaut du pays de la ville de départ ; null = pays sans devise par défaut configurée. */
     originCurrency?: string | null;
+    /** Surcharges du service de prix des trajets (par défaut : mode manuel, le prix saisi est retenu tel quel). */
+    tripPricing?: Record<string, unknown>;
   } = {},
 ) {
   const trip = tripRow(options.trip);
   const tx = {
-    trip: { create: jest.fn().mockResolvedValue({ id: 'new-trip' }) },
+    trip: {
+      create: jest.fn().mockResolvedValue({ id: 'new-trip' }),
+      update: jest.fn().mockResolvedValue({
+        id: 'trip1', pricePerSeat: 100_000n, departureAt: DEPARTURE, originLocationId: 'loc-conakry', destinationLocationId: 'loc-labe',
+      }),
+    },
     tripStop: {
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -67,6 +75,7 @@ function build(
     trip: {
       findMany: jest.fn().mockResolvedValue(options.candidates ?? []),
       findUnique: jest.fn().mockResolvedValue(trip),
+      update: jest.fn().mockResolvedValue({ id: 'trip1' }),
     },
     city: {
       findUnique: jest.fn().mockResolvedValue({
@@ -91,6 +100,14 @@ function build(
   };
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
   const vehicles = { assertOwnership: jest.fn().mockResolvedValue({ totalSeats: 4 }) };
+  const tripPricing = {
+    decidePrice: jest
+      .fn()
+      .mockImplementation(({ requested }: { requested?: bigint }) => Promise.resolve({ pricePerSeat: requested, locked: false })),
+    isPriceLocked: jest.fn().mockResolvedValue(false),
+    priceToApplyOnPublish: jest.fn().mockResolvedValue(null),
+    ...options.tripPricing,
+  };
   const service = new TripsService(
     prisma as never,
     { log: jest.fn() } as never,
@@ -100,8 +117,9 @@ function build(
     {} as never,
     pricing as never,
     notifications as never,
+    tripPricing as never,
   );
-  return { service, prisma, tx, pricing, locations, notifications, trip };
+  return { service, prisma, tx, pricing, locations, notifications, trip, tripPricing };
 }
 
 describe('TripsService.create — devise du trajet', () => {
@@ -618,5 +636,136 @@ describe('Devise du trajet dans les listes', () => {
     const { service, prisma } = build();
     await service.findOne('trip1');
     expect(prisma.trip.findUnique.mock.calls[0][0].include.currency).toBeTruthy();
+  });
+});
+
+describe('TripsService — prix fixé par la plateforme (modes de prix)', () => {
+  const createDto = (extra: Record<string, unknown> = {}) =>
+    ({
+      vehicleId: 'v1', originCityId: 'conakry', originLocationId: 'loc-conakry',
+      destinationCityId: 'labe', destinationLocationId: 'loc-labe',
+      departureAt: new Date(Date.now() + 86_400_000).toISOString(), totalSeats: 3,
+      ...extra,
+    }) as never;
+  const locked = (price: bigint) => ({
+    decidePrice: jest.fn().mockResolvedValue({ pricePerSeat: price, locked: true }),
+    isPriceLocked: jest.fn().mockResolvedValue(true),
+  });
+
+  it('create : le prix retenu est celui décidé par le service (le conducteur ne peut pas imposer le sien en mode automatique)', async () => {
+    const { service, tx, tripPricing } = build({ tripPricing: locked(48_000n) });
+    await service.create('driver1', createDto({ pricePerSeat: '999999999' }));
+    expect(tripPricing.decidePrice).toHaveBeenCalledWith({
+      originLocationId: 'loc-conakry',
+      destinationLocationId: 'loc-labe',
+      currencyId: 'cur-gnf',
+      requested: 999_999_999n,
+    });
+    expect(tx.trip.create.mock.calls[0][0].data.pricePerSeat).toBe(48_000n);
+  });
+
+  it('create : le prix peut être omis (mode automatique) et la requête arrive quand même au service', async () => {
+    const { service, tx, tripPricing } = build({ tripPricing: locked(48_000n) });
+    await service.create('driver1', createDto());
+    expect(tripPricing.decidePrice).toHaveBeenCalledWith(expect.objectContaining({ requested: undefined }));
+    expect(tx.trip.create.mock.calls[0][0].data.pricePerSeat).toBe(48_000n);
+  });
+
+  it('create : un prix refusé par le service (trop élevé) n\'écrit rien', async () => {
+    const { service, tx } = build({
+      tripPricing: { decidePrice: jest.fn().mockRejectedValue(new BadRequestException('Prix trop élevé pour ce trajet')) },
+    });
+    await expect(service.create('driver1', createDto({ pricePerSeat: '900000' }))).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.trip.create).not.toHaveBeenCalled();
+  });
+
+  it('create : en mode automatique, les prix d\'étapes saisis sont ignorés (calcul au prorata)', async () => {
+    const { service, tx } = build({ tripPricing: locked(100_000n), distances: [135, 135, 160] });
+    await service.create('driver1', createDto({ stops: [{ locationId: 'loc-kindia', sequence: 1, fareFromOrigin: '1000' }] }));
+    expect(tx.tripStop.createMany.mock.calls[0][0].data[0].fareFromOrigin).not.toBe(1_000n);
+  });
+
+  it('create : hors mode automatique, le prix d\'étape saisi est conservé', async () => {
+    const { service, tx } = build({
+      tripPricing: { decidePrice: jest.fn().mockResolvedValue({ pricePerSeat: 100_000n, locked: false }) },
+      distances: [135, 135, 160],
+    });
+    await service.create('driver1', createDto({ stops: [{ locationId: 'loc-kindia', sequence: 1, fareFromOrigin: '40000' }] }));
+    expect(tx.tripStop.createMany.mock.calls[0][0].data[0].fareFromOrigin).toBe(40_000n);
+  });
+
+  it('update : le prix modifié passe par le service ; sans changement de prix ni de trajet, le prix n\'est pas revu', async () => {
+    const { service, tripPricing, prisma } = build({ trip: { status: TripStatus.DRAFT, stops: [] } });
+    await service.update('trip1', 'driver1', { pricePerSeat: '60000' } as never);
+    expect(tripPricing.decidePrice).toHaveBeenCalledWith(expect.objectContaining({ requested: 60_000n, currencyId: 'cur-gnf' }));
+
+    tripPricing.decidePrice.mockClear();
+    await service.update('trip1', 'driver1', { notes: 'Bagages acceptés' } as never);
+    expect(tripPricing.decidePrice).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('update : un changement d\'adresse recalcule le prix avec les nouvelles adresses et le prix actuel comme demande', async () => {
+    const { service, tripPricing } = build({ trip: { status: TripStatus.DRAFT, stops: [] } });
+    await service.update('trip1', 'driver1', { destinationLocationId: 'loc-mamou' } as never);
+    expect(tripPricing.decidePrice).toHaveBeenCalledWith({
+      originLocationId: 'loc-conakry',
+      destinationLocationId: 'loc-mamou',
+      currencyId: 'cur-gnf',
+      requested: 100_000n,
+    });
+  });
+
+  it('updateStop : en mode automatique, modifier le prix d\'une étape est refusé ; l\'heure et la disponibilité restent modifiables', async () => {
+    const { service, prisma } = build({ trip: { status: TripStatus.DRAFT }, tripPricing: locked(100_000n) });
+    await expect(service.updateStop('trip1', 's-kindia', 'driver1', { fareFromOrigin: '40000' })).rejects.toThrow(
+      "Les prix des étapes sont fixés automatiquement par Occa'Z.",
+    );
+    await service.updateStop('trip1', 's-kindia', 'driver1', { isBookable: false });
+    expect(prisma.tripStop.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('addStop : en mode automatique, le prix saisi est ignoré et le prix reste entre ceux des voisins', async () => {
+    const { service, tx } = build({ trip: { status: TripStatus.DRAFT }, tripPricing: locked(100_000n), distances: [100, 100, 100, 100] });
+    await service.addStop('trip1', 'driver1', { locationId: 'loc-dalaba', sequence: 2, fareFromOrigin: '1000' } as never);
+    const created = tx.tripStop.create.mock.calls[0][0].data;
+    expect(created.fareFromOrigin).toBeGreaterThanOrEqual(35_000n);
+    expect(created.fareFromOrigin).toBeLessThanOrEqual(65_000n);
+  });
+
+  it('publish : prix inchangé, le trajet est simplement publié', async () => {
+    const { service, prisma } = build({ trip: { status: TripStatus.DRAFT } });
+    await service.publish('trip1', 'driver1');
+    expect(prisma.trip.update).toHaveBeenCalledWith({ where: { id: 'trip1' }, data: { status: TripStatus.PUBLISHED } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('publish : en mode automatique, le prix du jour est appliqué avec les étapes, dans une transaction', async () => {
+    const { service, tx, prisma } = build({
+      trip: { status: TripStatus.DRAFT },
+      tripPricing: { priceToApplyOnPublish: jest.fn().mockResolvedValue(120_000n) },
+    });
+    tx.trip.update.mockResolvedValue({
+      id: 'trip1', pricePerSeat: 120_000n, departureAt: DEPARTURE, originLocationId: 'loc-conakry', destinationLocationId: 'loc-labe',
+    });
+    await service.publish('trip1', 'driver1');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.trip.update).toHaveBeenCalledWith({
+      where: { id: 'trip1' },
+      data: { status: TripStatus.PUBLISHED, pricePerSeat: 120_000n },
+    });
+    // les prix d'étapes suivent le nouveau prix (35 000 / 100 000 → 42 000)
+    expect(tx.tripStop.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 's-kindia' }, data: expect.objectContaining({ fareFromOrigin: 42_000n }) }),
+    );
+  });
+
+  it('publish : un prix devenu trop élevé (mode semi-automatique) bloque la publication', async () => {
+    const { service, prisma } = build({
+      trip: { status: TripStatus.DRAFT },
+      tripPricing: { priceToApplyOnPublish: jest.fn().mockRejectedValue(new BadRequestException('Prix trop élevé')) },
+    });
+    await expect(service.publish('trip1', 'driver1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.trip.update).not.toHaveBeenCalled();
   });
 });

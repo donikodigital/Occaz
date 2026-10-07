@@ -1299,6 +1299,8 @@ model OtpCode {
 
   @@index([bookingId])
   @@index([shipmentId])
+  @@index([userId, purpose, createdAt])
+  @@index([purpose, createdAt])
   @@map("otp_codes")
 }
 

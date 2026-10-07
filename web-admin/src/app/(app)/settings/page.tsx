@@ -1,5 +1,11 @@
 // web-admin/src/app/(app)/settings/page.tsx
 //
+// v4 — Nouveau thème « Connexion et SMS » : durée et essais des codes, limites de demandes, plafonds quotidiens, SMS de
+//   remise, pays acceptés et délai entre deux changements de numéro. Ces réglages étaient jusqu'ici dans des variables
+//   d'environnement ; ils se modifient maintenant ici (le backend les lit à chaque demande, repli sur l'environnement).
+//   Nouvelles unités : secondes, jours, nombre ; nouveau champ « indicatifs » (liste, vide = tous les pays).
+//   Nouveau thème « Tâches automatiques » : interrupteurs des tâches d'expiration (trajets, réservations, envois) et plafond
+//   des SMS de notification par utilisateur.
 // v3 — Refonte « sans jargon » (réservée au SuperAdmin : SETTINGS_UPDATE n'est
 // accordée à aucun des rôles Support du seed, voir rbac.seed.ts).
 //   - Plus de clés techniques (booking.unpaid_expiry_minutes), de police
@@ -29,6 +35,7 @@ import {
   IconCash,
   IconChevronRight,
   IconClockHour4,
+  IconDeviceMobileMessage,
   IconGauge,
   IconGift,
   IconHash,
@@ -36,6 +43,7 @@ import {
   IconPackage,
   IconPercentage,
   IconPlus,
+  IconRefresh,
   IconRoute,
   IconRuler2,
   IconScale,
@@ -44,6 +52,7 @@ import {
   IconToggleRight,
   IconTrash,
   IconWallet,
+  IconWorld,
 } from '@tabler/icons-react';
 import { Button, Modal, TextArea, TextField } from '@/components/ui';
 import {
@@ -74,7 +83,21 @@ type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
 // Catalogue des réglages connus du backend
 // ---------------------------------------------------------------------------
 
-type Kind = 'number' | 'money' | 'percent' | 'hours' | 'minutes' | 'km' | 'kmh' | 'factor' | 'flag' | 'flag01';
+type Kind =
+  | 'number'
+  | 'money'
+  | 'percent'
+  | 'hours'
+  | 'minutes'
+  | 'seconds'
+  | 'days'
+  | 'count'
+  | 'km'
+  | 'kmh'
+  | 'factor'
+  | 'prefixes'
+  | 'flag'
+  | 'flag01';
 
 /** Unité affichée, pas de variation des boutons − / +, icône de la carte. */
 const KIND_INFO: Record<Kind, { unit: string; step: number; icon: IconComponent }> = {
@@ -83,9 +106,13 @@ const KIND_INFO: Record<Kind, { unit: string; step: number; icon: IconComponent 
   percent: { unit: '%', step: 1, icon: IconPercentage },
   hours: { unit: 'h', step: 1, icon: IconClockHour4 },
   minutes: { unit: 'min', step: 5, icon: IconClockHour4 },
+  seconds: { unit: 's', step: 30, icon: IconClockHour4 },
+  days: { unit: 'j', step: 1, icon: IconClockHour4 },
+  count: { unit: '', step: 1, icon: IconHash },
   km: { unit: 'km', step: 1, icon: IconRuler2 },
   kmh: { unit: 'km/h', step: 5, icon: IconGauge },
   factor: { unit: '×', step: 0.1, icon: IconScale },
+  prefixes: { unit: '', step: 1, icon: IconWorld },
   flag: { unit: '', step: 1, icon: IconToggleRight },
   flag01: { unit: '', step: 1, icon: IconToggleRight },
 };
@@ -98,6 +125,8 @@ type GroupId =
   | 'shipmentDelays'
   | 'payouts'
   | 'referral'
+  | 'otp'
+  | 'jobs'
   | 'other';
 
 const GROUPS: { id: GroupId; title: string; description: string; icon: IconComponent }[] = [
@@ -108,6 +137,8 @@ const GROUPS: { id: GroupId; title: string; description: string; icon: IconCompo
   { id: 'shipmentDelays', title: 'Délais et alertes des envois', description: 'Durées d’attente et notifications.', icon: IconClockHour4 },
   { id: 'payouts', title: 'Retraits', description: 'Retraits des conducteurs vers leur compte Mobile Money.', icon: IconWallet },
   { id: 'referral', title: 'Parrainage', description: 'Récompense des parrains.', icon: IconGift },
+  { id: 'otp', title: 'Connexion et SMS', description: 'Codes reçus par SMS, limites d’envoi et pays acceptés.', icon: IconDeviceMobileMessage },
+  { id: 'jobs', title: 'Tâches automatiques', description: 'Expirations réalisées toutes seules par la plateforme.', icon: IconRefresh },
   { id: 'other', title: 'Autres réglages', description: 'Réglages ajoutés manuellement.', icon: IconSettings },
 ];
 
@@ -118,9 +149,9 @@ interface Known {
   kind: Kind;
   group: GroupId;
   /** Valeur appliquée par le backend tant que le réglage n'est pas personnalisé. */
-  defaultValue: number | boolean;
+  defaultValue: number | boolean | string;
   /** Texte affiché à la place de la valeur quand elle vaut zéro (ex. « Aucun plafond »). */
-  zeroLabel?: string;
+  zeroLabel?: string; // aussi utilisé pour une liste d’indicatifs vide (« Tous les pays »)
   /** Minimum accepté (0 par défaut). */
   min?: number;
   /** Explications des deux états d'une option Oui / Non. */
@@ -322,6 +353,126 @@ const KNOWN: Known[] = [
     group: 'referral',
     defaultValue: 10000,
   },
+  {
+    key: 'otp.expiry_seconds',
+    title: 'Durée de validité d’un code SMS',
+    help: 'Temps dont la personne dispose pour saisir le code reçu par SMS (connexion, remise, changement de numéro). 300 secondes = 5 minutes.',
+    kind: 'seconds',
+    group: 'otp',
+    defaultValue: 300,
+    min: 30,
+  },
+  {
+    key: 'otp.max_attempts',
+    title: 'Essais autorisés par code',
+    help: 'Après ce nombre d’erreurs de saisie, le code est bloqué et la personne doit en redemander un.',
+    kind: 'count',
+    group: 'otp',
+    defaultValue: 3,
+    min: 1,
+  },
+  {
+    key: 'otp.request_limit',
+    title: 'Codes demandés à la suite',
+    help: 'Nombre de codes qu’un même numéro peut demander pendant la durée indiquée juste en dessous.',
+    kind: 'count',
+    group: 'otp',
+    defaultValue: 5,
+    min: 1,
+  },
+  {
+    key: 'otp.request_window_minutes',
+    title: 'Durée de cette limite',
+    help: 'Quand un numéro a atteint le nombre de codes ci-dessus, il doit patienter cette durée avant d’en redemander.',
+    kind: 'minutes',
+    group: 'otp',
+    defaultValue: 15,
+    min: 1,
+  },
+  {
+    key: 'otp.daily_limit_per_phone',
+    title: 'Codes par numéro et par jour',
+    help: 'Nombre maximum de codes de connexion envoyés à un même numéro sur 24 heures. Mets zéro pour ne fixer aucune limite.',
+    kind: 'count',
+    group: 'otp',
+    defaultValue: 10,
+    zeroLabel: 'Aucune limite',
+  },
+  {
+    key: 'otp.daily_limit_global',
+    title: 'Codes de connexion par jour (toute la plateforme)',
+    help: 'Protège ton crédit SMS : une fois ce nombre atteint sur 24 heures, les nouvelles demandes sont refusées. Mets zéro pour ne fixer aucune limite.',
+    kind: 'count',
+    group: 'otp',
+    defaultValue: 2000,
+    zeroLabel: 'Aucune limite',
+  },
+  {
+    key: 'otp.handover_sms_daily_limit',
+    title: 'SMS de remise par réservation ou envoi',
+    help: 'Nombre maximum de SMS envoyés pour une même étape (prise en charge, dépose, colis) sur 24 heures. Au-delà, le code reste visible dans l’application. Mets zéro pour ne fixer aucune limite.',
+    kind: 'count',
+    group: 'otp',
+    defaultValue: 5,
+    zeroLabel: 'Aucune limite',
+  },
+  {
+    key: 'otp.allowed_phone_prefixes',
+    title: 'Pays acceptés pour recevoir un code',
+    help: 'Indicatifs des numéros autorisés, par exemple +224 pour la Guinée. Les autres numéros sont refusés avant tout envoi de SMS. Laisse vide pour accepter tous les pays.',
+    kind: 'prefixes',
+    group: 'otp',
+    defaultValue: '*',
+    zeroLabel: 'Tous les pays',
+  },
+  {
+    key: 'sms.notification_daily_limit_per_user',
+    title: 'SMS de notification par personne et par jour',
+    help: 'Nombre maximum de SMS d’information (paiement confirmé, litige…) envoyés à une même personne sur 24 heures. Les notifications dans l’application ne sont pas limitées. Mets zéro pour ne fixer aucune limite.',
+    kind: 'count',
+    group: 'otp',
+    defaultValue: 10,
+    zeroLabel: 'Aucune limite',
+  },
+  {
+    key: 'auth.phone_change_cooldown_days',
+    title: 'Délai entre deux changements de numéro',
+    help: 'Une personne qui vient de changer de numéro doit attendre ce délai avant de pouvoir le refaire. Mets zéro pour ne fixer aucun délai.',
+    kind: 'days',
+    group: 'otp',
+    defaultValue: 30,
+    zeroLabel: 'Aucun délai',
+  },
+  {
+    key: 'jobs.booking_expiry_enabled',
+    title: 'Annulation des réservations non payées',
+    help: 'Libère automatiquement les places des réservations qui n’ont pas été payées à temps.',
+    kind: 'flag01',
+    group: 'jobs',
+    defaultValue: true,
+    onText: 'Les réservations non payées sont annulées toutes seules après le délai prévu.',
+    offText: 'Pause : les réservations non payées restent bloquées, et leurs places aussi, jusqu’à la réactivation.',
+  },
+  {
+    key: 'jobs.trip_expiry_enabled',
+    title: 'Clôture des trajets sans réservation',
+    help: 'Clôture automatiquement les trajets publiés dont le départ est largement passé sans aucune réservation.',
+    kind: 'flag01',
+    group: 'jobs',
+    defaultValue: true,
+    onText: 'Les trajets restés sans réservation après leur départ sont clôturés tout seuls.',
+    offText: 'Pause : ces trajets restent affichés comme publiés jusqu’à la réactivation.',
+  },
+  {
+    key: 'jobs.shipment_window_enabled',
+    title: 'Fin de période des envois',
+    help: 'Invite le client à prolonger quand aucun conducteur n’a pris l’envoi, rembourse sans réponse et annule les envois jamais payés.',
+    kind: 'flag01',
+    group: 'jobs',
+    defaultValue: true,
+    onText: 'Les envois sans conducteur ou non payés sont traités automatiquement à la fin de leur période.',
+    offText: 'Pause : aucune invitation, aucun remboursement automatique ni annulation d’envoi jusqu’à la réactivation.',
+  },
 ];
 
 const KNOWN_BY_KEY = new Map(KNOWN.map((item) => [item.key, item]));
@@ -347,13 +498,38 @@ function isOn(value: unknown): boolean {
   return value !== false && value !== 0;
 }
 
+/**
+ * « +224, 33 » → « +224, +33 » ; liste vide → « * » (tous les pays, valeur que le backend comprend comme « aucun filtre »).
+ * Une entrée invalide renvoie `invalid` (le texte fautif) et une valeur vide.
+ */
+function normalizePrefixes(raw: string): { value: string; invalid: string | null } {
+  const list: string[] = [];
+  for (const part of raw.split(/[,;\s]+/)) {
+    const entry = part.trim();
+    if (!entry || entry === '*') continue;
+    const prefix = entry.startsWith('+') ? entry : `+${entry}`;
+    if (!/^\+\d{1,8}$/.test(prefix)) return { value: '', invalid: entry };
+    if (!list.includes(prefix)) list.push(prefix);
+  }
+  return { value: list.length > 0 ? list.join(', ') : '*', invalid: null };
+}
+
+function prefixesKey(value: unknown): string {
+  return typeof value === 'string' ? normalizePrefixes(value).value : '*';
+}
+
 function sameValue(kind: Kind, a: unknown, b: unknown): boolean {
   if (isFlag(kind)) return isOn(a) === isOn(b);
+  if (kind === 'prefixes') return prefixesKey(a) === prefixesKey(b);
   return a === b;
 }
 
 function formatKnownValue(known: Known, value: unknown): string {
   if (isFlag(known.kind)) return isOn(value) ? 'Activé' : 'Désactivé';
+  if (known.kind === 'prefixes') {
+    const list = prefixesKey(value);
+    return list === '*' ? (known.zeroLabel ?? 'Aucun filtre') : list;
+  }
   if (typeof value !== 'number') return 'À vérifier';
   if (value === 0 && known.zeroLabel) return known.zeroLabel;
   const text = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 8 }).format(value);
@@ -415,8 +591,9 @@ function buildRows(items: SettingItem[]): Row[] {
   });
 
   for (const item of items) {
-    // Les taux de change ont leur propre page ; les réglages connus sont déjà ci-dessus.
-    if (KNOWN_BY_KEY.has(item.key) || item.key.startsWith('exchange_rate.')) continue;
+    // Les taux de change et les prix des trajets (« Configuration frais trajets ») ont leur propre page ; les réglages
+    // connus sont déjà ci-dessus. Les clés « trip_pricing.* » ne se modifient d'ailleurs pas ici : le serveur les refuse.
+    if (KNOWN_BY_KEY.has(item.key) || item.key.startsWith('exchange_rate.') || item.key.startsWith('trip_pricing.')) continue;
     rows.push({
       id: item.key,
       key: item.key,
@@ -504,6 +681,9 @@ function KnownSettingModal({
     if (isFlag(row.known.kind)) {
       setFlag(isOn(row.value));
       setRaw('');
+    } else if (row.known.kind === 'prefixes') {
+      const list = prefixesKey(row.value);
+      setRaw(list === '*' ? '' : list);
     } else {
       setRaw(typeof row.value === 'number' ? String(row.value) : '');
     }
@@ -516,9 +696,19 @@ function KnownSettingModal({
   const flagMode = isFlag(known.kind);
   const minimum = known.min ?? 0;
   const parsed = parseNumber(raw);
+  const prefixMode = known.kind === 'prefixes';
+  const prefixResult = normalizePrefixes(raw);
   const defaultNumber = typeof known.defaultValue === 'number' ? known.defaultValue : null;
-  const differsFromDefault = flagMode ? flag !== isOn(known.defaultValue) : parsed !== defaultNumber;
-  const hasChanged = flagMode ? flag !== isOn(row.value) : parsed !== (typeof row.value === 'number' ? row.value : null);
+  const differsFromDefault = flagMode
+    ? flag !== isOn(known.defaultValue)
+    : prefixMode
+      ? prefixResult.value !== prefixesKey(known.defaultValue)
+      : parsed !== defaultNumber;
+  const hasChanged = flagMode
+    ? flag !== isOn(row.value)
+    : prefixMode
+      ? prefixResult.value !== prefixesKey(row.value)
+      : parsed !== (typeof row.value === 'number' ? row.value : null);
 
   function nudge(direction: 1 | -1) {
     const current = parsed ?? 0;
@@ -534,6 +724,12 @@ function KnownSettingModal({
     let value: unknown;
     if (flagMode) {
       value = known.kind === 'flag01' ? (flag ? 1 : 0) : flag;
+    } else if (prefixMode) {
+      if (prefixResult.invalid !== null) {
+        setErrorMessage(`« ${prefixResult.invalid} » n’est pas un indicatif valide. Exemple : +224, +33.`);
+        return;
+      }
+      value = prefixResult.value;
     } else {
       if (parsed === null) {
         setErrorMessage('Saisis un nombre, par exemple 25 ou 1,5.');
@@ -602,6 +798,30 @@ function KnownSettingModal({
               </button>
             ) : null}
           </>
+        ) : prefixMode ? (
+          <FormSection title="Indicatifs acceptés">
+            <input
+              type="text"
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              placeholder="Tous les pays"
+              aria-label="Indicatifs acceptés"
+              className="h-11 w-full rounded-xl border border-border bg-surface px-3.5 text-base font-semibold text-text-primary placeholder:font-normal placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <p className="text-xs text-text-muted">
+              Sépare les indicatifs par une virgule, par exemple « +224, +33 ». Laisse le champ vide pour accepter tous les pays.
+            </p>
+            {differsFromDefault ? (
+              <button
+                type="button"
+                onClick={() => setRaw('')}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition hover:text-primary-dark"
+              >
+                <IconArrowBackUp size={16} />
+                Rétablir : tous les pays
+              </button>
+            ) : null}
+          </FormSection>
         ) : (
           <FormSection title="Valeur">
             <div className="flex items-stretch gap-2">

@@ -200,7 +200,8 @@ export interface CreateTripPayload {
   destinationLocationId: string;
   departureAt: string;
   totalSeats: number;
-  pricePerSeat: string;
+  /** Obligatoire en mode de prix manuel ; omis en mode automatique (le prix est fixé par Occa'Z) ; facultatif en semi-automatique. */
+  pricePerSeat?: string;
   /** Facultatif et ignoré par le serveur : la devise est celle du pays de la ville de départ. */
   currencyId?: string;
   allowsLuggage?: boolean;

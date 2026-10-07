@@ -35,6 +35,7 @@ import { DisputesModule } from './disputes/disputes.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
+import { TripPricingModule } from './trip-pricing/trip-pricing.module';
 import { TranslationsModule } from './translations/translations.module';
 import { DashboardsModule } from './dashboards/dashboards.module';
 import { PromoCodesModule } from './promo-codes/promo-codes.module';
@@ -95,6 +96,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     NotificationsModule,
     ConversationsModule,
     PlatformSettingsModule,
+    TripPricingModule,
     TranslationsModule,
     DashboardsModule,
     PromoCodesModule,
