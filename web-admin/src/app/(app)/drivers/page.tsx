@@ -12,7 +12,6 @@ import React, { useEffect, useState } from 'react';
 import {
   IconAlertTriangle,
   IconChevronRight,
-  IconMapPin,
   IconRosetteDiscountCheck,
   IconSteeringWheel,
   IconStarFilled,
@@ -24,7 +23,6 @@ import {
   FilterChips,
   ListCard,
   ListSkeleton,
-  MetaItem,
   Notice,
   PageHero,
   SearchField,
@@ -32,7 +30,7 @@ import {
 import { useDriversList } from '@/hooks/useDrivers';
 import { DRIVER_STATUS_LABELS, DRIVER_STATUS_TONE } from '@/utils/driverLabels';
 import { DriverDetailModal } from '@/components/drivers/DriverDetailModal';
-import { DriverAvatar, driverExtras, formatDate } from '@/components/drivers/driverUi';
+import { DriverAvatar } from '@/components/drivers/driverUi';
 import type { DriverAccountStatus } from '@/types/drivers.types';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -98,7 +96,7 @@ export default function DriversPage() {
       {isError ? (
         <Notice tone="danger">Impossible de charger les conducteurs.</Notice>
       ) : isLoading ? (
-        <ListSkeleton count={6} heightClass="h-36" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
+        <ListSkeleton count={6} heightClass="h-24" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
       ) : drivers.length === 0 ? (
         <EmptyState
           icon={<IconSteeringWheel size={26} />}
@@ -121,13 +119,7 @@ export default function DriversPage() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {drivers.map((driver) => {
               const tone = DRIVER_STATUS_TONE[driver.status] ?? 'neutral';
-              const extra = driverExtras(driver);
               const hasPhoto = Boolean(driver.photoUrl);
-              const counters = [
-                { label: 'Trajets', value: extra.completedTripsCount },
-                { label: 'Envois', value: extra.completedShipmentsCount },
-                { label: 'Avis', value: extra.ratingsCount },
-              ].filter((item) => typeof item.value === 'number');
 
               return (
                 <ListCard key={driver.id} onClick={() => setSelectedDriverId(driver.id)} tone={tone}>
@@ -147,56 +139,25 @@ export default function DriversPage() {
                           <IconRosetteDiscountCheck size={17} className="shrink-0 text-primary" />
                         ) : null}
                       </p>
-                      <MetaItem icon={<IconMapPin size={14} />}>{driver.city?.name ?? 'Ville non renseignée'}</MetaItem>
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <Chip tone={tone}>{DRIVER_STATUS_LABELS[driver.status] ?? driver.status}</Chip>
+                        {driver.averageRating ? (
+                          <Chip tone="accent" icon={<IconStarFilled size={11} />}>
+                            {driver.averageRating.toFixed(1)}
+                          </Chip>
+                        ) : null}
+                        {!hasPhoto ? (
+                          <Chip tone="danger" icon={<IconAlertTriangle size={11} />}>
+                            Sans photo
+                          </Chip>
+                        ) : null}
+                      </div>
                     </div>
                     <IconChevronRight
                       size={18}
                       className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
                     />
                   </div>
-
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                    <Chip tone={tone}>{DRIVER_STATUS_LABELS[driver.status] ?? driver.status}</Chip>
-                    {driver.averageRating ? (
-                      <Chip tone="accent" icon={<IconStarFilled size={11} />}>
-                        {driver.averageRating.toFixed(1)}
-                      </Chip>
-                    ) : (
-                      <Chip>Aucun avis</Chip>
-                    )}
-                  </div>
-
-                  {counters.length > 0 ? (
-                    <div
-                      className="mt-2.5 grid gap-2"
-                      style={{ gridTemplateColumns: `repeat(${counters.length}, minmax(0, 1fr))` }}
-                    >
-                      {counters.map((item) => (
-                        <div key={item.label} className="rounded-xl bg-surface-muted/70 px-2 py-1.5 text-center">
-                          <p className="text-base font-bold leading-none text-text-primary">{item.value}</p>
-                          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
-                            {item.label}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  {!hasPhoto || extra.createdAt ? (
-                    <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border/70 pt-2 text-xs">
-                      {!hasPhoto ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-light px-2 py-1 font-semibold text-danger-dark">
-                          <IconAlertTriangle size={13} />
-                          Photo manquante
-                        </span>
-                      ) : (
-                        <span />
-                      )}
-                      {extra.createdAt ? (
-                        <span className="text-text-muted">Inscrit le {formatDate(extra.createdAt)}</span>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </ListCard>
               );
             })}

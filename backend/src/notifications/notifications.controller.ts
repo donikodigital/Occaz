@@ -18,6 +18,12 @@ export class NotificationsController {
     return this.notificationsService.findMine(user.id, query);
   }
 
+  /** Pastille de la cloche : nombre de notifications non lues. */
+  @Get('mine/unread-count')
+  unreadCount(@CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.unreadCount(user.id);
+  }
+
   @Patch('mine/read-all')
   markAllRead(@CurrentUser() user: AuthenticatedUser) {
     return this.notificationsService.markAllRead(user.id);
@@ -33,6 +39,12 @@ export class NotificationsController {
   @Post('mine/delete-many')
   removeMany(@Body() dto: DeleteNotificationsDto, @CurrentUser() user: AuthenticatedUser) {
     return this.notificationsService.removeMany(dto.ids, user.id);
+  }
+
+  /** Vide toute la boîte de réception. */
+  @Post('mine/delete-all')
+  removeAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.removeAll(user.id);
   }
 
   @Delete(':id')

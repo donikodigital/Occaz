@@ -12,7 +12,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { IconChevronRight, IconRoute, IconSteeringWheel, IconUsers } from '@tabler/icons-react';
+import { IconChevronRight, IconRoute } from '@tabler/icons-react';
 import {
   Chip,
   EmptyState,
@@ -20,7 +20,6 @@ import {
   IconTile,
   ListCard,
   ListSkeleton,
-  MetaItem,
   Notice,
   PageHero,
   SearchField,
@@ -32,7 +31,6 @@ import {
   TRIP_STATUS_LABELS,
   TRIP_STATUS_TONE,
   formatDateTime,
-  formatShortDate,
   groupOf,
   routeLabel,
   type TripGroup,
@@ -45,38 +43,24 @@ function TripCard({ trip }: { trip: AdminTripListItem }) {
 
   return (
     <ListCard href={`/trips/${trip.id}`} tone={tone}>
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <IconTile tone={tone}>
           <IconRoute size={20} />
         </IconTile>
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 break-words font-semibold leading-snug text-text-primary">{routeLabel(trip)}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Chip tone={tone}>{TRIP_STATUS_LABELS[trip.status]}</Chip>
-            <span className="text-xs text-text-secondary">{formatDateTime(trip.departureAt)}</span>
+          <p className="line-clamp-1 break-words font-semibold leading-snug text-text-primary">{routeLabel(trip)}</p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Chip tone={tone}>{TRIP_STATUS_LABELS[trip.status]}</Chip>
+              <span className="truncate text-xs text-text-secondary">{formatDateTime(trip.departureAt)}</span>
+            </div>
+            <span className="shrink-0 text-sm font-bold text-text-primary">{formatMoney(trip.pricePerSeat, currencyCode)}</span>
           </div>
         </div>
         <IconChevronRight
           size={18}
-          className="mt-1 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
+          className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
         />
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-        <MetaItem icon={<IconSteeringWheel size={15} />}>
-          {trip.driver.firstName} {trip.driver.lastName}
-        </MetaItem>
-        <MetaItem icon={<IconUsers size={15} />}>
-          {trip.availableSeats} libre{trip.availableSeats > 1 ? 's' : ''} sur {trip.totalSeats}
-        </MetaItem>
-      </div>
-
-      <div className="mt-3 flex items-end justify-between gap-3 border-t border-border/70 pt-2.5">
-        <p className="text-base font-bold leading-none text-text-primary">
-          {formatMoney(trip.pricePerSeat, currencyCode)}
-          <span className="ml-1 text-xs font-medium text-text-muted">par place</span>
-        </p>
-        <span className="text-xs text-text-muted">Créé le {formatShortDate(trip.createdAt)}</span>
       </div>
     </ListCard>
   );
@@ -146,7 +130,7 @@ export default function TripsPage() {
       {isError ? (
         <Notice tone="danger">Impossible de charger les trajets.</Notice>
       ) : isLoading ? (
-        <ListSkeleton count={4} heightClass="h-36" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
+        <ListSkeleton count={4} heightClass="h-24" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<IconRoute size={26} />}

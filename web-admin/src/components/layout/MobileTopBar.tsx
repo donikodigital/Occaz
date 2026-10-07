@@ -5,26 +5,18 @@
 // compte (email, déconnexion) reste dans le pied de la Sidebar, cet avatar
 // n'est qu'un second accès, symétrique du burger.
 // v3 — Le logo Occa'Z s'affiche entre le burger et le titre de la page.
+// v4 — L'avatar (initiales) laisse la place à la cloche des notifications ; le compte reste dans le pied de la Sidebar.
 'use client';
 
 import React from 'react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { IconMenu2 } from '@tabler/icons-react';
-import { useAuthStore } from '@/stores/authStore';
 import { getActiveNavItem } from './nav-items';
+import { NotificationBell } from './NotificationBell';
 
 interface MobileTopBarProps {
   onOpenMenu: () => void;
-}
-
-function initialsFor(user: { firstName?: string | null; lastName?: string | null; email?: string | null; phone?: string } | null): string {
-  if (!user) return '·';
-  if (user.firstName || user.lastName) {
-    return `${user.firstName?.charAt(0) ?? ''}${user.lastName?.charAt(0) ?? ''}`.toUpperCase() || '·';
-  }
-  const source = user.email ?? user.phone ?? '';
-  return source.slice(0, 2).toUpperCase() || '·';
 }
 
 /**
@@ -36,7 +28,6 @@ function initialsFor(user: { firstName?: string | null; lastName?: string | null
  */
 export function MobileTopBar({ onOpenMenu }: MobileTopBarProps) {
   const pathname = usePathname();
-  const user = useAuthStore((state) => state.user);
   const activeItem = getActiveNavItem(pathname);
 
   return (
@@ -65,13 +56,7 @@ export function MobileTopBar({ onOpenMenu }: MobileTopBarProps) {
         <p className="truncate text-xs font-medium text-text-secondary">Occa'Z</p>
       </div>
 
-      <button
-        onClick={onOpenMenu}
-        aria-label="Ouvrir le menu du compte"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-light text-xs font-bold text-primary-dark transition-transform active:scale-95"
-      >
-        {initialsFor(user)}
-      </button>
+      <NotificationBell />
     </header>
   );
 }

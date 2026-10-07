@@ -12,11 +12,9 @@
 
 import React, { useMemo, useState } from 'react';
 import {
-  IconCalendarEvent,
   IconChevronRight,
   IconClockExclamation,
   IconPackage,
-  IconSteeringWheel,
 } from '@tabler/icons-react';
 import {
   Chip,
@@ -25,7 +23,6 @@ import {
   IconTile,
   ListCard,
   ListSkeleton,
-  MetaItem,
   Notice,
   PageHero,
   SearchField,
@@ -36,9 +33,6 @@ import {
   SHIPMENT_GROUP_OPTIONS,
   SHIPMENT_STATUS_LABELS,
   SHIPMENT_STATUS_TONE,
-  driverNet,
-  formatShortDate,
-  formatWindow,
   groupOf,
   routeLabel,
   type ShipmentGroup,
@@ -52,49 +46,23 @@ function ShipmentCard({ shipment }: { shipment: AdminShipmentListItem }) {
 
   return (
     <ListCard href={`/shipments/${shipment.id}`} tone={tone}>
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <IconTile tone={tone}>{needsCustomer ? <IconClockExclamation size={20} /> : <IconPackage size={20} />}</IconTile>
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 break-words font-semibold leading-snug text-text-primary">{routeLabel(shipment)}</p>
-          <p className="mt-0.5 truncate text-xs text-text-secondary">
-            {shipment.category?.name ?? 'Colis'} · {shipment.weightKg} kg
-          </p>
+          <p className="line-clamp-1 break-words font-semibold leading-snug text-text-primary">{routeLabel(shipment)}</p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-1">
+              <Chip tone={SHIPMENT_STATUS_TONE[shipment.status]}>{SHIPMENT_STATUS_LABELS[shipment.status]}</Chip>
+              {needsCustomer ? <Chip tone="accent">Prolongation</Chip> : null}
+              {shipment.isUrgent ? <Chip tone="danger">Urgent</Chip> : null}
+            </div>
+            <span className="shrink-0 text-sm font-bold text-text-primary">{formatMoney(shipment.totalAmount, currencyCode)}</span>
+          </div>
         </div>
         <IconChevronRight
           size={18}
-          className="mt-1 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
+          className="shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
         />
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <Chip tone={SHIPMENT_STATUS_TONE[shipment.status]}>{SHIPMENT_STATUS_LABELS[shipment.status]}</Chip>
-        {needsCustomer ? <Chip tone="accent">Prolongation demandée</Chip> : null}
-        {shipment.isUrgent ? <Chip tone="danger">Urgent</Chip> : null}
-      </div>
-
-      <div className="mt-2.5 space-y-1">
-        <MetaItem icon={<IconCalendarEvent size={15} />}>{formatWindow(shipment.windowStart, shipment.windowEnd)}</MetaItem>
-        <div>
-          <MetaItem icon={<IconSteeringWheel size={15} />}>
-            {shipment.driver ? (
-              `${shipment.driver.firstName} ${shipment.driver.lastName}`
-            ) : (
-              <span className="text-text-muted">Aucun conducteur pour l’instant</span>
-            )}
-          </MetaItem>
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-end justify-between gap-3 border-t border-border/70 pt-2.5">
-        <div>
-          <p className="text-base font-bold leading-none text-text-primary">
-            {formatMoney(shipment.totalAmount, currencyCode)}
-          </p>
-          <p className="mt-1 text-xs text-text-muted">
-            Conducteur : {formatMoney(driverNet(shipment.totalAmount, shipment.platformFee), currencyCode)}
-          </p>
-        </div>
-        <span className="text-xs text-text-muted">Créé le {formatShortDate(shipment.createdAt)}</span>
       </div>
     </ListCard>
   );
@@ -180,7 +148,7 @@ export default function ShipmentsPage() {
       {isError ? (
         <Notice tone="danger">Impossible de charger les envois.</Notice>
       ) : isLoading ? (
-        <ListSkeleton count={4} heightClass="h-44" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
+        <ListSkeleton count={4} heightClass="h-24" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<IconPackage size={26} />}

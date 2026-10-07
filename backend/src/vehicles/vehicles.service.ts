@@ -168,7 +168,20 @@ export class VehiclesService {
 
   async uploadDocument(vehicleId: string, driverId: string, dto: CreateDocumentDto) {
     await this.assertOwnership(vehicleId, driverId);
-    return this.documentsService.create(DocumentOwnerType.VEHICLE, vehicleId, dto);
+    const document = await this.documentsService.create(DocumentOwnerType.VEHICLE, vehicleId, dto);
+    // Cloche du back-office : un document de véhicule attend son contrôle (une alerte manquée ne fait jamais échouer l'envoi).
+    try {
+      await this.notifications.notifyStaff({
+        permission: 'vehicle.verify',
+        type: NotificationType.STATUS_CHANGE,
+        title: 'Document de véhicule à vérifier',
+        body: 'Un conducteur a envoyé un document de véhicule à contrôler.',
+        link: '/drivers',
+      });
+    } catch {
+      // volontairement ignoré
+    }
+    return document;
   }
 
   findDocuments(vehicleId: string) {

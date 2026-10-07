@@ -156,6 +156,8 @@ export class DisputesService {
           channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
           fallbackTitle: 'Nouveau litige à traiter',
           fallbackBody: `Motif : ${reason}`,
+          // « link » : page à ouvrir depuis la cloche du back-office.
+          payload: { link: '/disputes', disputeId },
           pushData: { type: 'DISPUTE', disputeId },
         }),
       ),

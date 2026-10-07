@@ -86,10 +86,12 @@ function UserCard({ user, onClick }: { user: SafeUser; onClick: () => void }) {
           {named ? initialsOf(user) : <IconUser size={20} />}
         </IconTile>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-text-primary">{fullNameOf(user)}</p>
-          <p className="truncate text-xs text-text-secondary">{named ? user.phone : 'Nom non renseigné'}</p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate font-semibold text-text-primary">{fullNameOf(user)}</p>
             <Badge label={ACCOUNT_TYPE_LABELS[user.accountType]} tone={roleTone} />
+          </div>
+          <div className="mt-0.5 flex items-center justify-between gap-2">
+            <p className="truncate text-xs text-text-secondary">{named ? user.phone : 'Nom non renseigné'}</p>
             {!user.isActive ? (
               <Badge label="Désactivé" tone="neutral" />
             ) : user.isSuspended ? (

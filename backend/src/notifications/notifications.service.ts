@@ -1,7 +1,7 @@
 // backend/src/notifications/notifications.service.ts
 // [21/09/2026] v2 — pushData et pushOptions transmis au fournisseur push.
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { NotificationChannel, NotificationType } from '@prisma/client';
+import { AccountType, NotificationChannel, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationTemplatesService } from './notification-templates.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
@@ -174,7 +174,8 @@ export class NotificationsService {
    * qu'en base : le volume par utilisateur reste modeste, pas la peine
    * d'ajouter une colonne de regroupement en base pour l'instant.
    */
-  async findMine(userId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
+  /** Boîte de réception d'un utilisateur : plus récentes d'abord, un seul élément par événement (voir findMine). */
+  private async dedupedInbox(userId: string) {
     const rows = await this.prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -192,10 +193,39 @@ export class NotificationsService {
       );
       if (!isDuplicate) deduped.push(row);
     }
+    return deduped;
+  }
 
+  async findMine(userId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
+    const deduped = await this.dedupedInbox(userId);
     const total = deduped.length;
     const data = deduped.slice(query.skip, query.skip + query.take);
     return new PaginatedResult(data, total, query.page, query.limit);
+  }
+
+  /** Nombre de notifications non lues (un événement envoyé sur plusieurs canaux ne compte qu'une fois) — pour la pastille de la cloche. */
+  async unreadCount(userId: string): Promise<{ count: number }> {
+    const deduped = await this.dedupedInbox(userId);
+    return { count: deduped.filter((row) => row.readAt === null).length };
+  }
+
+  /**
+   * Les lignes « jumelles » d'une notification : le même événement envoyé sur d'autres canaux (même type, même texte, à
+   * quelques secondes d'écart). La boîte n'en montre qu'une ; lire ou supprimer celle-là doit donc traiter aussi les autres,
+   * sinon la jumelle cachée réapparaîtrait comme une notification non lue ou « ressuscitée ».
+   */
+  private twinsWhere(notification: { userId: string; type: NotificationType; title: string | null; body: string | null; createdAt: Date }): Prisma.NotificationWhereInput {
+    const WINDOW_MS = 5_000;
+    return {
+      userId: notification.userId,
+      type: notification.type,
+      title: notification.title,
+      body: notification.body,
+      createdAt: {
+        gt: new Date(notification.createdAt.getTime() - WINDOW_MS),
+        lt: new Date(notification.createdAt.getTime() + WINDOW_MS),
+      },
+    };
   }
 
   async markRead(id: string, userId: string): Promise<void> {
@@ -203,7 +233,10 @@ export class NotificationsService {
     if (!notification || notification.userId !== userId) {
       throw new NotFoundException('Notification introuvable.');
     }
-    await this.prisma.notification.update({ where: { id }, data: { readAt: new Date() } });
+    await this.prisma.notification.updateMany({
+      where: { ...this.twinsWhere(notification), readAt: null },
+      data: { readAt: new Date() },
+    });
   }
 
   async markAllRead(userId: string): Promise<void> {
@@ -218,7 +251,7 @@ export class NotificationsService {
     if (!notification || notification.userId !== userId) {
       throw new NotFoundException('Notification introuvable.');
     }
-    await this.prisma.notification.delete({ where: { id } });
+    await this.prisma.notification.deleteMany({ where: this.twinsWhere(notification) });
   }
 
   /**
@@ -230,6 +263,74 @@ export class NotificationsService {
    */
   async removeMany(ids: string[], userId: string): Promise<void> {
     if (ids.length === 0) return;
-    await this.prisma.notification.deleteMany({ where: { id: { in: ids }, userId } });
+    const selected = await this.prisma.notification.findMany({ where: { id: { in: ids }, userId } });
+    if (selected.length === 0) return;
+    await this.prisma.notification.deleteMany({
+      where: { OR: selected.map((notification) => this.twinsWhere(notification)) },
+    });
+  }
+
+  /** Vide toute la boîte de réception de l'utilisateur. */
+  async removeAll(userId: string): Promise<void> {
+    await this.prisma.notification.deleteMany({ where: { userId } });
+  }
+
+  // ---------------------------------------------------------------------
+  // Alertes pour l'équipe (cloche du back-office)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Alerte l'équipe d'un événement à traiter (retrait à valider, conducteur à vérifier, document à contrôler…). Destinataires :
+   * les SuperAdmins actifs et les comptes dont un rôle porte la permission demandée (limité à leurs pays quand le rôle l'est).
+   * Rien n'est envoyé hors de l'application : la notification s'affiche dans la cloche du back-office. Ne lève jamais
+   * d'exception — une alerte manquée ne doit pas défaire l'opération qui l'a déclenchée.
+   */
+  async notifyStaff(params: {
+    permission: string;
+    type: NotificationType;
+    title: string;
+    body: string;
+    /** Page du back-office à ouvrir au clic (ex. « /payouts »). */
+    link?: string;
+    /** Si renseigné, un rôle limité à un pays n'est alerté que pour ces pays ; un rôle sans pays l'est toujours. */
+    countryIds?: string[];
+    payload?: Record<string, unknown>;
+  }): Promise<void> {
+    try {
+      const staff = await this.prisma.user.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { accountType: AccountType.SUPERADMIN },
+            {
+              userRoles: {
+                some: {
+                  role: { permissions: { some: { permission: { key: params.permission } } } },
+                  ...(params.countryIds ? { OR: [{ countryId: null }, { countryId: { in: params.countryIds } }] } : {}),
+                },
+              },
+            },
+          ],
+        },
+        select: { id: true },
+      });
+      if (staff.length === 0) return;
+
+      const payload = { ...params.payload, link: params.link, audience: 'STAFF' } as Prisma.InputJsonValue;
+      const now = new Date();
+      await this.prisma.notification.createMany({
+        data: staff.map((user) => ({
+          userId: user.id,
+          type: params.type,
+          channel: NotificationChannel.PUSH,
+          title: params.title,
+          body: params.body,
+          payload,
+          sentAt: now,
+        })),
+      });
+    } catch (error) {
+      this.logger.warn(`Alerte équipe non enregistrée (${params.title}) : ${(error as Error).message}`);
+    }
   }
 }

@@ -122,7 +122,13 @@ export class PayoutsService {
 
     // Retrait automatique : envoyé tout de suite au prestataire (sauf réglage contraire ou plafond dépassé). Le résultat — payé,
     // en cours, refusé, ou toujours en attente de l'équipe — est celui du retrait renvoyé au conducteur.
-    return this.processAutomatically(payout.id);
+    const result = await this.processAutomatically(payout.id);
+
+    // Resté « demandé » (retrait automatique coupé, montant au-dessus du plafond, numéro manquant) : l'équipe doit le traiter.
+    if (result.status === PayoutStatus.REQUESTED) {
+      await this.alertStaffOfPendingPayout(payout.id, result.amount, wallet.currency?.isoCode ?? '');
+    }
+    return result;
   }
 
   // ---------------------------------------------------------------------------
@@ -218,6 +224,22 @@ export class PayoutsService {
       });
     }
     return this.findOne(id);
+  }
+
+  /** Alerte la cloche du back-office. Une alerte manquée ne doit jamais faire échouer la demande du conducteur. */
+  private async alertStaffOfPendingPayout(payoutId: string, amount: bigint, isoCode: string): Promise<void> {
+    try {
+      await this.notifications.notifyStaff({
+        permission: 'payout.manage',
+        type: NotificationType.DRIVER_PAYMENT,
+        title: 'Retrait à valider',
+        body: `Un conducteur demande un retrait de ${formatMoneyWithCurrency(amount, isoCode)}.`,
+        link: '/payouts',
+        payload: { payoutId },
+      });
+    } catch (error) {
+      this.logger.warn(`Alerte équipe du retrait ${payoutId} non enregistrée : ${(error as Error).message}`);
+    }
   }
 
   private async notifyDriver(driverId: string, title: string, body: string): Promise<void> {

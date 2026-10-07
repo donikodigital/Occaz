@@ -4,12 +4,14 @@
 // le vrai en-tête (MobileTopBar). Plus de pb-24 réservé pour elle.
 // [02/10/2026] v3 — Garde d'accès par permission : une page absente du menu du compte (lien tapé à la main)
 // affiche « Accès non autorisé » au lieu d'une erreur brute. Le contenu attend que les permissions soient chargées.
+// v4 — Fine barre du haut sur grand écran avec la cloche des notifications (sur mobile, elle est dans MobileTopBar).
 'use client';
 
 import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileTopBar } from '@/components/layout/MobileTopBar';
+import { NotificationBell } from '@/components/layout/NotificationBell';
 import { AccessDenied } from '@/components/layout/AccessDenied';
 import { canSeeNavItem, getActiveNavItem } from '@/components/layout/nav-items';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -38,6 +40,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar isOpen={isMobileNavOpen} onClose={() => setMobileNavOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileTopBar onOpenMenu={() => setMobileNavOpen(true)} />
+        {/* Grand écran : la barre latérale remplace l'en-tête mobile ; une fine barre porte la cloche des notifications. */}
+        <header className="sticky top-0 z-30 hidden items-center justify-end border-b border-border bg-surface/95 px-10 py-2 backdrop-blur lg:flex">
+          <NotificationBell />
+        </header>
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
           <div className="mx-auto w-full max-w-6xl">
             {!isReady ? (

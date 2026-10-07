@@ -146,6 +146,8 @@ export class DriverProfilesService {
       fallbackTitle: "Bienvenue chez Occa'Z",
       fallbackBody: `Bienvenue ${dto.firstName} ! Votre profil conducteur est en cours de vérification.`,
     });
+    // Cloche du back-office : un nouveau conducteur attend sa vérification.
+    await this.alertStaff('driver.verify', 'Nouveau conducteur à vérifier', `${dto.firstName} ${dto.lastName ?? ''}`.trim() + ' vient de créer son profil conducteur.', '/drivers');
 
     return profile;
   }
@@ -428,7 +430,18 @@ export class DriverProfilesService {
 
   async uploadDocumentForUser(userId: string, dto: CreateDocumentDto) {
     const driverId = await this.getProfileIdForUser(userId);
-    return this.documentsService.create(DocumentOwnerType.DRIVER, driverId, dto);
+    const document = await this.documentsService.create(DocumentOwnerType.DRIVER, driverId, dto);
+    await this.alertStaff('document.verify', 'Document à vérifier', 'Un conducteur a envoyé un document à contrôler.', '/drivers');
+    return document;
+  }
+
+  /** Alerte la cloche du back-office ; une alerte manquée ne doit jamais faire échouer l'action du conducteur. */
+  private async alertStaff(permission: string, title: string, body: string, link: string): Promise<void> {
+    try {
+      await this.notifications.notifyStaff({ permission, type: NotificationType.STATUS_CHANGE, title, body, link });
+    } catch {
+      // volontairement ignoré
+    }
   }
 
   async findDocumentsForUser(userId: string) {

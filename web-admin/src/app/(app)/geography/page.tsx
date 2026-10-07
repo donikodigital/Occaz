@@ -275,26 +275,23 @@ function CountryCard({ country, currencies, onClick }: { country: Country; curre
     <button
       type="button"
       onClick={onClick}
-      className={`${CARD_CLASSES} flex-col gap-3 ${country.isActive ? '' : 'opacity-70'} ${
+      className={`${CARD_CLASSES} items-center gap-3 !p-3 ${country.isActive ? '' : 'opacity-70'} ${
         missingCurrency ? 'border-danger-light' : ''
       }`}
     >
-      <div className="flex w-full items-start justify-between">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-light text-2xl leading-none" aria-hidden="true">
-          {isoToFlagEmoji(country.isoCode)}
-        </span>
-        <IconChevronRight size={18} className="text-text-muted transition-transform group-hover:translate-x-0.5" />
-      </div>
-      <div className="min-w-0">
-        <p className="truncate font-semibold text-text-primary">{country.name}</p>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-light text-xl leading-none" aria-hidden="true">
+        {isoToFlagEmoji(country.isoCode)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold leading-snug text-text-primary">{country.name}</p>
         <p className="text-xs text-text-secondary">
           {country.isoCode} · {country.phoneCode}
         </p>
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         {!country.isActive ? <Badge label="Désactivé" tone="neutral" /> : null}
         {missingCurrency ? <Badge label="Devise manquante" tone="danger" /> : <Badge label={currency?.isoCode ?? '—'} tone="primary" />}
-        {country.isCrossBorderEnabled ? <Badge label="Transfrontalier" tone="success" /> : null}
+        <IconChevronRight size={18} className="text-text-muted transition-transform group-hover:translate-x-0.5" />
       </div>
     </button>
   );
