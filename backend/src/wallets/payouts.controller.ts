@@ -11,6 +11,7 @@ import { PayoutsService } from './payouts.service';
 import { RequestPayoutDto } from './dto/request-payout.dto';
 import { FailPayoutDto } from './dto/fail-payout.dto';
 import { ListPayoutsQueryDto } from './dto/list-payouts-query.dto';
+import { SetPayoutModeDto } from './dto/set-payout-mode.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 
 @ApiTags('Retraits')
@@ -35,6 +36,21 @@ export class PayoutsController {
     return this.payoutsService.request(driverId, dto);
   }
 
+  /** Mode des retraits (Automatique / Manuel), plafond, état du prestataire et nombre de retraits à valider. */
+  @Permissions(PERMISSIONS.PAYOUT_MANAGE)
+  @Get('config')
+  getConfig(@CurrentUser() user: AuthenticatedUser) {
+    return this.payoutsService.getConfig(this.scope.payoutWhere(user, PERMISSIONS.PAYOUT_MANAGE));
+  }
+
+  /** Bascule Automatique / Manuel. Réservé à qui peut modifier les paramètres de la plateforme : c'est un contrôle sur l'argent. */
+  @Permissions(PERMISSIONS.SETTINGS_UPDATE)
+  @Patch('mode')
+  async setMode(@Body() dto: SetPayoutModeDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.payoutsService.setMode(dto.autoEnabled, user.id);
+    return this.payoutsService.getConfig(this.scope.payoutWhere(user, PERMISSIONS.PAYOUT_MANAGE));
+  }
+
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)
   @Get()
   findAll(@Query() query: ListPayoutsQueryDto, @CurrentUser() user: AuthenticatedUser) {
@@ -50,6 +66,14 @@ export class PayoutsController {
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     await this.scope.assertPayout(user, PERMISSIONS.PAYOUT_MANAGE, id);
     return this.payoutsService.findOne(id);
+  }
+
+  /** Valide un retrait en attente et l'envoie tout de suite par le prestataire de paiement. */
+  @Permissions(PERMISSIONS.PAYOUT_MANAGE)
+  @Patch(':id/approve')
+  async approve(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertPayout(user, PERMISSIONS.PAYOUT_MANAGE, id);
+    return this.payoutsService.approve(id, user.id);
   }
 
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)

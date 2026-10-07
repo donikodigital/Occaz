@@ -1,6 +1,6 @@
 // backend/src/integrations/email/console-email.provider.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { EmailProvider } from './email-provider.interface';
+import { EmailAction, EmailProvider } from './email-provider.interface';
 
 /**
  * Fournisseur par défaut pour le développement — journalise au lieu
@@ -12,7 +12,7 @@ import { EmailProvider } from './email-provider.interface';
 export class ConsoleEmailProvider implements EmailProvider {
   private readonly logger = new Logger('Email');
 
-  async send(toEmail: string, subject: string, body: string): Promise<void> {
-    this.logger.log(`[SIMULATION EMAIL] -> ${toEmail} : ${subject} — ${body}`);
+  async send(toEmail: string, subject: string, body: string, action?: EmailAction): Promise<void> {
+    this.logger.log(`[SIMULATION EMAIL] -> ${toEmail} : ${subject} — ${body}${action ? ` [${action.label} : ${action.url}]` : ''}`);
   }
 }

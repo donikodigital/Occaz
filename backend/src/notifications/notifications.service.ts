@@ -295,6 +295,8 @@ export class NotificationsService {
     /** Si renseigné, un rôle limité à un pays n'est alerté que pour ces pays ; un rôle sans pays l'est toujours. */
     countryIds?: string[];
     payload?: Record<string, unknown>;
+    /** Envoie aussi un email à chaque destinataire (en plus de la cloche). Pour les alertes qui ne peuvent pas attendre. */
+    email?: boolean;
   }): Promise<void> {
     try {
       const staff = await this.prisma.user.findMany({
@@ -312,7 +314,7 @@ export class NotificationsService {
             },
           ],
         },
-        select: { id: true },
+        select: { id: true, email: true },
       });
       if (staff.length === 0) return;
 
@@ -329,8 +331,34 @@ export class NotificationsService {
           sentAt: now,
         })),
       });
+
+      if (params.email) await this.emailStaff(staff, params);
     } catch (error) {
       this.logger.warn(`Alerte équipe non enregistrée (${params.title}) : ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Email d'une alerte équipe. Le bouton « Ouvrir » ne s'affiche que si ADMIN_PANEL_URL (adresse du back-office, sans « / » final)
+   * est défini : jamais un bouton qui ne mène nulle part. Un email qui échoue (adresse absente, service coupé) est journalisé et
+   * n'empêche ni les autres envois ni la cloche, déjà enregistrée.
+   */
+  private async emailStaff(
+    staff: Array<{ id: string; email: string | null }>,
+    params: { title: string; body: string; link?: string },
+  ): Promise<void> {
+    const panelUrl = process.env.ADMIN_PANEL_URL?.trim().replace(/\/+$/, '');
+    const action = panelUrl && params.link ? { url: `${panelUrl}${params.link}`, label: 'Ouvrir dans le back-office' } : undefined;
+
+    const results = await Promise.allSettled(
+      staff
+        .filter((member): member is { id: string; email: string } => Boolean(member.email))
+        .map((member) => this.emailProvider.send(member.email, params.title, params.body, action)),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.warn(`Email d'alerte équipe non envoyé (${params.title}) : ${(result.reason as Error).message}`);
+      }
     }
   }
 }

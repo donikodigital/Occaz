@@ -88,14 +88,14 @@ const TX_STATUS: Record<WalletTransactionStatus, { label: string; tone: StatusTo
 };
 
 const PAYOUT_STATUS: Record<PayoutStatus, { label: string; tone: StatusTone }> = {
-  REQUESTED: { label: 'Demandé', tone: 'neutral' },
+  REQUESTED: { label: 'En attente de validation', tone: 'neutral' },
   PROCESSING: { label: 'En cours', tone: 'ocean' },
   PAID: { label: 'Payé', tone: 'success' },
   FAILED: { label: 'Échoué', tone: 'danger' },
   CANCELLED: { label: 'Annulé', tone: 'danger' },
 };
 
-/** Pastille de statut : pour un retrait, celui de la demande de retrait (Demandé, En cours, Payé, Échoué) ; sinon celui de l'opération. */
+/** Pastille de statut : pour un retrait, celui de la demande de retrait (En attente de validation, En cours, Payé, Échoué) ; sinon celui de l'opération. */
 export function txStatus(tx: Pick<WalletTransaction, 'status' | 'subject'>): { label: string; tone: StatusTone } {
   if (tx.subject?.kind === 'PAYOUT') return PAYOUT_STATUS[tx.subject.status];
   return TX_STATUS[tx.status];

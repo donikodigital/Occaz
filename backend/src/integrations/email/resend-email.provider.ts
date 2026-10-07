@@ -1,6 +1,6 @@
 // backend/src/integrations/email/resend-email.provider.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { EmailProvider } from './email-provider.interface';
+import { EmailAction, EmailProvider } from './email-provider.interface';
 import { renderNotificationEmailHtml } from './email-template';
 
 /**
@@ -17,7 +17,7 @@ export class ResendEmailProvider implements EmailProvider {
   private readonly logger = new Logger('Email');
   private readonly endpoint = 'https://api.resend.com/emails';
 
-  async send(toEmail: string, subject: string, body: string): Promise<void> {
+  async send(toEmail: string, subject: string, body: string, action?: EmailAction): Promise<void> {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       throw new Error(
@@ -44,7 +44,12 @@ export class ResendEmailProvider implements EmailProvider {
           to: toEmail,
           subject,
           text: body,
-          html: renderNotificationEmailHtml({ title: subject, body }),
+          html: renderNotificationEmailHtml({
+            title: subject,
+            body,
+            actionUrl: action?.url,
+            actionLabel: action?.label,
+          }),
         }),
       });
     } catch (error) {

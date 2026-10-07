@@ -1,11 +1,16 @@
 // backend/src/wallets/payouts.service.ts
 //
-// Retraits des conducteurs. Deux voies, au choix du réglage « payout.auto_enabled » (page « Paramètres » du back-office) :
+// Retraits des conducteurs. Deux modes, au choix du réglage « payout.auto_enabled » (page « Retraits » du back-office) :
 //  - AUTOMATIQUE (par défaut) : la demande est envoyée tout de suite au prestataire de paiement (Orange Money), sans validation du
 //    support ; le conducteur est prévenu du résultat. Un plafond facultatif (payout.auto_max_amount) renvoie les gros montants
 //    vers la validation manuelle.
-//  - MANUELLE : la demande attend l'équipe, qui la marque « en traitement », « payée » ou « échouée » depuis le back-office. Ces
-//    actions restent disponibles même en mode automatique, pour traiter un retrait resté bloqué.
+//  - MANUEL : la demande reste « en attente de validation » (statut REQUESTED), le solde est réservé, et l'équipe est alertée
+//    (cloche + email). L'admin vérifie d'abord que son compte de paiement est approvisionné, puis :
+//      · « Valider et envoyer » (approve) : le virement part par le prestataire de paiement ;
+//      · ou « Passer en traitement » (markProcessing), fait le virement lui-même, puis « Marquer payé » (markPaid) ;
+//      · ou refuse (markFailed) : le solde est remis au conducteur.
+//    Chaque décision prévient le conducteur. Ces actions restent disponibles même en mode automatique, pour traiter un retrait
+//    resté bloqué.
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { NotificationChannel, NotificationType, PayoutStatus, Prisma } from '@prisma/client';
 import * as Sentry from '@sentry/nestjs';
@@ -26,10 +31,42 @@ export interface PayoutAutoSettings {
   maxAmount: bigint;
 }
 
+/** Ce que la page « Retraits » du back-office affiche en tête : le mode, le plafond, l'état du prestataire et la file d'attente. */
+export interface PayoutConfig {
+  /** true = automatique, false = manuel (chaque retrait attend la validation de l'équipe). */
+  autoEnabled: boolean;
+  /** Plafond du mode automatique, plus petite unité de la devise (« 0 » = aucune limite). Texte : un BigInt ne passe pas en JSON. */
+  autoMaxAmount: string;
+  /** Vrai tant qu'aucun prestataire réel n'est branché : un « envoi » ne fait alors partir aucun argent. */
+  providerSimulated: boolean;
+  /** Retraits en attente de validation (dans la portée de l'équipier qui consulte). */
+  pendingCount: number;
+}
+
+const AUTO_ENABLED_KEY = 'payout.auto_enabled';
+const AUTO_MAX_AMOUNT_KEY = 'payout.auto_max_amount';
+
 /** Numéro masqué pour les messages : « ••••4417 ». */
 function maskDestination(destination: string | null | undefined): string {
   const digits = (destination ?? '').replace(/\D/g, '');
   return digits.length >= 4 ? `••••${digits.slice(-4)}` : 'votre compte Mobile Money';
+}
+
+type PayoutMessageKind = 'VALIDATED' | 'PAID' | 'FAILED';
+
+/** Texte envoyé au conducteur : le même quel que soit celui qui a décidé (automatique ou équipe). */
+function payoutMessage(kind: PayoutMessageKind, amount: string, masked: string, reason?: string): { title: string; body: string } {
+  switch (kind) {
+    case 'PAID':
+      return { title: 'Retrait effectué', body: `${amount} ont été envoyés sur votre compte Mobile Money (${masked}).` };
+    case 'FAILED':
+      return {
+        title: 'Retrait refusé',
+        body: `Votre retrait de ${amount} a été refusé (${reason ?? 'raison non précisée'}). Le montant a été remis dans votre solde.`,
+      };
+    case 'VALIDATED':
+      return { title: 'Retrait validé', body: `Votre retrait de ${amount} a été validé : l'envoi vers ${masked} est en cours.` };
+  }
 }
 
 /**
@@ -84,7 +121,8 @@ export class PayoutsService {
         skip: query.skip,
         take: query.take,
         orderBy: { requestedAt: 'desc' },
-        include: { wallet: { include: { driver: true } } },
+        // La devise du retrait (GNF, XOF…) : l'admin valide un montant, il doit le voir dans la bonne devise.
+        include: { currency: true, wallet: { include: { driver: true } } },
       }),
       this.prisma.payout.count({ where }),
     ]);
@@ -120,11 +158,11 @@ export class PayoutsService {
       throw error;
     }
 
-    // Retrait automatique : envoyé tout de suite au prestataire (sauf réglage contraire ou plafond dépassé). Le résultat — payé,
+    // Retrait automatique : envoyé tout de suite au prestataire (sauf mode manuel ou plafond dépassé). Le résultat — payé,
     // en cours, refusé, ou toujours en attente de l'équipe — est celui du retrait renvoyé au conducteur.
     const result = await this.processAutomatically(payout.id);
 
-    // Resté « demandé » (retrait automatique coupé, montant au-dessus du plafond, numéro manquant) : l'équipe doit le traiter.
+    // Resté « en attente de validation » (mode manuel, montant au-dessus du plafond, numéro manquant) : l'équipe doit le traiter.
     if (result.status === PayoutStatus.REQUESTED) {
       await this.alertStaffOfPendingPayout(payout.id, result.amount, wallet.currency?.isoCode ?? '');
     }
@@ -132,29 +170,72 @@ export class PayoutsService {
   }
 
   // ---------------------------------------------------------------------------
-  // Retrait automatique
+  // Mode des retraits (page « Retraits » du back-office)
   // ---------------------------------------------------------------------------
 
-  /** Réglages lus à chaque demande : le SuperAdmin peut couper l'automatisme à tout moment, sans redéploiement. */
+  /** Réglages lus à chaque demande : le SuperAdmin peut changer de mode à tout moment, sans redéploiement. */
   async getAutoSettings(): Promise<PayoutAutoSettings> {
     const rows = await this.prisma.platformSetting.findMany({
-      where: { key: { in: ['payout.auto_enabled', 'payout.auto_max_amount'] } },
+      where: { key: { in: [AUTO_ENABLED_KEY, AUTO_MAX_AMOUNT_KEY] } },
     });
     const value = (key: string) => rows.find((row) => row.key === key)?.value;
-    const maxRaw = value('payout.auto_max_amount');
+    const maxRaw = value(AUTO_MAX_AMOUNT_KEY);
     return {
       // Absent = activé : c'est le comportement voulu par défaut (la migration crée le réglage à « oui »).
-      enabled: value('payout.auto_enabled') !== false,
+      enabled: value(AUTO_ENABLED_KEY) !== false,
       maxAmount: typeof maxRaw === 'number' && maxRaw > 0 ? BigInt(Math.floor(maxRaw)) : 0n,
     };
   }
+
+  /** Mode courant + file d'attente, pour l'en-tête de la page « Retraits ». */
+  async getConfig(scopeWhere?: Prisma.PayoutWhereInput): Promise<PayoutConfig> {
+    const settings = await this.getAutoSettings();
+    const pendingBase = { status: PayoutStatus.REQUESTED };
+    const pendingCount = await this.prisma.payout.count({ where: scopeWhere ? { AND: [pendingBase, scopeWhere] } : pendingBase });
+    return {
+      autoEnabled: settings.enabled,
+      autoMaxAmount: settings.maxAmount.toString(),
+      providerSimulated: this.providers.get().isSimulated,
+      pendingCount,
+    };
+  }
+
+  /**
+   * Bascule Automatique / Manuel. Écrit le même réglage que la page « Paramètres » (une seule source de vérité) et trace le
+   * changement : savoir qui a coupé l'automatisme, et quand, compte pour un flux d'argent. N'affecte que les retraits à venir —
+   * ceux déjà en attente le restent jusqu'à décision de l'équipe.
+   */
+  async setMode(autoEnabled: boolean, actorId: string): Promise<void> {
+    const setting = await this.prisma.platformSetting.upsert({
+      where: { key: AUTO_ENABLED_KEY },
+      update: { value: autoEnabled, updatedById: actorId },
+      create: {
+        key: AUTO_ENABLED_KEY,
+        value: autoEnabled,
+        description:
+          "Retrait automatique : le retrait d'un conducteur est envoyé tout de suite sur son compte Mobile Money, sans validation de l'équipe. Désactiver pour passer en validation manuelle.",
+        updatedById: actorId,
+      },
+    });
+    await this.audit.log({
+      actorId,
+      entityType: 'PlatformSetting',
+      entityId: setting.id,
+      action: 'UPSERT',
+      diff: { key: AUTO_ENABLED_KEY, value: autoEnabled } as Prisma.InputJsonValue,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Retrait automatique
+  // ---------------------------------------------------------------------------
 
   /**
    * Envoie le retrait au prestataire de paiement sans attendre l'équipe. Ne lève jamais d'exception vers le conducteur : quoi
    * qu'il arrive, sa demande existe et ses fonds sont réservés — le pire cas est un retrait « en attente » ou « en cours » que
    * l'équipe traite depuis le back-office.
    *
-   *  - réglage coupé, montant au-dessus du plafond, numéro manquant → reste « demandé » (validation manuelle) ;
+   *  - mode manuel, montant au-dessus du plafond, numéro manquant → reste « en attente de validation » ;
    *  - le prestataire dit PAYÉ → retrait payé, solde en attente décompté, conducteur prévenu ;
    *  - le prestataire dit REFUSÉ → retrait échoué, solde remis au conducteur, conducteur prévenu ;
    *  - le prestataire accepte sans confirmer → « en cours » (confirmation à venir) ;
@@ -165,7 +246,7 @@ export class PayoutsService {
     const payout = await this.findOne(id);
     const settings = await this.getAutoSettings();
 
-    // Réglage coupé volontairement : validation manuelle, rien à tracer (ce n'est pas une anomalie).
+    // Mode manuel choisi volontairement : validation par l'équipe, rien à tracer (ce n'est pas une anomalie).
     if (!settings.enabled) return payout;
 
     // Cas qui renvoient vers la validation manuelle : on le trace pour que l'équipe sache pourquoi ce retrait attend.
@@ -180,17 +261,57 @@ export class PayoutsService {
       return payout;
     }
 
-    // Réclamer le retrait avant tout appel au prestataire : si l'équipe l'a déjà pris en charge, on n'envoie rien en double.
+    return this.sendToProvider(payout, null);
+  }
+
+  /**
+   * Validation par l'équipe : le virement part tout de suite par le prestataire de paiement, comme en mode automatique, mais
+   * seulement une fois que l'admin a vérifié que son compte est approvisionné. Refusée s'il n'y a pas de prestataire réel en
+   * production : « envoyer » marquerait le retrait payé sans qu'aucun argent ne parte (voir PayoutProviderRegistry).
+   */
+  async approve(id: string, actorId: string) {
+    const payout = await this.findOne(id);
+    if (payout.status !== PayoutStatus.REQUESTED) {
+      throw new BadRequestException('Seul un retrait en attente de validation peut être validé.');
+    }
+    if (!payout.destinationRef?.trim()) {
+      throw new BadRequestException("Ce retrait n'a pas de numéro Mobile Money : refuse-le, le conducteur pourra réessayer avec un numéro.");
+    }
+    if (this.providers.get().isSimulated && process.env.NODE_ENV === 'production') {
+      throw new BadRequestException(
+        "Orange Money n'est pas encore branché : un envoi serait marqué payé sans qu'aucun argent ne parte. Passe le retrait en traitement, fais le virement toi-même, puis marque-le payé.",
+      );
+    }
+    return this.sendToProvider(payout, actorId);
+  }
+
+  /**
+   * Envoi au prestataire, commun au mode automatique (`actorId` nul) et à la validation par l'équipe. Le retrait est « réclamé »
+   * avant tout appel au prestataire : si quelqu'un l'a déjà pris en charge, rien n'est envoyé en double.
+   */
+  private async sendToProvider(payout: { id: string; walletId: string; amount: bigint; method: string | null; destinationRef: string | null }, actorId: string | null) {
+    const id = payout.id;
+    const automatic = actorId === null;
+    const prefix = automatic ? 'AUTO' : 'APPROVED';
+
     const claimed = await this.prisma.payout.updateMany({
       where: { id, status: PayoutStatus.REQUESTED },
-      data: { status: PayoutStatus.PROCESSING, autoProcessed: true },
+      data: { status: PayoutStatus.PROCESSING, autoProcessed: automatic },
     });
-    if (claimed.count === 0) return this.findOne(id);
+    if (claimed.count === 0) {
+      if (!automatic) throw new BadRequestException('Ce retrait a déjà été pris en charge.');
+      return this.findOne(id);
+    }
+    if (!automatic) {
+      await this.audit.log({ actorId, entityType: 'Payout', entityId: id, action: 'APPROVED' });
+    }
 
     const wallet = await this.prisma.wallet.findUniqueOrThrow({
       where: { id: payout.walletId },
       include: { currency: true },
     });
+    const amountText = formatMoneyWithCurrency(payout.amount, wallet.currency.isoCode);
+    const masked = maskDestination(payout.destinationRef);
 
     try {
       const outcome = await this.providers.get().disburse({
@@ -202,40 +323,51 @@ export class PayoutsService {
       });
 
       if (outcome.status === 'PAID') {
-        await this.closeAsPaid(id, null, { externalReference: outcome.externalReference });
-        await this.notifyDriver(wallet.driverId, 'Retrait effectué', `${formatMoneyWithCurrency(payout.amount, wallet.currency.isoCode)} ont été envoyés sur votre compte Mobile Money (${maskDestination(payout.destinationRef)}).`);
+        await this.closeAsPaid(id, actorId, { externalReference: outcome.externalReference });
+        const message = payoutMessage('PAID', amountText, masked);
+        await this.notifyDriver(wallet.driverId, message.title, message.body);
       } else if (outcome.status === 'FAILED') {
-        await this.closeAsFailed(id, outcome.reason, null, { externalReference: outcome.externalReference });
-        await this.notifyDriver(wallet.driverId, 'Retrait refusé', `Votre retrait de ${formatMoneyWithCurrency(payout.amount, wallet.currency.isoCode)} a été refusé (${outcome.reason}). Le montant a été remis dans votre solde.`);
+        await this.closeAsFailed(id, outcome.reason, actorId, { externalReference: outcome.externalReference });
+        const message = payoutMessage('FAILED', amountText, masked, outcome.reason);
+        await this.notifyDriver(wallet.driverId, message.title, message.body);
       } else {
         await this.prisma.payout.update({ where: { id }, data: { externalReference: outcome.externalReference } });
-        await this.audit.log({ actorId: null, entityType: 'Payout', entityId: id, action: 'AUTO_PROCESSING', diff: { externalReference: outcome.externalReference } });
+        await this.audit.log({ actorId, entityType: 'Payout', entityId: id, action: `${prefix}_PROCESSING`, diff: { externalReference: outcome.externalReference } });
+        // Validé par l'équipe mais pas encore confirmé par le prestataire : le conducteur sait que sa demande avance.
+        if (!automatic) {
+          const message = payoutMessage('VALIDATED', amountText, masked);
+          await this.notifyDriver(wallet.driverId, message.title, message.body);
+        }
       }
     } catch (error) {
       // Résultat inconnu : on ne rembourse pas (l'argent est peut-être parti), on ne marque pas payé. L'équipe vérifie.
       this.logger.error(`Retrait ${id} : résultat inconnu après l'appel au prestataire — laissé « en cours » pour vérification.`, (error as Error).stack);
       Sentry.captureException(error);
       await this.audit.log({
-        actorId: null,
+        actorId,
         entityType: 'Payout',
         entityId: id,
-        action: 'AUTO_ERROR',
+        action: `${prefix}_ERROR`,
         diff: { message: (error as Error).message },
       });
     }
     return this.findOne(id);
   }
 
-  /** Alerte la cloche du back-office. Une alerte manquée ne doit jamais faire échouer la demande du conducteur. */
+  /**
+   * Alerte l'équipe : cloche du back-office ET email, pour qu'un retrait en attente ne passe pas inaperçu (le conducteur attend son
+   * argent). Une alerte manquée ne doit jamais faire échouer la demande du conducteur.
+   */
   private async alertStaffOfPendingPayout(payoutId: string, amount: bigint, isoCode: string): Promise<void> {
     try {
       await this.notifications.notifyStaff({
         permission: 'payout.manage',
         type: NotificationType.DRIVER_PAYMENT,
         title: 'Retrait à valider',
-        body: `Un conducteur demande un retrait de ${formatMoneyWithCurrency(amount, isoCode)}.`,
+        body: `Un conducteur demande un retrait de ${formatMoneyWithCurrency(amount, isoCode)}. Vérifie que ton compte Orange Money est approvisionné avant de valider.`,
         link: '/payouts',
         payload: { payoutId },
+        email: true,
       });
     } catch (error) {
       this.logger.warn(`Alerte équipe du retrait ${payoutId} non enregistrée : ${(error as Error).message}`);
@@ -259,7 +391,19 @@ export class PayoutsService {
     }
   }
 
-  /** L'équipe marque le virement comme initié côté prestataire. */
+  /** Prévient le conducteur d'une décision de l'équipe (validé, payé, refusé). Ne lève jamais d'exception. */
+  private async notifyDriverOfDecision(id: string, kind: PayoutMessageKind, reason?: string): Promise<void> {
+    try {
+      const payout = await this.findOne(id);
+      const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { id: payout.walletId }, include: { currency: true } });
+      const message = payoutMessage(kind, formatMoneyWithCurrency(payout.amount, wallet.currency.isoCode), maskDestination(payout.destinationRef), reason);
+      await this.notifyDriver(wallet.driverId, message.title, message.body);
+    } catch (error) {
+      this.logger.warn(`Notification de décision du retrait ${id} non envoyée : ${(error as Error).message}`);
+    }
+  }
+
+  /** L'équipe valide la demande : le virement va être (ou est) fait hors prestataire, le conducteur en est prévenu. */
   async markProcessing(id: string, actorId: string) {
     const payout = await this.findOne(id);
     if (payout.status !== PayoutStatus.REQUESTED) {
@@ -275,6 +419,7 @@ export class PayoutsService {
       entityId: id,
       action: 'PROCESSING',
     });
+    await this.notifyDriverOfDecision(id, 'VALIDATED');
     return updated;
   }
 
@@ -346,10 +491,14 @@ export class PayoutsService {
   }
 
   async markPaid(id: string, actorId: string) {
-    return this.closeAsPaid(id, actorId);
+    const updated = await this.closeAsPaid(id, actorId);
+    await this.notifyDriverOfDecision(id, 'PAID');
+    return updated;
   }
 
   async markFailed(id: string, reason: string, actorId: string) {
-    return this.closeAsFailed(id, reason, actorId);
+    const updated = await this.closeAsFailed(id, reason, actorId);
+    await this.notifyDriverOfDecision(id, 'FAILED', reason);
+    return updated;
   }
 }

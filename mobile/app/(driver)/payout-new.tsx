@@ -1,5 +1,8 @@
 // mobile/app/(driver)/payout-new.tsx
 //
+// [07/10/2026] v3 — Retrait en mode Manuel : l'écran annonce « En attente de validation » (statut de la demande, même libellé que
+// dans l'historique du portefeuille) et dit que le montant est mis de côté en attendant la décision de l'équipe.
+//
 // [05/10/2026] v2 — Le retrait part tout de suite sur le compte Mobile Money (retrait automatique) ; l'écran dit ensuite ce qui s'est
 // passé : effectué, en cours, demande en attente de validation (réglage de l'équipe ou montant au-dessus du plafond), ou refusé
 // (le montant est alors remis dans le solde). Plus de retour silencieux sans savoir où en est son argent.
@@ -54,8 +57,8 @@ function describeOutcome(payout: Payout, amountText: string, destination: string
       return {
         Icon: IconClockHour4,
         tint: OCEAN.base,
-        title: 'Demande envoyée',
-        text: `Votre retrait de ${amountText} doit être validé par l'équipe avant l'envoi vers ${masked}. Vous serez prévenu dès qu'il sera traité.`,
+        title: 'En attente de validation',
+        text: `Votre retrait de ${amountText} a bien été demandé : il doit être validé par l'équipe avant l'envoi vers ${masked}. Le montant est mis de côté, et vous serez prévenu dès que ce sera traité.`,
       };
   }
 }
