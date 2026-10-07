@@ -10,7 +10,10 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "sarl.occaz.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "sarl.occaz.app",
@@ -71,15 +74,11 @@
       "expo-image"
     ],
     "extra": {
-      "apiUrl": "https://api.transport-partage.example.com/api/v1",
-      "router": {},
-      "eas": {
-        "projectId": "e7307b16-5582-40ad-bddc-608cbea827f8"
-      }
+      "apiUrl": "https://api.occaz.sarl/api/v1",
+      "router": {}
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "owner": "doniko2025"
+    }
   }
 }
