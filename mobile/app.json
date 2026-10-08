@@ -10,10 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "sarl.occaz.app",
-      "buildNumber": "1",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "buildNumber": "1"
     },
     "android": {
       "package": "sarl.occaz.app",
@@ -68,21 +65,31 @@
       [
         "expo-notifications",
         {
-          "color": "#0B6BA8"
+          "color": "#0B6BA8",
+          "sounds": ["./assets/sounds/message.wav"]
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
         }
       ],
       "expo-image"
     ],
     "extra": {
-      "apiUrl": "https://api.occaz.sarl/api/v1",
+      "apiUrl": "https://api.transport-partage.example.com/api/v1",
       "router": {},
       "eas": {
-        "projectId": "442c452f-5eb3-4de1-bb7b-ff269181bc5e"
+        "projectId": "e7307b16-5582-40ad-bddc-608cbea827f8"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "dftransfer"
+    "owner": "doniko2025"
   }
 }

@@ -19,6 +19,8 @@ import { AppText, ScreenContainer, TextField } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useConversation, useConversationMessages, useMarkConversationRead, useSendMessage } from '@/hooks/useConversations';
+import { useIncomingMessageSound } from '@/hooks/useIncomingMessageSound';
+import { setActiveConversation } from '@/utils/messageSound';
 import { useAuthStore } from '@/stores/authStore';
 import { formatTime } from '@/utils/date';
 import type { ConversationDetail, Message } from '@/types/conversations.types';
@@ -124,9 +126,15 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
   const messages = data?.data ?? [];
   const canSend = Boolean(draft.trim()) && !sendMessage.isPending;
 
+  // Son à l'arrivée d'un message de l'autre personne dans cette conversation.
+  useIncomingMessageSound(conversationId, data?.data, currentUserId);
+
   useFocusEffect(
     useCallback(() => {
+      // Tant que cet écran est affiché, un nouveau message ne s'annonce pas par une bannière (il apparaît dans la liste, avec le son).
+      setActiveConversation(conversationId);
       markRead.mutate();
+      return () => setActiveConversation(null);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [conversationId]),
   );

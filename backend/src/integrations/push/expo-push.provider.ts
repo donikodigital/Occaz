@@ -45,7 +45,7 @@ export class ExpoPushProvider implements PushProvider {
       title,
       body,
       data,
-      sound: 'default' as const,
+      sound: options?.sound ?? ('default' as const),
       ...(options?.channelId ? { channelId: options.channelId } : {}),
       ...(options?.priority ? { priority: options.priority } : {}),
     }));

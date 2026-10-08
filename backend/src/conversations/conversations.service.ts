@@ -18,6 +18,11 @@ import { NotificationsService } from '../notifications/notifications.service';
  * permission qui n'est ni le client ni le conducteur est marqué
  * isSupportIntervention.
  */
+/** Canal Android des messages d'échange — créé par l'app (mobile/src/hooks/usePushNotifications.ts), même identifiant. */
+export const MESSAGE_CHANNEL_ID = 'messages';
+/** Son iOS des messages d'échange : fichier embarqué dans l'app (mobile/assets/sounds/message.wav, déclaré dans app.json). */
+export const MESSAGE_SOUND = 'message.wav';
+
 @Injectable()
 export class ConversationsService {
   constructor(
@@ -293,6 +298,9 @@ export class ConversationsService {
           // tard) n'aurait aucun moyen de savoir vers quelle conversation
           // ouvrir la carte d'alerte.
           payload: { conversationId: conversation.id },
+          // Son propre aux messages d'échange : canal Android « messages » (créé par l'app, voir usePushNotifications) et fichier
+          // son embarqué dans l'app pour iOS. Les autres notifications gardent leur son habituel.
+          pushOptions: { channelId: MESSAGE_CHANNEL_ID, sound: MESSAGE_SOUND, priority: 'high' },
         }),
       ),
     );

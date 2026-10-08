@@ -14,6 +14,8 @@ export const PUSH_PROVIDER = 'PUSH_PROVIDER';
  */
 export interface PushOptions {
   channelId?: string;
+  /** Son joué sur iOS (nom d'un fichier embarqué dans l'app, ex. « message.wav ») ; par défaut « default ». Sur Android, le son se règle par canal. */
+  sound?: string;
   priority?: 'default' | 'normal' | 'high';
 }
 
