@@ -129,7 +129,7 @@ function BalanceCard({ balance, canWithdraw, onWithdraw }: { balance: CurrencyBa
       </div>
 
       <div className="mt-4 space-y-1.5 border-t border-border/70 pt-3">
-        <BalanceLine label="Commissions gagnées" value={balance.earned} iso={balance.isoCode} />
+        <BalanceLine label="Commissions gagnées (courses terminées)" value={balance.earned} iso={balance.isoCode} />
         <BalanceLine label="Déjà retiré" value={balance.withdrawn} iso={balance.isoCode} />
         <BalanceLine label="Retraits en cours" value={balance.inProgress} iso={balance.isoCode} />
         <BalanceLine label="En attente (courses non terminées)" value={balance.pending} iso={balance.isoCode} muted />
@@ -580,6 +580,13 @@ export default function PlatformWalletPage() {
             <BalanceCard key={balance.currencyId} balance={balance} canWithdraw={canManage} onWithdraw={() => setWithdrawing(balance)} />
           ))}
         </div>
+      ) : null}
+      {data ? (
+        <p className="px-1 text-xs leading-relaxed text-text-secondary">
+          Seules les commissions des courses et envois <span className="font-medium text-text-primary">terminés</span> sont retirables. Le tableau de bord
+          compte toutes les commissions confirmées d’une période, y compris celles qui sont encore « en attente » ici : les deux totaux ne
+          coïncident donc qu’une fois les courses terminées. Chaque commission est comptée dans la devise payée par le client.
+        </p>
       ) : null}
 
       {/* Bénéficiaires */}

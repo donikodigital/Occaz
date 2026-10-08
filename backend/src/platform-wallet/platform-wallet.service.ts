@@ -4,7 +4,7 @@
 // Money enregistrés (le sien, ceux du support, du service client…).
 //
 // Le solde n'est pas stocké — on ne tient pas deux comptabilités. Les commissions sont déjà dans le registre (WalletTransaction de
-// type COMMISSION, montant négatif côté conducteur) ; pour chaque devise :
+// type COMMISSION) pour leur statut, et dans Booking/Shipment.platformFee pour leur montant et leur devise de paiement ; pour chaque devise :
 //     disponible = commissions libérées (COMPLETED) − retraits payés − retraits en cours
 // Les commissions « en attente » (course pas encore terminée, donc remboursable) ne sont pas retirables.
 //
@@ -19,7 +19,6 @@ import {
   PlatformWithdrawalStatus,
   Prisma,
   WalletTransactionStatus,
-  WalletTransactionType,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as Sentry from '@sentry/nestjs';
@@ -79,24 +78,35 @@ export class PlatformWalletService {
 
   // ─── Solde ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Les commissions viennent du registre des conducteurs POUR LE STATUT (libérée = course terminée, en attente = pas encore), mais le
+   * MONTANT et la DEVISE sont ceux de la réservation / de l'envoi d'origine (Booking.platformFee, Shipment.platformFee) : c'est dans cette
+   * devise que le client a payé, donc dans cette devise que l'argent est arrivé sur le compte marchand. Le registre, lui, convertit la
+   * commission dans la devise du portefeuille du conducteur (trajet payé en XOF, conducteur en GNF) : s'y fier ferait apparaître des GNF
+   * qui n'ont jamais été encaissés. C'est aussi la même source que le tableau de bord (Booking/Shipment.platformFee par devise).
+   */
   private async computeBalance(client: Prisma.TransactionClient | PrismaService, currencyId: string): Promise<RawBalance> {
-    const commission = (status: WalletTransactionStatus) =>
-      client.walletTransaction.aggregate({
-        where: { type: WalletTransactionType.COMMISSION, status, currencyId },
-        _sum: { amount: true },
-      });
+    const rows = await client.$queryRaw<{ status: string; total: bigint | null }[]>`
+      SELECT wt."status"::text AS "status", SUM(src."platformFee")::bigint AS "total"
+      FROM "wallet_transactions" wt
+      JOIN (
+        SELECT "id", "currencyId", "platformFee" FROM "bookings"
+        UNION ALL
+        SELECT "id", "currencyId", "platformFee" FROM "shipments"
+      ) src ON src."id" = COALESCE(wt."bookingId", wt."shipmentId")
+      WHERE wt."type" = 'COMMISSION'
+        AND wt."status" IN ('COMPLETED', 'PENDING')
+        AND src."currencyId" = ${currencyId}
+      GROUP BY wt."status"
+    `;
+    const sumOf = (status: WalletTransactionStatus) => rows.find((row) => row.status === status)?.total ?? 0n;
+
     const withdrawal = (status: PlatformWithdrawalStatus) =>
       client.platformWithdrawal.aggregate({ where: { currencyId, status }, _sum: { amount: true } });
+    const [paid, processing] = await Promise.all([withdrawal(PlatformWithdrawalStatus.PAID), withdrawal(PlatformWithdrawalStatus.PROCESSING)]);
 
-    const [done, held, paid, processing] = await Promise.all([
-      commission(WalletTransactionStatus.COMPLETED),
-      commission(WalletTransactionStatus.PENDING),
-      withdrawal(PlatformWithdrawalStatus.PAID),
-      withdrawal(PlatformWithdrawalStatus.PROCESSING),
-    ]);
-    // Le registre des conducteurs porte la commission en négatif (c'est un débit pour eux) : pour la plateforme c'est un gain.
-    const earned = -(done._sum.amount ?? 0n);
-    const pending = -(held._sum.amount ?? 0n);
+    const earned = sumOf(WalletTransactionStatus.COMPLETED);
+    const pending = sumOf(WalletTransactionStatus.PENDING);
     const withdrawn = paid._sum.amount ?? 0n;
     const inProgress = processing._sum.amount ?? 0n;
     const available = earned - withdrawn - inProgress;

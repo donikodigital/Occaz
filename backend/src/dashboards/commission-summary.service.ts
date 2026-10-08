@@ -79,7 +79,7 @@ export class CommissionSummaryService {
       this.prisma.shipment.groupBy({
         by: ['currencyId'],
         where: {
-          status: { notIn: [ShipmentStatus.CREATED, ShipmentStatus.CANCELLED] },
+          status: { notIn: [ShipmentStatus.CREATED, ShipmentStatus.CANCELLED, ShipmentStatus.REFUNDED] },
           createdAt: { gte: window.start, lt: window.end },
         },
         _sum: { platformFee: true },

@@ -1,3 +1,4 @@
+//backend/src/platform-wallet/platform-wallet.service.spec.ts
 // Portefeuille plateforme : le solde vient du registre des commissions, un retrait ne dépasse jamais le disponible, ne part que vers
 // un bénéficiaire enregistré, après confirmation du mot de passe, et un résultat inconnu ne rembourse jamais tout seul.
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
@@ -11,7 +12,7 @@ const BENEFICIARY = { id: 'b1', label: 'Mon Orange Money', isActive: true, metho
 const XOF = { id: 'xof', isoCode: 'XOF' };
 
 function build(options: {
-  earned?: bigint; // commissions libérées (positif côté plateforme)
+  earned?: bigint; // commissions libérées
   pending?: bigint;
   paid?: bigint;
   processing?: bigint;
@@ -20,13 +21,9 @@ function build(options: {
   simulated?: boolean;
 } = {}) {
   const state: Record<string, unknown> = {};
-  const commissionSum = (status: string) => (status === 'COMPLETED' ? -(options.earned ?? 100_000n) : -(options.pending ?? 0n));
   const withdrawalSum = (status: string) => (status === 'PAID' ? (options.paid ?? 0n) : (options.processing ?? 0n));
   const prisma = {
     currency: { findUnique: jest.fn().mockResolvedValue(XOF), findMany: jest.fn().mockResolvedValue([XOF]) },
-    walletTransaction: {
-      aggregate: jest.fn().mockImplementation(({ where }: { where: { status: string } }) => Promise.resolve({ _sum: { amount: commissionSum(where.status) } })),
-    },
     platformWithdrawal: {
       aggregate: jest.fn().mockImplementation(({ where }: { where: { status: string } }) => Promise.resolve({ _sum: { amount: withdrawalSum(where.status) } })),
       count: jest.fn().mockResolvedValue(0),
@@ -48,6 +45,11 @@ function build(options: {
       findUnique: jest.fn().mockResolvedValue(options.beneficiary === undefined ? BENEFICIARY : options.beneficiary),
     },
     user: { findUnique: jest.fn().mockResolvedValue({ passwordHash: bcrypt.hashSync(PASSWORD, 4) }) },
+    // Commissions par statut, avec le montant d'origine de la réservation / de l'envoi (pas la valeur convertie du registre).
+    $queryRaw: jest.fn().mockResolvedValue([
+      { status: 'COMPLETED', total: options.earned ?? 100_000n },
+      { status: 'PENDING', total: options.pending ?? 0n },
+    ]),
     $executeRaw: jest.fn().mockResolvedValue(1),
     $transaction: jest.fn(),
   };
@@ -69,6 +71,18 @@ describe('PlatformWalletService — solde', () => {
     const { service } = build({ earned: 100_000n, pending: 30_000n, paid: 20_000n, processing: 10_000n });
     const { balances } = await service.getOverview();
     expect(balances[0]).toMatchObject({ isoCode: 'XOF', earned: '100000', pending: '30000', withdrawn: '20000', inProgress: '10000', available: '70000' });
+  });
+});
+
+describe('PlatformWalletService — devise de la commission', () => {
+  it('lit le montant et la devise de la réservation / de l\'envoi d\'origine (pas la valeur convertie du registre du conducteur)', async () => {
+    const { service, prisma } = build();
+    await service.getOverview();
+    const sql = (prisma.$queryRaw.mock.calls[0][0] as string[]).join('?');
+    expect(sql).toContain('"platformFee"');
+    expect(sql).toContain('"bookings"');
+    expect(sql).toContain('"shipments"');
+    expect(prisma.$queryRaw.mock.calls[0][1]).toBe('xof'); // filtré sur la devise de paiement
   });
 });
 

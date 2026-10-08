@@ -74,7 +74,7 @@ export class AdminDashboardService {
       }),
       this.prisma.shipment.groupBy({
         by: ['currencyId'],
-        where: { status: { notIn: [ShipmentStatus.CREATED, ShipmentStatus.CANCELLED] } },
+        where: { status: { notIn: [ShipmentStatus.CREATED, ShipmentStatus.CANCELLED, ShipmentStatus.REFUNDED] } },
         _sum: { totalAmount: true, platformFee: true },
       }),
       this.prisma.paymentTransaction.groupBy({
@@ -175,7 +175,7 @@ export class AdminDashboardService {
       }),
       this.prisma.shipment.groupBy({
         by: ['currencyId'],
-        where: { status: { notIn: [ShipmentStatus.CREATED, ShipmentStatus.CANCELLED] } },
+        where: { status: { notIn: [ShipmentStatus.CREATED, ShipmentStatus.CANCELLED, ShipmentStatus.REFUNDED] } },
         _sum: { totalAmount: true },
       }),
     ]);
