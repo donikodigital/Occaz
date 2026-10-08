@@ -28,6 +28,8 @@ describe('TripExpiryService.runOnce', () => {
     expect(call.where.bookings).toEqual({
       none: { status: { in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED] } },
     });
+    // Un envoi accepté et pas encore livré empêche l'expiration du trajet.
+    expect(call.where.shipments.none.status.in).toEqual(expect.arrayContaining(['DRIVER_ASSIGNED', 'IN_TRANSIT']));
   });
 
   it('expire chaque trajet trouvé', async () => {

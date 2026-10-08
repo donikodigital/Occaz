@@ -1,4 +1,15 @@
 // mobile/app/(driver)/(tabs)/home.tsx
+// [08/10/2026] v11 — (1) la carte de la route s'affiche enfin : GET /trips/mine ne renvoie pas les adresses (donc pas de coordonnées), le trajet
+// affiché est maintenant relu en détail (useTrip) ; (2) le « prochain trajet » est le plus PROCHE dans le temps (la liste arrive triée du
+// plus lointain au plus proche) ; (3) « Activité récente » mêle trajets créés, envois acceptés et notifications, chaque ligne ouvrant son
+// élément.
+// v10 — REFONTE de l'accueil d'après la maquette : bandeau bleu océan (avatar, nom, sceau, cloche) avec, à cheval dessus, la
+// carte « Mon tableau de bord » (solde du portefeuille | nombre de trajets et de colis) ; barre de recherche (ouvre /(driver)/search) ;
+// les deux tuiles « Créer un trajet » et « Envois disponibles » INCHANGÉES (seule la phrase de la première est reprise de la maquette) ;
+// « Vos trajets en cours » (carte de la route, date, places, type, prix, deux boutons) ; « Activité récente » (dernières notifications) ;
+// bouton flottant « + ». Les cartes de statistiques (note, anneau de trajets, véhicules) et l'itinéraire décoratif Conakry → Dakar
+// quittent l'accueil : le tableau de bord les remplace, et la note vit sur le profil.
+//
 // [21/09/2026] v9 — tuile « Créer un trajet », badge de places et carte véhicule des statistiques passent en bleu Ocean ; la tuile « Envois disponibles » garde son jaune, propre aux colis.
 //
 // v8 — Plus d'air entre l'en-tête (profil + cloche) et ce qui suit (bandeau
@@ -33,19 +44,13 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import {
-  IconAlertTriangle,
-  IconCalendarEvent,
-  IconCar,
-  IconChevronRight,
-  IconPackage,
-  IconRoute,
-  IconStarFilled,
-} from '@tabler/icons-react-native';
-import { AppText, Card, ProgressRing, RouteMap, ScreenContainer } from '@/components/ui';
-import { OceanPill } from '@/components/ocean/OceanKit';
-import { HomeHeader } from '@/components/screens/HomeHeader';
-import { StatCard, StatIconBadge } from '@/components/screens/StatCard';
+import { IconAlertTriangle, IconCar, IconPackage, IconRoute, IconSearch } from '@tabler/icons-react-native';
+import { AppText, Card, ScreenContainer } from '@/components/ui';
+import { OceanButton, OceanEmpty } from '@/components/ocean/OceanKit';
+import { DashboardCard, HomeHero } from '@/components/home/HomeHero';
+import { HomeFab, HomeSearchBar, HomeSectionTitle } from '@/components/home/HomeParts';
+import { CurrentTripCard } from '@/components/home/CurrentTripCard';
+import { RecentActivity, notificationToActivity, sortActivity, type ActivityItem } from '@/components/home/RecentActivity';
 import { TripTileIllustration } from '@/components/illustrations/TripTileIllustration';
 import { ShipmentTileIllustration } from '@/components/illustrations/ShipmentTileIllustration';
 import { colors, radius, spacing } from '@/theme';
@@ -53,45 +58,90 @@ import { OCEAN } from '@/theme/ocean';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useMyTrips } from '@/hooks/useDriverTrips';
+import { useTrip } from '@/hooks/useTripSearch';
+import { useAssignedShipments } from '@/hooks/useDriverShipments';
+import { useMyWallet } from '@/hooks/useWallet';
 import { useLatestMessageAlert, useMarkNotificationRead, useMyNotifications } from '@/hooks/useNotifications';
 import { MessageAlertCard } from '@/components/screens/MessageAlertCard';
 import { formatDateShort, formatTime } from '@/utils/date';
-import { getTripMilestoneProgress } from '@/utils/milestones';
-import { formatSeatsAvailability } from '@/utils/seats';
+import { formatMoney } from '@/utils/money';
+import { formatShipmentRoute } from '@/utils/shipmentDisplay';
+import { SHIPMENT_STATUS_LABELS } from '@/utils/tripStatusLabels';
+import type { AppNotification } from '@/types/notifications.types';
 
 const UPCOMING_STATUSES = new Set(['PUBLISHED', 'DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS']);
-
-// Coordonnées fixes — raccourci décoratif, pas une recherche de trajet
-// réelle. Mêmes valeurs que CONAKRY_CENTER dans RouteMap.web.tsx pour
-// l'origine.
-const CONAKRY = { latitude: 9.6412, longitude: -13.6773, label: 'Conakry' };
-const DAKAR = { latitude: 14.7167, longitude: -17.4677, label: 'Dakar' };
+const ACTIVITY_COUNT = 5;
 
 export default function DriverHomeScreen() {
   const { data: profile } = useDriverProfile();
   const { data: vehicles } = useMyVehicles();
   const { data: tripsPage } = useMyTrips();
+  const { data: shipmentsPage } = useAssignedShipments();
+  const { data: wallet } = useMyWallet();
   // Pas d'endpoint compteur dédié — approximation à partir de la première
   // page de notifications (30 les plus récentes). Sous-compte si plus de
   // 30 non lues d'un coup, cas limite acceptable pour un badge d'accueil.
-  const { data: notificationsPage } = useMyNotifications(1);
+  const { data: notificationsPage, isLoading: notificationsLoading } = useMyNotifications(1);
   const messageAlert = useLatestMessageAlert();
   const markNotificationRead = useMarkNotificationRead();
 
-  const nextTrip = tripsPage?.data.find((trip) => UPCOMING_STATUSES.has(trip.status));
-  const unreadCount = notificationsPage?.data.filter((n) => !n.readAt).length ?? 0;
-  const tripMilestone = getTripMilestoneProgress(profile?.completedTripsCount ?? 0);
-
-  const completedTrips = profile?.completedTripsCount ?? 0;
-  const ratingsCount = profile?.ratingsCount ?? 0;
-  const vehiclesCount = vehicles?.length ?? 0;
+  // La liste arrive du plus lointain au plus proche : on trie pour que « en cours » soit le prochain départ.
+  const upcomingTrips = (tripsPage?.data.filter((trip) => UPCOMING_STATUSES.has(trip.status)) ?? []).sort(
+    (a, b) => new Date(a.departureAt).getTime() - new Date(b.departureAt).getTime(),
+  );
+  const nextTripSummary = upcomingTrips[0];
+  // La liste ne contient pas les adresses ; le détail, si : c'est lui qui donne les coordonnées de la carte.
+  const { data: nextTripDetail } = useTrip(nextTripSummary?.id);
+  const nextTrip = nextTripDetail && nextTripDetail.id === nextTripSummary?.id ? { ...nextTripSummary, ...nextTripDetail } : nextTripSummary;
+  const notifications = notificationsPage?.data ?? [];
+  const unreadCount = notifications.filter((n) => !n.readAt).length;
   const initials = profile ? `${profile.firstName[0] ?? ''}${profile.lastName[0] ?? ''}` : '…';
+  const walletCurrency = wallet?.currency?.isoCode;
+
+  function openNotification(notification: AppNotification) {
+    if (!notification.readAt) markNotificationRead.mutate(notification.id);
+    const conversationId = notification.payload?.conversationId;
+    if (notification.type === 'CONVERSATION_MESSAGE' && typeof conversationId === 'string') {
+      router.push(`/(driver)/conversation/${conversationId}`);
+    } else {
+      router.push('/(driver)/notifications');
+    }
+  }
+
+  const activityItems: ActivityItem[] = sortActivity(
+    [
+      ...notifications.map((notification) => notificationToActivity(notification, () => openNotification(notification))),
+      ...(tripsPage?.data ?? []).map((trip): ActivityItem => ({
+        key: `t-${trip.id}`,
+        icon: IconRoute,
+        tone: 'ocean',
+        title: 'Trajet publié',
+        text: `${trip.originCity.name} → ${trip.destinationCity.name} · ${formatDateShort(trip.departureAt)}`,
+        at: trip.createdAt,
+        onPress: () => router.push(`/(driver)/trip/${trip.id}`),
+      })),
+      ...(shipmentsPage?.data ?? []).map((shipment): ActivityItem => ({
+        key: `s-${shipment.id}`,
+        icon: IconPackage,
+        tone: 'gold',
+        title: `Envoi · ${SHIPMENT_STATUS_LABELS[shipment.status]}`,
+        text: formatShipmentRoute(shipment) ?? shipment.recipientName,
+        at: shipment.updatedAt,
+        onPress: () => router.push(`/(driver)/shipment/${shipment.id}`),
+      })),
+    ],
+    ACTIVITY_COUNT,
+  );
+
+  const nextTripOrigin = nextTrip?.originLocation;
+  const nextTripDestination = nextTrip?.destinationLocation;
 
   return (
-    <ScreenContainer scroll>
-      <View style={styles.header}>
-        <HomeHeader
+    <View style={styles.root}>
+      <ScreenContainer scroll padded={false} edges={['bottom']}>
+        <HomeHero
           firstName={profile?.firstName}
+          lastName={profile?.lastName}
           initials={initials}
           photoUri={profile?.photoUrl}
           isVerified={profile?.status === 'VALIDATED'}
@@ -99,164 +149,188 @@ export default function DriverHomeScreen() {
           onPressAvatar={() => router.navigate('/(driver)/(tabs)/profile')}
           onPressNotifications={() => router.push('/(driver)/notifications')}
         />
-      </View>
 
-      {messageAlert ? (
-        <View style={styles.alertWrap}>
-          <MessageAlertCard
-            senderName={messageAlert.title ?? 'Nouveau message'}
-            preview={messageAlert.body ?? ''}
-            onPress={() => {
-              markNotificationRead.mutate(messageAlert.id);
-              const conversationId = messageAlert.payload?.conversationId;
-              if (typeof conversationId === 'string') {
-                router.push(`/(driver)/conversation/${conversationId}`);
-              } else {
-                router.push('/(driver)/(tabs)/messages');
-              }
-            }}
-          />
-        </View>
-      ) : null}
+        <DashboardCard
+          main={{
+            label: 'Solde',
+            value: wallet ? formatMoney(wallet.balance, walletCurrency) : '—',
+            hint: wallet && Number(wallet.pendingBalance) > 0 ? `${formatMoney(wallet.pendingBalance, walletCurrency)} en attente` : 'Disponible',
+            onPress: () => router.navigate('/(driver)/(tabs)/wallet'),
+          }}
+          stats={[
+            { label: 'Vos trajets', value: tripsPage ? String(tripsPage.meta.total) : '—' },
+            { label: 'Vos colis', value: shipmentsPage ? String(shipmentsPage.meta.total) : '—' },
+          ]}
+        />
 
-      {profile && profile.status !== 'VALIDATED' ? (
-        <Card style={styles.statusBanner}>
-          <IconAlertTriangle size={18} color={colors.accentDark} />
-          <AppText variant="sm" color={colors.accentDark} style={{ flex: 1 }}>
-            {profile.status === 'PENDING'
-              ? 'Votre profil est en cours de vérification par notre équipe.'
-              : profile.status === 'SUSPENDED'
-                ? 'Votre compte est suspendu — contactez le support.'
-                : 'Votre dossier a été rejeté — contactez le support pour en savoir plus.'}
-          </AppText>
-        </Card>
-      ) : null}
+        <HomeSearchBar
+          placeholder="Rechercher un trajet, un envoi ou une ville"
+          onPress={() => router.push('/(driver)/search')}
+        />
 
-      {vehicles && vehicles.length === 0 ? (
-        <Pressable onPress={() => router.push('/(driver)/vehicle-new')} style={styles.setupCard}>
-          <IconCar size={20} color={OCEAN.base} />
-          <AppText variant="sm" weight="medium" style={{ flex: 1 }}>
-            Ajoutez un véhicule pour commencer à proposer des trajets
-          </AppText>
-        </Pressable>
-      ) : (
-        <View style={styles.tileRow}>
-          <Pressable
-            onPress={() => router.push('/(driver)/trip-new')}
-            style={[styles.tile, { backgroundColor: OCEAN.deep }]}
-          >
-            <View style={styles.tileIllustration}>
-              <TripTileIllustration />
-            </View>
-            <IconCar size={36} color={OCEAN.onDark} style={styles.tileIcon} />
-            <AppText variant="base" weight="semibold" color={OCEAN.onDark}>
-              Créer un trajet
-            </AppText>
-            <AppText variant="xs" color={OCEAN.onDark} style={styles.tileSubtitle}>
-              Partager votre route
-            </AppText>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/(driver)/shipment-available')}
-            style={[styles.tile, { backgroundColor: colors.accent }]}
-          >
-            <View style={styles.tileIllustration}>
-              <ShipmentTileIllustration />
-            </View>
-            <IconPackage size={36} color={colors.onAccent} style={styles.tileIcon} />
-            <AppText variant="base" weight="semibold" color={colors.onAccent}>
-              Envois disponibles
-            </AppText>
-            <AppText variant="xs" color={colors.onAccent} style={styles.tileSubtitle}>
-              Livrer des colis
-            </AppText>
-          </Pressable>
-        </View>
-      )}
-
-      {nextTrip ? (
-        <>
-          <AppText variant="md" weight="semibold" style={styles.sectionTitle}>
-            Prochain trajet
-          </AppText>
-          <Card onPress={() => router.push(`/(driver)/trip/${nextTrip.id}`)} style={styles.tripCard}>
-            <View style={styles.tripTop}>
-              <AppText variant="md" weight="semibold" style={styles.tripRoute} numberOfLines={1}>
-                {nextTrip.originCity.name} → {nextTrip.destinationCity.name}
-              </AppText>
-              <IconChevronRight size={18} color={colors.textMuted} />
-            </View>
-            <View style={styles.tripBottom}>
-              <View style={styles.tripWhen}>
-                <IconCalendarEvent size={16} color={colors.textSecondary} />
-                <AppText variant="sm" color="textSecondary">
-                  {formatDateShort(nextTrip.departureAt)} à {formatTime(nextTrip.departureAt)}
-                </AppText>
-              </View>
-              <OceanPill
-                label={formatSeatsAvailability(nextTrip.availableSeats)}
-                tone={nextTrip.availableSeats > 0 ? 'ocean' : 'success'}
+        <View style={styles.content}>
+          {messageAlert ? (
+            <View style={styles.block}>
+              <MessageAlertCard
+                senderName={messageAlert.title ?? 'Nouveau message'}
+                preview={messageAlert.body ?? ''}
+                onPress={() => {
+                  markNotificationRead.mutate(messageAlert.id);
+                  const conversationId = messageAlert.payload?.conversationId;
+                  if (typeof conversationId === 'string') {
+                    router.push(`/(driver)/conversation/${conversationId}`);
+                  } else {
+                    router.push('/(driver)/(tabs)/messages');
+                  }
+                }}
               />
             </View>
-          </Card>
-        </>
-      ) : null}
+          ) : null}
 
-      <AppText variant="md" weight="semibold" color={OCEAN.deep} style={styles.sectionTitle}>
-        Vos statistiques
-      </AppText>
-      <View style={styles.statsRow}>
-        <StatCard
-          visual={
-            <StatIconBadge
-              background={colors.accentLight}
-              icon={<IconStarFilled size={18} color={colors.accent} />}
-            />
-          }
-          value={profile?.averageRating ? profile.averageRating.toFixed(1) : '—'}
-          label={`Note moyenne\n${ratingsCount} avis`}
-        />
-        <StatCard
-          visual={
-            <ProgressRing progress={tripMilestone.progress} size={56} strokeWidth={5}>
-              <AppText variant="lg" weight="bold">
-                {completedTrips}
+          {profile && profile.status !== 'VALIDATED' ? (
+            <Card style={[styles.statusBanner, styles.block]}>
+              <IconAlertTriangle size={18} color={colors.accentDark} />
+              <AppText variant="sm" color={colors.accentDark} style={{ flex: 1 }}>
+                {profile.status === 'PENDING'
+                  ? 'Votre profil est en cours de vérification par notre équipe.'
+                  : profile.status === 'SUSPENDED'
+                    ? 'Votre compte est suspendu — contactez le support.'
+                    : 'Votre dossier a été rejeté — contactez le support pour en savoir plus.'}
               </AppText>
-            </ProgressRing>
-          }
-          label={'Trajets\nterminés'}
-        />
-        <StatCard
-          visual={
-            <StatIconBadge
-              background={OCEAN.mist}
-              icon={<IconCar size={18} color={OCEAN.base} />}
-            />
-          }
-          value={String(vehiclesCount)}
-          label={vehiclesCount > 1 ? 'Véhicules\nenregistrés' : 'Véhicule\nenregistré'}
-        />
-      </View>
+            </Card>
+          ) : null}
 
-      <View style={styles.routeSectionHeader}>
-        <IconRoute size={16} color={colors.textSecondary} />
-        <AppText variant="md" weight="semibold">
-          Itinéraire Conakry → Dakar
-        </AppText>
-      </View>
-      <Card style={styles.routeCard}>
-        <RouteMap origin={CONAKRY} destination={DAKAR} height={180} />
-      </Card>
-    </ScreenContainer>
+          {vehicles && vehicles.length === 0 ? (
+            <Pressable onPress={() => router.push('/(driver)/vehicle-new')} style={[styles.setupCard, styles.block]}>
+              <IconCar size={20} color={OCEAN.base} />
+              <AppText variant="sm" weight="medium" style={{ flex: 1 }}>
+                Ajoutez un véhicule pour commencer à proposer des trajets
+              </AppText>
+            </Pressable>
+          ) : (
+            <View style={styles.tileRow}>
+              <Pressable
+                onPress={() => router.push('/(driver)/trip-new')}
+                style={[styles.tile, { backgroundColor: OCEAN.deep }]}
+              >
+                <View style={styles.tileIllustration}>
+                  <TripTileIllustration />
+                </View>
+                <IconCar size={36} color={OCEAN.onDark} style={styles.tileIcon} />
+                <AppText variant="base" weight="semibold" color={OCEAN.onDark}>
+                  Créer un trajet
+                </AppText>
+                <AppText variant="xs" color={OCEAN.onDark} style={styles.tileSubtitle}>
+                  Partagez votre route, réduisez vos coûts.
+                </AppText>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push('/(driver)/shipment-available')}
+                style={[styles.tile, { backgroundColor: colors.accent }]}
+              >
+                <View style={styles.tileIllustration}>
+                  <ShipmentTileIllustration />
+                </View>
+                <IconPackage size={36} color={colors.onAccent} style={styles.tileIcon} />
+                <AppText variant="base" weight="semibold" color={colors.onAccent}>
+                  Envois disponibles
+                </AppText>
+                <AppText variant="xs" color={colors.onAccent} style={styles.tileSubtitle}>
+                  Livrer des colis
+                </AppText>
+              </Pressable>
+            </View>
+          )}
+
+          <HomeSectionTitle
+            title="Vos trajets en cours"
+            actionLabel={upcomingTrips.length > 1 ? `Voir tout (${upcomingTrips.length})` : 'Voir tout'}
+            onPressAction={() => router.navigate('/(driver)/(tabs)/trips')}
+          />
+          <View style={styles.block}>
+            {nextTrip ? (
+              <CurrentTripCard
+                eyebrow="Trajet partagé"
+                originName={nextTrip.originCity.name}
+                destinationName={nextTrip.destinationCity.name}
+                origin={
+                  nextTripOrigin?.latitude != null && nextTripOrigin.longitude != null
+                    ? { latitude: nextTripOrigin.latitude, longitude: nextTripOrigin.longitude, label: nextTrip.originCity.name }
+                    : null
+                }
+                destination={
+                  nextTripDestination?.latitude != null && nextTripDestination.longitude != null
+                    ? {
+                        latitude: nextTripDestination.latitude,
+                        longitude: nextTripDestination.longitude,
+                        label: nextTrip.destinationCity.name,
+                      }
+                    : null
+                }
+                columns={[
+                  { label: 'Date', value: `${formatDateShort(nextTrip.departureAt)} · ${formatTime(nextTrip.departureAt)}` },
+                  { label: 'Places libres', value: `${nextTrip.availableSeats}/${nextTrip.totalSeats}` },
+                  { label: 'Type', value: nextTrip.allowsShipments ? 'Passagers + colis' : 'Passagers' },
+                  { label: 'Prix', value: formatMoney(nextTrip.pricePerSeat, nextTrip.currency?.isoCode ?? walletCurrency) },
+                ]}
+                primary={{ label: 'Gérer le trajet', onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
+                secondary={{ label: 'Voir les passagers', onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
+                onPress={() => router.push(`/(driver)/trip/${nextTrip.id}`)}
+              />
+            ) : (
+              <OceanEmpty
+                icon={<IconRoute size={28} color={OCEAN.base} />}
+                title="Aucun trajet en cours"
+                text="Publiez un trajet pour que des passagers puissent réserver une place."
+                action={
+                  vehicles && vehicles.length > 0 ? (
+                    <OceanButton label="Publier un trajet" onPress={() => router.push('/(driver)/trip-new')} style={styles.emptyButton} />
+                  ) : undefined
+                }
+              />
+            )}
+          </View>
+
+          <HomeSectionTitle
+            title="Activité récente"
+            actionLabel="Mon activité"
+            onPressAction={() => router.navigate('/(driver)/(tabs)/trips')}
+          />
+          <RecentActivity
+            items={activityItems}
+            isLoading={notificationsLoading}
+            onPressAll={() => router.push('/(driver)/notifications')}
+          />
+        </View>
+      </ScreenContainer>
+
+      <HomeFab
+        actions={[
+          { label: 'Créer un trajet', icon: <IconCar size={20} color={OCEAN.base} />, onPress: () => router.push('/(driver)/trip-new') },
+          {
+            label: 'Envois disponibles',
+            icon: <IconPackage size={20} color={OCEAN.goldInk} />,
+            onPress: () => router.push('/(driver)/shipment-available'),
+          },
+          { label: 'Rechercher', icon: <IconSearch size={20} color={OCEAN.base} />, onPress: () => router.push('/(driver)/search') },
+        ]}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    marginBottom: spacing.lg,
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-  alertWrap: {
-    marginBottom: spacing.md,
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: 110,
+  },
+  block: {
+    marginBottom: spacing.lg,
   },
   statusBanner: {
     flexDirection: 'row',
@@ -264,7 +338,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     backgroundColor: colors.accentLight,
     borderColor: colors.accentLight,
-    marginBottom: spacing.md,
   },
   setupCard: {
     flexDirection: 'row',
@@ -273,12 +346,11 @@ const styles = StyleSheet.create({
     backgroundColor: OCEAN.mist,
     borderRadius: radius.lg,
     padding: spacing.md,
-    marginBottom: spacing.lg,
   },
   tileRow: {
     flexDirection: 'row',
     gap: spacing.xs + 2,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   tile: {
     flex: 1,
@@ -301,46 +373,8 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     marginTop: 2,
   },
-  sectionTitle: {
-    marginBottom: spacing.sm,
-  },
-  tripCard: {
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-  tripTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  tripRoute: {
-    flex: 1,
-  },
-  tripBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.xs,
-  },
-  tripWhen: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs + 2,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  routeSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  routeCard: {
-    padding: 0,
-    overflow: 'hidden',
-    marginBottom: spacing.lg,
+  emptyButton: {
+    alignSelf: 'stretch',
+    marginTop: spacing.xs,
   },
 });

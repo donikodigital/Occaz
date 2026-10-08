@@ -39,6 +39,8 @@ describe('TripsService.expireStale', () => {
           id: 't1',
           status: { in: [TripStatus.PUBLISHED, TripStatus.DRIVER_ARRIVED] },
           bookings: { none: { status: { in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED] } } },
+          // Un envoi accepté et pas encore livré empêche l'expiration du trajet.
+          shipments: expect.objectContaining({ none: expect.objectContaining({ status: expect.anything() }) }),
         }),
         data: { status: TripStatus.CANCELLED },
       }),

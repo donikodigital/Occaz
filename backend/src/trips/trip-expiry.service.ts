@@ -1,6 +1,6 @@
 // backend/src/trips/trip-expiry.service.ts
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { BookingStatus, TripStatus } from '@prisma/client';
+import { BookingStatus, ShipmentStatus, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
 import { TripsService } from './trips.service';
@@ -81,6 +81,8 @@ export class TripExpiryService implements OnModuleInit, OnModuleDestroy {
         status: { in: [TripStatus.PUBLISHED, TripStatus.DRIVER_ARRIVED] },
         departureAt: { lt: departedBefore },
         bookings: { none: { status: { in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED] } } },
+        // Un envoi accepté sur ce trajet et pas encore livré : le conducteur a encore du travail, le trajet n'est pas « abandonné ».
+        shipments: { none: { status: { in: [ShipmentStatus.DRIVER_ASSIGNED, ShipmentStatus.PICKUP_PENDING, ShipmentStatus.PICKED_UP, ShipmentStatus.IN_TRANSIT, ShipmentStatus.DELIVERY_PENDING] } } },
       },
       select: { id: true },
       take: BATCH_SIZE,

@@ -16,6 +16,7 @@ import {
   NotificationType,
   Prisma,
   ServiceType,
+  ShipmentStatus,
   TripStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -527,6 +528,16 @@ export class TripsService {
     if (trip.status !== TripStatus.PUBLISHED) {
       throw new BadRequestException('Seul un trajet PUBLISHED peut passer à "conducteur arrivé".');
     }
+    // Sans réservation payée, personne n'attend au départ — et une fois « arrivé », le trajet n'accepte plus de réservation
+    // (elles ne se prennent que sur un trajet PUBLISHED) : il ne pourrait jamais démarrer.
+    const reservations = await this.prisma.booking.count({
+      where: { tripId: id, status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] } },
+    });
+    if (reservations === 0) {
+      throw new BadRequestException(
+        "Aucune réservation sur ce trajet : vous pourrez signaler votre arrivée au départ dès qu'un passager aura réservé.",
+      );
+    }
     const updated = await this.prisma.trip.update({
       where: { id },
       data: { status: TripStatus.DRIVER_ARRIVED },
@@ -696,6 +707,8 @@ export class TripsService {
         id,
         status: { in: [TripStatus.PUBLISHED, TripStatus.DRIVER_ARRIVED] },
         bookings: { none: { status: { in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED] } } },
+        // Un envoi accepté sur ce trajet et pas encore livré : le conducteur a encore du travail, le trajet n'est pas « abandonné ».
+        shipments: { none: { status: { in: [ShipmentStatus.DRIVER_ASSIGNED, ShipmentStatus.PICKUP_PENDING, ShipmentStatus.PICKED_UP, ShipmentStatus.IN_TRANSIT, ShipmentStatus.DELIVERY_PENDING] } } },
       },
       data: { status: TripStatus.CANCELLED },
     });

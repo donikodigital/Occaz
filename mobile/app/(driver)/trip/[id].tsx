@@ -1,5 +1,8 @@
 // mobile/app/(driver)/trip/[id].tsx
 //
+// [08/10/2026] v8 — « Signaler mon arrivée au départ » n'apparaît plus tant qu'aucune réservation n'existe : sans passager il n'y a personne à
+// attendre, et passer en « arrivé » ferme les réservations (elles ne sont prises que sur un trajet publié) sans permettre de démarrer.
+// Le trajet publié sans réservation explique maintenant qu'il attend ses premiers passagers.
 // [03/10/2026] v6 — Villes traversées : section « Villes traversées » (heure de passage et prix de chaque étape, modifiables
 // tant que le trajet est en brouillon ; en route, bouton « Je suis arrivé à … » qui prévient les clients de l'étape), lien
 // « Colis sur ce trajet », et chaque client affiche son tronçon (« Kindia → Labé »). La prise en charge d'un client qui monte
@@ -174,12 +177,19 @@ function getStage(
         tone: 'gold',
       };
     case 'PUBLISHED':
-      return {
-        icon: IconCircleCheck,
-        title: 'Trajet publié',
-        text: 'Rendez-vous au point de départ, puis signalez votre arrivée.',
-        tone: 'ocean',
-      };
+      return hasBookings
+        ? {
+            icon: IconCircleCheck,
+            title: 'Trajet publié',
+            text: 'Rendez-vous au point de départ, puis signalez votre arrivée.',
+            tone: 'ocean',
+          }
+        : {
+            icon: IconUsers,
+            title: 'En attente de réservations',
+            text: 'Votre trajet est visible des passagers. Le bouton « Signaler mon arrivée au départ » apparaîtra dès la première réservation.',
+            tone: 'ocean',
+          };
     case 'DRIVER_ARRIVED':
       if (onlyStopBookings) {
         return {
@@ -199,7 +209,7 @@ function getStage(
         : {
             icon: IconInfoCircle,
             title: 'Aucun passager pour l’instant',
-            text: 'Personne n’a réservé ce trajet — vous pouvez attendre une réservation ou l’annuler ci-dessous.',
+            text: 'Personne n’a réservé ce trajet, et les réservations ne sont plus ouvertes une fois votre arrivée signalée — vous pouvez l’annuler ci-dessous.',
             tone: 'gold',
           };
     case 'PASSENGER_PICKED_UP':
@@ -837,6 +847,8 @@ export default function DriverTripDetailScreen() {
   }
 
   const activeBookings = (bookings ?? []).filter((b) => b.status === 'CONFIRMED');
+  // Au moins une réservation payée (même règle que le serveur) : sinon personne à attendre au départ.
+  const hasReservation = (bookings ?? []).some((b) => b.status === 'CONFIRMED' || b.status === 'PAID');
 
   // Clients qui montent au départ / à une étape — décide si le conducteur peut démarrer sans prise en charge au départ.
   const waitingAtOrigin = activeBookings.filter((booking) => !booking.boardingStopId && !booking.passengers?.some((p) => p.pickedUpAt));
@@ -862,7 +874,7 @@ export default function DriverTripDetailScreen() {
   let action: StageAction | null = null;
   if (trip.status === 'DRAFT') {
     action = { label: 'Publier le trajet', run: () => publishTrip.mutate(), isPending: publishTrip.isPending };
-  } else if (trip.status === 'PUBLISHED') {
+  } else if (trip.status === 'PUBLISHED' && hasReservation) {
     action = {
       label: 'Signaler mon arrivée au départ',
       run: () => markDriverArrived.mutate(),
@@ -880,7 +892,7 @@ export default function DriverTripDetailScreen() {
     action = { label: 'Clôturer le trajet', run: () => completeTrip.mutate(), isPending: completeTrip.isPending };
   }
 
-  const stage = getStage(trip.status, activeBookings.length > 0, positionError, positionMode, onlyStopBookings);
+  const stage = getStage(trip.status, trip.status === 'PUBLISHED' ? hasReservation : activeBookings.length > 0, positionError, positionMode, onlyStopBookings);
 
   const originAddress =
     trip.originLocation?.label && trip.originLocation.label !== trip.originCity.name ? trip.originLocation.label : undefined;
