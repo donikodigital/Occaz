@@ -50,7 +50,8 @@ export function ScreenContainer({
 
   return (
     <SafeAreaView style={[styles.safeArea, transparent && styles.safeAreaTransparent]} edges={edges}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* « padding » aussi sur Android : l'app y est en plein écran (edge-to-edge), le système ne redimensionne plus la fenêtre quand le clavier s'ouvre — sans cela le clavier recouvre les champs de saisie et la barre du bas. */}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
         <View style={[styles.flex, widthConstraint, styles.fullWidth]}>
           {scroll ? (
             <ScrollView

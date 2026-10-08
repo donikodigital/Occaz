@@ -1,5 +1,10 @@
 // mobile/src/components/screens/ConversationThreadScreen.tsx
 //
+// [08/10/2026] v3 — (1) l'en-tête devient un bandeau (hero) bleu océan : bouton retour, avatar, NOM du correspondant, son RÔLE (« Votre
+// conducteur », « Votre passager », « Expéditeur du colis ») et une pastille de contexte lisible (« Réservation · Lélouma → Conakry »,
+// « Votre colis pour Mariama ») au lieu de « nom + ville → ville » sans libellé ; (2) « Aucun message pour le moment » n'est plus le
+// composant « liste vide » d'une liste inversée (qui s'affichait à l'envers sur Android) : c'est un texte posé hors de la liste ;
+// (3) le clavier ne masque plus la zone de saisie — voir ScreenContainer (KeyboardAvoidingView actif sur Android aussi).
 // v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
 // bouton de retour rond, avatar aux initiales et contexte (trajet ou envoi),
 // bulles bleues pour soi et claires pour l'autre, message du support en
@@ -9,6 +14,7 @@ import React, { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { IconArrowLeft, IconPackage, IconRoute, IconSend } from '@tabler/icons-react-native';
+import { OceanHeroCard } from '@/components/ocean/OceanKit';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -53,9 +59,12 @@ function initialsOf(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
-/** Nom du correspondant + contexte (trajet/envoi) à partir du détail — déduit selon si l'utilisateur courant est le client ou le conducteur de cette conversation. */
+/**
+ * Nom du correspondant, son rôle et le contexte de la conversation (réservation ou colis), déduits du détail selon que l'utilisateur
+ * courant est le client ou le conducteur de cette conversation.
+ */
 function useThreadHeader(detail: ConversationDetail | undefined, currentUserId: string | undefined) {
-  if (!detail) return { name: 'Conversation', initials: '…', subtitle: undefined, isShipment: false };
+  if (!detail) return { name: 'Conversation', initials: '…', role: undefined, context: undefined, isShipment: false };
 
   const iAmCustomer = currentUserId === detail.customer.userId;
   const iAmDriver = currentUserId === detail.driver.userId;
@@ -70,13 +79,21 @@ function useThreadHeader(detail: ConversationDetail | undefined, currentUserId: 
     : `${detail.customer.firstName} ${detail.customer.lastName} ↔ ${detail.driver.firstName} ${detail.driver.lastName}`;
   const initials = correspondent ? initialsOf(correspondent.firstName, correspondent.lastName) : '⋯';
 
-  const subtitle = detail.booking
-    ? `${detail.booking.trip.originCity.name} → ${detail.booking.trip.destinationCity.name}`
-    : detail.shipment
-      ? `Envoi pour ${detail.shipment.recipientName}`
-      : undefined;
+  let role: string;
+  if (iAmCustomer) role = 'Votre conducteur';
+  else if (iAmDriver) role = detail.shipment ? 'Expéditeur du colis' : 'Votre passager';
+  else role = 'Client et conducteur';
 
-  return { name, initials, subtitle, isShipment: Boolean(detail.shipment) };
+  let context: string | undefined;
+  if (detail.booking) {
+    context = `Réservation · ${detail.booking.trip.originCity.name} → ${detail.booking.trip.destinationCity.name}`;
+  } else if (detail.shipment) {
+    context = iAmCustomer
+      ? `Votre colis pour ${detail.shipment.recipientName}`
+      : `Colis de ${detail.shipment.senderName} pour ${detail.shipment.recipientName}`;
+  }
+
+  return { name, initials, role, context, isShipment: Boolean(detail.shipment) };
 }
 
 /**
@@ -91,11 +108,9 @@ function useThreadHeader(detail: ConversationDetail | undefined, currentUserId: 
  * cette correction (qui visait le manque de contexte affiché), à
  * traiter séparément si une conversation dépasse 30 messages en usage réel.
  *
- * NOTE : la liste utilise `inverted`. React Native retourne déjà lui-même
- * chaque cellule (et le composant « liste vide ») pour qu'ils restent à
- * l'endroit. Ne surtout pas ajouter de contre-retournement manuel
- * (`scaleY: -1`) sur les éléments : ce serait un double retournement et
- * le texte s'afficherait la tête en bas.
+ * NOTE : la liste utilise `inverted`. Les cellules (bulles) sont retournées par React Native pour rester à l'endroit, mais pas
+ * le composant `ListEmptyComponent`, qui s'affichait à l'envers sur Android : le message « aucun message » est donc rendu hors de
+ * la liste (voir plus bas), jamais comme composant « liste vide ».
  */
 export function ConversationThreadScreen({ conversationId }: ConversationThreadScreenProps) {
   const [draft, setDraft] = useState('');
@@ -106,6 +121,7 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
   const markRead = useMarkConversationRead(conversationId);
 
   const header = useThreadHeader(detail, currentUserId);
+  const messages = data?.data ?? [];
   const canSend = Boolean(draft.trim()) && !sendMessage.isPending;
 
   useFocusEffect(
@@ -147,55 +163,61 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
         </View>
       }
     >
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-        >
-          <IconArrowLeft size={18} color={OCEAN.base} />
-        </Pressable>
-        <View style={styles.avatar}>
-          <AppText variant="sm" weight="bold" color={OCEAN.base}>
-            {header.initials}
-          </AppText>
-        </View>
-        <View style={styles.headerTextGroup}>
-          <AppText variant="md" weight="bold" color={OCEAN.deep} numberOfLines={1}>
-            {header.name}
-          </AppText>
-          {header.subtitle ? (
-            <View style={styles.subtitleRow}>
-              {header.isShipment ? (
-                <IconPackage size={12} color={colors.textSecondary} />
-              ) : (
-                <IconRoute size={12} color={colors.textSecondary} />
-              )}
-              <AppText variant="xs" color="textSecondary" numberOfLines={1}>
-                {header.subtitle}
+      <OceanHeroCard style={styles.hero}>
+        <View style={styles.heroRow}>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+          >
+            <IconArrowLeft size={18} color={OCEAN.onDark} />
+          </Pressable>
+          <View style={styles.avatar}>
+            <AppText variant="md" weight="bold" color={OCEAN.onDark}>
+              {header.initials}
+            </AppText>
+          </View>
+          <View style={styles.headerTextGroup}>
+            <AppText variant="lg" weight="bold" color={OCEAN.onDark} numberOfLines={1}>
+              {header.name}
+            </AppText>
+            {header.role ? (
+              <AppText variant="xs" color={OCEAN.sky} numberOfLines={1}>
+                {header.role}
               </AppText>
-            </View>
-          ) : null}
+            ) : null}
+          </View>
         </View>
-      </View>
+        {header.context ? (
+          <View style={styles.contextPill}>
+            {header.isShipment ? (
+              <IconPackage size={14} color={OCEAN.gold} />
+            ) : (
+              <IconRoute size={14} color={OCEAN.gold} />
+            )}
+            <AppText variant="xs" weight="semibold" color={OCEAN.onDark} numberOfLines={2} style={styles.contextText}>
+              {header.context}
+            </AppText>
+          </View>
+        ) : null}
+      </OceanHeroCard>
 
-      <FlatList
-        data={data?.data ?? []}
-        keyExtractor={(item) => item.id}
-        inverted
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          !isLoading
-            ? () => (
-                <AppText variant="sm" color="textMuted" style={styles.empty}>
-                  Aucun message pour le moment — écrivez le premier.
-                </AppText>
-              )
-            : undefined
-        }
-        renderItem={({ item }) => <MessageBubble message={item} isMine={item.senderId === currentUserId} />}
-      />
+      {messages.length === 0 && !isLoading ? (
+        <View style={styles.emptyWrap}>
+          <AppText variant="sm" color="textMuted" style={styles.empty}>
+            Aucun message pour le moment — écrivez le premier.
+          </AppText>
+        </View>
+      ) : (
+        <FlatList
+          data={messages}
+          keyExtractor={(item) => item.id}
+          inverted
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => <MessageBubble message={item} isMine={item.senderId === currentUserId} />}
+        />
+      )}
     </ScreenContainer>
   );
 }
@@ -204,45 +226,57 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.75,
   },
-  header: {
+  hero: {
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    marginBottom: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: OCEAN.line,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: OCEAN.line,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: OCEAN.mist,
-    borderWidth: 1.5,
-    borderColor: OCEAN.sky,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: OCEAN.bright,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.45)',
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contextPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    maxWidth: '100%',
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  contextText: {
+    flexShrink: 1,
+  },
+  emptyWrap: {
+    flex: 1,
     justifyContent: 'center',
   },
   headerTextGroup: {
     flex: 1,
     minWidth: 0,
     gap: 1,
-  },
-  subtitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
   },
   list: {
     paddingVertical: spacing.sm,

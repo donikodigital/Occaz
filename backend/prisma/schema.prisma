@@ -637,6 +637,7 @@ model Currency {
   paymentTransactions PaymentTransaction[]
   wallets             Wallet[]
   walletTransactions  WalletTransaction[]
+  platformWithdrawals PlatformWithdrawal[]
   payouts             Payout[]
   commissionRules     CommissionRule[]
   cancellationFees    CancellationPolicy[]
@@ -1202,6 +1203,66 @@ model Payout {
   processedAt DateTime?
 
   @@map("payouts")
+}
+
+// ─── Portefeuille de la PLATEFORME ──────────────────────────────────────────────────────────────────────────────────────────────
+// Les commissions sont déjà inscrites dans le registre des conducteurs (WalletTransaction de type COMMISSION, montant négatif) ;
+// il n'existe donc PAS de second solde à tenir à jour : le solde disponible de la plateforme se calcule, par devise, comme
+//   commissions libérées (COMPLETED) − retraits payés − retraits en cours.
+// Un retrait ne part que vers un numéro enregistré ici (PlatformBeneficiary) : le propriétaire, le support, le service client…
+enum PlatformBeneficiaryKind {
+  OWNER
+  SUPPORT
+  STAFF
+  OTHER
+}
+
+enum PlatformWithdrawalStatus {
+  PROCESSING
+  PAID
+  FAILED
+}
+
+model PlatformBeneficiary {
+  id         String                  @id @default(uuid())
+  label      String // « Mon Orange Money », « Awa — Service client »
+  holderName String
+  kind       PlatformBeneficiaryKind @default(OWNER)
+  method     String                  @default("orange_money")
+  phone      String // format international, ex. +224620004417
+  isActive   Boolean                 @default(true)
+  createdById String?
+
+  withdrawals PlatformWithdrawal[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_beneficiaries")
+}
+
+model PlatformWithdrawal {
+  id            String                   @id @default(uuid())
+  beneficiaryId String
+  beneficiary   PlatformBeneficiary      @relation(fields: [beneficiaryId], references: [id])
+  amount        BigInt
+  currencyId    String
+  currency      Currency                 @relation(fields: [currencyId], references: [id])
+  status        PlatformWithdrawalStatus @default(PROCESSING)
+  method        String
+  destinationRef String // numéro au moment du retrait (le bénéficiaire peut changer de numéro ensuite)
+  note          String?
+
+  externalReference String?
+  failureReason     String?
+  requestedById     String?
+
+  requestedAt DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([currencyId, status])
+  @@index([requestedAt])
+  @@map("platform_withdrawals")
 }
 
 // Configurable par le SuperAdmin, différent par pays / type de prestation

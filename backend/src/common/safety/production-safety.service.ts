@@ -45,7 +45,7 @@ export class ProductionSafetyService implements OnApplicationBootstrap {
     // sans qu'aucun argent ne parte.
     if (this.payoutProviders?.get().isSimulated) {
       issues.push(
-        'Retraits simulés (PAYOUT_PROVIDER absent ou « simulated ») : un retrait automatique est marqué payé sans qu\'aucun argent réel ne parte vers le conducteur. Brancher Orange Money dans PayoutProviderRegistry.',
+        'Retraits simulés (PAYOUT_PROVIDER absent ou « simulated ») : un retrait automatique est marqué payé sans qu\'aucun argent réel ne parte vers le conducteur. Définir PAYOUT_PROVIDER=orange_money et les variables ORANGE_MONEY_* (voir .env.example).',
       );
     }
     if (!env.TEXTBEE_API_KEY) {

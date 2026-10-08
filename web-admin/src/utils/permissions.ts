@@ -34,6 +34,8 @@ export const PERMISSIONS = {
   WALLET_READ: 'wallet.read',
   WALLET_ADJUST: 'wallet.adjust',
   PAYOUT_MANAGE: 'payout.manage',
+  PLATFORM_WALLET_READ: 'platform_wallet.read',
+  PLATFORM_WALLET_MANAGE: 'platform_wallet.manage',
   COMMISSION_MANAGE: 'commission.manage',
   PROMOTION_MANAGE: 'promotion.manage',
   CANCELLATION_POLICY_MANAGE: 'cancellation_policy.manage',

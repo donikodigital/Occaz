@@ -36,6 +36,9 @@ export const GLOBAL_ONLY_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   PERMISSIONS.PROMOTION_MANAGE,
   PERMISSIONS.CANCELLATION_POLICY_MANAGE,
   PERMISSIONS.NOTIFICATION_TEMPLATE_MANAGE,
+  // L'argent de la plateforme n'est pas rattaché à un pays : jamais de portée par pays.
+  PERMISSIONS.PLATFORM_WALLET_READ,
+  PERMISSIONS.PLATFORM_WALLET_MANAGE,
 ]);
 
 export interface RoleGrant {

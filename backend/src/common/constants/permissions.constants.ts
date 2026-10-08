@@ -48,6 +48,9 @@ export const PERMISSIONS = {
   WALLET_READ: 'wallet.read',
   WALLET_ADJUST: 'wallet.adjust',
   PAYOUT_MANAGE: 'payout.manage',
+  // Portefeuille de la PLATEFORME (commissions encaissées) : consulter / retirer vers les numéros bénéficiaires. Distinct de WALLET_* (conducteurs).
+  PLATFORM_WALLET_READ: 'platform_wallet.read',
+  PLATFORM_WALLET_MANAGE: 'platform_wallet.manage',
   COMMISSION_MANAGE: 'commission.manage',
   PROMOTION_MANAGE: 'promotion.manage', // Codes promo, bons plans, actualités, parrainage
   CANCELLATION_POLICY_MANAGE: 'cancellation_policy.manage',

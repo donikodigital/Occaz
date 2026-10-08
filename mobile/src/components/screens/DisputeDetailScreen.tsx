@@ -72,11 +72,8 @@ function DisputeMessageBubble({
 /**
  * Interrogation périodique (15s) — même limite backend que la messagerie du Lot 7 (aucun canal temps réel).
  *
- * NOTE : la liste utilise `inverted`. React Native retourne déjà lui-même
- * chaque cellule (et le composant « liste vide ») pour qu'ils restent à
- * l'endroit. Ne surtout pas ajouter de contre-retournement manuel
- * (`scaleY: -1`) sur les éléments : ce serait un double retournement et
- * le texte s'afficherait la tête en bas.
+ * NOTE : la liste utilise `inverted`. Les bulles sont retournées par React Native pour rester à l'endroit, mais pas
+ * `ListEmptyComponent`, qui s'affichait à l'envers sur Android : « Aucun message » est donc rendu hors de la liste.
  */
 export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenProps) {
   const [draft, setDraft] = useState('');
@@ -185,24 +182,27 @@ export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenP
         </View>
       ) : null}
 
-      <FlatList
-        data={messages}
-        keyExtractor={(item) => item.id}
-        inverted
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
+      {messages.length === 0 ? (
+        <View style={styles.emptyWrap}>
           <AppText variant="sm" color="textMuted" style={styles.empty}>
             Aucun message pour le moment.
           </AppText>
-        }
-        renderItem={({ item }) => (
-          <DisputeMessageBubble
-            message={item}
-            isMine={item.authorId === currentUserId}
-            isFromAgent={Boolean(dispute.assignedAgentId) && item.authorId === dispute.assignedAgentId}
-          />
-        )}
-      />
+        </View>
+      ) : (
+        <FlatList
+          data={messages}
+          keyExtractor={(item) => item.id}
+          inverted
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <DisputeMessageBubble
+              message={item}
+              isMine={item.authorId === currentUserId}
+              isFromAgent={Boolean(dispute.assignedAgentId) && item.authorId === dispute.assignedAgentId}
+            />
+          )}
+        />
+      )}
     </ScreenContainer>
   );
 }
@@ -259,6 +259,10 @@ const styles = StyleSheet.create({
   list: {
     paddingVertical: spacing.sm,
     gap: spacing.xs,
+  },
+  emptyWrap: {
+    flex: 1,
+    justifyContent: 'center',
   },
   empty: {
     textAlign: 'center',

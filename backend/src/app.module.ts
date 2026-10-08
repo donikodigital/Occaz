@@ -28,6 +28,7 @@ import { ShipmentCategoriesModule } from './shipment-categories/shipment-categor
 import { ShipmentsModule } from './shipments/shipments.module';
 import { PaymentProvidersModule } from './payment-providers/payment-providers.module';
 import { WalletsModule } from './wallets/wallets.module';
+import { PlatformWalletModule } from './platform-wallet/platform-wallet.module';
 import { PaymentsModule } from './payments/payments.module';
 import { VerificationsModule } from './verifications/verifications.module';
 import { RatingsModule } from './ratings/ratings.module';
@@ -89,6 +90,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     ShipmentsModule,
     PaymentProvidersModule,
     WalletsModule,
+    PlatformWalletModule,
     PaymentsModule,
     VerificationsModule,
     RatingsModule,

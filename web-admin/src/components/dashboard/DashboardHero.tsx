@@ -2,9 +2,12 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { IconArrowDownRight, IconArrowUpRight, IconCoinFilled } from '@tabler/icons-react';
+import Link from 'next/link';
+import { IconArrowDownRight, IconArrowUpRight, IconCoinFilled, IconWallet } from '@tabler/icons-react';
 import { useCommissionSummary } from '@/hooks/useCommissionSummary';
 import { useRevenueTimeSeries } from '@/hooks/useRevenueTimeSeries';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/utils/permissions';
 import { windowForPeriod } from './periodWindows';
 import { RevenueChart } from './RevenueChart';
 import { formatMoney } from '@/utils/money';
@@ -42,6 +45,7 @@ function trendPercent(current: number, previous: number): number | null {
  */
 export function DashboardHero() {
   const [period, setPeriod] = useState<CommissionSummaryPeriod>('month');
+  const { can } = usePermissions();
 
   const { data: summary, isLoading: summaryLoading, isError: summaryError } = useCommissionSummary(period);
 
@@ -54,7 +58,8 @@ export function DashboardHero() {
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary-dark p-5 text-white shadow-xl shadow-primary-dark/30 sm:p-6">
       <IconCoinFilled size={110} className="pointer-events-none absolute -right-4 -top-4 text-white/10" />
 
-      <div className="mb-3 flex gap-1.5">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex gap-1.5">
         {PERIODS.map((value) => (
           <button
             key={value}
@@ -67,6 +72,16 @@ export function DashboardHero() {
             {PERIOD_LABELS[value].tab}
           </button>
         ))}
+        </div>
+        {can(PERMISSIONS.PLATFORM_WALLET_READ) ? (
+          <Link
+            href="/platform-wallet"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-primary-dark transition hover:bg-white/90"
+          >
+            <IconWallet size={14} />
+            Retirer
+          </Link>
+        ) : null}
       </div>
 
       {summaryError ? (

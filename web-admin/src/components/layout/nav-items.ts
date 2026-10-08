@@ -26,6 +26,7 @@ import {
   IconTruckDelivery,
   IconUsers,
   IconWallet,
+  IconBuildingBank,
 } from '@tabler/icons-react';
 import type React from 'react';
 import { PERMISSIONS, type PermissionKey } from '@/utils/permissions';
@@ -65,6 +66,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/payment-providers', label: 'Moyens de paiement', icon: IconCreditCard, permissions: [PERMISSIONS.PAYMENT_PROVIDER_MANAGE] },
       { href: '/payouts', label: 'Retraits', icon: IconWallet, permissions: [PERMISSIONS.PAYOUT_MANAGE] },
+      { href: '/platform-wallet', label: 'Portefeuille plateforme', icon: IconBuildingBank, permissions: [PERMISSIONS.PLATFORM_WALLET_READ] },
       { href: '/pricing', label: 'Tarification', icon: IconCash, permissions: [PERMISSIONS.COMMISSION_MANAGE, PERMISSIONS.CANCELLATION_POLICY_MANAGE] },
       { href: '/trip-pricing', label: 'Configuration frais trajets', icon: IconAdjustmentsDollar, permissions: [PERMISSIONS.SETTINGS_UPDATE] },
       { href: '/exchange-rates', label: 'Taux de change', icon: IconArrowsExchange, permissions: [PERMISSIONS.SETTINGS_UPDATE] },
