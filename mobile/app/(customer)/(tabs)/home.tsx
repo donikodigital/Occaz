@@ -2,6 +2,7 @@
 // [08/10/2026] v4 — (1) la carte de la route s'affiche aussi côté client : la liste des réservations ne contient pas les adresses, le trajet
 // est relu en détail (useTrip) pour en tirer les coordonnées ; (2) « Activité récente » mêle réservations, colis, recherches de trajet et
 // notifications, chaque ligne ouvrant son élément (une recherche se relance d'un geste).
+// v4b — la carte retombe sur le centre des villes quand l'adresse du trajet n'a pas de coordonnées GPS (adresse saisie à la main).
 // v3 — REFONTE de l'accueil d'après la maquette (même structure que l'accueil conducteur) : bandeau bleu océan (avatar, nom,
 // cloche) avec, à cheval dessus, la carte « Mon tableau de bord » (paiements en attente | nombre de trajets et de colis) ; barre de
 // recherche « Rechercher un trajet, un colis ou un chauffeur » (ouvre /(customer)/search, avec les recherches récentes) ; les deux
@@ -25,6 +26,7 @@ import { OceanButton, OceanEmpty } from '@/components/ocean/OceanKit';
 import { DashboardCard, HomeHero } from '@/components/home/HomeHero';
 import { HomeFab, HomeSearchBar, HomeSectionTitle } from '@/components/home/HomeParts';
 import { CurrentTripCard } from '@/components/home/CurrentTripCard';
+import { routePoint } from '@/components/home/routePoint';
 import { RecentActivity, notificationToActivity, sortActivity, type ActivityItem } from '@/components/home/RecentActivity';
 import { TripTileIllustration } from '@/components/illustrations/TripTileIllustration';
 import { ShipmentTileIllustration } from '@/components/illustrations/ShipmentTileIllustration';
@@ -286,24 +288,8 @@ export default function CustomerHomeScreen() {
                 eyebrow="Trajet partagé"
                 originName={currentTrip.originCity.name}
                 destinationName={currentTrip.destinationCity.name}
-                origin={
-                  currentTrip.originLocation?.latitude != null && currentTrip.originLocation.longitude != null
-                    ? {
-                        latitude: currentTrip.originLocation.latitude,
-                        longitude: currentTrip.originLocation.longitude,
-                        label: currentTrip.originCity.name,
-                      }
-                    : null
-                }
-                destination={
-                  currentTrip.destinationLocation?.latitude != null && currentTrip.destinationLocation.longitude != null
-                    ? {
-                        latitude: currentTrip.destinationLocation.latitude,
-                        longitude: currentTrip.destinationLocation.longitude,
-                        label: currentTrip.destinationCity.name,
-                      }
-                    : null
-                }
+                origin={routePoint(currentTrip.originLocation, currentTrip.originCity)}
+                destination={routePoint(currentTrip.destinationLocation, currentTrip.destinationCity)}
                 columns={[
                   { label: 'Date', value: `${formatDateShort(currentTrip.departureAt)} · ${formatTime(currentTrip.departureAt)}` },
                   { label: 'Places', value: String(current.seatsCount) },

@@ -3,6 +3,7 @@
 // affiché est maintenant relu en détail (useTrip) ; (2) le « prochain trajet » est le plus PROCHE dans le temps (la liste arrive triée du
 // plus lointain au plus proche) ; (3) « Activité récente » mêle trajets créés, envois acceptés et notifications, chaque ligne ouvrant son
 // élément.
+// v11b — la carte retombe sur le centre des villes quand l'adresse du trajet n'a pas de coordonnées GPS (adresse saisie à la main).
 // v10 — REFONTE de l'accueil d'après la maquette : bandeau bleu océan (avatar, nom, sceau, cloche) avec, à cheval dessus, la
 // carte « Mon tableau de bord » (solde du portefeuille | nombre de trajets et de colis) ; barre de recherche (ouvre /(driver)/search) ;
 // les deux tuiles « Créer un trajet » et « Envois disponibles » INCHANGÉES (seule la phrase de la première est reprise de la maquette) ;
@@ -50,6 +51,7 @@ import { OceanButton, OceanEmpty } from '@/components/ocean/OceanKit';
 import { DashboardCard, HomeHero } from '@/components/home/HomeHero';
 import { HomeFab, HomeSearchBar, HomeSectionTitle } from '@/components/home/HomeParts';
 import { CurrentTripCard } from '@/components/home/CurrentTripCard';
+import { routePoint } from '@/components/home/routePoint';
 import { RecentActivity, notificationToActivity, sortActivity, type ActivityItem } from '@/components/home/RecentActivity';
 import { TripTileIllustration } from '@/components/illustrations/TripTileIllustration';
 import { ShipmentTileIllustration } from '@/components/illustrations/ShipmentTileIllustration';
@@ -133,8 +135,6 @@ export default function DriverHomeScreen() {
     ACTIVITY_COUNT,
   );
 
-  const nextTripOrigin = nextTrip?.originLocation;
-  const nextTripDestination = nextTrip?.destinationLocation;
 
   return (
     <View style={styles.root}>
@@ -253,20 +253,8 @@ export default function DriverHomeScreen() {
                 eyebrow="Trajet partagé"
                 originName={nextTrip.originCity.name}
                 destinationName={nextTrip.destinationCity.name}
-                origin={
-                  nextTripOrigin?.latitude != null && nextTripOrigin.longitude != null
-                    ? { latitude: nextTripOrigin.latitude, longitude: nextTripOrigin.longitude, label: nextTrip.originCity.name }
-                    : null
-                }
-                destination={
-                  nextTripDestination?.latitude != null && nextTripDestination.longitude != null
-                    ? {
-                        latitude: nextTripDestination.latitude,
-                        longitude: nextTripDestination.longitude,
-                        label: nextTrip.destinationCity.name,
-                      }
-                    : null
-                }
+                origin={routePoint(nextTrip.originLocation, nextTrip.originCity)}
+                destination={routePoint(nextTrip.destinationLocation, nextTrip.destinationCity)}
                 columns={[
                   { label: 'Date', value: `${formatDateShort(nextTrip.departureAt)} · ${formatTime(nextTrip.departureAt)}` },
                   { label: 'Places libres', value: `${nextTrip.availableSeats}/${nextTrip.totalSeats}` },
