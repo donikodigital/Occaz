@@ -25,6 +25,7 @@ export default function DriverLayout() {
       <Stack.Screen name="trip-new" />
       <Stack.Screen name="trip/[id]" />
       <Stack.Screen name="shipment-available" />
+      <Stack.Screen name="shipment-invitations" />
       <Stack.Screen name="shipment/[id]" />
       <Stack.Screen name="payout-new" />
       <Stack.Screen name="conversation/[id]" />

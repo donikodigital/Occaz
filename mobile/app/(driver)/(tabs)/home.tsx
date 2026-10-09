@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/home.tsx
+// [09/10/2026] v12 — bannière clignotante « Un client vous invite » quand un client demande au conducteur de prendre son colis (ShipmentInvitationBanner).
 // [08/10/2026] v11 — (1) la carte de la route s'affiche enfin : GET /trips/mine ne renvoie pas les adresses (donc pas de coordonnées), le trajet
 // affiché est maintenant relu en détail (useTrip) ; (2) le « prochain trajet » est le plus PROCHE dans le temps (la liste arrive triée du
 // plus lointain au plus proche) ; (3) « Activité récente » mêle trajets créés, envois acceptés et notifications, chaque ligne ouvrant son
@@ -65,6 +66,8 @@ import { useAssignedShipments } from '@/hooks/useDriverShipments';
 import { useMyWallet } from '@/hooks/useWallet';
 import { useLatestMessageAlert, useMarkNotificationRead, useMyNotifications } from '@/hooks/useNotifications';
 import { MessageAlertCard } from '@/components/screens/MessageAlertCard';
+import { ShipmentInvitationBanner } from '@/components/screens/ShipmentInvitationBanner';
+import { useMyInvitations } from '@/hooks/useShipmentInvitations';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { formatMoney } from '@/utils/money';
 import { formatShipmentRoute } from '@/utils/shipmentDisplay';
@@ -85,6 +88,9 @@ export default function DriverHomeScreen() {
   // 30 non lues d'un coup, cas limite acceptable pour un badge d'accueil.
   const { data: notificationsPage, isLoading: notificationsLoading } = useMyNotifications(1);
   const messageAlert = useLatestMessageAlert();
+  // Seul un conducteur validé peut recevoir des invitations (le serveur refuse les autres).
+  const { data: invitations } = useMyInvitations(profile?.status === 'VALIDATED');
+  const pendingInvitations = invitations ?? [];
   const markNotificationRead = useMarkNotificationRead();
 
   // La liste arrive du plus lointain au plus proche : on trie pour que « en cours » soit le prochain départ.
@@ -169,6 +175,16 @@ export default function DriverHomeScreen() {
         />
 
         <View style={styles.content}>
+          {pendingInvitations.length > 0 ? (
+            <View style={styles.block}>
+              <ShipmentInvitationBanner
+                count={pendingInvitations.length}
+                destinationCity={pendingInvitations[0].shipment.recipientLocation.label}
+                onPress={() => router.push('/(driver)/shipment-invitations')}
+              />
+            </View>
+          ) : null}
+
           {messageAlert ? (
             <View style={styles.block}>
               <MessageAlertCard

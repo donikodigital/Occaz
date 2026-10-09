@@ -6,6 +6,8 @@
 //   - carte « Conducteur » (photo, badge vérifié, note, véhicule et plaque) ;
 //   - carte « Détails » : places, colis acceptés, note du conducteur ;
 //   - pied de page fixe : le prix par place et « Réserver ».
+// [09/10/2026] v5 — Page allégée : l'essentiel d'abord (date, heure, itinéraire, conducteur, prix, « Réserver »). Les villes
+// traversées, le choix de montée / descente, le véhicule et les infos complémentaires sont sous « Voir tous les détails ».
 // [04/10/2026] v4 — Choix de la ville de montée et de descente : sur un trajet qui traverse des villes, le client choisit où il
 // monte et où il descend (puces) ; le prix, l'heure et les places s'adaptent. Utile surtout après une recherche sans ville de
 // départ, où le tronçon proposé part du départ du conducteur.
@@ -18,6 +20,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import {
   IconCar,
   IconArrowsSplit2,
+  IconChevronDown,
+  IconChevronUp,
   IconInfoCircle,
   IconMapPin,
   IconPackage,
@@ -57,6 +61,8 @@ export default function TripDetailScreen() {
   // Tronçon choisi : celui de la recherche au départ, puis modifiable ici (undefined = départ / arrivée du trajet).
   const [boardingStopId, setBoardingStopId] = useState<string | undefined>(params.boardingStopId || undefined);
   const [alightingStopId, setAlightingStopId] = useState<string | undefined>(params.alightingStopId || undefined);
+  // Détails (étapes, choix de montée / descente, véhicule, infos) : repliés par défaut.
+  const [showDetails, setShowDetails] = useState(false);
   const {
     data: trip,
     isLoading,
@@ -137,6 +143,13 @@ export default function TripDetailScreen() {
             tone={isFull ? 'neutral' : 'ocean'}
             icon={<IconUsers size={13} color={isFull ? colors.textSecondary : OCEAN.base} />}
           />
+          {trip.stops && trip.stops.length > 0 ? (
+            <OceanPill
+              label={`${trip.stops.length} ville${trip.stops.length > 1 ? 's' : ''} traversée${trip.stops.length > 1 ? 's' : ''}`}
+              tone="neutral"
+              icon={<IconArrowsSplit2 size={13} color={colors.textSecondary} />}
+            />
+          ) : null}
         </View>
 
         <View style={styles.when}>
@@ -171,6 +184,8 @@ export default function TripDetailScreen() {
             {trip.stops && trip.stops.length > 0
               ? trip.stops.map((stop) => {
                   const isMine = stop.id === segment?.boardingStopId || stop.id === segment?.alightingStopId;
+                  // Fermé : seules les étapes du client (montée / descente) apparaissent ; les autres sont dans les détails.
+                  if (!showDetails && !isMine) return null;
                   return (
                     <View key={stop.id} style={styles.stop}>
                       <AppText variant="xs" color={OCEAN.sky}>
@@ -200,6 +215,46 @@ export default function TripDetailScreen() {
         </View>
       </OceanHeroCard>
 
+      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Conducteur">
+        <View style={styles.driverRow}>
+          <Avatar initials={initials} imageUri={trip.driver.photoUrl} size={52} />
+          <View style={styles.driverText}>
+            <View style={styles.nameRow}>
+              <AppText variant="lg" weight="bold" numberOfLines={1} style={styles.nameText}>
+                {trip.driver.firstName} {trip.driver.lastName}
+              </AppText>
+              {trip.driver.isVerifiedBadge ? (
+                <IconRosetteDiscountCheck size={17} color={OCEAN.base} />
+              ) : (
+                <OceanPill label="Non vérifié" tone="neutral" />
+              )}
+            </View>
+            {trip.driver.averageRating ? (
+              <View style={styles.ratingRow}>
+                <IconStarFilled size={13} color={colors.accent} />
+                <AppText variant="sm" color="textSecondary">
+                  {trip.driver.averageRating.toFixed(1)} · {trip.driver.completedTripsCount} trajets effectués
+                </AppText>
+              </View>
+            ) : (
+              <AppText variant="sm" color="textSecondary">
+                Nouveau conducteur
+              </AppText>
+            )}
+          </View>
+        </View>
+      </OceanSection>
+
+      <OceanButton
+        label={showDetails ? 'Masquer les détails' : 'Voir tous les détails'}
+        variant="soft"
+        icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
+        onPress={() => setShowDetails((value) => !value)}
+        style={styles.detailsToggle}
+      />
+
+      {showDetails ? (
+        <>
       {routeOptions.length > 2 ? (
         <OceanSection icon={<IconArrowsSplit2 size={17} color={OCEAN.base} />} title="Votre trajet">
           <AppText variant="xs" color="textSecondary">
@@ -238,35 +293,7 @@ export default function TripDetailScreen() {
         </OceanSection>
       ) : null}
 
-      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Conducteur">
-        <View style={styles.driverRow}>
-          <Avatar initials={initials} imageUri={trip.driver.photoUrl} size={52} />
-          <View style={styles.driverText}>
-            <View style={styles.nameRow}>
-              <AppText variant="lg" weight="bold" numberOfLines={1} style={styles.nameText}>
-                {trip.driver.firstName} {trip.driver.lastName}
-              </AppText>
-              {trip.driver.isVerifiedBadge ? (
-                <IconRosetteDiscountCheck size={17} color={OCEAN.base} />
-              ) : (
-                <OceanPill label="Non vérifié" tone="neutral" />
-              )}
-            </View>
-            {trip.driver.averageRating ? (
-              <View style={styles.ratingRow}>
-                <IconStarFilled size={13} color={colors.accent} />
-                <AppText variant="sm" color="textSecondary">
-                  {trip.driver.averageRating.toFixed(1)} · {trip.driver.completedTripsCount} trajets effectués
-                </AppText>
-              </View>
-            ) : (
-              <AppText variant="sm" color="textSecondary">
-                Nouveau conducteur
-              </AppText>
-            )}
-          </View>
-        </View>
-
+      <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title="Véhicule">
         <View style={styles.vehicleBox}>
           <View style={styles.vehicleIcon}>
             <IconCar size={18} color={OCEAN.base} />
@@ -302,6 +329,8 @@ export default function TripDetailScreen() {
           </View>
         ) : null}
       </OceanSection>
+        </>
+      ) : null}
     </ScreenContainer>
   );
 }
@@ -318,6 +347,8 @@ const styles = StyleSheet.create({
   heroTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   },
   when: {
     gap: 2,
@@ -429,6 +460,9 @@ const styles = StyleSheet.create({
   },
   reserveButton: {
     minWidth: 150,
+  },
+  detailsToggle: {
+    marginBottom: spacing.md,
   },
   choiceBlock: {
     gap: spacing.xs,

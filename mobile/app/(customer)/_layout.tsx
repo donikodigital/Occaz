@@ -28,6 +28,7 @@ export default function CustomerLayout() {
       <Stack.Screen name="booking/[id]" />
       <Stack.Screen name="shipment-new" />
       <Stack.Screen name="shipment/[id]" />
+      <Stack.Screen name="shipment-find-driver" />
       <Stack.Screen name="payment" />
       <Stack.Screen name="rate" />
       <Stack.Screen name="conversation/[id]" />

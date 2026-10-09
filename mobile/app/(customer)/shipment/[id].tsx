@@ -1,4 +1,8 @@
 // mobile/app/(customer)/shipment/[id].tsx
+// [09/10/2026] v5 — Page allégée, comme le suivi du conducteur : on ne montre que l'essentiel (statut, conducteur, code à donner,
+// action à faire) ; période, suivi détaillé, expéditeur, destinataire et montant passent sous « Voir tous les détails ».
+// « Annuler l'envoi » et « Être remboursé » ne passent plus par Alert.alert (sans effet sur le web) mais par ConfirmDialog, avec
+// un message d'erreur dans la page. « Signaler un problème » reste toujours proposé.
 // [30/09/2026] v4 — le client voit désormais aussi le code de livraison (DeliveryCodeCard, pendant DELIVERY_PENDING), et pas seulement celui de récupération : le destinataire le reçoit toujours par SMS, mais l'expéditeur peut maintenant le retrouver dans son espace.
 // [21/09/2026] v3 — Habillage bleu océan ; logique inchangée : période, prolongation ou remboursement, montant unique payé, messagerie dès qu'un conducteur est assigné.
 //
@@ -7,19 +11,23 @@
 // suivi, de l'expéditeur, du destinataire et du montant payé.
 
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   IconCalendarEvent,
   IconCash,
+  IconChevronDown,
+  IconChevronUp,
   IconMapPin,
   IconMessageCircle,
   IconPackage,
   IconRoute,
+  IconSearch,
+  IconSend,
   IconUser,
   IconUserCheck,
 } from '@tabler/icons-react-native';
-import { AppText, ScreenContainer } from '@/components/ui';
+import { AppText, ConfirmDialog, ScreenContainer } from '@/components/ui';
 import {
   OceanButton,
   OceanCard,
@@ -35,6 +43,7 @@ import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCancelShipment, useExtendShipment, useShipment } from '@/hooks/useShipments';
 import { useRevealShipmentDeliveryOtpForSender, useRevealShipmentPickupOtpForSender } from '@/hooks/useShipmentOtp';
+import { useShipmentInvitations } from '@/hooks/useShipmentInvitations';
 import { useShipmentRatings } from '@/hooks/useRatings';
 import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { formatMoney } from '@/utils/money';
@@ -110,8 +119,14 @@ export default function ShipmentDetailScreen() {
   const cancelShipment = useCancelShipment(id ?? '');
   const extendShipment = useExtendShipment(id ?? '');
   const [extensionError, setExtensionError] = useState<string | undefined>();
+  const [showDetails, setShowDetails] = useState(false);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [confirmRefundOpen, setConfirmRefundOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | undefined>();
   const getOrCreateConversation = useGetOrCreateConversationForShipment();
   const { data: existingRatings } = useShipmentRatings(id);
+  const { data: invitations } = useShipmentInvitations(id, shipment?.status === 'SEARCHING_DRIVER');
+  const pendingInvitations = (invitations ?? []).filter((invitation) => invitation.status === 'PENDING').length;
 
   if (isLoading || !shipment) {
     return (
@@ -147,41 +162,30 @@ export default function ShipmentDetailScreen() {
   }
 
   function handleRefund() {
-    Alert.alert('Être remboursé ?', 'Votre envoi sera annulé et votre paiement vous sera remboursé intégralement.', [
-      { text: 'Retour', style: 'cancel' },
+    setActionError(undefined);
+    cancelShipment.mutate(
+      { reason: 'Aucun conducteur avant la fin de la période — remboursement demandé par le client.' },
       {
-        text: 'Me rembourser',
-        style: 'destructive',
-        onPress: () =>
-          cancelShipment.mutate(
-            { reason: 'Aucun conducteur avant la fin de la période — remboursement demandé par le client.' },
-            { onError: () => Alert.alert('Erreur', 'La demande a échoué — réessayez.') },
-          ),
+        onSuccess: () => setConfirmRefundOpen(false),
+        onError: (error) => {
+          setConfirmRefundOpen(false);
+          setActionError(error instanceof ApiError ? error.message : 'La demande a échoué — réessayez.');
+        },
       },
-    ]);
+    );
   }
 
   function handleCancel() {
-    Alert.alert(
-      'Annuler cet envoi ?',
-      isPaid
-        ? 'Votre envoi sera annulé et votre paiement vous sera remboursé intégralement.'
-        : 'Cette action ne peut pas être annulée.',
-      [
-        { text: 'Retour', style: 'cancel' },
-        {
-          text: "Annuler l'envoi",
-          style: 'destructive',
-          onPress: () =>
-            cancelShipment.mutate(
-              { reason: "Annulé depuis l'application" },
-              {
-                onError: (error) =>
-                  Alert.alert('Erreur', error instanceof ApiError ? error.message : "L'annulation a échoué — réessayez."),
-              },
-            ),
+    setActionError(undefined);
+    cancelShipment.mutate(
+      { reason: "Annulé depuis l'application" },
+      {
+        onSuccess: () => setConfirmCancelOpen(false),
+        onError: (error) => {
+          setConfirmCancelOpen(false);
+          setActionError(error instanceof ApiError ? error.message : "L'annulation a échoué — réessayez.");
         },
-      ],
+      },
     );
   }
 
@@ -229,12 +233,17 @@ export default function ShipmentDetailScreen() {
         <AppText variant="sm" color={OCEAN.onDark} style={styles.heroWeight}>
           {shipment.category?.name ?? 'Colis'} · {shipment.weightKg} kg
         </AppText>
+        {!isPaid ? (
+          <AppText variant="sm" weight="bold" color={OCEAN.onDark}>
+            À payer : {formatMoney(shipment.totalAmount, currencyCode)}
+          </AppText>
+        ) : null}
       </OceanHeroCard>
 
       {needsExtensionAnswer ? (
         <ShipmentExtensionCard
           onExtend={handleExtend}
-          onRefund={handleRefund}
+          onRefund={() => setConfirmRefundOpen(true)}
           isExtending={extendShipment.isPending}
           isRefunding={cancelShipment.isPending}
           errorMessage={extensionError}
@@ -259,9 +268,24 @@ export default function ShipmentDetailScreen() {
           <AppText variant="xs" color="textSecondary">
             Le premier à l&apos;accepter la prend en charge. Vous serez prévenu dès qu&apos;un conducteur est trouvé.
           </AppText>
+          {pendingInvitations > 0 ? (
+            <OceanPill
+              label={`${pendingInvitations} invitation${pendingInvitations > 1 ? 's' : ''} en attente`}
+              tone="gold"
+              icon={<IconSend size={13} color={OCEAN.goldInk} />}
+            />
+          ) : null}
+          <OceanButton
+            label="Chercher un conducteur"
+            variant="soft"
+            icon={<IconSearch size={16} color={OCEAN.base} />}
+            onPress={() => router.push({ pathname: '/(customer)/shipment-find-driver', params: { id: shipment.id } })}
+          />
         </OceanCard>
       ) : null}
 
+      {showDetails ? (
+        <>
       <OceanSection icon={<IconCalendarEvent size={17} color={OCEAN.base} />} title="Période choisie">
         <AppText variant="sm" weight="semibold">
           {formatWindow(shipment)}
@@ -336,6 +360,16 @@ export default function ShipmentDetailScreen() {
         </View>
         {!isPaid ? <OceanPill label="Paiement en attente" tone="gold" /> : null}
       </OceanSection>
+        </>
+      ) : null}
+
+      <OceanButton
+        label={showDetails ? 'Masquer les détails' : 'Voir tous les détails'}
+        variant="soft"
+        icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
+        onPress={() => setShowDetails((value) => !value)}
+        style={styles.actionButton}
+      />
 
       {shipment.status === 'CREATED' ? (
         <OceanButton
@@ -354,11 +388,20 @@ export default function ShipmentDetailScreen() {
         />
       ) : null}
 
+      {actionError ? (
+        <AppText variant="sm" color="danger" style={styles.actionError}>
+          {actionError}
+        </AppText>
+      ) : null}
+
       {canCancel ? (
         <OceanButton
           label="Annuler l'envoi"
           variant="outline"
-          onPress={handleCancel}
+          onPress={() => {
+            setActionError(undefined);
+            setConfirmCancelOpen(true);
+          }}
           loading={cancelShipment.isPending}
           style={styles.actionButton}
         />
@@ -374,6 +417,32 @@ export default function ShipmentDetailScreen() {
           })
         }
         style={styles.actionButton}
+      />
+
+      <ConfirmDialog
+        visible={confirmCancelOpen}
+        title="Annuler cet envoi ?"
+        message={
+          isPaid
+            ? 'Votre envoi sera annulé et votre paiement vous sera remboursé intégralement.'
+            : 'Cette action ne peut pas être annulée.'
+        }
+        confirmLabel="Annuler l'envoi"
+        destructive
+        loading={cancelShipment.isPending}
+        onConfirm={handleCancel}
+        onCancel={() => setConfirmCancelOpen(false)}
+      />
+
+      <ConfirmDialog
+        visible={confirmRefundOpen}
+        title="Être remboursé ?"
+        message="Votre envoi sera annulé et votre paiement vous sera remboursé intégralement."
+        confirmLabel="Me rembourser"
+        destructive
+        loading={cancelShipment.isPending}
+        onConfirm={handleRefund}
+        onCancel={() => setConfirmRefundOpen(false)}
       />
     </ScreenContainer>
   );
@@ -474,6 +543,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
+  },
+  actionError: {
+    marginBottom: spacing.sm,
   },
   actionButton: {
     marginBottom: spacing.sm,

@@ -43,6 +43,7 @@ const TYPE_ICON: Record<NotificationType, IconType> = {
   SUPPORT_MESSAGE: IconMessageCircle,
   SHIPMENT_REQUEST: IconPackage,
   SHIPMENT_EXTENSION: IconRefresh,
+  SHIPMENT_INVITATION: IconPackage,
   CONVERSATION_MESSAGE: IconMessageCircle,
 };
 

@@ -270,6 +270,15 @@ enum NotificationType {
   SHIPMENT_EXTENSION
   // Nouveau message dans une conversation client <-> conducteur (hors litige, qui reste SUPPORT_MESSAGE).
   CONVERSATION_MESSAGE
+  // Un client invite un conducteur à prendre son colis (ShipmentInvitation).
+  SHIPMENT_INVITATION
+}
+
+enum ShipmentInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
 }
 
 enum RatingRole {
@@ -527,6 +536,7 @@ model DriverProfile {
   vehicles      Vehicle[]
   trips         Trip[]
   shipments     Shipment[]
+  shipmentInvitations ShipmentInvitation[]
   wallet        Wallet?
   verifications Verification[]
   conversations Conversation[]
@@ -805,6 +815,7 @@ model Trip {
   stops      TripStop[]
   bookings   Booking[]
   shipments  Shipment[]
+  shipmentInvitations ShipmentInvitation[]
   passengers TripPassenger[]
 
   createdAt DateTime  @default(now())
@@ -1019,6 +1030,7 @@ model Shipment {
   ratings            Rating[]
   walletTransactions WalletTransaction[]
   promoRedemption    PromoCodeRedemption?
+  invitations        ShipmentInvitation[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -1029,6 +1041,28 @@ model Shipment {
   @@index([driverId])
   @@index([status, windowEnd])
   @@map("shipments")
+}
+
+// Invitation d'un client à un conducteur précis : « j'ai vu que vous faites ce trajet, pouvez-vous prendre mon colis ? ».
+// S'ajoute à l'annonce à tous les conducteurs (ShipmentDispatchService), sans la remplacer : le premier qui accepte l'emporte.
+model ShipmentInvitation {
+  id          String                   @id @default(uuid())
+  shipmentId  String
+  shipment    Shipment                 @relation(fields: [shipmentId], references: [id])
+  driverId    String
+  driver      DriverProfile            @relation(fields: [driverId], references: [id])
+  // Trajet du conducteur qui a servi à le trouver (peut être nul si le trajet a été supprimé depuis).
+  tripId      String?
+  trip        Trip?                    @relation(fields: [tripId], references: [id])
+  status      ShipmentInvitationStatus @default(PENDING)
+  respondedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shipmentId, driverId])
+  @@index([driverId, status])
+  @@map("shipment_invitations")
 }
 
 model ShipmentItem {

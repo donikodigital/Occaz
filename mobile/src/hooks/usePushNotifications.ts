@@ -127,6 +127,15 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
     // (sans attendre l'actualisation automatique).
     const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
       const data = notification.request.content.data as PushData;
+      // Invitation de colis reçue (conducteur) ou refusée (client) : la bannière / la liste se met à jour tout de suite.
+      if (data?.type === 'SHIPMENT_INVITATION') {
+        void queryClient.invalidateQueries({ queryKey: ['shipments', 'invitations', 'mine'] });
+        return;
+      }
+      if (data?.type === 'SHIPMENT_INVITATION_DECLINED' && data.shipmentId) {
+        void queryClient.invalidateQueries({ queryKey: ['shipments', data.shipmentId, 'invitations'] });
+        return;
+      }
       if (data?.type !== 'CONVERSATION_MESSAGE') return;
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       // Conversation déjà à l'écran : le son part quand le nouveau message apparaît dans la liste (useIncomingMessageSound).
@@ -143,7 +152,13 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
         router.push(`/${group}/conversation/${data.conversationId}` as never);
       } else if (data?.type === 'SHIPMENT_REQUEST') {
         router.push('/(driver)/shipment-available');
-      } else if (data?.shipmentId && (data.type === 'SHIPMENT_EXTENSION' || data.type === 'DRIVER_ACCEPTED')) {
+      } else if (data?.type === 'SHIPMENT_INVITATION') {
+        // Un client invite ce conducteur à prendre son colis : l'écran des invitations montre son message.
+        router.push('/(driver)/shipment-invitations');
+      } else if (
+        data?.shipmentId &&
+        (data.type === 'SHIPMENT_EXTENSION' || data.type === 'DRIVER_ACCEPTED' || data.type === 'SHIPMENT_INVITATION_DECLINED')
+      ) {
         router.push(`/(customer)/shipment/${data.shipmentId}`);
       }
     });

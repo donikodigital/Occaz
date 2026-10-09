@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.module.ts
+// [09/10/2026] v4 — ShipmentInvitationsService (le client invite des conducteurs).
 // [23/09/2026] v3 — PromoCodesModule (code promo à la création d'un envoi).
 // [21/09/2026] v2 — ShipmentDispatchService et ShipmentWindowService.
 import { Module } from '@nestjs/common';
@@ -7,6 +8,7 @@ import { ShipmentsService } from './shipments.service';
 import { ShipmentOtpService } from './shipment-otp.service';
 import { ShipmentDispatchService } from './shipment-dispatch.service';
 import { ShipmentWindowService } from './shipment-window.service';
+import { ShipmentInvitationsService } from './shipment-invitations.service';
 import { ShipmentCategoriesModule } from '../shipment-categories/shipment-categories.module';
 import { DocumentsModule } from '../documents/documents.module';
 import { PricingModule } from '../pricing/pricing.module';
@@ -30,7 +32,7 @@ import { PromoCodesModule } from '../promo-codes/promo-codes.module';
     PromoCodesModule,
   ],
   controllers: [ShipmentsController],
-  providers: [ShipmentsService, ShipmentOtpService, ShipmentDispatchService, ShipmentWindowService],
+  providers: [ShipmentsService, ShipmentOtpService, ShipmentDispatchService, ShipmentWindowService, ShipmentInvitationsService],
   exports: [ShipmentsService, ShipmentOtpService],
 })
 export class ShipmentsModule {}

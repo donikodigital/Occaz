@@ -1,4 +1,5 @@
 // mobile/src/services/api/shipments.api.ts
+// [09/10/2026] v4 — searchDrivers, inviteDrivers, listInvitations (client) ; listMyInvitations, acceptInvitation, declineInvitation (conducteur).
 // [30/09/2026] v3 — revealDeliveryOtpForSender : l'expéditeur peut revoir le code de livraison dans l'app.
 // [21/09/2026] v2 — quote, extend ; liste des envois disponibles typée AvailableShipment.
 import { api } from './client';
@@ -8,10 +9,15 @@ import type {
   AvailableShipment,
   CancelShipmentPayload,
   CreateShipmentPayload,
+  DriverInvitation,
+  DriverSearchResult,
   ExtendShipmentPayload,
+  InviteDriversResult,
   QuoteShipmentPayload,
   SearchAvailableShipmentsParams,
+  SearchDriversParams,
   Shipment,
+  ShipmentInvitationSummary,
   ShipmentQuote,
 } from '@/types/shipments.types';
 
@@ -32,7 +38,27 @@ export const shipmentsApi = {
   cancel: (id: string, payload: CancelShipmentPayload) =>
     api.post<Shipment>(`/shipments/${id}/cancel`, payload),
 
+  // --- Invitations (client) ---
+
+  /** Conducteurs dont un trajet publié atteint la ville d'arrivée (ville de départ facultative). */
+  searchDrivers: (id: string, params: SearchDriversParams) =>
+    api.get<DriverSearchResult[]>(`/shipments/${id}/drivers`, {
+      query: params as unknown as Record<string, string | number | boolean | undefined>,
+    }),
+
+  inviteDrivers: (id: string, tripIds: string[]) =>
+    api.post<InviteDriversResult>(`/shipments/${id}/invitations`, { tripIds }),
+
+  listInvitations: (id: string) => api.get<ShipmentInvitationSummary[]>(`/shipments/${id}/invitations`),
+
   // --- Côté conducteur ---
+
+  listMyInvitations: () => api.get<DriverInvitation[]>('/shipments/invitations/mine'),
+
+  acceptInvitation: (invitationId: string) => api.post<Shipment>(`/shipments/invitations/${invitationId}/accept`),
+
+  declineInvitation: (invitationId: string) =>
+    api.post<{ id: string; status: string }>(`/shipments/invitations/${invitationId}/decline`),
 
   listAvailable: (params: SearchAvailableShipmentsParams) =>
     api.get<Paginated<AvailableShipment>>('/shipments/available', {

@@ -1,5 +1,7 @@
 // mobile/app/(driver)/shipment-available.tsx
 //
+// [09/10/2026] v5 — Liste allégée : les encarts explicatifs (« Premier arrivé, premier servi », « Comment ça marche ») sont derrière un
+// seul bouton « Comment ça marche ? », fermé par défaut. Le conducteur voit d'abord les demandes.
 // [03/10/2026] v4 — « Colis sur ce trajet » : ouvert avec `tripId` (depuis l'écran d'un trajet), l'écran ne montre que les colis
 // dont le ramassage précède la livraison sur la route du trajet, villes traversées comprises (un colis Kindia → Labé sur un
 // trajet Conakry → Labé), et retient ce trajet à l'acceptation. Un bouton ramène à la liste complète.
@@ -465,6 +467,7 @@ export default function AvailableShipmentsScreen() {
   const [destinationCity, setDestinationCity] = useState<City | null>(null);
   const [selectedShipment, setSelectedShipment] = useState<AvailableShipment | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const citySelection = useCitySelectionStore((state) => state.selection);
   const consumeCitySelection = useCitySelectionStore((state) => state.consume);
@@ -564,9 +567,23 @@ export default function AvailableShipmentsScreen() {
         onSwap={swapCities}
         onClearAll={clearFilters}
       />
-      {shipments.length > 0 ? (
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => setHelpOpen((value) => !value)}
+        style={({ pressed }) => [styles.helpToggle, pressed && styles.pressed]}
+      >
+        <AppText variant="sm" weight="semibold" color={colors.primary}>
+          {helpOpen ? 'Masquer l’aide' : 'Comment ça marche ?'}
+        </AppText>
+      </Pressable>
+      {helpOpen ? (
         <>
           <RulesBanner />
+          <StepsCard />
+        </>
+      ) : null}
+      {shipments.length > 0 ? (
+        <>
           <View style={styles.sectionHeader}>
             <AppText variant="md" weight="semibold">
               Demandes ouvertes
@@ -620,7 +637,6 @@ export default function AvailableShipmentsScreen() {
         <Button label="Effacer les filtres" variant="outline" size="md" fullWidth={false} onPress={clearFilters} />
       ) : (
         <>
-          <StepsCard />
           <Button
             label="Voir mon activité"
             variant="ghost"
@@ -679,6 +695,11 @@ const styles = StyleSheet.create({
   },
   tripFilterText: {
     flex: 1,
+  },
+  helpToggle: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.sm,
   },
   tripFilterButton: {
     paddingVertical: spacing.xs,

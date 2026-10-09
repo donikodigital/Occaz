@@ -16,6 +16,7 @@ export type NotificationType =
   | 'SUPPORT_MESSAGE'
   | 'SHIPMENT_REQUEST'
   | 'SHIPMENT_EXTENSION'
+  | 'SHIPMENT_INVITATION'
   | 'CONVERSATION_MESSAGE';
 
 export type NotificationChannel = 'PUSH' | 'SMS' | 'EMAIL';

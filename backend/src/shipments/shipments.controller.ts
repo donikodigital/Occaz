@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.controller.ts
+// [09/10/2026] v4 — invitations : le client cherche des conducteurs (/:id/drivers) et les invite (/:id/invitations) ; le conducteur répond (/invitations/…).
 // [30/09/2026] v3 — route otp/delivery/reveal-for-sender : l'expéditeur peut revoir le code de livraison, sur le modèle de otp/pickup/reveal-for-sender.
 // [21/09/2026] v2 — /quote, /extend, /available réservé aux conducteurs validés, assign = acceptation.
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
@@ -23,6 +24,9 @@ import { CreateDocumentDto } from '../documents/dto/create-document.dto';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { ShipmentOtpService } from './shipment-otp.service';
+import { ShipmentInvitationsService } from './shipment-invitations.service';
+import { SearchShipmentDriversDto } from './dto/search-shipment-drivers.dto';
+import { InviteShipmentDriversDto } from './dto/invite-shipment-drivers.dto';
 import { hideContactsOnceDelivered } from './shipment-views';
 
 @ApiTags('Envois')
@@ -34,6 +38,7 @@ export class ShipmentsController {
     private readonly customerProfilesService: CustomerProfilesService,
     private readonly driverProfilesService: DriverProfilesService,
     private readonly shipmentOtpService: ShipmentOtpService,
+    private readonly invitations: ShipmentInvitationsService,
     private readonly scope: CountryScopeService,
   ) {}
 
@@ -62,6 +67,22 @@ export class ShipmentsController {
     return this.shipmentsService.findAvailable(query, driverId);
   }
 
+  /** Invitations reçues d'un client, à traiter (alimente la bannière de l'accueil conducteur). */
+  @Get('invitations/mine')
+  listMyInvitations(@CurrentUser() user: AuthenticatedUser) {
+    return this.invitations.listMine(user.id);
+  }
+
+  @Post('invitations/:invitationId/accept')
+  acceptInvitation(@Param('invitationId') invitationId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.invitations.accept(invitationId, user.id);
+  }
+
+  @Post('invitations/:invitationId/decline')
+  declineInvitation(@Param('invitationId') invitationId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.invitations.decline(invitationId, user.id);
+  }
+
   /** Prix affiché au client avant paiement — même calcul que la création. */
   @Post('quote')
   quote(@Body() dto: QuoteShipmentDto) {
@@ -72,6 +93,33 @@ export class ShipmentsController {
   async create(@Body() dto: CreateShipmentDto, @CurrentUser() user: AuthenticatedUser) {
     const customer = await this.customerProfilesService.findByUserId(user.id);
     return this.shipmentsService.create(customer.id, dto);
+  }
+
+  /** Le client cherche des conducteurs pour son colis payé : ville d'arrivée obligatoire, ville de départ facultative. */
+  @Get(':id/drivers')
+  async searchDrivers(
+    @Param('id') id: string,
+    @Query() query: SearchShipmentDriversDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const customer = await this.customerProfilesService.findByUserId(user.id);
+    return this.invitations.searchDrivers(id, customer.id, query);
+  }
+
+  @Post(':id/invitations')
+  async inviteDrivers(
+    @Param('id') id: string,
+    @Body() dto: InviteShipmentDriversDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const customer = await this.customerProfilesService.findByUserId(user.id);
+    return this.invitations.invite(id, customer.id, dto.tripIds);
+  }
+
+  @Get(':id/invitations')
+  async listInvitations(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const customer = await this.customerProfilesService.findByUserId(user.id);
+    return this.invitations.listForShipment(id, customer.id);
   }
 
   @Get(':id')

@@ -1,5 +1,10 @@
 // mobile/app/(driver)/trip/[id].tsx
 //
+// [09/10/2026] v10 — Trajet en brouillon ou publié sans réservation : même simplification que le guide. L'écran ne montre que le billet
+// et l'action à faire (« Publier le trajet »). Villes traversées, colis, passagers, véhicule et annulation passent sous « Voir tous
+// les détails ». Plus de section « Passagers · Aucune réservation confirmée » sur un brouillon (rien ne peut être réservé avant la
+// publication), et l'ajout d'une ville traversée (avec ses adresses récentes) ne se déplie que sur demande.
+//
 // [09/10/2026] v9 — Guide pas à pas : dès qu'un trajet publié a une réservation payée, l'écran ne montre QUE l'étape à faire
 // (DriverJourneyGuide : en route → arrivée → code → en route → … → clôture), avec un seul bouton à la fois. Fini les deux boutons
 // « Je suis arrivé à Mamou » et « Signaler l'arrivée à destination » affichés ensemble. Tout le reste (billet, villes traversées,
@@ -601,6 +606,8 @@ function TripStopsSection({
   const [editingStopId, setEditingStopId] = useState<string | null>(null);
   const [fareText, setFareText] = useState('');
   const [addFieldKey, setAddFieldKey] = useState(0);
+  // Le champ d'ajout (avec ses suggestions et adresses récentes) ne se déplie que sur demande.
+  const [adding, setAdding] = useState(false);
 
   // Rien à montrer sans étape, sauf en brouillon où le conducteur peut en ajouter.
   if (stops.length === 0 && !isDraft) return null;
@@ -653,7 +660,7 @@ function TripStopsSection({
     }
     addStop.mutate(
       { locationId: location.id, sequence: insertionSequence(trip.originLocation, stops, location) },
-      { onError: showError },
+      { onSuccess: () => setAdding(false), onError: showError },
     );
   }
 
@@ -820,13 +827,20 @@ function TripStopsSection({
       </View>
 
       {isDraft ? (
-        <LocationAutocompleteField
-          key={addFieldKey}
-          label=""
-          value={null}
-          onChange={handleAdd}
-          placeholder="Ajouter une ville traversée (ex. Mamou)"
-        />
+        adding ? (
+          <>
+            <LocationAutocompleteField
+              key={addFieldKey}
+              label=""
+              value={null}
+              onChange={handleAdd}
+              placeholder="Ajouter une ville traversée (ex. Mamou)"
+            />
+            <OceanButton label="Fermer" variant="soft" onPress={() => setAdding(false)} />
+          </>
+        ) : (
+          <OceanButton label="Ajouter une ville traversée" variant="soft" onPress={() => setAdding(true)} />
+        )
       ) : null}
     </OceanSection>
   );
@@ -866,7 +880,11 @@ export default function DriverTripDetailScreen() {
   }
 
   const guided = isGuidedTrip(trip, bookings ?? []);
-  const detailsVisible = !guided || showDetails;
+  // Brouillon ou publié sans réservation : l'essentiel (billet + action), le reste sous « Voir tous les détails ».
+  const simple = !guided && (trip.status === 'DRAFT' || trip.status === 'PUBLISHED');
+  const ticketVisible = !guided || showDetails;
+  const secondaryVisible = guided || simple ? showDetails : true;
+  const missingFare = (trip.stops ?? []).some((stop) => stop.fareFromOrigin == null);
   const activeBookings = (bookings ?? []).filter((b) => b.status === 'CONFIRMED');
   // Au moins une réservation payée (même règle que le serveur) : sinon personne à attendre au départ.
   const hasReservation = (bookings ?? []).some((b) => b.status === 'CONFIRMED' || b.status === 'PAID');
@@ -924,7 +942,8 @@ export default function DriverTripDetailScreen() {
 
   const seatsTitle = formatSeatsAvailability(trip.availableSeats);
 
-  const canReceiveBookings = ['DRAFT', 'PUBLISHED', 'BOOKING_PENDING', 'CONFIRMED'].includes(trip.status);
+  // Un brouillon n'est pas publié : rien ne peut y être réservé, la section « Passagers » n'a pas lieu d'être.
+  const canReceiveBookings = ['PUBLISHED', 'BOOKING_PENDING', 'CONFIRMED'].includes(trip.status);
   const showPassengers = activeBookings.length > 0 || canReceiveBookings;
 
   const luggageLabel = trip.allowsLuggage ? 'Bagages acceptés' : 'Sans bagages';
@@ -938,6 +957,16 @@ export default function DriverTripDetailScreen() {
       shipmentsLabel = 'Envois acceptés';
     }
   }
+
+  const detailsToggle = (
+    <OceanButton
+      label={showDetails ? 'Masquer les détails du trajet' : 'Voir tous les détails du trajet'}
+      variant="soft"
+      icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
+      onPress={() => setShowDetails((value) => !value)}
+      style={styles.detailsToggle}
+    />
+  );
 
   return (
     <ScreenContainer scroll maxWidth="detail">
@@ -957,17 +986,11 @@ export default function DriverTripDetailScreen() {
             onCancel={handleCancel}
             cancelPending={cancelTrip.isPending}
           />
-          <OceanButton
-            label={showDetails ? 'Masquer les détails du trajet' : 'Voir tous les détails du trajet'}
-            variant="soft"
-            icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
-            onPress={() => setShowDetails((value) => !value)}
-            style={styles.detailsToggle}
-          />
+          {detailsToggle}
         </>
       ) : null}
 
-      {detailsVisible ? (
+      {ticketVisible ? (
         <>
       {/* Billet : bandeau coloré + coupon détachable */}
       <View style={styles.ticketShadow}>
@@ -1045,8 +1068,21 @@ export default function DriverTripDetailScreen() {
         </View>
       </View>
 
+        </>
+      ) : null}
+
       {stage && !guided ? <StageCard stage={stage} action={action} /> : null}
 
+      {simple && missingFare && !showDetails ? (
+        <AppText variant="xs" color="danger" style={styles.missingFareNote}>
+          Une ville traversée n&apos;a pas de prix : ouvrez les détails pour l&apos;indiquer avant de publier.
+        </AppText>
+      ) : null}
+
+      {simple ? detailsToggle : null}
+
+      {secondaryVisible ? (
+        <>
       <TripStopsSection trip={trip} bookings={bookings ?? []} allowArrivalActions={!guided} />
 
       {trip.allowsShipments && ['PUBLISHED', 'DRIVER_ARRIVED'].includes(trip.status) ? (
@@ -1498,6 +1534,10 @@ const styles = StyleSheet.create({
 
   cancelButton: {
     marginBottom: spacing.lg,
+  },
+  missingFareNote: {
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xxs,
   },
   detailsToggle: {
     marginBottom: spacing.md,

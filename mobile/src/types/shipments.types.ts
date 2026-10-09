@@ -1,4 +1,5 @@
 // mobile/src/types/shipments.types.ts
+// [09/10/2026] v4 — invitations de conducteurs : DriverSearchResult, ShipmentInvitationSummary, DriverInvitation.
 // [23/09/2026] v3 — champ promoCode facultatif sur CreateShipmentPayload.
 // [21/09/2026] v2 — plage de dates, conducteur direct, devis, AvailableShipment, tripId facultatif à l'acceptation.
 import type { Money } from '@/services/api/types';
@@ -221,4 +222,61 @@ export interface SearchAvailableShipmentsParams {
 export interface AssignShipmentPayload {
   /** Facultatif : un conducteur validé sans trajet établi peut accepter un envoi. */
   tripId?: string;
+}
+
+// --- Invitations : le client cherche un conducteur et l'invite à prendre son colis ---
+
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED';
+
+export interface SearchDriversParams {
+  /** Ville où le colis doit arriver — obligatoire. */
+  destinationCityId: string;
+  /** Facultative : sans elle, tout conducteur qui se rend à la ville d'arrivée est proposé. */
+  originCityId?: string;
+}
+
+/** Un conducteur trouvé (un trajet par conducteur) — champs publics seulement. */
+export interface DriverSearchResult {
+  tripId: string;
+  departureAt: string;
+  /** Heure à laquelle le conducteur passe au point de départ cherché. */
+  passingAt: string;
+  originCityName: string;
+  destinationCityName: string;
+  viaCityNames: string[];
+  driver: {
+    firstName: string;
+    lastName: string;
+    photoUrl: string | null;
+    averageRating: number | null;
+    ratingsCount: number;
+    isVerifiedBadge: boolean;
+    completedTripsCount: number;
+  };
+  vehicle: { brand: string; model: string; color: string | null } | null;
+  /** Déjà invité pour cet envoi ? null = pas encore. */
+  invitationStatus: InvitationStatus | null;
+}
+
+export interface InviteDriversResult {
+  invited: number;
+  alreadyInvited: number;
+  unavailable: number;
+}
+
+/** Invitation envoyée, vue par le client. */
+export interface ShipmentInvitationSummary {
+  id: string;
+  status: InvitationStatus;
+  createdAt: string;
+  driver: { firstName: string; lastName: string; photoUrl: string | null };
+}
+
+/** Invitation reçue, vue par le conducteur : le message du client et l'envoi (sans donnée personnelle). */
+export interface DriverInvitation {
+  id: string;
+  createdAt: string;
+  message: string;
+  shipment: AvailableShipment;
+  trip: { id: string; departureAt: string; originCityName: string; destinationCityName: string } | null;
 }

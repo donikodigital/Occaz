@@ -1,5 +1,10 @@
 // mobile/app/(driver)/shipment/[id].tsx
 //
+// [09/10/2026] v4 — Page allégée : on ne montre que l'étape à faire (bouton ou code), le bandeau (statut, itinéraire, gain) et la
+// personne concernée par cette étape (l'expéditeur avant la récupération, le destinataire ensuite). Période et les deux fiches
+// complètes passent sous « Voir tous les détails ». Erreurs et confirmations s'affichent dans la page (Alert.alert ne fait rien
+// sur le web) et l'annulation passe par ConfirmDialog.
+//
 // [03/10/2026] v3 — Page refaite dans le style bleu océan du reste de l'app. Un bandeau en tête réunit l'essentiel : statut,
 // itinéraire « Dakar → Koundara », gain net et période. L'expéditeur et le destinataire ont chacun leur carte (nom, adresse,
 // appel / SMS). La prochaine étape est annoncée avant le bouton qui la déclenche. Tous les parcours sont conservés : récupération
@@ -12,17 +17,21 @@
 // v2 — gain net et période affichés, téléphones appelables, annulation avant récupération seulement ; l'attribution se fait
 // depuis la liste.
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
+  IconAlertTriangle,
   IconCalendarEvent,
+  IconChevronDown,
+  IconChevronUp,
+  IconCircleCheck,
   IconLifebuoy,
   IconLock,
   IconMapPin,
   IconMessageCircle,
   IconPackage,
 } from '@tabler/icons-react-native';
-import { AppText, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, ConfirmDialog, ScreenContainer, TextField } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
 import { OceanButton, OceanCard, OceanPill, OceanScreenHeader, OceanSection, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
@@ -90,6 +99,38 @@ function initialsOf(name: string): string {
 function cityOf(location: Shipment['senderLocation']): { city: string; country?: string } {
   const city = location?.city;
   return { city: city?.name ?? location?.label ?? '—', country: city?.country?.name };
+}
+
+/** Erreur ou confirmation affichée dans la page (visible aussi sur le web, contrairement à Alert.alert). */
+interface Feedback {
+  tone: 'error' | 'info';
+  title: string;
+  text: string;
+}
+
+function errorFeedback(error: unknown, title = 'Une erreur est survenue'): Feedback {
+  return { tone: 'error', title, text: error instanceof ApiError ? error.message : 'Réessayez dans un instant.' };
+}
+
+function FeedbackBanner({ feedback, onDismiss }: { feedback: Feedback; onDismiss: () => void }) {
+  const isError = feedback.tone === 'error';
+  return (
+    <Pressable
+      accessibilityRole="alert"
+      onPress={onDismiss}
+      style={[styles.feedback, isError ? styles.feedbackError : styles.feedbackInfo]}
+    >
+      {isError ? <IconAlertTriangle size={18} color={colors.danger} /> : <IconCircleCheck size={18} color={colors.successDark} />}
+      <View style={styles.feedbackText}>
+        <AppText variant="sm" weight="bold" color={isError ? 'danger' : colors.successDark}>
+          {feedback.title}
+        </AppText>
+        <AppText variant="xs" color={isError ? 'danger' : colors.successDark}>
+          {feedback.text}
+        </AppText>
+      </View>
+    </Pressable>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +267,9 @@ export default function DriverShipmentDetailScreen() {
   const verifyPickupOtp = useVerifyShipmentPickupOtp(id ?? '');
   const requestDeliveryOtp = useRequestShipmentDeliveryOtp(id ?? '');
   const verifyDeliveryOtp = useVerifyShipmentDeliveryOtp(id ?? '');
+  const [showDetails, setShowDetails] = useState(false);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   if (isLoading || !shipment) {
     return (
@@ -251,22 +295,24 @@ export default function DriverShipmentDetailScreen() {
   const nextStep = NEXT_STEP[shipment.status];
 
   function handleCancel() {
-    Alert.alert('Annuler cet envoi ?', "Le client sera remboursé intégralement et l'envoi sera annulé.", [
-      { text: 'Retour', style: 'cancel' },
+    setFeedback(null);
+    cancelShipment.mutate(
+      { reason: "Annulé depuis l'application" },
       {
-        text: "Annuler l'envoi",
-        style: 'destructive',
-        onPress: () =>
-          cancelShipment.mutate(
-            { reason: "Annulé depuis l'application" },
-            {
-              onError: (error) =>
-                Alert.alert('Erreur', error instanceof ApiError ? error.message : "L'annulation a échoué."),
-            },
-          ),
+        onSuccess: () => setConfirmCancelOpen(false),
+        onError: (error) => {
+          setConfirmCancelOpen(false);
+          setFeedback(errorFeedback(error, "L'annulation a échoué"));
+        },
       },
-    ]);
+    );
   }
+
+  const reportError = (error: unknown) => setFeedback(errorFeedback(error));
+  // La personne à retrouver pour CETTE étape : l'expéditeur avant la récupération, le destinataire ensuite.
+  const meetSender = shipment.status === 'DRIVER_ASSIGNED' || shipment.status === 'PICKUP_PENDING';
+  const meetRecipient =
+    shipment.status === 'PICKED_UP' || shipment.status === 'IN_TRANSIT' || shipment.status === 'DELIVERY_PENDING';
 
   return (
     <ScreenContainer scroll maxWidth="detail">
@@ -359,12 +405,14 @@ export default function DriverShipmentDetailScreen() {
               {formatMoney(driverNetAmount(shipment), currencyCode)}
             </AppText>
           </View>
-          <View style={styles.dateChip}>
-            <IconCalendarEvent size={13} color={colors.onPrimary} />
-            <AppText variant="xs" weight="semibold" color={colors.onPrimary}>
-              {formatWindow(shipment)}
-            </AppText>
-          </View>
+          {showDetails ? (
+            <View style={styles.dateChip}>
+              <IconCalendarEvent size={13} color={colors.onPrimary} />
+              <AppText variant="xs" weight="semibold" color={colors.onPrimary}>
+                {formatWindow(shipment)}
+              </AppText>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -377,11 +425,13 @@ export default function DriverShipmentDetailScreen() {
         </View>
       ) : null}
 
+      {feedback ? <FeedbackBanner feedback={feedback} onDismiss={() => setFeedback(null)} /> : null}
+
       {/* Actions de l'étape en cours */}
       {shipment.status === 'DRIVER_ASSIGNED' ? (
         <OceanButton
           label="En route pour la récupération"
-          onPress={() => markPickupPending.mutate()}
+          onPress={() => markPickupPending.mutate(undefined, { onError: reportError })}
           loading={markPickupPending.isPending}
           style={styles.actionButton}
         />
@@ -394,19 +444,18 @@ export default function DriverShipmentDetailScreen() {
             requestPickupOtp.mutate(undefined, {
               onSuccess: (result) => {
                 if (!result.smsSent) {
-                  Alert.alert(
-                    'Code généré',
-                    "Le SMS n'a pas pu être envoyé à l'expéditeur — demandez-lui de consulter son code directement dans l'application.",
-                  );
+                  setFeedback({
+                    tone: 'info',
+                    title: 'Code généré',
+                    text: "Le SMS n'a pas pu être envoyé à l'expéditeur — demandez-lui de consulter son code directement dans l'application.",
+                  });
                 }
               },
+              onError: reportError,
             })
           }
           onVerify={(code) =>
-            verifyPickupOtp.mutate(code, {
-              onError: (error) =>
-                Alert.alert('Code invalide', error instanceof ApiError ? error.message : 'Réessayez.'),
-            })
+            verifyPickupOtp.mutate(code, { onError: (error) => setFeedback(errorFeedback(error, 'Code invalide')) })
           }
           isRequesting={requestPickupOtp.isPending}
           isVerifying={verifyPickupOtp.isPending}
@@ -428,7 +477,7 @@ export default function DriverShipmentDetailScreen() {
       {shipment.status === 'PICKED_UP' ? (
         <OceanButton
           label="Démarrer le transport"
-          onPress={() => markInTransit.mutate()}
+          onPress={() => markInTransit.mutate(undefined, { onError: reportError })}
           loading={markInTransit.isPending}
           style={styles.actionButton}
         />
@@ -437,7 +486,7 @@ export default function DriverShipmentDetailScreen() {
       {shipment.status === 'IN_TRANSIT' ? (
         <OceanButton
           label="En route pour la livraison"
-          onPress={() => markDeliveryPending.mutate()}
+          onPress={() => markDeliveryPending.mutate(undefined, { onError: reportError })}
           loading={markDeliveryPending.isPending}
           style={styles.actionButton}
         />
@@ -450,19 +499,18 @@ export default function DriverShipmentDetailScreen() {
             requestDeliveryOtp.mutate(undefined, {
               onSuccess: (result) => {
                 if (!result.smsSent) {
-                  Alert.alert(
-                    'Code généré',
-                    "Le SMS n'a pas pu être envoyé au destinataire — contrairement à l'expéditeur, il n'a pas de compte dans l'application pour le consulter autrement. Réessayez ou contactez-le directement.",
-                  );
+                  setFeedback({
+                    tone: 'info',
+                    title: 'Code généré',
+                    text: "Le SMS n'a pas pu être envoyé au destinataire — contrairement à l'expéditeur, il n'a pas de compte dans l'application pour le consulter autrement. Réessayez ou contactez-le directement.",
+                  });
                 }
               },
+              onError: reportError,
             })
           }
           onVerify={(code) =>
-            verifyDeliveryOtp.mutate(code, {
-              onError: (error) =>
-                Alert.alert('Code invalide', error instanceof ApiError ? error.message : 'Réessayez.'),
-            })
+            verifyDeliveryOtp.mutate(code, { onError: (error) => setFeedback(errorFeedback(error, 'Code invalide')) })
           }
           isRequesting={requestDeliveryOtp.isPending}
           isVerifying={verifyDeliveryOtp.isPending}
@@ -481,7 +529,21 @@ export default function DriverShipmentDetailScreen() {
         />
       ) : null}
 
-      {/* Expéditeur et destinataire */}
+      {/* La personne concernée par cette étape ; les deux fiches complètes sont sous « Voir tous les détails » */}
+      {!showDetails && meetSender && !contactsClosed ? (
+        <PersonCard role="Expéditeur" name={shipment.senderName} location={shipment.senderLocation} phone={shipment.senderPhone} />
+      ) : null}
+      {!showDetails && meetRecipient && !contactsClosed ? (
+        <PersonCard
+          role="Destinataire"
+          name={shipment.recipientName}
+          location={shipment.recipientLocation}
+          phone={shipment.recipientPhone}
+        />
+      ) : null}
+
+      {showDetails ? (
+        <>
       <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Personnes concernées">
         <View style={styles.people}>
           <PersonCard
@@ -508,12 +570,25 @@ export default function DriverShipmentDetailScreen() {
           </View>
         ) : null}
       </OceanSection>
+        </>
+      ) : null}
+
+      <OceanButton
+        label={showDetails ? 'Masquer les détails' : 'Voir tous les détails'}
+        variant="soft"
+        icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
+        onPress={() => setShowDetails((value) => !value)}
+        style={styles.actionButton}
+      />
 
       {canCancel ? (
         <OceanButton
           label="Annuler l'envoi"
           variant="outline"
-          onPress={handleCancel}
+          onPress={() => {
+            setFeedback(null);
+            setConfirmCancelOpen(true);
+          }}
           loading={cancelShipment.isPending}
           style={styles.actionButton}
         />
@@ -530,6 +605,17 @@ export default function DriverShipmentDetailScreen() {
         }
         style={styles.actionButton}
       />
+
+      <ConfirmDialog
+        visible={confirmCancelOpen}
+        title="Annuler cet envoi ?"
+        message="Le client sera remboursé intégralement et l'envoi sera annulé."
+        confirmLabel="Annuler l'envoi"
+        destructive
+        loading={cancelShipment.isPending}
+        onConfirm={handleCancel}
+        onCancel={() => setConfirmCancelOpen(false)}
+      />
     </ScreenContainer>
   );
 }
@@ -541,6 +627,27 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  feedback: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+  },
+  feedbackError: {
+    backgroundColor: '#FDE8E8',
+    borderColor: '#F5C2C2',
+  },
+  feedbackInfo: {
+    backgroundColor: colors.successLight,
+    borderColor: '#B7E4D3',
+  },
+  feedbackText: {
+    flex: 1,
+    gap: 2,
   },
   chatButton: {
     width: 40,
