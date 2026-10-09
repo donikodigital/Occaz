@@ -128,8 +128,9 @@ describe('BookingsService.create — tronçon réservé', () => {
 });
 
 describe('BookingsService.cancel — délai compté depuis la montée du client', () => {
-  function cancelService(departureAt: Date, boardingAt: Date | null) {
+  function cancelService(departureAt: Date, boardingAt: Date | null, passengers: Array<{ pickedUpAt: Date | null }> = []) {
     const booking = {
+      passengers,
       id: 'b1',
       customerId: 'c1',
       tripId: 'trip1',
@@ -161,7 +162,7 @@ describe('BookingsService.cancel — délai compté depuis la montée du client'
     };
     const emit = jest.fn();
     const service = new BookingsService(prisma as never, pricing as never, { emit } as never, {} as never, { notify: jest.fn() } as never);
-    return { service, emit };
+    return { service, emit, tx };
   }
 
   it('départ dans 10 h mais montée dans 30 h : remboursement intégral (le délai suit la montée)', async () => {
@@ -176,6 +177,20 @@ describe('BookingsService.cancel — délai compté depuis la montée du client'
     const { service } = cancelService(new Date(now + 10 * 3_600_000), null);
     const result = await service.cancel('b1', 'c1', 'Imprévu');
     expect(result.refundEligiblePercentage).toBe(0);
+  });
+
+  it('client déjà pris en charge : annulation refusée, rien n\'est modifié ni remboursé', async () => {
+    const now = Date.now();
+    const { service, emit, tx } = cancelService(new Date(now + 10 * 3_600_000), null, [{ pickedUpAt: new Date(now - 60_000) }]);
+    await expect(service.cancel('b1', 'c1', 'Imprévu')).rejects.toThrow(/déjà été pris en charge/);
+    expect(tx.booking.update).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it('client pas encore monté (passagers sans prise en charge) : l\'annulation reste possible', async () => {
+    const now = Date.now();
+    const { service } = cancelService(new Date(now + 10 * 3_600_000), null, [{ pickedUpAt: null }]);
+    await expect(service.cancel('b1', 'c1', 'Imprévu')).resolves.toBeDefined();
   });
 });
 

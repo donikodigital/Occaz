@@ -1,5 +1,9 @@
 // mobile/app/(driver)/trip/[id].tsx
 //
+// [09/10/2026] v9 — Guide pas à pas : dès qu'un trajet publié a une réservation payée, l'écran ne montre QUE l'étape à faire
+// (DriverJourneyGuide : en route → arrivée → code → en route → … → clôture), avec un seul bouton à la fois. Fini les deux boutons
+// « Je suis arrivé à Mamou » et « Signaler l'arrivée à destination » affichés ensemble. Tout le reste (billet, villes traversées,
+// passagers, véhicule) se consulte sous « Voir tous les détails », en lecture seule : on n'avance que par le guide.
 // [08/10/2026] v8 — « Signaler mon arrivée au départ » n'apparaît plus tant qu'aucune réservation n'existe : sans passager il n'y a personne à
 // attendre, et passer en « arrivé » ferme les réservations (elles ne sont prises que sur un trajet publié) sans permettre de démarrer.
 // Le trajet publié sans réservation explique maintenant qu'il attend ses premiers passagers.
@@ -43,6 +47,8 @@ import {
   IconAlertTriangle,
   IconArrowLeft,
   IconCar,
+  IconChevronDown,
+  IconChevronUp,
   IconCircleCheck,
   IconFlag,
   IconInfoCircle,
@@ -59,6 +65,7 @@ import {
 } from '@tabler/icons-react-native';
 import { AppText, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
+import { DriverJourneyGuide } from '@/components/screens/DriverJourneyGuide';
 import { LocationAutocompleteField } from '@/components/screens/LocationAutocompleteField';
 import { OceanButton, OceanCard, OceanPill, OceanScreenHeader, OceanSection, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
@@ -94,6 +101,7 @@ import { bookingRoute, isPartialBooking, stopAddress, stopName } from '@/utils/t
 import { insertionSequence } from '@/utils/routeOrder';
 import { closeToHome } from '@/utils/navigation';
 import { describeUnpicked, getBookingPhase, isPickupMissed, unpickedBoarders, type BookingPhase } from '@/utils/bookingPhase';
+import { isGuidedTrip } from '@/utils/driverJourney';
 import { ApiError } from '@/services/api/ApiError';
 import type { Booking } from '@/types/bookings.types';
 import type { Trip, TripLocation, TripStatus, TripStop } from '@/types/trips.types';
@@ -568,7 +576,16 @@ function confirmIfPickupMissed(trip: Trip, bookings: Booking[], proceed: () => v
  * automatiquement, décoche une ville où il ne prend personne, retire ou ajoute une ville. En route, il signale son
  * arrivée à chaque étape pour prévenir les clients qui y montent.
  */
-function TripStopsSection({ trip, bookings }: { trip: Trip; bookings: Booking[] }) {
+function TripStopsSection({
+  trip,
+  bookings,
+  allowArrivalActions = true,
+}: {
+  trip: Trip;
+  bookings: Booking[];
+  /** false quand le guide pas à pas est affiché : l'arrivée à une ville se signale depuis le guide, jamais depuis la liste. */
+  allowArrivalActions?: boolean;
+}) {
   const isDraft = trip.status === 'DRAFT';
   const isRunning = trip.status === 'IN_PROGRESS';
   const stops = trip.stops ?? [];
@@ -589,7 +606,7 @@ function TripStopsSection({ trip, bookings }: { trip: Trip; bookings: Booking[] 
   if (stops.length === 0 && !isDraft) return null;
 
   const total = Number(trip.pricePerSeat);
-  const nextStopToReach = isRunning ? stops.find((stop) => !stop.arrivedAt) : undefined;
+  const nextStopToReach = isRunning && allowArrivalActions ? stops.find((stop) => !stop.arrivedAt) : undefined;
 
   function showError(error: unknown) {
     Alert.alert('Erreur', error instanceof ApiError ? error.message : 'Réessayez.');
@@ -831,6 +848,8 @@ export default function DriverTripDetailScreen() {
   const completeTrip = useCompleteTrip(id ?? '');
   const cancelTrip = useCancelTrip(id ?? '');
   const { error: positionError, mode: positionMode } = useTripPositionBroadcast(id ?? '', trip?.status === 'IN_PROGRESS');
+  // Parcours guidé : le détail complet est replié par défaut, à la demande du conducteur.
+  const [showDetails, setShowDetails] = useState(false);
 
   if (isLoading || !trip) {
     return (
@@ -846,6 +865,8 @@ export default function DriverTripDetailScreen() {
     );
   }
 
+  const guided = isGuidedTrip(trip, bookings ?? []);
+  const detailsVisible = !guided || showDetails;
   const activeBookings = (bookings ?? []).filter((b) => b.status === 'CONFIRMED');
   // Au moins une réservation payée (même règle que le serveur) : sinon personne à attendre au départ.
   const hasReservation = (bookings ?? []).some((b) => b.status === 'CONFIRMED' || b.status === 'PAID');
@@ -927,6 +948,27 @@ export default function DriverTripDetailScreen() {
         onClose={created ? () => closeToHome('/(driver)/(tabs)/home') : undefined}
       />
 
+      {guided ? (
+        <>
+          <DriverJourneyGuide
+            trip={trip}
+            bookings={bookings ?? []}
+            positionNote={{ error: positionError, mode: positionMode }}
+            onCancel={handleCancel}
+            cancelPending={cancelTrip.isPending}
+          />
+          <OceanButton
+            label={showDetails ? 'Masquer les détails du trajet' : 'Voir tous les détails du trajet'}
+            variant="soft"
+            icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
+            onPress={() => setShowDetails((value) => !value)}
+            style={styles.detailsToggle}
+          />
+        </>
+      ) : null}
+
+      {detailsVisible ? (
+        <>
       {/* Billet : bandeau coloré + coupon détachable */}
       <View style={styles.ticketShadow}>
         <View style={styles.ticket}>
@@ -1003,9 +1045,9 @@ export default function DriverTripDetailScreen() {
         </View>
       </View>
 
-      {stage ? <StageCard stage={stage} action={action} /> : null}
+      {stage && !guided ? <StageCard stage={stage} action={action} /> : null}
 
-      <TripStopsSection trip={trip} bookings={bookings ?? []} />
+      <TripStopsSection trip={trip} bookings={bookings ?? []} allowArrivalActions={!guided} />
 
       {trip.allowsShipments && ['PUBLISHED', 'DRIVER_ARRIVED'].includes(trip.status) ? (
         <OceanButton
@@ -1037,8 +1079,8 @@ export default function DriverTripDetailScreen() {
                   key={booking.id}
                   booking={booking}
                   tripId={trip.id}
-                  phase={getBookingPhase(booking, trip)}
-                  pickupMissed={isPickupMissed(booking, trip)}
+                  phase={guided ? 'none' : getBookingPhase(booking, trip)}
+                  pickupMissed={!guided && isPickupMissed(booking, trip)}
                 />
               ))}
             </View>
@@ -1107,6 +1149,8 @@ export default function DriverTripDetailScreen() {
           loading={cancelTrip.isPending}
           style={styles.cancelButton}
         />
+      ) : null}
+        </>
       ) : null}
     </ScreenContainer>
   );
@@ -1454,6 +1498,9 @@ const styles = StyleSheet.create({
 
   cancelButton: {
     marginBottom: spacing.lg,
+  },
+  detailsToggle: {
+    marginBottom: spacing.md,
   },
   stopList: {
     gap: spacing.sm,

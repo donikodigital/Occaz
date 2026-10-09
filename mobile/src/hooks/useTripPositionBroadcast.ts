@@ -1,5 +1,11 @@
 // mobile/src/hooks/useTripPositionBroadcast.ts
+//
+// [09/10/2026] v2 — Sur le web, `Location.startLocationUpdatesAsync` n'existe pas (pas de service d'arrière-plan dans un
+// navigateur) : l'écran du trajet plantait avec « startLocationUpdatesAsync is not a function » dès que le trajet passait en
+// cours. Le web (et tout appareil où le démarrage d'arrière-plan échoue, ex. Expo Go) utilise désormais directement le repli
+// premier plan, qui passe par la géolocalisation du navigateur / getCurrentPositionAsync.
 import { useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { activeTripStorage } from '@/services/storage/activeTripStorage';
 import { tripsApi } from '@/services/api/trips.api';
@@ -43,28 +49,38 @@ export function useTripPositionBroadcast(tripId: string, isActive: boolean) {
         return;
       }
 
-      const background = await Location.requestBackgroundPermissionsAsync();
-      if (background.granted) {
-        await activeTripStorage.set(tripId);
-        const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(TRIP_LOCATION_TASK).catch(() => false);
-        if (!alreadyStarted) {
-          await Location.startLocationUpdatesAsync(TRIP_LOCATION_TASK, {
-            accuracy: Location.Accuracy.High,
-            timeInterval: FOREGROUND_INTERVAL_MS,
-            distanceInterval: 25,
-            showsBackgroundLocationIndicator: true,
-            foregroundService: {
-              notificationTitle: 'Trajet en cours',
-              notificationBody: 'Votre position est partagée avec le passager.',
-              notificationColor: OCEAN.base,
-            },
-          });
-        }
-        if (!cancelled) {
-          setMode('background');
-          setError(undefined);
-        }
+      // Pas d'arrière-plan dans un navigateur : repli premier plan direct, sans demander la permission « Toujours ».
+      if (Platform.OS === 'web') {
+        if (!cancelled) setMode('foreground');
         return;
+      }
+
+      const background = await Location.requestBackgroundPermissionsAsync().catch(() => null);
+      if (background?.granted) {
+        try {
+          await activeTripStorage.set(tripId);
+          const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(TRIP_LOCATION_TASK).catch(() => false);
+          if (!alreadyStarted) {
+            await Location.startLocationUpdatesAsync(TRIP_LOCATION_TASK, {
+              accuracy: Location.Accuracy.High,
+              timeInterval: FOREGROUND_INTERVAL_MS,
+              distanceInterval: 25,
+              showsBackgroundLocationIndicator: true,
+              foregroundService: {
+                notificationTitle: 'Trajet en cours',
+                notificationBody: 'Votre position est partagée avec le passager.',
+                notificationColor: OCEAN.base,
+              },
+            });
+          }
+          if (!cancelled) {
+            setMode('background');
+            setError(undefined);
+          }
+          return;
+        } catch {
+          // Démarrage d'arrière-plan impossible sur cet appareil : on retombe sur le premier plan ci-dessous.
+        }
       }
 
       // "Toujours" refusé — on continue quand même, en repli premier plan,

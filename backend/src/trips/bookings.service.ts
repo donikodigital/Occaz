@@ -269,6 +269,13 @@ export class BookingsService {
     ) {
       throw new BadRequestException('Cette réservation ne peut plus être annulée.');
     }
+    // Une fois pris en charge, le client n'annule plus : il est dans le véhicule, le trajet est en cours. Le recours est le
+    // litige (« Signaler un problème »), qui reste ouvert à tout moment.
+    if (booking.passengers?.some((passenger: { pickedUpAt: Date | null }) => Boolean(passenger.pickedUpAt))) {
+      throw new BadRequestException(
+        "Vous avez déjà été pris en charge : l'annulation n'est plus possible. En cas de problème, utilisez « Signaler un problème ».",
+      );
+    }
 
     const trip = await this.prisma.trip.findUniqueOrThrow({
       where: { id: booking.tripId },

@@ -1,4 +1,5 @@
 // backend/src/trips/trips.module.ts
+// [09/10/2026] v5 — TripArrivalService (notifications et codes envoyés à chaque arrivée du conducteur).
 // [23/09/2026] v4 — TripExpiryService (trajets publiés sans réservation, dont le départ est dépassé).
 // [23/09/2026] v3 — PromoCodesModule (code promo à la création d'une réservation).
 // [22/09/2026] v2 — BookingExpiryService (expiration des réservations impayées).
@@ -10,6 +11,7 @@ import { BookingsService } from './bookings.service';
 import { BookingExpiryService } from './booking-expiry.service';
 import { TripExpiryService } from './trip-expiry.service';
 import { TripOtpService } from './trip-otp.service';
+import { TripArrivalService } from './trip-arrival.service';
 import { VehiclesModule } from '../vehicles/vehicles.module';
 import { LocationsModule } from '../locations/locations.module';
 import { DriverProfilesModule } from '../profiles/driver-profiles/driver-profiles.module';
@@ -41,7 +43,7 @@ import { TripPricingModule } from '../trip-pricing/trip-pricing.module';
     TripPricingModule,
   ],
   controllers: [TripsController, BookingsController],
-  providers: [TripsService, BookingsService, TripOtpService, BookingExpiryService, TripExpiryService],
+  providers: [TripsService, BookingsService, TripOtpService, TripArrivalService, BookingExpiryService, TripExpiryService],
   exports: [TripsService, BookingsService, TripOtpService],
 })
 export class TripsModule {}

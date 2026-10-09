@@ -43,7 +43,9 @@ export function getBookingPhase(booking: Booking, trip: Trip): BookingPhase {
   if (!booking.boardingStopId) {
     return trip.status === 'DRIVER_ARRIVED' || trip.status === 'PASSENGER_PICKED_UP' ? 'pickup' : 'none';
   }
-  return trip.status === 'IN_PROGRESS' && stopOf(trip, booking.boardingStopId)?.arrivedAt ? 'pickup' : 'none';
+  // Client d'une étape : sa prise en charge s'ouvre quand le conducteur est arrivé SUR LES LIEUX de montée (pickupArrivedAt), pas
+  // seulement dans la ville.
+  return trip.status === 'IN_PROGRESS' && stopOf(trip, booking.boardingStopId)?.pickupArrivedAt ? 'pickup' : 'none';
 }
 
 /** La dépose est proposée alors que la prise en charge de ce client n'a jamais été validée. */
@@ -78,10 +80,10 @@ export function describeUnpicked(booking: Booking, trip: Trip): string {
  * Codes visibles dans l'app du CLIENT. `tripStatus` vient de la réservation (le détail d'un trajet n'est pas joint) ; les étapes
  * de montée et de descente, elles, viennent de la réservation (`boardingStop` / `alightingStop`, avec leur `arrivedAt`).
  *
- *  - code de prise en charge : client du départ, conducteur arrivé au départ ; client d'une étape, conducteur arrivé à cette étape
- *    pendant le trajet ;
- *  - code de dépose : à l'arrivée du trajet, ou quand le conducteur est à l'étape de descente du client, ou une fois pris en
- *    charge — et même si la prise en charge a été oubliée, pour ne jamais bloquer la dépose.
+ *  - code de prise en charge : client du départ, conducteur arrivé au départ ; client d'une étape, conducteur arrivé sur les lieux de
+ *    montée de cette étape (pickupArrivedAt) pendant le trajet ;
+ *  - code de dépose : à l'arrivée du trajet, ou quand le conducteur est à l'étape de descente du client — et même si la prise en
+ *    charge a été oubliée, pour ne jamais bloquer la dépose.
  */
 export function customerCodeVisibility(
   booking: Pick<Booking, 'status' | 'passengers' | 'boardingStopId' | 'alightingStopId' | 'boardingStop' | 'alightingStop'>,
@@ -92,17 +94,17 @@ export function customerCodeVisibility(
   const picked = isPickedUp(booking);
   const boardsAtStop = Boolean(booking.boardingStopId);
   const running = tripStatus === 'IN_PROGRESS';
-  const atBoardingStop = running && Boolean(booking.boardingStop?.arrivedAt);
+  const atBoardingStop = running && Boolean(booking.boardingStop?.pickupArrivedAt);
   const atAlightingStop = running && Boolean(booking.alightingStopId) && Boolean(booking.alightingStop?.arrivedAt);
 
   const pickup = boardsAtStop
     ? atBoardingStop && !picked
     : tripStatus === 'DRIVER_ARRIVED' || tripStatus === 'PASSENGER_PICKED_UP';
 
-  const dropoff =
-    tripStatus === 'ARRIVED' ||
-    atAlightingStop ||
-    (boardsAtStop ? picked : tripStatus === 'PASSENGER_PICKED_UP' || tripStatus === 'IN_PROGRESS');
+  // [09/10/2026] Le code de dépose n'apparaît qu'à l'arrivée du conducteur au point de descente du client (sa ville, ou la
+  // destination) : c'est à ce moment-là que le serveur le lui envoie, avec sa notification. Avant, il s'affichait dès la prise en
+  // charge, bien avant d'être utile.
+  const dropoff = tripStatus === 'ARRIVED' || atAlightingStop;
 
   return { pickup, dropoff };
 }

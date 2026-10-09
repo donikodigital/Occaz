@@ -1,11 +1,20 @@
 // backend/src/trips/trip-otp.service.ts
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { BookingStatus, OtpPurpose, TripStatus } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BookingStatus, NotificationChannel, NotificationType, OtpPurpose, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OtpService } from '../otp/otp.service';
 import { WalletsService } from '../wallets/wallets.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { BON_VOYAGE_BODY, BON_VOYAGE_TITLE } from './trip-arrival.service';
 
 /**
+ * [09/10/2026] v++ — Message de bienvenue : une fois la dépose validée, le client reçoit (notification + email) un mot de bienvenue
+ * dans la ville où il arrive, avec ses souhaits de bon séjour.
+ *
+ * [09/10/2026] v+ — Le code de dépose n'est plus envoyé dès la prise en charge : il part à l'arrivée du conducteur au point de
+ * descente du client, avec sa notification (TripArrivalService). Même chose pour le code de prise en charge, envoyé
+ * automatiquement à l'arrivée du conducteur ; requestPickupOtp / requestDropoffOtp servent désormais à RENVOYER un code.
+ *
  * [03/10/2026] v+ — Embarquement à une étape : un client qui monte en cours de route (Kindia, Mamou…) est pris en charge
  * pendant que le trajet est EN COURS, avec le même code ; un client qui monte au départ garde le parcours habituel
  * (conducteur arrivé au point de départ). Le code de dépose fonctionne partout, étape comprise.
@@ -22,12 +31,19 @@ export class TripOtpService {
     private readonly prisma: PrismaService,
     private readonly otpService: OtpService,
     private readonly wallets: WalletsService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  private readonly logger = new Logger(TripOtpService.name);
 
   private async getBookingWithContext(bookingId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { trip: true, customer: { include: { user: true } } },
+      include: {
+        trip: { include: { destinationCity: true } },
+        customer: { include: { user: true } },
+        alightingStop: { include: { city: true } },
+      },
     });
     if (!booking) throw new NotFoundException('Réservation introuvable.');
     return booking;
@@ -144,9 +160,26 @@ export class TripOtpService {
       });
     }
 
-    // Le code de dépose est généré tout de suite : le client le reçoit dès
-    // la prise en charge et l'a déjà en main au moment de la dépose.
-    await this.requestDropoffOtp(booking.id, booking.trip.driverId);
+    // Un client qui monte alors que le trajet est déjà en route (étape) reçoit tout de suite son message de bon voyage : les clients
+    // du départ, eux, le reçoivent quand le conducteur démarre (TripArrivalService.announceDeparture).
+    if (booking.trip.status === TripStatus.IN_PROGRESS) {
+      try {
+        await this.notifications.notify({
+          userId: booking.customer.userId,
+          type: NotificationType.STATUS_CHANGE,
+          channels: [NotificationChannel.PUSH],
+          fallbackTitle: BON_VOYAGE_TITLE,
+          fallbackBody: BON_VOYAGE_BODY,
+          pushData: { type: 'STATUS_CHANGE', tripId: booking.tripId, bookingId: booking.id },
+        });
+      } catch (error) {
+        this.logger.warn(`Message de bon voyage non envoyé pour la réservation ${booking.id} — ${(error as Error).message}.`);
+      }
+    }
+
+    // Le code de dépose n'est plus généré ici : il part à l'arrivée du conducteur au point de descente du client (ville traversée
+    // ou destination), avec sa notification — voir TripArrivalService. Il reste obtenable à tout moment (« Voir mon code » côté
+    // client, « Renvoyer le code » côté conducteur).
   }
 
   async requestDropoffOtp(bookingId: string, driverId: string) {
@@ -218,5 +251,28 @@ export class TripOtpService {
     });
 
     await this.wallets.releaseHeldFunds({ driverId: booking.trip.driverId, bookingId: booking.id });
+
+    await this.sendWelcome(booking);
+  }
+
+  /**
+   * Mot de bienvenue du client qui vient d'arriver (sa ville de descente, ou la destination du trajet). Jamais bloquant : la dépose
+   * est déjà validée et le conducteur payé, un message manqué ne doit rien défaire.
+   */
+  private async sendWelcome(booking: Awaited<ReturnType<TripOtpService['getBookingWithContext']>>): Promise<void> {
+    const city = booking.alightingStop?.city?.name ?? booking.trip.destinationCity?.name;
+    const place = city ? ` à ${city}` : '';
+    try {
+      await this.notifications.notify({
+        userId: booking.customer.userId,
+        type: NotificationType.ARRIVAL,
+        channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+        fallbackTitle: city ? `Bienvenue à ${city} !` : 'Bienvenue !',
+        fallbackBody: `Vous êtes bien arrivé${place}. Toute l'équipe Occa'Z vous souhaite un excellent séjour${place} et vous remercie d'avoir voyagé avec nous.`,
+        pushData: { type: 'ARRIVAL', tripId: booking.tripId, bookingId: booking.id },
+      });
+    } catch (error) {
+      this.logger.warn(`Message de bienvenue non envoyé pour la réservation ${booking.id} — ${(error as Error).message}.`);
+    }
   }
 }

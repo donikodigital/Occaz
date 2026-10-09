@@ -12,8 +12,6 @@ import {
 import {
   BookingStatus,
   CancellationInitiator,
-  NotificationChannel,
-  NotificationType,
   Prisma,
   ServiceType,
   ShipmentStatus,
@@ -27,6 +25,7 @@ import { DriverProfilesService } from '../profiles/driver-profiles/driver-profil
 import { PricingService } from '../pricing/pricing.service';
 import { TripPricingService } from '../trip-pricing/trip-pricing.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TripArrivalService } from './trip-arrival.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { toMoneyBigInt } from '../common/utils/money.util';
@@ -97,6 +96,7 @@ export class TripsService {
     private readonly pricing: PricingService,
     private readonly notifications: NotificationsService,
     private readonly tripPricing: TripPricingService,
+    private readonly arrivals: TripArrivalService,
   ) {}
 
   /** Calculs de route qui demandent la base (distances, prix automatiques) — sans changer le constructeur injecté. */
@@ -496,6 +496,17 @@ export class TripsService {
     if (trip.status === TripStatus.CANCELLED || trip.status === TripStatus.COMPLETED) {
       throw new BadRequestException('Ce trajet ne peut plus être annulé.');
     }
+    // Dès qu'un passager est monté, annuler rembourserait à 100 % des clients déjà en route : le trajet va à son terme, et tout
+    // différend passe par un litige (« Signaler un problème »), toujours possible.
+    if (
+      trip.status === TripStatus.PASSENGER_PICKED_UP ||
+      trip.status === TripStatus.IN_PROGRESS ||
+      trip.status === TripStatus.ARRIVED
+    ) {
+      throw new BadRequestException(
+        "Le trajet a commencé : l'annulation n'est plus possible. En cas de problème, utilisez « Signaler un problème ».",
+      );
+    }
 
     await this.prisma.trip.update({
       where: { id },
@@ -543,23 +554,9 @@ export class TripsService {
       data: { status: TripStatus.DRIVER_ARRIVED },
     });
 
-    const activeBookings = await this.prisma.booking.findMany({
-      // Les clients qui montent à une étape sont prévenus à leur étape (voir markArrivedAtStop), pas au départ.
-      where: { tripId: id, boardingStopId: null, status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] } },
-      select: { customer: { select: { userId: true } } },
-    });
-    await Promise.all(
-      activeBookings.map((booking) =>
-        this.notifications.notify({
-          userId: booking.customer.userId,
-          type: NotificationType.DEPARTURE_IMMINENT,
-          channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
-          fallbackTitle: 'Le conducteur est arrivé',
-          fallbackBody: `Votre conducteur vous attend au point de départ de ${trip.originCity.name} → ${trip.destinationCity.name}. Tenez votre code de prise en charge prêt à lui communiquer.`,
-          pushData: { type: 'DEPARTURE_IMMINENT', tripId: id },
-        }),
-      ),
-    );
+    // Les clients qui montent au départ reçoivent leur notification ET leur code de prise en charge ; ceux qui montent à une
+    // étape sont prévenus à leur étape (voir markArrivedAtStop).
+    await this.arrivals.announceArrival(trip, { kind: 'ORIGIN' }, trip.originCity.name);
 
     return updated;
   }
@@ -585,15 +582,55 @@ export class TripsService {
         'Au moins un passager doit être pris en charge (code OTP vérifié) avant de démarrer le trajet.',
       );
     }
-    return this.prisma.trip.update({ where: { id }, data: { status: TripStatus.IN_PROGRESS } });
+    const started = await this.prisma.trip.update({ where: { id }, data: { status: TripStatus.IN_PROGRESS } });
+    // Les clients déjà à bord reçoivent leur message de bon voyage (ceinture de sécurité).
+    await this.arrivals.announceDeparture(id);
+    return started;
   }
 
+  /**
+   * Arrivée à destination. Refusée tant qu'une ville traversée où des clients montent ou descendent n'a pas été signalée :
+   * ces clients attendent (ou doivent descendre) à leur étape, et le conducteur ne peut pas la sauter en passant directement à
+   * l'arrivée. Une ville où personne ne monte ni ne descend n'est jamais demandée. À l'arrivée, chaque client à bord reçoit sa
+   * notification et son code de dépose.
+   */
   async markArrived(id: string, driverId: string) {
     const trip = await this.assertOwnership(id, driverId);
     if (trip.status !== TripStatus.IN_PROGRESS) {
       throw new BadRequestException('Seul un trajet IN_PROGRESS peut passer à "arrivé à destination".');
     }
-    return this.prisma.trip.update({ where: { id }, data: { status: TripStatus.ARRIVED } });
+    const [nextStop] = await this.stopsStillToReach(id, trip.stops ?? []);
+    if (nextStop) {
+      throw new BadRequestException(
+        `Signalez d'abord votre arrivée à ${nextStop.city?.name ?? 'la prochaine étape'} : des clients y montent ou y descendent.`,
+      );
+    }
+    const updated = await this.prisma.trip.update({ where: { id }, data: { status: TripStatus.ARRIVED } });
+    await this.arrivals.announceArrival(trip, { kind: 'DESTINATION' }, trip.destinationCity.name);
+    return updated;
+  }
+
+  /**
+   * Villes traversées, dans l'ordre de passage, où au moins un client monte ou descend (réservation payée) et dont le
+   * conducteur n'a pas encore signalé l'arrivée. Une ville sans client n'est jamais à signaler.
+   */
+  private async stopsStillToReach<T extends { id: string; sequence: number; arrivedAt?: Date | null }>(
+    tripId: string,
+    stops: T[],
+  ): Promise<T[]> {
+    if (stops.length === 0) return [];
+    const bookings = await this.prisma.booking.findMany({
+      where: { tripId, status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] } },
+      select: { boardingStopId: true, alightingStopId: true },
+    });
+    const withPeople = new Set<string>();
+    for (const booking of bookings) {
+      if (booking.boardingStopId) withPeople.add(booking.boardingStopId);
+      if (booking.alightingStopId) withPeople.add(booking.alightingStopId);
+    }
+    return stops
+      .filter((stop) => withPeople.has(stop.id) && !stop.arrivedAt)
+      .sort((a, b) => a.sequence - b.sequence);
   }
 
   /**
@@ -906,8 +943,10 @@ export class TripsService {
   }
 
   /**
-   * Le conducteur signale son arrivée à une étape (trajet en cours) : les clients qui montent ici sont prévenus et peuvent
-   * donner leur code de prise en charge. Sans effet répété : la première arrivée signalée fait foi.
+   * Le conducteur signale son arrivée à une étape (trajet en cours). Les clients qui y montent reçoivent leur notification et
+   * leur code de prise en charge ; ceux qui y descendent, leur notification et leur code de dépose. Sans effet répété : la
+   * première arrivée signalée fait foi. Refusée si une ville plus tôt sur la route, où des clients montent ou descendent, n'a pas
+   * été signalée : les étapes se font dans l'ordre.
    */
   async markArrivedAtStop(tripId: string, stopId: string, driverId: string) {
     const trip = await this.assertOwnership(tripId, driverId);
@@ -918,25 +957,51 @@ export class TripsService {
     if (!stop) throw new NotFoundException('Étape introuvable sur ce trajet.');
     if (stop.arrivedAt) return stop;
 
-    const updated = await this.prisma.tripStop.update({ where: { id: stopId }, data: { arrivedAt: new Date() } });
+    const earlier = (await this.stopsStillToReach(tripId, trip.stops)).filter((candidate) => candidate.sequence < stop.sequence);
+    if (earlier.length > 0) {
+      throw new BadRequestException(
+        `Signalez d'abord votre arrivée à ${earlier[0].city?.name ?? 'l\'étape précédente'} : des clients y montent ou y descendent.`,
+      );
+    }
 
-    const boardingHere = await this.prisma.booking.findMany({
-      where: { tripId, boardingStopId: stopId, status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] } },
-      select: { customer: { select: { userId: true } } },
+    // Des clients descendent ici : on les prévient d'abord (code de dépose). Ceux qui montent le seront à « Je suis arrivé sur les lieux »
+    // (markArrivedAtPickup), une fois les déposes faites. Si personne ne descend, un seul signal suffit : ceux qui montent sont prévenus
+    // tout de suite et l'étape « prise en charge » est ouverte en même temps.
+    const alighting = await this.prisma.booking.count({
+      where: { tripId, alightingStopId: stopId, status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] } },
     });
-    const cityName = stop.city?.name ?? 'votre point de montée';
-    await Promise.all(
-      boardingHere.map((booking) =>
-        this.notifications.notify({
-          userId: booking.customer.userId,
-          type: NotificationType.DEPARTURE_IMMINENT,
-          channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
-          fallbackTitle: 'Le conducteur est arrivé',
-          fallbackBody: `Votre conducteur est arrivé à ${cityName}. Tenez votre code de prise en charge prêt à lui communiquer.`,
-          pushData: { type: 'DEPARTURE_IMMINENT', tripId },
-        }),
-      ),
+    const now = new Date();
+    const updated = await this.prisma.tripStop.update({
+      where: { id: stopId },
+      data: alighting > 0 ? { arrivedAt: now } : { arrivedAt: now, pickupArrivedAt: now },
+    });
+    await this.arrivals.announceArrival(
+      trip,
+      { kind: 'STOP', stopId, audience: alighting > 0 ? 'ALIGHTING' : 'BOTH' },
+      stop.city?.name ?? 'votre point de montée',
     );
+    return updated;
+  }
+
+  /**
+   * « Je suis arrivé sur les lieux » : le conducteur est au point où les clients montent à cette étape (après avoir déposé ceux qui
+   * y descendaient). Ces clients reçoivent leur notification et leur code de prise en charge. Sans effet répété. Refusée tant que
+   * l'arrivée dans la ville n'a pas été signalée.
+   */
+  async markArrivedAtPickup(tripId: string, stopId: string, driverId: string) {
+    const trip = await this.assertOwnership(tripId, driverId);
+    if (trip.status !== TripStatus.IN_PROGRESS) {
+      throw new BadRequestException("L'arrivée au point de prise en charge ne se signale que pendant un trajet en cours.");
+    }
+    const stop = trip.stops.find((candidate) => candidate.id === stopId);
+    if (!stop) throw new NotFoundException('Étape introuvable sur ce trajet.');
+    if (!stop.arrivedAt) {
+      throw new BadRequestException(`Signalez d'abord votre arrivée à ${stop.city?.name ?? 'cette étape'}.`);
+    }
+    if (stop.pickupArrivedAt) return stop;
+
+    const updated = await this.prisma.tripStop.update({ where: { id: stopId }, data: { pickupArrivedAt: new Date() } });
+    await this.arrivals.announceArrival(trip, { kind: 'STOP', stopId, audience: 'BOARDING' }, stop.city?.name ?? 'votre point de montée');
     return updated;
   }
 

@@ -77,8 +77,10 @@ export interface TripStop {
   distanceFromOriginKm?: number | null;
   /** false : le conducteur traverse cette ville sans prendre de passagers. */
   isBookable?: boolean;
-  /** Renseigné quand le conducteur a signalé son arrivée à cette étape. */
+  /** Renseigné quand le conducteur a signalé son arrivée dans la ville de cette étape. */
   arrivedAt?: string | null;
+  /** Renseigné quand il est arrivé au point où les clients MONTENT ici (c'est alors que leur code de prise en charge leur est envoyé). */
+  pickupArrivedAt?: string | null;
 }
 
 /**

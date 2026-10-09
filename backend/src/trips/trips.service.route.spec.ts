@@ -99,6 +99,8 @@ function build(
     ),
   };
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+  // Notifications et codes envoyés à chaque arrivée : testés dans trip-arrival.service.spec.ts, ici on vérifie seulement l'appel.
+  const arrivals = { announceArrival: jest.fn().mockResolvedValue(undefined), announceDeparture: jest.fn().mockResolvedValue(undefined) };
   const vehicles = { assertOwnership: jest.fn().mockResolvedValue({ totalSeats: 4 }) };
   const tripPricing = {
     decidePrice: jest
@@ -118,8 +120,9 @@ function build(
     pricing as never,
     notifications as never,
     tripPricing as never,
+    arrivals as never,
   );
-  return { service, prisma, tx, pricing, locations, notifications, trip, tripPricing };
+  return { service, prisma, tx, pricing, locations, notifications, arrivals, trip, tripPricing };
 }
 
 describe('TripsService.create — devise du trajet', () => {
@@ -437,26 +440,94 @@ describe('TripsService — cycle de vie avec embarquement à une étape', () => 
     expect(prisma.booking.count).not.toHaveBeenCalled();
   });
 
-  it('markArrivedAtStop : prévient seulement les clients qui montent à cette étape, une seule fois', async () => {
-    const { service, prisma, notifications } = build({ trip: { status: TripStatus.IN_PROGRESS } });
-    prisma.booking.findMany.mockResolvedValue([{ customer: { userId: 'u1' } }, { customer: { userId: 'u2' } }]);
-    await service.markArrivedAtStop('trip1', 's-kindia', 'driver1');
+  it('startTrip : les clients à bord reçoivent leur message de bon voyage au démarrage, et seulement si le démarrage a lieu', async () => {
+    const { service, prisma, arrivals } = build({ trip: { status: TripStatus.PASSENGER_PICKED_UP } });
+    (prisma.trip as Record<string, unknown>).update = jest.fn().mockResolvedValue({ status: TripStatus.IN_PROGRESS });
+    await service.startTrip('trip1', 'driver1');
+    expect(arrivals.announceDeparture).toHaveBeenCalledWith('trip1');
 
-    expect(prisma.booking.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ tripId: 'trip1', boardingStopId: 's-kindia' }) }),
-    );
-    expect(notifications.notify).toHaveBeenCalledTimes(2);
-    expect(notifications.notify.mock.calls[0][0].fallbackBody).toContain('Kindia');
+    const refused = build({ trip: { status: TripStatus.PUBLISHED } });
+    await expect(refused.service.startTrip('trip1', 'driver1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(refused.arrivals.announceDeparture).not.toHaveBeenCalled();
   });
 
-  it('markArrivedAtStop : un second signalement ne renvoie aucune notification', async () => {
+  it('markArrivedAtStop : enregistre l\'arrivée et déclenche notifications et codes de CETTE étape, une seule fois', async () => {
+    const { service, prisma, arrivals } = build({ trip: { status: TripStatus.IN_PROGRESS } });
+    await service.markArrivedAtStop('trip1', 's-kindia', 'driver1');
+
+    // Personne ne descend à Kindia : un seul signal, ceux qui montent sont prévenus tout de suite (étape « prise en charge » ouverte).
+    expect(prisma.tripStop.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 's-kindia' },
+        data: { arrivedAt: expect.any(Date), pickupArrivedAt: expect.any(Date) },
+      }),
+    );
+    expect(arrivals.announceArrival).toHaveBeenCalledTimes(1);
+    expect(arrivals.announceArrival).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip1' }),
+      { kind: 'STOP', stopId: 's-kindia', audience: 'BOTH' },
+      'Kindia',
+    );
+  });
+
+  it('markArrivedAtStop : si des clients descendent ici, seuls eux sont prévenus — la prise en charge attend « Je suis arrivé sur les lieux »', async () => {
+    const { service, prisma, arrivals } = build({ trip: { status: TripStatus.IN_PROGRESS } });
+    prisma.booking.count.mockResolvedValue(1); // un client descend à Kindia
+    await service.markArrivedAtStop('trip1', 's-kindia', 'driver1');
+
+    expect(prisma.tripStop.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 's-kindia' }, data: { arrivedAt: expect.any(Date) } }),
+    );
+    expect(arrivals.announceArrival).toHaveBeenCalledWith(
+      expect.anything(),
+      { kind: 'STOP', stopId: 's-kindia', audience: 'ALIGHTING' },
+      'Kindia',
+    );
+  });
+
+  it('markArrivedAtPickup : enregistre l\'arrivée au point de montée et prévient seulement ceux qui montent', async () => {
+    const reached = tripRow({
+      status: TripStatus.IN_PROGRESS,
+      stops: [stop('s-kindia', 1, 'kindia', 'Kindia', 35_000n, 2, { arrivedAt: new Date() })],
+    });
+    const { service, prisma, arrivals } = build({ trip: reached });
+    await service.markArrivedAtPickup('trip1', 's-kindia', 'driver1');
+
+    expect(prisma.tripStop.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 's-kindia' }, data: { pickupArrivedAt: expect.any(Date) } }),
+    );
+    expect(arrivals.announceArrival).toHaveBeenCalledWith(
+      expect.anything(),
+      { kind: 'STOP', stopId: 's-kindia', audience: 'BOARDING' },
+      'Kindia',
+    );
+  });
+
+  it('markArrivedAtPickup : sans effet répété, et refusée tant que l\'arrivée dans la ville n\'est pas signalée', async () => {
+    const twice = tripRow({
+      status: TripStatus.IN_PROGRESS,
+      stops: [stop('s-kindia', 1, 'kindia', 'Kindia', 35_000n, 2, { arrivedAt: new Date(), pickupArrivedAt: new Date() })],
+    });
+    const done = build({ trip: twice });
+    await done.service.markArrivedAtPickup('trip1', 's-kindia', 'driver1');
+    expect(done.arrivals.announceArrival).not.toHaveBeenCalled();
+
+    const early = build({ trip: { status: TripStatus.IN_PROGRESS } }); // Kindia pas encore signalée
+    await expect(early.service.markArrivedAtPickup('trip1', 's-kindia', 'driver1')).rejects.toThrow(/Kindia/);
+    expect(early.arrivals.announceArrival).not.toHaveBeenCalled();
+
+    const waiting = build({ trip: { status: TripStatus.PUBLISHED } });
+    await expect(waiting.service.markArrivedAtPickup('trip1', 's-kindia', 'driver1')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('markArrivedAtStop : un second signalement ne renvoie aucune notification ni aucun code', async () => {
     const already = tripRow({
       status: TripStatus.IN_PROGRESS,
       stops: [stop('s-kindia', 1, 'kindia', 'Kindia', 35_000n, 2, { arrivedAt: new Date() })],
     });
-    const { service, notifications } = build({ trip: already });
+    const { service, arrivals } = build({ trip: already });
     await service.markArrivedAtStop('trip1', 's-kindia', 'driver1');
-    expect(notifications.notify).not.toHaveBeenCalled();
+    expect(arrivals.announceArrival).not.toHaveBeenCalled();
   });
 
   it('markArrivedAtStop : seulement pendant un trajet en cours, et sur une étape de ce trajet', async () => {
@@ -464,6 +535,72 @@ describe('TripsService — cycle de vie avec embarquement à une étape', () => 
     await expect(service.markArrivedAtStop('trip1', 's-kindia', 'driver1')).rejects.toBeInstanceOf(BadRequestException);
     const running = build({ trip: { status: TripStatus.IN_PROGRESS } });
     await expect(running.service.markArrivedAtStop('trip1', 'autre', 'driver1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('markArrivedAtStop : les étapes se font dans l\'ordre — Mamou refusé tant que Kindia (où un client descend) n\'est pas signalée', async () => {
+    const { service, prisma, arrivals } = build({ trip: { status: TripStatus.IN_PROGRESS } });
+    prisma.booking.findMany.mockResolvedValue([{ boardingStopId: null, alightingStopId: 's-kindia' }]);
+    await expect(service.markArrivedAtStop('trip1', 's-mamou', 'driver1')).rejects.toThrow(/Kindia/);
+    expect(prisma.tripStop.update).not.toHaveBeenCalled();
+    expect(arrivals.announceArrival).not.toHaveBeenCalled();
+  });
+
+  it('markArrivedAtStop : une ville plus tôt sur la route où personne ne monte ni ne descend n\'est jamais exigée', async () => {
+    const { service, prisma, arrivals } = build({ trip: { status: TripStatus.IN_PROGRESS } });
+    prisma.booking.findMany.mockResolvedValue([{ boardingStopId: 's-mamou', alightingStopId: null }]);
+    await service.markArrivedAtStop('trip1', 's-mamou', 'driver1');
+    expect(arrivals.announceArrival).toHaveBeenCalledWith(
+      expect.anything(),
+      { kind: 'STOP', stopId: 's-mamou', audience: 'BOTH' },
+      'Mamou',
+    );
+  });
+
+  it('markArrived : refusé tant qu\'une ville où un client monte n\'a pas été signalée (un seul bouton à la fois côté appli)', async () => {
+    const { service, prisma, arrivals } = build({ trip: { status: TripStatus.IN_PROGRESS } });
+    prisma.booking.findMany.mockResolvedValue([{ boardingStopId: 's-mamou', alightingStopId: null }]);
+    await expect(service.markArrived('trip1', 'driver1')).rejects.toThrow(/Mamou/);
+    expect(prisma.trip.update).not.toHaveBeenCalled();
+    expect(arrivals.announceArrival).not.toHaveBeenCalled();
+  });
+
+  it('markArrived : possible quand toutes les villes avec des clients ont été signalées, et envoie les codes de dépose', async () => {
+    const reached = tripRow({
+      status: TripStatus.IN_PROGRESS,
+      stops: [
+        stop('s-kindia', 1, 'kindia', 'Kindia', 35_000n, 2, { arrivedAt: new Date() }),
+        stop('s-mamou', 2, 'mamou', 'Mamou', 65_000n, 4),
+      ],
+    });
+    const { service, prisma, arrivals } = build({ trip: reached });
+    // Mamou n'a personne : elle n'est pas exigée ; Kindia (avec un client) est déjà signalée.
+    prisma.booking.findMany.mockResolvedValue([{ boardingStopId: null, alightingStopId: 's-kindia' }]);
+    prisma.trip.update.mockResolvedValue({ id: 'trip1', status: TripStatus.ARRIVED });
+    await expect(service.markArrived('trip1', 'driver1')).resolves.toMatchObject({ status: TripStatus.ARRIVED });
+    expect(arrivals.announceArrival).toHaveBeenCalledWith(expect.anything(), { kind: 'DESTINATION' }, 'Labé');
+  });
+
+  it('markArrived : un trajet sans ville traversée peut signaler son arrivée sans requête supplémentaire', async () => {
+    const { service, prisma, arrivals } = build({ trip: { status: TripStatus.IN_PROGRESS, stops: [] } });
+    prisma.trip.update.mockResolvedValue({ id: 'trip1', status: TripStatus.ARRIVED });
+    await service.markArrived('trip1', 'driver1');
+    expect(prisma.booking.findMany).not.toHaveBeenCalled();
+    expect(arrivals.announceArrival).toHaveBeenCalledWith(expect.anything(), { kind: 'DESTINATION' }, 'Labé');
+  });
+
+  it('markDriverArrived : déclenche notifications et codes de prise en charge des clients du départ', async () => {
+    const { service, prisma, arrivals } = build({ trip: { status: TripStatus.PUBLISHED } });
+    prisma.booking.count.mockResolvedValue(1);
+    prisma.trip.update.mockResolvedValue({ id: 'trip1', status: TripStatus.DRIVER_ARRIVED });
+    await service.markDriverArrived('trip1', 'driver1');
+    expect(arrivals.announceArrival).toHaveBeenCalledWith(expect.anything(), { kind: 'ORIGIN' }, 'Conakry');
+  });
+
+  it('markDriverArrived : sans réservation, rien n\'est envoyé et le statut ne change pas', async () => {
+    const { service, prisma, arrivals } = build({ trip: { status: TripStatus.PUBLISHED } });
+    prisma.booking.count.mockResolvedValue(0);
+    await expect(service.markDriverArrived('trip1', 'driver1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(arrivals.announceArrival).not.toHaveBeenCalled();
   });
 });
 

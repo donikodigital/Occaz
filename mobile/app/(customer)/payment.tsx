@@ -1,5 +1,12 @@
 // mobile/app/(customer)/payment.tsx
 //
+// [09/10/2026] v5 — La confirmation de paiement passait par Alert.alert(), qui ne fait RIEN sur le web (react-native-web
+// n'implémente pas ce module, voir ConfirmDialog.tsx) : le paiement partait bien, mais aucun message ne s'affichait, et un second
+// appui sur « Payer » tombait sur « Ce paiement a déjà été effectué. ». La confirmation est désormais un écran à part entière,
+// dans la page (donc identique sur web, Android et iOS) : coche verte, montant payé, bouton « Continuer ». Si le serveur répond
+// que le paiement existe déjà (409), ou si la réservation est déjà payée à l'ouverture de la page, on affiche la même
+// confirmation au lieu d'une erreur rouge.
+//
 // [04/10/2026] v4 — Après un paiement réussi, on revient à la page de la réservation ou de l'envoi d'où l'on vient (retour dans la
 // pile) au lieu d'en ouvrir une seconde copie par-dessus : la pile ne s'allonge plus, et la croix « Fermer » de cette page (affichée
 // après une création) renvoie à l'accueil en une fois.
@@ -19,9 +26,9 @@
 // relation disponible côté API/type.
 
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconCheck, IconCreditCard, IconShieldLock } from '@tabler/icons-react-native';
+import { IconCheck, IconCircleCheck, IconCreditCard, IconShieldLock } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
 import { OceanButton, OceanCard, OceanEmpty, OceanHeroCard, OceanScreenHeader } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
@@ -45,6 +52,7 @@ export default function PaymentScreen() {
   const { bookingId, shipmentId } = useLocalSearchParams<{ bookingId?: string; shipmentId?: string }>();
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [justPaid, setJustPaid] = useState(false);
 
   const bookingQuery = useBooking(bookingId);
   const shipmentQuery = useShipment(shipmentId);
@@ -57,34 +65,69 @@ export default function PaymentScreen() {
   const currencyCode = bookingId ? currencyOf(bookingQuery.data) : shipmentQuery.data?.currency?.isoCode;
   const isLoadingAmount = bookingId ? bookingQuery.isLoading : shipmentQuery.isLoading;
 
+  // Réservation déjà payée (page rouverte, ou paiement fait depuis un autre écran) : même confirmation, pas de second paiement.
+  const bookingStatus = bookingQuery.data?.status;
+  const alreadyPaid =
+    Boolean(bookingId) && (bookingStatus === 'PAID' || bookingStatus === 'CONFIRMED' || bookingStatus === 'COMPLETED');
+  const paid = justPaid || alreadyPaid;
+
+  function goBackToItem() {
+    // La page de la réservation / de l'envoi est juste en dessous (le paiement s'ouvre depuis elle) : on y revient.
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace(bookingId ? `/(customer)/booking/${bookingId}` : `/(customer)/shipment/${shipmentId}`);
+  }
+
   function handlePay() {
-    if (!selectedProviderId) return;
+    if (!selectedProviderId || initiatePayment.isPending) return;
     setErrorMessage(undefined);
 
     initiatePayment.mutate(
       { bookingId, shipmentId, providerId: selectedProviderId },
       {
-        onSuccess: () => {
-          Alert.alert('Paiement confirmé', 'Votre paiement a bien été pris en compte.', [
-            {
-              text: 'OK',
-              onPress: () => {
-                // La page de la réservation / de l'envoi est juste en dessous (le paiement s'ouvre depuis elle) : on y revient.
-                if (router.canGoBack()) {
-                  router.back();
-                  return;
-                }
-                router.replace(
-                  bookingId ? `/(customer)/booking/${bookingId}` : `/(customer)/shipment/${shipmentId}`,
-                );
-              },
-            },
-          ]);
-        },
+        onSuccess: () => setJustPaid(true),
         onError: (error) => {
+          // 409 : le serveur a déjà capturé ce paiement (premier appui, ou double appui rapide) → c'est un succès, pas une erreur.
+          if (error instanceof ApiError && error.statusCode === 409) {
+            setJustPaid(true);
+            return;
+          }
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },
       },
+    );
+  }
+
+  if (paid) {
+    return (
+      <ScreenContainer scroll maxWidth="form">
+        <OceanScreenHeader title="Paiement" subtitle="Paiement effectué" onBack={goBackToItem} />
+
+        <OceanHeroCard style={styles.successHero}>
+          <View style={styles.successBadge}>
+            <IconCircleCheck size={40} color={OCEAN.onDark} />
+          </View>
+          <AppText variant="lg" weight="bold" color={OCEAN.onDark} align="center">
+            Paiement confirmé
+          </AppText>
+          <AppText variant="sm" color={OCEAN.sky} align="center">
+            Votre paiement a bien été pris en compte.
+          </AppText>
+          {totalAmount ? (
+            <AppText variant="display" weight="bold" color={OCEAN.onDark} align="center" style={styles.successAmount}>
+              {formatMoney(totalAmount, currencyCode)}
+            </AppText>
+          ) : null}
+        </OceanHeroCard>
+
+        <OceanButton
+          label={bookingId ? 'Voir ma réservation' : 'Voir mon envoi'}
+          onPress={goBackToItem}
+          style={styles.submit}
+        />
+      </ScreenContainer>
     );
   }
 
@@ -228,6 +271,25 @@ const styles = StyleSheet.create({
   },
   error: {
     marginBottom: spacing.sm,
+  },
+  successHero: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xl,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.successDeep,
+  },
+  successBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  successAmount: {
+    marginTop: spacing.sm,
   },
   submit: {
     marginBottom: spacing.lg,

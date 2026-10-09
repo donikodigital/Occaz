@@ -59,6 +59,9 @@ export const tripsApi = {
   /** Pendant le trajet : prévient les clients qui montent à cette étape. */
   markArrivedAtStop: (id: string, stopId: string) => api.post<TripStop>(`/trips/${id}/stops/${stopId}/arrived`),
 
+  /** « Je suis arrivé sur les lieux » : prévient les clients qui montent à cette étape et leur envoie leur code de prise en charge. */
+  markArrivedAtPickup: (id: string, stopId: string) => api.post<TripStop>(`/trips/${id}/stops/${stopId}/pickup-arrived`),
+
   updatePosition: (id: string, latitude: number, longitude: number) =>
     api.patch<TripPosition>(`/trips/${id}/position`, { latitude, longitude }),
 

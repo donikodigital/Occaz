@@ -163,6 +163,17 @@ export class TripsController {
     return this.tripsService.markArrivedAtStop(id, stopId, driverId);
   }
 
+  /** Le conducteur est arrivé au point où les clients montent à cette étape : prévient ces clients et leur envoie leur code. */
+  @Post(':id/stops/:stopId/pickup-arrived')
+  async markArrivedAtPickup(
+    @Param('id') id: string,
+    @Param('stopId') stopId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    return this.tripsService.markArrivedAtPickup(id, stopId, driverId);
+  }
+
   @Delete(':id/stops/:stopId')
   async removeStop(
     @Param('id') id: string,

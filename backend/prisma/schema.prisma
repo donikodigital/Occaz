@@ -838,7 +838,11 @@ model TripStop {
 
   // Le conducteur peut décocher une ville traversée où il ne prend personne.
   isBookable Boolean   @default(true)
-  arrivedAt  DateTime?
+  // Le conducteur est arrivé dans la ville de l'étape (les clients qui y descendent reçoivent leur code de dépose).
+  arrivedAt DateTime?
+  // Le conducteur est arrivé au point où les clients MONTENT à cette étape (leur code de prise en charge part à ce moment-là).
+  // Renseigné en même temps que arrivedAt quand personne ne descend ici ; sinon après les déposes, par « Je suis arrivé sur les lieux ».
+  pickupArrivedAt DateTime?
 
   bookingsBoarding  Booking[] @relation("BookingBoardingStop")
   bookingsAlighting Booking[] @relation("BookingAlightingStop")

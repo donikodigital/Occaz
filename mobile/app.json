@@ -66,7 +66,9 @@
         "expo-notifications",
         {
           "color": "#0B6BA8",
-          "sounds": ["./assets/sounds/message.wav"]
+          "sounds": [
+            "./assets/sounds/message.wav"
+          ]
         }
       ],
       [
@@ -82,7 +84,10 @@
     ],
     "extra": {
       "apiUrl": "https://api.transport-partage.example.com/api/v1",
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "442c452f-5eb3-4de1-bb7b-ff269181bc5e"
+      }
     },
     "runtimeVersion": {
       "policy": "appVersion"

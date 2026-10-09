@@ -4,7 +4,7 @@ import { TripsService } from './trips.service';
 import type { PrismaService } from '../prisma/prisma.service';
 
 /**
- * Seul `prisma` est réellement sollicité par getPosition — les 6 autres
+ * Seul `prisma` est réellement sollicité par getPosition — les autres
  * dépendances de TripsService sont de simples stubs vides, jamais
  * appelés par le chemin de code testé ici.
  */
@@ -15,7 +15,7 @@ function createService(trip: unknown, activeBooking: unknown = null) {
   } as unknown as PrismaService;
 
   const stub = {} as any;
-  return new TripsService(prisma, stub, stub, stub, stub, stub, stub, stub, stub);
+  return new TripsService(prisma, stub, stub, stub, stub, stub, stub, stub, stub, stub);
 }
 
 describe('TripsService.getPosition', () => {

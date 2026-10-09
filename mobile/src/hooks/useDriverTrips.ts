@@ -107,3 +107,7 @@ export function useRemoveTripStop(tripId: string) {
 export function useMarkArrivedAtStop(tripId: string) {
   return useStopMutation(tripId, (stopId: string) => tripsApi.markArrivedAtStop(tripId, stopId));
 }
+
+export function useMarkArrivedAtPickup(tripId: string) {
+  return useStopMutation(tripId, (stopId: string) => tripsApi.markArrivedAtPickup(tripId, stopId));
+}
