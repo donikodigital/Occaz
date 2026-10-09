@@ -1,4 +1,7 @@
 // mobile/app/(customer)/shipment-new.tsx
+// [09/10/2026] v7 — Parcours pas à pas : une seule étape à l'écran (Expéditeur, Destinataire, Colis, Période). « Continuer » (pied de page)
+// contrôle l'étape puis ouvre la suivante, « Retour » revient à la précédente. Le prix à payer, le code promo et le détail du prix
+// n'apparaissent qu'à la dernière étape, avec « Confirmer l'envoi ». Tous les champs et règles sont conservés.
 // [07/10/2026] v6.1 — Les titres d'étape (Expéditeur, Destinataire, Colis, Période) passent en bandeau « hero » : voir
 // FormAccordion.tsx. Seule modification ici : chaque étape reçoit `total` pour afficher « ÉTAPE n SUR 4 ».
 // [04/10/2026] v6 — Formulaire en étapes repliables : une seule étape ouverte à la fois, les autres tiennent sur une ligne avec un
@@ -35,7 +38,6 @@ import {
 } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
 import {
-  OceanButton,
   OceanCard,
   OceanChip,
   OceanScreenHeader,
@@ -48,7 +50,7 @@ import { ShipmentQuoteCard } from '@/components/screens/ShipmentQuoteCard';
 import { ShipmentWindowField, toShipmentWindow } from '@/components/screens/ShipmentWindowField';
 import { PromoCodeField } from '@/components/screens/PromoCodeField';
 import { LockedField } from '@/components/screens/LockedField';
-import { Disclosure, FormAccordionSection, StepProgress, animateNextLayout, type StepStatus } from '@/components/screens/FormAccordion';
+import { Disclosure, FormAccordionSection, WizardNav, WizardProgress, type StepStatus } from '@/components/screens/FormAccordion';
 import { useShipmentCategories } from '@/hooks/useShipmentCategories';
 import { useCreateShipment, useShipmentQuote } from '@/hooks/useShipments';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
@@ -172,10 +174,9 @@ export default function NewShipmentScreen() {
   const [isUrgent, setIsUrgent] = useState(false);
   const [promoCode, setPromoCode] = useState<string | undefined>();
   const [promoDiscount, setPromoDiscount] = useState<string | undefined>();
-  // Étape ouverte (une seule à la fois) et dernière erreur de validation, rattachée à son étape quand elle en a une.
-  const [openSection, setOpenSection] = useState<SectionKey | null>('sender');
+  // Étape affichée (une seule à la fois) et dernière erreur de validation, rattachée à son étape quand elle en a une.
+  const [stepIndex, setStepIndex] = useState(0);
   const [formError, setFormError] = useState<{ message: string; section?: SectionKey } | null>(null);
-  const userToggled = useRef(false);
 
   const { data: categories } = useShipmentCategories();
   const createShipment = useCreateShipment();
@@ -228,41 +229,68 @@ export default function NewShipmentScreen() {
   const parcelDone = categoryId !== null && weightOk;
   const windowDone = windowStart !== null && windowEnd !== null;
   const done: Record<SectionKey, boolean> = { sender: senderDone, recipient: recipientDone, parcel: parcelDone, window: windowDone };
-  const doneCount = SECTION_ORDER.filter((key) => done[key]).length;
   const visibleError = formError && (!formError.section || !done[formError.section]) ? formError : null;
   const statusOf = (key: SectionKey): StepStatus =>
     done[key] ? 'done' : visibleError?.section === key ? 'error' : 'todo';
 
-  // Dès que l'adresse de récupération est connue (adresse du profil chargée), on passe au destinataire — sauf si la personne
-  // a déjà ouvert ou fermé une étape elle-même.
-  useEffect(() => {
-    if (!userToggled.current && senderDone && openSection === 'sender') {
-      animateNextLayout();
-      setOpenSection('recipient');
-    }
-  }, [senderDone, openSection]);
+  const currentKey = SECTION_ORDER[stepIndex];
+  const isLastStep = stepIndex === SECTION_ORDER.length - 1;
 
-  function toggleSection(key: SectionKey) {
-    userToggled.current = true;
-    animateNextLayout();
-    setOpenSection((current) => (current === key ? null : key));
-  }
-
-  function goToNextSection(from: SectionKey) {
-    userToggled.current = true;
-    animateNextLayout();
-    const next = SECTION_ORDER[SECTION_ORDER.indexOf(from) + 1];
-    setOpenSection(next ?? null);
-  }
-
-  /** Erreur de validation : ouvre l'étape concernée pour que la personne voie tout de suite quoi corriger. */
+  /** Erreur de validation : ramène à l'étape concernée pour que la personne voie tout de suite quoi corriger. */
   function fail(section: SectionKey | undefined, message: string) {
-    if (section) {
-      userToggled.current = true;
-      animateNextLayout();
-      setOpenSection(section);
-    }
+    if (section) setStepIndex(SECTION_ORDER.indexOf(section));
     setFormError({ message, section });
+  }
+
+  /** Les contrôles d'une étape, dans l'ordre. Renvoie false (et affiche pourquoi) si elle n'est pas prête. */
+  function validateStep(key: SectionKey): boolean {
+    if (key === 'sender') {
+      if (senderName.length < 2) {
+        fail('sender', "Complétez votre profil (nom) avant d'envoyer un colis.");
+        return false;
+      }
+      if (!senderLocation) {
+        fail('sender', "Choisissez l'adresse de récupération.");
+        return false;
+      }
+    } else if (key === 'recipient') {
+      if (recipientName.trim().length < 2) {
+        fail('recipient', 'Renseignez le nom du destinataire.');
+        return false;
+      }
+      if (!isValidPhoneNumber(recipientPhone)) {
+        fail('recipient', 'Renseignez le téléphone du destinataire au format international, par exemple +224620000000.');
+        return false;
+      }
+      if (!recipientLocation) {
+        fail('recipient', "Choisissez l'adresse de livraison.");
+        return false;
+      }
+    } else if (key === 'parcel') {
+      if (!categoryId) {
+        fail('parcel', 'Choisissez une catégorie de colis.');
+        return false;
+      }
+      if (!weightOk) {
+        fail('parcel', 'Indiquez le poids du colis.');
+        return false;
+      }
+    } else if (!windowStart || !windowEnd) {
+      fail('window', 'Indiquez la période pendant laquelle le colis peut partir.');
+      return false;
+    }
+    return true;
+  }
+
+  function goNext() {
+    setFormError(null);
+    if (!validateStep(currentKey)) return;
+    setStepIndex((index) => Math.min(index + 1, SECTION_ORDER.length - 1));
+  }
+
+  function goBack() {
+    setFormError(null);
+    setStepIndex((index) => Math.max(index - 1, 0));
   }
 
   // --- Résumés des étapes repliées ------------------------------------------------------------------------------------------
@@ -286,6 +314,7 @@ export default function NewShipmentScreen() {
     window: windowStart && windowEnd ? formatWindow(toShipmentWindow(windowStart, windowEnd)) : 'Dates à choisir',
   };
 
+  const noop = () => undefined;
   const optionalDetails = [
     [lengthCm, widthCm, heightCm].every((value) => value.trim().length > 0) ? 'Dimensions' : null,
     declaredValue.trim() ? 'Valeur déclarée' : null,
@@ -314,39 +343,12 @@ export default function NewShipmentScreen() {
   function handleSubmit() {
     setFormError(null);
 
-    // Dans l'ordre des étapes : la première à corriger s'ouvre.
-    if (senderName.length < 2) {
-      fail('sender', "Complétez votre profil (nom) avant d'envoyer un colis.");
-      return;
+    // Dans l'ordre des étapes : la première à corriger s'affiche.
+    for (const key of SECTION_ORDER) {
+      if (!validateStep(key)) return;
     }
-    if (!senderLocation) {
-      fail('sender', "Choisissez l'adresse de récupération.");
-      return;
-    }
-    if (recipientName.trim().length < 2) {
-      fail('recipient', 'Renseignez le nom du destinataire.');
-      return;
-    }
-    if (!isValidPhoneNumber(recipientPhone)) {
-      fail('recipient', 'Renseignez le téléphone du destinataire au format international, par exemple +224620000000.');
-      return;
-    }
-    if (!recipientLocation) {
-      fail('recipient', "Choisissez l'adresse de livraison.");
-      return;
-    }
-    if (!categoryId) {
-      fail('parcel', 'Choisissez une catégorie de colis.');
-      return;
-    }
-    if (!weightOk) {
-      fail('parcel', 'Indiquez le poids du colis.');
-      return;
-    }
-    if (!windowStart || !windowEnd) {
-      fail('window', 'Indiquez la période pendant laquelle le colis peut partir.');
-      return;
-    }
+    // Garde pour TypeScript : les contrôles ci-dessus garantissent ces valeurs.
+    if (!categoryId || !senderLocation || !recipientLocation || !windowStart || !windowEnd) return;
 
     createShipment.mutate(
       {
@@ -376,30 +378,28 @@ export default function NewShipmentScreen() {
     );
   }
 
+  const errorLine = visibleError ? (
+    <View style={styles.footerError}>
+      <IconAlertCircle size={15} color={colors.danger} />
+      <AppText variant="xs" color="danger" style={styles.footerErrorText}>
+        {visibleError.message}
+      </AppText>
+    </View>
+  ) : null;
+
+  // Étapes 1 à 3 : seulement « Retour / Continuer ». Dernière étape : le prix à payer, puis « Confirmer l'envoi ».
   const footer = (
     <View style={styles.footer}>
-      {visibleError ? (
-        <View style={styles.footerError}>
-          <IconAlertCircle size={15} color={colors.danger} />
-          <AppText variant="xs" color="danger" style={styles.footerErrorText}>
-            {visibleError.message}
-          </AppText>
-        </View>
-      ) : null}
-      <View style={styles.footerRow}>
+      {errorLine}
+      {isLastStep ? (
         <View style={styles.footerPrice}>
           <AppText variant="xs" color="textSecondary">
             Prix à payer
           </AppText>
           {quotePayload === null ? (
-            <>
-              <AppText variant="lg" weight="bold" color="textMuted">
-                —
-              </AppText>
-              <AppText variant="xs" color="textMuted" numberOfLines={2}>
-                {missingForQuote.length > 0 ? `Il manque : ${missingForQuote.join(', ')}` : ''}
-              </AppText>
-            </>
+            <AppText variant="xs" color="textMuted" numberOfLines={2}>
+              {missingForQuote.length > 0 ? `Il manque : ${missingForQuote.join(', ')}` : '—'}
+            </AppText>
           ) : quoteError ? (
             <AppText variant="sm" color="danger" numberOfLines={2}>
               Prix indisponible pour le moment
@@ -424,236 +424,262 @@ export default function NewShipmentScreen() {
             </>
           )}
         </View>
-        <OceanButton
-          label="Confirmer l'envoi"
-          onPress={handleSubmit}
-          loading={createShipment.isPending}
-          style={styles.footerButton}
-        />
-      </View>
+      ) : null}
+      <WizardNav
+        onBack={stepIndex > 0 ? goBack : undefined}
+        onNext={isLastStep ? handleSubmit : goNext}
+        nextLabel={isLastStep ? "Confirmer l'envoi" : 'Continuer'}
+        loading={isLastStep && createShipment.isPending}
+      />
     </View>
   );
 
   return (
-    <ScreenContainer scroll maxWidth="detail" footer={footer}>
-      <OceanScreenHeader title="Envoyer un colis" subtitle="Complétez les étapes, une à la fois" onBack={() => router.back()} />
+    // Un nouveau conteneur à chaque étape : l'écran repart en haut.
+    <ScreenContainer key={`step-${stepIndex}`} scroll maxWidth="detail" footer={footer}>
+      <OceanScreenHeader
+        title="Envoyer un colis"
+        subtitle="Complétez les étapes, une à la fois"
+        onBack={() => (stepIndex > 0 ? goBack() : router.back())}
+      />
 
-      <StepProgress done={doneCount} total={SECTION_ORDER.length} />
+      <WizardProgress current={stepIndex} total={SECTION_ORDER.length} />
 
       {/* 1 — Expéditeur : l'adresse de récupération d'abord ; les informations du profil, repliées */}
-      <FormAccordionSection
-        step={1}
-        total={SECTION_ORDER.length}
-        icon={<IconUser size={15} color={OCEAN.base} />}
-        title="Expéditeur"
-        summary={summaries.sender}
-        status={statusOf('sender')}
-        expanded={openSection === 'sender'}
-        onToggle={() => toggleSection('sender')}
-      >
-        {!hasProfileAddress ? (
-          <AppText variant="xs" color="danger">
-            Ajoutez votre adresse et votre ville dans votre profil pour qu'elles soient proposées comme adresse de récupération.
-          </AppText>
-        ) : null}
-        <AddressCard
-          label="Adresse de récupération"
-          tag={senderLocation && senderLocation.id === profilePickup?.id ? 'adresse du profil' : undefined}
-          location={senderLocation}
-          onPress={() => openAddressPicker('sender')}
-        />
-        {isCustomPickup && profilePickup ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              setIsCustomPickup(false);
-              setSenderLocation(profilePickup);
-            }}
-            style={({ pressed }) => [styles.resetPickup, pressed && styles.pressed]}
-          >
-            <IconCheck size={14} color={OCEAN.base} />
-            <AppText variant="xs" weight="semibold" color={OCEAN.base}>
-              Utiliser l'adresse de mon profil
-            </AppText>
-          </Pressable>
-        ) : null}
-
-        <Disclosure
-          icon={<IconLock size={15} color={OCEAN.base} />}
-          label="Mes informations (profil)"
-          preview={[senderName || 'Nom non renseigné', senderPhone || null].filter(Boolean).join(' · ')}
+      {currentKey === 'sender' ? (
+        <FormAccordionSection
+          step={1}
+          total={SECTION_ORDER.length}
+          icon={<IconUser size={15} color={OCEAN.base} />}
+          title="Expéditeur"
+          summary={summaries.sender}
+          status={statusOf('sender')}
+          expanded
+          collapsible={false}
+          onToggle={noop}
         >
-          <LockedField label="Nom complet" value={senderName} placeholder="Nom non renseigné" />
-          <LockedField label="Téléphone" value={senderPhone} placeholder="Téléphone non renseigné" />
-          <LockedField
-            label="Adresse du profil"
-            value={profileAddress}
-            secondary={profilePlace || null}
-            placeholder="Adresse non renseignée"
-          />
-          <View style={styles.lockedNote}>
-            <IconLock size={14} color={OCEAN.base} />
-            <AppText variant="xs" color="textSecondary" style={styles.lockedNoteText}>
-              Ces informations sont celles de votre profil : elles ne se modifient que dans{' '}
-              <AppText
-                variant="xs"
-                weight="semibold"
-                color={OCEAN.base}
-                onPress={() => router.push('/(customer)/edit-profile')}
-                accessibilityRole="link"
-              >
-                mon profil
-              </AppText>
-              .
+          {!hasProfileAddress ? (
+            <AppText variant="xs" color="danger">
+              Ajoutez votre adresse et votre ville dans votre profil pour qu'elles soient proposées comme adresse de récupération.
             </AppText>
-          </View>
-        </Disclosure>
+          ) : null}
+          <AddressCard
+            label="Adresse de récupération"
+            tag={senderLocation && senderLocation.id === profilePickup?.id ? 'adresse du profil' : undefined}
+            location={senderLocation}
+            onPress={() => openAddressPicker('sender')}
+          />
+          {isCustomPickup && profilePickup ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setIsCustomPickup(false);
+                setSenderLocation(profilePickup);
+              }}
+              style={({ pressed }) => [styles.resetPickup, pressed && styles.pressed]}
+            >
+              <IconCheck size={14} color={OCEAN.base} />
+              <AppText variant="xs" weight="semibold" color={OCEAN.base}>
+                Utiliser l'adresse de mon profil
+              </AppText>
+            </Pressable>
+          ) : null}
 
-        <OceanButton label="Continuer" variant="soft" disabled={!senderDone} onPress={() => goToNextSection('sender')} />
-      </FormAccordionSection>
+          <Disclosure
+            icon={<IconLock size={15} color={OCEAN.base} />}
+            label="Mes informations (profil)"
+            preview={[senderName || 'Nom non renseigné', senderPhone || null].filter(Boolean).join(' · ')}
+          >
+            <LockedField label="Nom complet" value={senderName} placeholder="Nom non renseigné" />
+            <LockedField label="Téléphone" value={senderPhone} placeholder="Téléphone non renseigné" />
+            <LockedField
+              label="Adresse du profil"
+              value={profileAddress}
+              secondary={profilePlace || null}
+              placeholder="Adresse non renseignée"
+            />
+            <View style={styles.lockedNote}>
+              <IconLock size={14} color={OCEAN.base} />
+              <AppText variant="xs" color="textSecondary" style={styles.lockedNoteText}>
+                Ces informations sont celles de votre profil : elles ne se modifient que dans{' '}
+                <AppText
+                  variant="xs"
+                  weight="semibold"
+                  color={OCEAN.base}
+                  onPress={() => router.push('/(customer)/edit-profile')}
+                  accessibilityRole="link"
+                >
+                  mon profil
+                </AppText>
+                .
+              </AppText>
+            </View>
+          </Disclosure>
+        </FormAccordionSection>
+      ) : null}
 
       {/* 2 — Destinataire */}
-      <FormAccordionSection
-        step={2}
-        total={SECTION_ORDER.length}
-        icon={<IconUserCheck size={15} color={OCEAN.base} />}
-        title="Destinataire"
-        summary={summaries.recipient}
-        status={statusOf('recipient')}
-        expanded={openSection === 'recipient'}
-        onToggle={() => toggleSection('recipient')}
-      >
-        <TextField
-          label="Nom complet"
-          value={recipientName}
-          onChangeText={setRecipientName}
-          placeholder="Nom du destinataire"
-        />
-        <TextField
-          label="Téléphone"
-          value={recipientPhone}
-          onChangeText={(t) => setRecipientPhone(normalizePhoneInput(t))}
-          keyboardType="phone-pad"
-          placeholder="+224620000000"
-        />
-        <AddressCard label="Adresse de livraison" location={recipientLocation} onPress={() => openAddressPicker('recipient')} />
-        <OceanButton label="Continuer" variant="soft" disabled={!recipientDone} onPress={() => goToNextSection('recipient')} />
-      </FormAccordionSection>
+      {currentKey === 'recipient' ? (
+        <FormAccordionSection
+          step={2}
+          total={SECTION_ORDER.length}
+          icon={<IconUserCheck size={15} color={OCEAN.base} />}
+          title="Destinataire"
+          summary={summaries.recipient}
+          status={statusOf('recipient')}
+          expanded
+          collapsible={false}
+          onToggle={noop}
+        >
+          <TextField
+            label="Nom complet"
+            value={recipientName}
+            onChangeText={setRecipientName}
+            placeholder="Nom du destinataire"
+          />
+          <TextField
+            label="Téléphone"
+            value={recipientPhone}
+            onChangeText={(t) => setRecipientPhone(normalizePhoneInput(t))}
+            keyboardType="phone-pad"
+            placeholder="+224620000000"
+          />
+          <AddressCard label="Adresse de livraison" location={recipientLocation} onPress={() => openAddressPicker('recipient')} />
+        </FormAccordionSection>
+      ) : null}
 
       {/* 3 — Colis : l'essentiel d'abord ; dimensions, valeur et description, repliées */}
-      <FormAccordionSection
-        step={3}
-        total={SECTION_ORDER.length}
-        icon={<IconPackage size={15} color={OCEAN.base} />}
-        title="Colis"
-        summary={summaries.parcel}
-        status={statusOf('parcel')}
-        expanded={openSection === 'parcel'}
-        onToggle={() => toggleSection('parcel')}
-      >
-        <View style={styles.block}>
-          <AppText variant="sm" weight="medium" color="textSecondary">
-            Catégorie
-          </AppText>
-          <View style={styles.categoryRow}>
-            {(categories ?? []).map((category) => (
-              <OceanChip
-                key={category.id}
-                label={category.name}
-                active={category.id === categoryId}
-                onPress={() => setCategoryId(category.id)}
-              />
-            ))}
-          </View>
-        </View>
-
-        <TextField
-          label="Poids (kg)"
-          value={weightKg}
-          onChangeText={setWeightKg}
-          keyboardType="decimal-pad"
-          placeholder="Ex : 3"
-        />
-
-        <View style={styles.block}>
-          <AppText variant="sm" weight="medium" color="textSecondary">
-            Quantité
-          </AppText>
-          <OceanStepper value={quantity} onChange={setQuantity} min={1} max={20} label="quantité" />
-        </View>
-
-        <OceanSwitchRow
-          value={isUrgent}
-          onChange={setIsUrgent}
-          label="Envoi urgent"
-          description="Une majoration peut s’appliquer au prix — voir le devis."
-          icon={<IconAlertCircle size={18} color={OCEAN.base} />}
-        />
-
-        <Disclosure
-          icon={<IconAdjustmentsHorizontal size={15} color={OCEAN.base} />}
-          label="Plus de détails (optionnel)"
-          preview={optionalDetails.length > 0 ? optionalDetails.join(' · ') : 'Dimensions, valeur déclarée, description'}
+      {currentKey === 'parcel' ? (
+        <FormAccordionSection
+          step={3}
+          total={SECTION_ORDER.length}
+          icon={<IconPackage size={15} color={OCEAN.base} />}
+          title="Colis"
+          summary={summaries.parcel}
+          status={statusOf('parcel')}
+          expanded
+          collapsible={false}
+          onToggle={noop}
         >
           <View style={styles.block}>
             <AppText variant="sm" weight="medium" color="textSecondary">
-              Dimensions d'un colis, en cm (optionnel)
+              Catégorie
             </AppText>
-            <View style={styles.dimensionsRow}>
-              <View style={styles.dimensionCell}>
-                <TextField value={lengthCm} onChangeText={setLengthCm} keyboardType="decimal-pad" placeholder="Long." />
-              </View>
-              <View style={styles.dimensionCell}>
-                <TextField value={widthCm} onChangeText={setWidthCm} keyboardType="decimal-pad" placeholder="Larg." />
-              </View>
-              <View style={styles.dimensionCell}>
-                <TextField value={heightCm} onChangeText={setHeightCm} keyboardType="decimal-pad" placeholder="Haut." />
-              </View>
+            <View style={styles.categoryRow}>
+              {(categories ?? []).map((category) => (
+                <OceanChip
+                  key={category.id}
+                  label={category.name}
+                  active={category.id === categoryId}
+                  onPress={() => setCategoryId(category.id)}
+                />
+              ))}
             </View>
           </View>
 
           <TextField
-            label="Valeur déclarée (optionnel)"
-            value={declaredValue}
-            onChangeText={setDeclaredValue}
-            keyboardType="numeric"
-            placeholder="Montant en chiffres"
+            label="Poids (kg)"
+            value={weightKg}
+            onChangeText={setWeightKg}
+            keyboardType="decimal-pad"
+            placeholder="Ex : 3"
           />
 
-          <TextField
-            label="Description (optionnel)"
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Contenu du colis"
-            multiline
-            style={styles.multiline}
-          />
-        </Disclosure>
+          <View style={styles.block}>
+            <AppText variant="sm" weight="medium" color="textSecondary">
+              Quantité
+            </AppText>
+            <OceanStepper value={quantity} onChange={setQuantity} min={1} max={20} label="quantité" />
+          </View>
 
-        <OceanButton label="Continuer" variant="soft" disabled={!parcelDone} onPress={() => goToNextSection('parcel')} />
-      </FormAccordionSection>
+          <OceanSwitchRow
+            value={isUrgent}
+            onChange={setIsUrgent}
+            label="Envoi urgent"
+            description="Une majoration peut s’appliquer au prix — voir le devis."
+            icon={<IconAlertCircle size={18} color={OCEAN.base} />}
+          />
+
+          <Disclosure
+            icon={<IconAdjustmentsHorizontal size={15} color={OCEAN.base} />}
+            label="Plus de détails (optionnel)"
+            preview={optionalDetails.length > 0 ? optionalDetails.join(' · ') : 'Dimensions, valeur déclarée, description'}
+          >
+            <View style={styles.block}>
+              <AppText variant="sm" weight="medium" color="textSecondary">
+                Dimensions d'un colis, en cm (optionnel)
+              </AppText>
+              <View style={styles.dimensionsRow}>
+                <View style={styles.dimensionCell}>
+                  <TextField value={lengthCm} onChangeText={setLengthCm} keyboardType="decimal-pad" placeholder="Long." />
+                </View>
+                <View style={styles.dimensionCell}>
+                  <TextField value={widthCm} onChangeText={setWidthCm} keyboardType="decimal-pad" placeholder="Larg." />
+                </View>
+                <View style={styles.dimensionCell}>
+                  <TextField value={heightCm} onChangeText={setHeightCm} keyboardType="decimal-pad" placeholder="Haut." />
+                </View>
+              </View>
+            </View>
+
+            <TextField
+              label="Valeur déclarée (optionnel)"
+              value={declaredValue}
+              onChangeText={setDeclaredValue}
+              keyboardType="numeric"
+              placeholder="Montant en chiffres"
+            />
+
+            <TextField
+              label="Description (optionnel)"
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Contenu du colis"
+              multiline
+              style={styles.multiline}
+            />
+          </Disclosure>
+        </FormAccordionSection>
+      ) : null}
 
       {/* 4 — Période */}
-      <FormAccordionSection
-        step={4}
-        total={SECTION_ORDER.length}
-        icon={<IconCalendarEvent size={15} color={OCEAN.base} />}
-        title="Période"
-        summary={summaries.window}
-        status={statusOf('window')}
-        expanded={openSection === 'window'}
-        onToggle={() => toggleSection('window')}
-      >
-        <ShipmentWindowField
-          startDate={windowStart}
-          endDate={windowEnd}
-          onChangeStart={setWindowStart}
-          onChangeEnd={setWindowEnd}
-        />
-        <OceanButton label="Terminer" variant="soft" disabled={!windowDone} onPress={() => goToNextSection('window')} />
-      </FormAccordionSection>
+      {currentKey === 'window' ? (
+        <FormAccordionSection
+          step={4}
+          total={SECTION_ORDER.length}
+          icon={<IconCalendarEvent size={15} color={OCEAN.base} />}
+          title="Période"
+          summary={summaries.window}
+          status={statusOf('window')}
+          expanded
+          collapsible={false}
+          onToggle={noop}
+        >
+          <View style={styles.stepRecap}>
+            <AppText variant="xs" weight="bold" color={OCEAN.base} style={styles.stepRecapTitle}>
+              VOTRE ENVOI
+            </AppText>
+            <AppText variant="sm" weight="semibold" numberOfLines={2}>
+              {summaries.parcel}
+            </AppText>
+            <AppText variant="xs" color="textSecondary" numberOfLines={2}>
+              De {summaries.sender}
+            </AppText>
+            <AppText variant="xs" color="textSecondary" numberOfLines={2}>
+              Vers {summaries.recipient}
+            </AppText>
+          </View>
+          <ShipmentWindowField
+            startDate={windowStart}
+            endDate={windowEnd}
+            onChangeStart={setWindowStart}
+            onChangeEnd={setWindowEnd}
+          />
+        </FormAccordionSection>
+      ) : null}
 
       {/* Facultatif : le code promo et le détail du prix restent à portée de main, repliés */}
+      {isLastStep ? (
       <View style={styles.extras}>
         <Disclosure
           icon={<IconDiscount2 size={15} color={OCEAN.base} />}
@@ -681,6 +707,7 @@ export default function NewShipmentScreen() {
           <ShipmentQuoteCard payload={quotePayload} discountAmount={promoDiscount} />
         </Disclosure>
       </View>
+      ) : null}
     </ScreenContainer>
   );
 }
@@ -766,8 +793,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   footerPrice: {
-    flex: 1,
     gap: 1,
+  },
+  stepRecap: {
+    gap: 2,
+    padding: spacing.md,
+    borderRadius: 16,
+    backgroundColor: OCEAN.mist,
+  },
+  stepRecapTitle: {
+    letterSpacing: 0.8,
   },
   footerButton: {
     flex: 1.2,

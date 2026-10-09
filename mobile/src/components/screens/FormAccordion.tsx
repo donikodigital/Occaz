@@ -1,5 +1,8 @@
 // mobile/src/components/screens/FormAccordion.tsx
 //
+// [09/10/2026] v3 — Parcours pas à pas : FormAccordionSection accepte `collapsible={false}` (étape toujours ouverte, sans chevron),
+// WizardProgress (barre « étape en cours ») et WizardNav (pied de page « Retour / Continuer »). Les formulaires de création de trajet
+// et d'envoi n'affichent plus qu'UNE étape à la fois sur téléphone : « Continuer » valide l'étape puis ouvre la suivante.
 // [07/10/2026] v2 — Le titre de chaque étape devient un « hero » : bandeau bleu océan avec une grosse icône dans une tuile, la
 // pastille d'état (numéro / coche / alerte) en badge sur l'icône, « ÉTAPE 2 SUR 4 » au-dessus du titre et le résumé dessous. Replié,
 // le bandeau est clair ; ouvert, il passe au bleu profond aux reflets. Même bandeau (StepHero) pour la recherche de trajets, qui
@@ -21,6 +24,7 @@ import React, { useState } from 'react';
 import { LayoutAnimation, Platform, Pressable, StyleProp, StyleSheet, UIManager, View, ViewStyle } from 'react-native';
 import { IconAlertTriangle, IconCheck, IconChevronDown } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
+import { OceanButton } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 
@@ -138,6 +142,7 @@ export function FormAccordionSection({
   status,
   expanded,
   onToggle,
+  collapsible = true,
   children,
 }: {
   /** Numéro affiché dans le badge tant que l'étape n'est pas complète. */
@@ -151,8 +156,18 @@ export function FormAccordionSection({
   status: StepStatus;
   expanded: boolean;
   onToggle: () => void;
+  /** false : l'étape est toujours ouverte, sans chevron ni bascule (parcours pas à pas : un seul bloc à la fois). */
+  collapsible?: boolean;
   children: React.ReactNode;
 }) {
+  if (!collapsible) {
+    return (
+      <View style={[styles.card, styles.cardExpanded, status === 'error' && styles.cardError]}>
+        <StepHero tone="deep" step={step} total={total} icon={icon} title={title} summary={summary} status={status} />
+        <View style={styles.body}>{children}</View>
+      </View>
+    );
+  }
   return (
     <View style={[styles.card, status === 'error' && styles.cardError, expanded && styles.cardExpanded]}>
       <Pressable
@@ -283,7 +298,66 @@ export function StepProgress({ done, total }: { done: number; total: number }) {
   );
 }
 
+/**
+ * Barre du parcours pas à pas : un segment par étape, plein jusqu'à l'étape en cours. `current` part de 0.
+ */
+export function WizardProgress({ current, total }: { current: number; total: number }) {
+  const remaining = total - 1 - current;
+  return (
+    <View
+      style={styles.progress}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 1, max: total, now: current + 1 }}
+    >
+      <View style={styles.progressBars}>
+        {Array.from({ length: total }).map((_, index) => (
+          <View key={index} style={[styles.progressBar, index <= current && styles.progressBarDone]} />
+        ))}
+      </View>
+      <AppText variant="xs" weight="semibold" color="textSecondary">
+        {remaining <= 0 ? 'Dernière étape' : remaining === 1 ? 'Encore 1 étape après celle-ci' : `Encore ${remaining} étapes après celle-ci`}
+      </AppText>
+    </View>
+  );
+}
+
+/**
+ * Boutons du pied de page d'un parcours pas à pas : « Retour » (absent à la première étape) et « Continuer » — ou le libellé final
+ * à la dernière étape. Le bouton principal prend la place restante.
+ */
+export function WizardNav({
+  onBack,
+  onNext,
+  nextLabel = 'Continuer',
+  loading,
+  disabled,
+}: {
+  onBack?: () => void;
+  onNext: () => void;
+  nextLabel?: string;
+  loading?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <View style={styles.wizardNav}>
+      {onBack ? <OceanButton label="Retour" variant="outline" onPress={onBack} disabled={loading} style={styles.wizardBack} /> : null}
+      <OceanButton label={nextLabel} onPress={onNext} loading={loading} disabled={disabled} style={styles.wizardNext} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  wizardNav: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    width: '100%',
+  },
+  wizardBack: {
+    flex: 1,
+  },
+  wizardNext: {
+    flex: 2,
+  },
   pressed: {
     opacity: 0.8,
   },

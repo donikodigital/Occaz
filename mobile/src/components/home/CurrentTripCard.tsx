@@ -1,5 +1,8 @@
 // mobile/src/components/home/CurrentTripCard.tsx
+// mobile/src/components/home/CurrentTripCard.tsx
 //
+// [09/10/2026] v1.1 — une colonne peut porter une valeur sur plusieurs lignes (« Passagers » puis « Colis ») et une largeur relative (`flex`),
+// pour que « Passagers » ne soit plus coupé en plein mot.
 // [08/10/2026] v1 — Carte « Détails du trajet » de l'accueil, d'après la maquette : la carte de la route (ou, sans coordonnées ni jeton
 // Mapbox, un tracé départ → arrivée dessiné ici), le titre « Trajet partagé · Conakry à Kindia », quatre colonnes (Date, Places, Type,
 // Prix) et deux boutons. Présentationnelle : l'écran qui l'utilise calcule les valeurs.
@@ -16,7 +19,10 @@ const hasMapToken = Boolean(process.env.EXPO_PUBLIC_MAPBOX_TOKEN);
 
 export interface TripColumn {
   label: string;
+  /** Un retour à la ligne (\n) sépare deux lignes : « Passagers\nColis ». */
   value: string;
+  /** Largeur relative de la colonne (1 par défaut) : plus grande pour un mot long comme « Passagers ». */
+  flex?: number;
 }
 
 export interface TripCardAction {
@@ -104,7 +110,7 @@ export function CurrentTripCard({
 
           <View style={styles.columns}>
             {columns.map((column) => (
-              <View key={column.label} style={styles.column}>
+              <View key={column.label} style={[styles.column, column.flex !== undefined && { flex: column.flex }]}>
                 <AppText variant="xs" color="textMuted">
                   {column.label}
                 </AppText>

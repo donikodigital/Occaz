@@ -42,6 +42,7 @@ import { useLatestMessageAlert, useMarkNotificationRead, useMyNotifications } fr
 import { MessageAlertCard } from '@/components/screens/MessageAlertCard';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { currencyOf, formatMoney } from '@/utils/money';
+import { customerCodeVisibility } from '@/utils/bookingPhase';
 import { formatShipmentRoute } from '@/utils/shipmentDisplay';
 import { SHIPMENT_STATUS_LABELS } from '@/utils/tripStatusLabels';
 import { recentSearchesStorage, formatRecentSearch, type RecentSearch } from '@/services/storage/recentSearches';
@@ -56,6 +57,8 @@ const UPCOMING_TRIP_STATUSES = new Set([
   'DRIVER_ARRIVED',
   'PASSENGER_PICKED_UP',
   'IN_PROGRESS',
+  // Le conducteur est arrivé mais la dépose n'est pas validée : le trajet n'est PAS fini, le client doit encore donner son code.
+  'ARRIVED',
 ]);
 const ACTIVITY_COUNT = 5;
 
@@ -124,6 +127,14 @@ export default function CustomerHomeScreen() {
     .filter((booking) => (booking.status === 'PAID' || booking.status === 'CONFIRMED') && booking.trip && UPCOMING_TRIP_STATUSES.has(booking.trip.status))
     .sort((a, b) => new Date(a.trip!.departureAt).getTime() - new Date(b.trip!.departureAt).getTime());
   const current = currentBookings[0];
+  // Quel code le client doit-il donner maintenant ? Le bouton de la carte y mène directement (pas besoin de passer par « Trajets »).
+  const currentCodes = current?.trip ? customerCodeVisibility(current, current.trip.status) : { pickup: false, dropoff: false };
+  const currentPrimaryLabel = currentCodes.dropoff
+    ? 'Voir mon code de dépose'
+    : currentCodes.pickup
+      ? 'Voir mon code de prise en charge'
+      : 'Voir la réservation';
+  const currentStatusLabel = currentCodes.dropoff ? 'Arrivé' : current?.status === 'PAID' ? 'Payée' : 'Confirmée';
   // La liste ne contient pas les adresses ; le détail du trajet, si : c'est lui qui donne les coordonnées de la carte.
   const { data: currentTripDetail } = useTrip(current?.tripId);
   const currentTrip = current?.trip && currentTripDetail && currentTripDetail.id === current.tripId
@@ -293,10 +304,10 @@ export default function CustomerHomeScreen() {
                 columns={[
                   { label: 'Date', value: `${formatDateShort(currentTrip.departureAt)} · ${formatTime(currentTrip.departureAt)}` },
                   { label: 'Places', value: String(current.seatsCount) },
-                  { label: 'Statut', value: current.status === 'PAID' ? 'Payée' : 'Confirmée' },
+                  { label: 'Statut', value: currentStatusLabel },
                   { label: 'Prix', value: formatMoney(current.totalAmount, currencyOf(current)) },
                 ]}
-                primary={{ label: 'Voir la réservation', onPress: () => router.push(`/(customer)/booking/${current.id}`) }}
+                primary={{ label: currentPrimaryLabel, onPress: () => router.push(`/(customer)/booking/${current.id}`) }}
                 secondary={{
                   label: 'Contacter le chauffeur',
                   onPress: () => contactDriver(current.id),

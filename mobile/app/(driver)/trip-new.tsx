@@ -1,5 +1,8 @@
 // mobile/app/(driver)/trip-new.tsx
 //
+// [09/10/2026] v7 — Parcours pas à pas sur téléphone : une seule étape à l'écran, « Continuer » (pied de page) valide l'étape puis ouvre
+// la suivante, « Retour » revient à la précédente ; la dernière étape rappelle l'essentiel (itinéraire, date, véhicule) puis « Créer le
+// trajet ». Sur grand écran, les quatre étapes restent ouvertes en deux colonnes, comme avant.
 // [07/10/2026] v6.1 — Les titres d'étape (Itinéraire, Date et heure, Véhicule, Places et tarif) passent en bandeau « hero » : voir
 // FormAccordion.tsx. Seule modification ici : chaque étape reçoit `total` pour afficher « ÉTAPE n SUR 4 ».
 // [04/10/2026] v6 — Formulaire en 4 étapes repliables (Itinéraire, Date et heure, Véhicule, Places et tarif) : une seule étape
@@ -52,8 +55,7 @@ import {
 } from '@/components/ui';
 import type { RouteInfo, RouteMapPoint, TimeValue } from '@/components/ui';
 import { LocationAutocompleteField } from '@/components/screens/LocationAutocompleteField';
-import { Disclosure, FormAccordionSection, StepProgress, animateNextLayout, type StepStatus } from '@/components/screens/FormAccordion';
-import { OceanButton } from '@/components/ocean/OceanKit';
+import { Disclosure, FormAccordionSection, WizardNav, WizardProgress, type StepStatus } from '@/components/screens/FormAccordion';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useMyVehicles } from '@/hooks/useVehicles';
@@ -214,9 +216,9 @@ export default function NewTripScreen() {
   const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
-  // Étape ouverte (une seule à la fois sur téléphone), étape en erreur, et date/heure confirmées (la date par défaut est
-  // « demain 8 h » : le conducteur doit la regarder, pas la valider sans la voir).
-  const [openSection, setOpenSection] = useState<SectionKey | null>('route');
+  // Étape affichée (téléphone : une seule à la fois), étape en erreur, et date/heure confirmées (la date par défaut est
+  // « demain 8 h » : le conducteur doit la regarder, pas la valider sans la voir — « Continuer » la confirme).
+  const [stepIndex, setStepIndex] = useState(0);
   const [errorSection, setErrorSection] = useState<SectionKey | undefined>();
   const [dateConfirmed, setDateConfirmed] = useState(false);
 
@@ -336,62 +338,82 @@ export default function NewTripScreen() {
   const vehicleDone = vehicleId !== null;
   const priceDone = hasValidPrice && !overMax;
   const done: Record<SectionKey, boolean> = { route: routeDone, date: dateConfirmed, vehicle: vehicleDone, price: priceDone };
-  const doneCount = SECTION_ORDER.filter((key) => done[key]).length;
   const statusOf = (key: SectionKey): StepStatus =>
     done[key] ? 'done' : errorSection === key && errorMessage ? 'error' : 'todo';
 
-  function toggleSection(key: SectionKey) {
-    animateNextLayout();
-    setOpenSection((current) => (current === key ? null : key));
-  }
+  const currentKey = SECTION_ORDER[stepIndex];
+  const isLastStep = stepIndex === SECTION_ORDER.length - 1;
+  // Téléphone : seule l'étape en cours est affichée. Grand écran : toutes.
+  const showStep = (key: SectionKey) => isDesktop || currentKey === key;
 
-  function goToNextSection(from: SectionKey) {
-    animateNextLayout();
-    if (from === 'date') setDateConfirmed(true);
-    setOpenSection(SECTION_ORDER[SECTION_ORDER.indexOf(from) + 1] ?? null);
-  }
-
-  /** Erreur de validation : ouvre l'étape concernée pour que le conducteur voie tout de suite quoi corriger. */
+  /** Erreur de validation : ramène à l'étape concernée pour que le conducteur voie tout de suite quoi corriger. */
   function fail(section: SectionKey, message: string) {
-    animateNextLayout();
-    setOpenSection(section);
+    setStepIndex(SECTION_ORDER.indexOf(section));
     setErrorSection(section);
     setErrorMessage(message);
+  }
+
+  /** Les contrôles d'une étape, dans l'ordre. Renvoie false (et affiche pourquoi) si elle n'est pas prête. */
+  function validateStep(key: SectionKey): boolean {
+    if (key === 'route') {
+      if (!origin || !destination) {
+        fail('route', 'Renseignez le point de départ et la destination.');
+        return false;
+      }
+      if (!origin.cityId || !destination.cityId) {
+        fail('route', 'Les adresses doivent être rattachées à une ville.');
+        return false;
+      }
+      if (orderedStops.some((stop) => stop.cityId === origin.cityId || stop.cityId === destination.cityId)) {
+        fail('route', "Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
+        return false;
+      }
+    } else if (key === 'vehicle') {
+      if (!vehicleId) {
+        fail('vehicle', 'Choisissez un véhicule.');
+        return false;
+      }
+    } else if (key === 'price') {
+      if (priceLocked && lockedPrice === null) {
+        fail('price', "Le prix de ce trajet est calculé par Occa'Z à partir de la distance : choisissez des adresses localisées sur la carte.");
+        return false;
+      }
+      if (!hasValidPrice) {
+        fail('price', 'Indiquez le prix par place.');
+        return false;
+      }
+      if (overMax) {
+        fail('price', overMaxMessage);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function goNext() {
+    setErrorMessage(undefined);
+    setErrorSection(undefined);
+    if (!validateStep(currentKey)) return;
+    if (currentKey === 'date') setDateConfirmed(true);
+    setStepIndex((index) => Math.min(index + 1, SECTION_ORDER.length - 1));
+  }
+
+  function goBack() {
+    setErrorMessage(undefined);
+    setErrorSection(undefined);
+    setStepIndex((index) => Math.max(index - 1, 0));
   }
 
   function handleSubmit() {
     setErrorMessage(undefined);
     setErrorSection(undefined);
 
-    // Dans l'ordre des étapes : la première à corriger s'ouvre.
-    if (!origin || !destination) {
-      fail('route', 'Renseignez le point de départ et la destination.');
-      return;
+    // Dans l'ordre des étapes : la première à corriger s'affiche.
+    for (const key of SECTION_ORDER) {
+      if (!validateStep(key)) return;
     }
-    if (!origin.cityId || !destination.cityId) {
-      fail('route', 'Les adresses doivent être rattachées à une ville.');
-      return;
-    }
-    if (orderedStops.some((stop) => stop.cityId === origin.cityId || stop.cityId === destination.cityId)) {
-      fail('route', "Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
-      return;
-    }
-    if (!vehicleId) {
-      fail('vehicle', 'Choisissez un véhicule.');
-      return;
-    }
-    if (priceLocked && lockedPrice === null) {
-      fail('price', "Le prix de ce trajet est calculé par Occa'Z à partir de la distance : choisissez des adresses localisées sur la carte.");
-      return;
-    }
-    if (!hasValidPrice) {
-      fail('price', 'Indiquez le prix par place.');
-      return;
-    }
-    if (overMax) {
-      fail('price', overMaxMessage);
-      return;
-    }
+    // Garde pour TypeScript : les contrôles ci-dessus garantissent ces valeurs.
+    if (!origin || !destination || !origin.cityId || !destination.cityId || !vehicleId) return;
 
     createTrip.mutate(
       {
@@ -422,12 +444,7 @@ export default function NewTripScreen() {
     );
   }
 
-  // Sur grand écran, les deux colonnes restent visibles : toutes les étapes sont ouvertes. Sur téléphone, une seule à la fois.
-  const isOpen = (key: SectionKey) => isDesktop || openSection === key;
-  const toggle = (key: SectionKey) => (isDesktop ? undefined : toggleSection(key));
-  const nextButton = (key: SectionKey, label = 'Continuer', disabled = false) =>
-    isDesktop ? null : <OceanButton label={label} variant="soft" disabled={disabled} onPress={() => goToNextSection(key)} />;
-
+  const noop = () => undefined;
   const priceUnit = currency?.isoCode;
   const summaries: Record<SectionKey, string> = {
     route:
@@ -445,6 +462,8 @@ export default function NewTripScreen() {
 
   return (
     <ScreenContainer
+      // Une étape après l'autre : un nouveau conteneur remet l'écran en haut à chaque changement d'étape.
+      key={isDesktop ? 'desktop' : `step-${stepIndex}`}
       scroll
       maxWidth="content"
       footer={
@@ -454,15 +473,26 @@ export default function NewTripScreen() {
               {errorMessage}
             </AppText>
           ) : null}
-          {showRecap && selectedVehicle ? (
-            <View style={styles.recapCard}>
-              <AppText variant="xs" weight="semibold" color="textSecondary" style={styles.recapEyebrow}>
-                {selectedVehicle.brand} {selectedVehicle.model}
-                {routeInfo ? ` · ${routeInfo.distanceKm} km` : ''}
-              </AppText>
-            </View>
-          ) : null}
-          <Button label="Créer le trajet" onPress={handleSubmit} loading={createTrip.isPending} />
+          {isDesktop ? (
+            <>
+              {showRecap && selectedVehicle ? (
+                <View style={styles.recapCard}>
+                  <AppText variant="xs" weight="semibold" color="textSecondary" style={styles.recapEyebrow}>
+                    {selectedVehicle.brand} {selectedVehicle.model}
+                    {routeInfo ? ` · ${routeInfo.distanceKm} km` : ''}
+                  </AppText>
+                </View>
+              ) : null}
+              <Button label="Créer le trajet" onPress={handleSubmit} loading={createTrip.isPending} />
+            </>
+          ) : (
+            <WizardNav
+              onBack={stepIndex > 0 ? goBack : undefined}
+              onNext={isLastStep ? handleSubmit : goNext}
+              nextLabel={isLastStep ? 'Créer le trajet' : 'Continuer'}
+              loading={isLastStep && createTrip.isPending}
+            />
+          )}
         </View>
       }
     >
@@ -470,7 +500,7 @@ export default function NewTripScreen() {
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
           accessibilityLabel="Retour"
-          onPress={() => router.back()}
+          onPress={() => (!isDesktop && stepIndex > 0 ? goBack() : router.back())}
         />
         <AppText variant="lg" weight="semibold">
           Créer un trajet
@@ -489,387 +519,411 @@ export default function NewTripScreen() {
           />
         </View>
       ) : (
-        <StepProgress done={doneCount} total={SECTION_ORDER.length} />
+        <WizardProgress current={stepIndex} total={SECTION_ORDER.length} />
       )}
 
       <View style={[styles.layout, isDesktop && styles.layoutDesktop]}>
         <View style={[styles.column, isDesktop && styles.columnLeft]}>
           {/* 1 — Itinéraire : départ et arrivée d'abord ; les villes traversées, repliées */}
-          <FormAccordionSection
-            step={1}
-            total={SECTION_ORDER.length}
-            icon={<IconRoute size={15} color={colors.primary} />}
-            title="Itinéraire"
-            summary={summaries.route}
-            status={statusOf('route')}
-            expanded={isOpen('route')}
-            onToggle={() => toggle('route')}
-          >
-            {isDesktop ? (
-              <View style={styles.desktopItinerary}>
-                <View style={styles.itineraryRow}>
-                  <View style={styles.inlineFieldsColumn}>
-                    <LocationAutocompleteField
-                      basePath="/(driver)"
-                      fieldKey={ORIGIN_CITY_FIELD}
-                      label="Point de départ"
-                      value={origin}
-                      onChange={setOrigin}
-                      placeholder="Ex : Rond-point de Bambeto, Conakry"
-                    />
-                    <LocationAutocompleteField
-                      basePath="/(driver)"
-                      fieldKey={DESTINATION_CITY_FIELD}
-                      label="Point d'arrivée"
-                      value={destination}
-                      onChange={setDestination}
-                      placeholder="Ex : Rue 7x16, Labé"
-                    />
-                  </View>
-                  <View style={styles.inlineSwap}>
-                    <IconButton
-                      icon={<IconArrowsUpDown size={16} color={colors.textPrimary} />}
-                      accessibilityLabel="Inverser le départ et l'arrivée"
-                      onPress={handleSwapLocations}
-                      disabled={!origin || !destination}
-                    />
-                  </View>
-                </View>
-                <RouteMap
-                  origin={toRoutePoint(origin)}
-                  destination={toRoutePoint(destination)}
-                  onRouteInfo={setRouteInfo}
-                  height={260}
-                />
-              </View>
-            ) : (
-              <View style={styles.itineraryRow}>
-                <Card style={styles.locationsCard}>
-                  <Pressable onPress={() => openLocation('trip-origin', 'Point de départ')} style={styles.locationRow}>
-                    <View style={styles.originDot} />
-                    <LocationRowText location={origin} placeholder="Point de départ" />
-                  </Pressable>
-                  <Divider />
-                  <Pressable
-                    onPress={() => openLocation('trip-destination', 'Destination')}
-                    style={styles.locationRow}
-                  >
-                    <IconMapPin size={14} color={colors.accentDark} />
-                    <LocationRowText location={destination} placeholder="Destination" />
-                  </Pressable>
-                </Card>
-                <IconButton
-                  icon={<IconArrowsUpDown size={16} color={colors.textPrimary} />}
-                  accessibilityLabel="Inverser le départ et l'arrivée"
-                  onPress={handleSwapLocations}
-                  disabled={!origin || !destination}
-                />
-              </View>
-            )}
-
-            <Disclosure
-              icon={<IconMapPin size={15} color={OCEAN.base} />}
-              label="Villes traversées (facultatif)"
-              preview={
-                orderedStops.length > 0
-                  ? orderedStops.map((stop) => stop.city?.name ?? stop.label).join(' · ')
-                  : 'Ajoutez les villes où vous passez'
-              }
-              defaultExpanded={isDesktop}
+          {showStep('route') ? (
+            <FormAccordionSection
+              step={1}
+              total={SECTION_ORDER.length}
+              icon={<IconRoute size={15} color={colors.primary} />}
+              title="Itinéraire"
+              summary={summaries.route}
+              status={statusOf('route')}
+              expanded
+              collapsible={false}
+              onToggle={noop}
             >
-              <AppText variant="sm" color="textSecondary">
-                Les clients qui y habitent pourront trouver votre trajet et monter ou descendre chez eux. Les prix sont
-                calculés automatiquement ; vous pourrez les modifier avant de publier.
-              </AppText>
-              {orderedStops.map((stop, index) => (
-                <View key={stop.id} style={styles.stopRow}>
-                  <View style={styles.stopBadge}>
-                    <AppText variant="xs" weight="bold" color="primary">
-                      {index + 1}
-                    </AppText>
+              {isDesktop ? (
+                <View style={styles.desktopItinerary}>
+                  <View style={styles.itineraryRow}>
+                    <View style={styles.inlineFieldsColumn}>
+                      <LocationAutocompleteField
+                        basePath="/(driver)"
+                        fieldKey={ORIGIN_CITY_FIELD}
+                        label="Point de départ"
+                        value={origin}
+                        onChange={setOrigin}
+                        placeholder="Ex : Rond-point de Bambeto, Conakry"
+                      />
+                      <LocationAutocompleteField
+                        basePath="/(driver)"
+                        fieldKey={DESTINATION_CITY_FIELD}
+                        label="Point d'arrivée"
+                        value={destination}
+                        onChange={setDestination}
+                        placeholder="Ex : Rue 7x16, Labé"
+                      />
+                    </View>
+                    <View style={styles.inlineSwap}>
+                      <IconButton
+                        icon={<IconArrowsUpDown size={16} color={colors.textPrimary} />}
+                        accessibilityLabel="Inverser le départ et l'arrivée"
+                        onPress={handleSwapLocations}
+                        disabled={!origin || !destination}
+                      />
+                    </View>
                   </View>
-                  <View style={styles.stopLabel}>
-                    <AppText variant="sm" weight="semibold" numberOfLines={1}>
-                      {stop.label}
-                    </AppText>
-                    {formatCityCountry(stop) ? (
-                      <AppText variant="xs" color="textSecondary" numberOfLines={1}>
-                        {formatCityCountry(stop)}
-                      </AppText>
-                    ) : null}
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Retirer ${stop.label}`}
-                    onPress={() => handleRemoveStop(stop.id)}
-                    hitSlop={8}
-                  >
-                    <IconX size={18} color={colors.textSecondary} />
-                  </Pressable>
+                  <RouteMap
+                    origin={toRoutePoint(origin)}
+                    destination={toRoutePoint(destination)}
+                    onRouteInfo={setRouteInfo}
+                    height={260}
+                  />
                 </View>
-              ))}
-              <LocationAutocompleteField
-                key={stopFieldKey}
-                label=""
-                value={null}
-                onChange={handleAddStop}
-                placeholder="Ajouter une ville traversée (ex. Kindia)"
-              />
-            </Disclosure>
+              ) : (
+                <View style={styles.itineraryRow}>
+                  <Card style={styles.locationsCard}>
+                    <Pressable onPress={() => openLocation('trip-origin', 'Point de départ')} style={styles.locationRow}>
+                      <View style={styles.originDot} />
+                      <LocationRowText location={origin} placeholder="Point de départ" />
+                    </Pressable>
+                    <Divider />
+                    <Pressable
+                      onPress={() => openLocation('trip-destination', 'Destination')}
+                      style={styles.locationRow}
+                    >
+                      <IconMapPin size={14} color={colors.accentDark} />
+                      <LocationRowText location={destination} placeholder="Destination" />
+                    </Pressable>
+                  </Card>
+                  <IconButton
+                    icon={<IconArrowsUpDown size={16} color={colors.textPrimary} />}
+                    accessibilityLabel="Inverser le départ et l'arrivée"
+                    onPress={handleSwapLocations}
+                    disabled={!origin || !destination}
+                  />
+                </View>
+              )}
 
-            {nextButton('route', 'Continuer', !routeDone)}
-          </FormAccordionSection>
+              <Disclosure
+                icon={<IconMapPin size={15} color={OCEAN.base} />}
+                label="Villes traversées (facultatif)"
+                preview={
+                  orderedStops.length > 0
+                    ? orderedStops.map((stop) => stop.city?.name ?? stop.label).join(' · ')
+                    : 'Ajoutez les villes où vous passez'
+                }
+                defaultExpanded={isDesktop}
+              >
+                <AppText variant="sm" color="textSecondary">
+                  Les clients qui y habitent pourront trouver votre trajet et monter ou descendre chez eux. Les prix sont
+                  calculés automatiquement ; vous pourrez les modifier avant de publier.
+                </AppText>
+                {orderedStops.map((stop, index) => (
+                  <View key={stop.id} style={styles.stopRow}>
+                    <View style={styles.stopBadge}>
+                      <AppText variant="xs" weight="bold" color="primary">
+                        {index + 1}
+                      </AppText>
+                    </View>
+                    <View style={styles.stopLabel}>
+                      <AppText variant="sm" weight="semibold" numberOfLines={1}>
+                        {stop.label}
+                      </AppText>
+                      {formatCityCountry(stop) ? (
+                        <AppText variant="xs" color="textSecondary" numberOfLines={1}>
+                          {formatCityCountry(stop)}
+                        </AppText>
+                      ) : null}
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Retirer ${stop.label}`}
+                      onPress={() => handleRemoveStop(stop.id)}
+                      hitSlop={8}
+                    >
+                      <IconX size={18} color={colors.textSecondary} />
+                    </Pressable>
+                  </View>
+                ))}
+                <LocationAutocompleteField
+                  key={stopFieldKey}
+                  label=""
+                  value={null}
+                  onChange={handleAddStop}
+                  placeholder="Ajouter une ville traversée (ex. Kindia)"
+                />
+              </Disclosure>
+            </FormAccordionSection>
+          ) : null}
 
           {/* 2 — Date et heure */}
-          <FormAccordionSection
-            step={2}
-            total={SECTION_ORDER.length}
-            icon={<IconCalendarEvent size={15} color={colors.primary} />}
-            title="Date et heure"
-            summary={summaries.date}
-            status={statusOf('date')}
-            expanded={isOpen('date')}
-            onToggle={() => toggle('date')}
-          >
-            <View style={styles.dateTimeRow}>
-              <View style={styles.dateTimeColumn}>
-                <CalendarPicker
-                  label=""
-                  selectedDate={departureDate}
-                  onSelectDate={(date) => {
-                    if (date) {
-                      setDepartureDate(date);
+          {showStep('date') ? (
+            <FormAccordionSection
+              step={2}
+              total={SECTION_ORDER.length}
+              icon={<IconCalendarEvent size={15} color={colors.primary} />}
+              title="Date et heure"
+              summary={summaries.date}
+              status={statusOf('date')}
+              expanded
+              collapsible={false}
+              onToggle={noop}
+            >
+              <View style={styles.dateTimeRow}>
+                <View style={styles.dateTimeColumn}>
+                  <CalendarPicker
+                    label=""
+                    selectedDate={departureDate}
+                    onSelectDate={(date) => {
+                      if (date) {
+                        setDepartureDate(date);
+                        setDateConfirmed(true);
+                      }
+                    }}
+                  />
+                </View>
+                <View style={styles.dateTimeColumn}>
+                  <TimePicker
+                    label=""
+                    value={departureTime}
+                    onChange={(value) => {
+                      setDepartureTime(value);
                       setDateConfirmed(true);
-                    }
-                  }}
-                />
+                    }}
+                    startHour={5}
+                    endHour={23}
+                  />
+                </View>
               </View>
-              <View style={styles.dateTimeColumn}>
-                <TimePicker
-                  label=""
-                  value={departureTime}
-                  onChange={(value) => {
-                    setDepartureTime(value);
-                    setDateConfirmed(true);
-                  }}
-                  startHour={5}
-                  endHour={23}
-                />
-              </View>
-            </View>
-            {nextButton('date')}
-          </FormAccordionSection>
+            </FormAccordionSection>
+          ) : null}
         </View>
 
         <View style={[styles.column, isDesktop && styles.columnRight]}>
           {/* 3 — Véhicule */}
-          <FormAccordionSection
-            step={3}
-            total={SECTION_ORDER.length}
-            icon={<IconCar size={15} color={colors.primary} />}
-            title="Véhicule"
-            summary={summaries.vehicle}
-            status={statusOf('vehicle')}
-            expanded={isOpen('vehicle')}
-            onToggle={() => toggle('vehicle')}
-          >
-            {vehicles && vehicles.length > 0 ? (
-              <View style={styles.vehicleRow}>
-                {vehicles.map((vehicle) => {
-                  const isActive = vehicle.id === vehicleId;
-                  return (
-                    <HoverCard
-                      key={vehicle.id}
-                      onPress={() => setVehicleId(vehicle.id)}
-                      style={[styles.vehicleCard, isActive && styles.vehicleCardActive]}
-                    >
-                      <View style={styles.vehicleCardHeader}>
-                        <IconCar size={18} color={isActive ? colors.primary : colors.textSecondary} />
-                        {isActive ? <IconCheck size={16} color={colors.primary} /> : null}
-                      </View>
-                      <AppText variant="sm" weight="semibold" numberOfLines={1}>
-                        {vehicle.brand} {vehicle.model}
-                      </AppText>
-                      <AppText variant="xs" color="textMuted">
-                        {vehicle.plateNumber}
-                      </AppText>
-                    </HoverCard>
-                  );
-                })}
-              </View>
-            ) : (
-              <View style={styles.emptyVehicle}>
-                <AppText variant="sm" color="textSecondary" style={styles.emptyVehicleText}>
-                  Aucun véhicule enregistré.
-                </AppText>
-                <Button
-                  label="Ajouter un véhicule"
-                  variant="outline"
-                  fullWidth={false}
-                  onPress={() => router.push('/(driver)/vehicle-new')}
-                />
-              </View>
-            )}
-            {nextButton('vehicle', 'Continuer', !vehicleDone)}
-          </FormAccordionSection>
-
-          {/* 4 — Places et tarif : l'essentiel d'abord ; les notes, repliées */}
-          <FormAccordionSection
-            step={4}
-            total={SECTION_ORDER.length}
-            icon={<IconUsers size={15} color={colors.primary} />}
-            title="Places et tarif"
-            summary={summaries.price}
-            status={statusOf('price')}
-            expanded={isOpen('price')}
-            onToggle={() => toggle('price')}
-          >
-            <View style={styles.fields}>
-              <View style={styles.stepperBlock}>
-                <AppText variant="sm" weight="medium" color="textSecondary">
-                  Places proposées
-                </AppText>
-                <View style={styles.stepper}>
-                  <IconButton
-                    icon={<IconMinus size={16} color={colors.textPrimary} />}
-                    accessibilityLabel="Retirer une place"
-                    onPress={() => setTotalSeats((value) => Math.max(1, value - 1))}
-                  />
-                  <AppText variant="lg" weight="semibold" style={styles.stepperValue}>
-                    {totalSeats}
+          {showStep('vehicle') ? (
+            <FormAccordionSection
+              step={3}
+              total={SECTION_ORDER.length}
+              icon={<IconCar size={15} color={colors.primary} />}
+              title="Véhicule"
+              summary={summaries.vehicle}
+              status={statusOf('vehicle')}
+              expanded
+              collapsible={false}
+              onToggle={noop}
+            >
+              {vehicles && vehicles.length > 0 ? (
+                <View style={styles.vehicleRow}>
+                  {vehicles.map((vehicle) => {
+                    const isActive = vehicle.id === vehicleId;
+                    return (
+                      <HoverCard
+                        key={vehicle.id}
+                        onPress={() => setVehicleId(vehicle.id)}
+                        style={[styles.vehicleCard, isActive && styles.vehicleCardActive]}
+                      >
+                        <View style={styles.vehicleCardHeader}>
+                          <IconCar size={18} color={isActive ? colors.primary : colors.textSecondary} />
+                          {isActive ? <IconCheck size={16} color={colors.primary} /> : null}
+                        </View>
+                        <AppText variant="sm" weight="semibold" numberOfLines={1}>
+                          {vehicle.brand} {vehicle.model}
+                        </AppText>
+                        <AppText variant="xs" color="textMuted">
+                          {vehicle.plateNumber}
+                        </AppText>
+                      </HoverCard>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.emptyVehicle}>
+                  <AppText variant="sm" color="textSecondary" style={styles.emptyVehicleText}>
+                    Aucun véhicule enregistré.
                   </AppText>
-                  <IconButton
-                    icon={<IconPlus size={16} color={colors.textPrimary} />}
-                    accessibilityLabel="Ajouter une place"
-                    onPress={() => setTotalSeats((value) => Math.min(12, value + 1))}
+                  <Button
+                    label="Ajouter un véhicule"
+                    variant="outline"
+                    fullWidth={false}
+                    onPress={() => router.push('/(driver)/vehicle-new')}
                   />
                 </View>
-              </View>
+              )}
+            </FormAccordionSection>
+          ) : null}
 
-              <View>
-                <AppText variant="sm" weight="medium" color="textSecondary" style={styles.fieldLabel}>
-                  Prix par place
-                </AppText>
-
-                {priceLocked ? (
-                  // Automatique : le prix est fixé par Occa'Z, le conducteur le voit mais ne peut pas le changer.
-                  <View style={styles.lockedCard} accessibilityLabel="Prix fixé par Occa'Z">
-                    <IconLock size={18} color={colors.primary} />
-                    <View style={styles.lockedBody}>
-                      {lockedPrice !== null ? (
-                        <>
-                          <AppText variant="lg" weight="bold" color="primary">
-                            {formatMoney(lockedPrice, priceDisplayUnit)}
-                          </AppText>
-                          <AppText variant="xs" color="textSecondary">
-                            Prix par place fixé par Occa&apos;Z pour ce trajet. Vous n&apos;avez rien à saisir.
-                          </AppText>
-                        </>
-                      ) : guidance?.reason === 'NO_DISTANCE' ? (
-                        <AppText variant="sm" color="textSecondary">
-                          Le prix est calculé par Occa&apos;Z à partir de la distance. Choisissez des adresses localisées sur la carte.
-                        </AppText>
-                      ) : (
-                        <AppText variant="sm" color="textSecondary">
-                          Le prix de ce trajet sera fixé automatiquement par Occa&apos;Z une fois le départ et l&apos;arrivée choisis.
-                        </AppText>
-                      )}
-                    </View>
-                  </View>
-                ) : guidancePending && origin && destination ? (
-                  <AppText variant="xs" color="textMuted">
-                    Calcul du prix conseillé…
+          {/* 4 — Places et tarif : l'essentiel d'abord ; les notes, repliées */}
+          {showStep('price') ? (
+            <FormAccordionSection
+              step={4}
+              total={SECTION_ORDER.length}
+              icon={<IconUsers size={15} color={colors.primary} />}
+              title="Places et tarif"
+              summary={summaries.price}
+              status={statusOf('price')}
+              expanded
+              collapsible={false}
+              onToggle={noop}
+            >
+              {!isDesktop ? (
+                <View style={styles.stepRecap}>
+                  <AppText variant="xs" weight="bold" color={OCEAN.base} style={styles.stepRecapTitle}>
+                    VOTRE TRAJET
                   </AppText>
-                ) : (
-                  <>
-                    <View style={styles.priceRow}>
-                      <View style={{ flex: 1 }}>
-                        <TextField
-                          value={pricePerSeat}
-                          onChangeText={(value) => {
-                            setPriceTouched(true);
-                            setPricePerSeat(value);
-                          }}
-                          keyboardType="numeric"
-                          placeholder="Ex : 50000"
-                          error={overMax ? overMaxMessage : undefined}
-                        />
-                      </View>
-                      {/* Devise imposée par le pays de départ : un repère, pas un choix. */}
-                      {currency ? (
-                        <View style={styles.currencyBadge} accessibilityLabel={`Devise : ${currency.isoCode}`}>
-                          <AppText variant="sm" weight="semibold" color="primary">
-                            {currency.isoCode}
+                  <AppText variant="sm" weight="semibold" numberOfLines={2}>
+                    {summaries.route}
+                  </AppText>
+                  <AppText variant="xs" color="textSecondary">
+                    {summaries.date}
+                  </AppText>
+                  <AppText variant="xs" color="textSecondary" numberOfLines={1}>
+                    {summaries.vehicle}
+                  </AppText>
+                </View>
+              ) : null}
+              <View style={styles.fields}>
+                <View style={styles.stepperBlock}>
+                  <AppText variant="sm" weight="medium" color="textSecondary">
+                    Places proposées
+                  </AppText>
+                  <View style={styles.stepper}>
+                    <IconButton
+                      icon={<IconMinus size={16} color={colors.textPrimary} />}
+                      accessibilityLabel="Retirer une place"
+                      onPress={() => setTotalSeats((value) => Math.max(1, value - 1))}
+                    />
+                    <AppText variant="lg" weight="semibold" style={styles.stepperValue}>
+                      {totalSeats}
+                    </AppText>
+                    <IconButton
+                      icon={<IconPlus size={16} color={colors.textPrimary} />}
+                      accessibilityLabel="Ajouter une place"
+                      onPress={() => setTotalSeats((value) => Math.min(12, value + 1))}
+                    />
+                  </View>
+                </View>
+
+                <View>
+                  <AppText variant="sm" weight="medium" color="textSecondary" style={styles.fieldLabel}>
+                    Prix par place
+                  </AppText>
+
+                  {priceLocked ? (
+                    // Automatique : le prix est fixé par Occa'Z, le conducteur le voit mais ne peut pas le changer.
+                    <View style={styles.lockedCard} accessibilityLabel="Prix fixé par Occa'Z">
+                      <IconLock size={18} color={colors.primary} />
+                      <View style={styles.lockedBody}>
+                        {lockedPrice !== null ? (
+                          <>
+                            <AppText variant="lg" weight="bold" color="primary">
+                              {formatMoney(lockedPrice, priceDisplayUnit)}
+                            </AppText>
+                            <AppText variant="xs" color="textSecondary">
+                              Prix par place fixé par Occa&apos;Z pour ce trajet. Vous n&apos;avez rien à saisir.
+                            </AppText>
+                          </>
+                        ) : guidance?.reason === 'NO_DISTANCE' ? (
+                          <AppText variant="sm" color="textSecondary">
+                            Le prix est calculé par Occa&apos;Z à partir de la distance. Choisissez des adresses localisées sur la carte.
                           </AppText>
+                        ) : (
+                          <AppText variant="sm" color="textSecondary">
+                            Le prix de ce trajet sera fixé automatiquement par Occa&apos;Z une fois le départ et l&apos;arrivée choisis.
+                          </AppText>
+                        )}
+                      </View>
+                    </View>
+                  ) : guidancePending && origin && destination ? (
+                    <AppText variant="xs" color="textMuted">
+                      Calcul du prix conseillé…
+                    </AppText>
+                  ) : (
+                    <>
+                      <View style={styles.priceRow}>
+                        <View style={{ flex: 1 }}>
+                          <TextField
+                            value={pricePerSeat}
+                            onChangeText={(value) => {
+                              setPriceTouched(true);
+                              setPricePerSeat(value);
+                            }}
+                            keyboardType="numeric"
+                            placeholder="Ex : 50000"
+                            error={overMax ? overMaxMessage : undefined}
+                          />
+                        </View>
+                        {/* Devise imposée par le pays de départ : un repère, pas un choix. */}
+                        {currency ? (
+                          <View style={styles.currencyBadge} accessibilityLabel={`Devise : ${currency.isoCode}`}>
+                            <AppText variant="sm" weight="semibold" color="primary">
+                              {currency.isoCode}
+                            </AppText>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      {pricingMode === 'SEMI_AUTO' && suggestedPrice !== null ? (
+                        <View style={styles.guidanceCard}>
+                          <AppText variant="sm" weight="semibold" color="primary">
+                            Prix conseillé : {formatMoney(suggestedPrice, priceDisplayUnit)}
+                          </AppText>
+                          {minPrice !== null && maxPrice !== null ? (
+                            <AppText variant="xs" color="textSecondary">
+                              Fourchette habituelle : de {formatMoney(minPrice, '')} à {formatMoney(maxPrice, priceDisplayUnit)}. Au-delà du
+                              maximum, le prix est refusé.
+                            </AppText>
+                          ) : null}
+                          {hasValidPrice && priceNumber !== suggestedPrice ? (
+                            <Pressable
+                              onPress={() => {
+                                setPriceTouched(false);
+                                setPricePerSeat(String(suggestedPrice));
+                              }}
+                              accessibilityRole="button"
+                            >
+                              <AppText variant="xs" weight="semibold" color="primary">
+                                Utiliser le prix conseillé
+                              </AppText>
+                            </Pressable>
+                          ) : null}
                         </View>
                       ) : null}
-                    </View>
 
-                    {pricingMode === 'SEMI_AUTO' && suggestedPrice !== null ? (
-                      <View style={styles.guidanceCard}>
-                        <AppText variant="sm" weight="semibold" color="primary">
-                          Prix conseillé : {formatMoney(suggestedPrice, priceDisplayUnit)}
-                        </AppText>
-                        {minPrice !== null && maxPrice !== null ? (
-                          <AppText variant="xs" color="textSecondary">
-                            Fourchette habituelle : de {formatMoney(minPrice, '')} à {formatMoney(maxPrice, priceDisplayUnit)}. Au-delà du
-                            maximum, le prix est refusé.
-                          </AppText>
-                        ) : null}
-                        {hasValidPrice && priceNumber !== suggestedPrice ? (
-                          <Pressable
-                            onPress={() => {
-                              setPriceTouched(false);
-                              setPricePerSeat(String(suggestedPrice));
-                            }}
-                            accessibilityRole="button"
-                          >
-                            <AppText variant="xs" weight="semibold" color="primary">
-                              Utiliser le prix conseillé
-                            </AppText>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    ) : null}
+                      <AppText variant="xs" color="textMuted" style={styles.currencyHint}>
+                        {currency
+                          ? `Devise du pays de départ${originCountry ? ` (${originCountry.name})` : ''}.`
+                          : 'La devise est celle du pays de départ : choisissez d’abord le départ.'}
+                      </AppText>
+                    </>
+                  )}
+                </View>
 
-                    <AppText variant="xs" color="textMuted" style={styles.currencyHint}>
-                      {currency
-                        ? `Devise du pays de départ${originCountry ? ` (${originCountry.name})` : ''}.`
-                        : 'La devise est celle du pays de départ : choisissez d’abord le départ.'}
-                    </AppText>
-                  </>
-                )}
+                <Pressable onPress={() => setAllowsShipments((value) => !value)} style={styles.switchRow}>
+                  <IconPackage size={16} color={colors.textSecondary} />
+                  <AppText variant="sm" style={styles.switchLabel}>
+                    Accepter les colis sur ce trajet
+                  </AppText>
+                  <Switch
+                    value={allowsShipments}
+                    onValueChange={setAllowsShipments}
+                    trackColor={{ true: colors.success, false: colors.border }}
+                    thumbColor={colors.surface}
+                  />
+                </Pressable>
+
+                <Disclosure
+                  icon={<IconPackage size={15} color={OCEAN.base} />}
+                  label="Notes pour les passagers (optionnel)"
+                  preview={notes.trim() ? notes.trim() : 'Informations complémentaires'}
+                  defaultExpanded={isDesktop}
+                >
+                  <TextField
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="Informations complémentaires pour les passagers"
+                    multiline
+                    style={styles.notesField}
+                  />
+                </Disclosure>
               </View>
-
-              <Pressable onPress={() => setAllowsShipments((value) => !value)} style={styles.switchRow}>
-                <IconPackage size={16} color={colors.textSecondary} />
-                <AppText variant="sm" style={styles.switchLabel}>
-                  Accepter les colis sur ce trajet
-                </AppText>
-                <Switch
-                  value={allowsShipments}
-                  onValueChange={setAllowsShipments}
-                  trackColor={{ true: colors.success, false: colors.border }}
-                  thumbColor={colors.surface}
-                />
-              </Pressable>
-
-              <Disclosure
-                icon={<IconPackage size={15} color={OCEAN.base} />}
-                label="Notes pour les passagers (optionnel)"
-                preview={notes.trim() ? notes.trim() : 'Informations complémentaires'}
-                defaultExpanded={isDesktop}
-              >
-                <TextField
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Informations complémentaires pour les passagers"
-                  multiline
-                  style={styles.notesField}
-                />
-              </Disclosure>
-            </View>
-          </FormAccordionSection>
+            </FormAccordionSection>
+          ) : null}
         </View>
       </View>
     </ScreenContainer>
@@ -877,6 +931,15 @@ export default function NewTripScreen() {
 }
 
 const styles = StyleSheet.create({
+  stepRecap: {
+    gap: 2,
+    padding: spacing.md,
+    borderRadius: 16,
+    backgroundColor: OCEAN.mist,
+  },
+  stepRecapTitle: {
+    letterSpacing: 0.8,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

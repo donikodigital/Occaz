@@ -74,7 +74,10 @@ import { formatShipmentRoute } from '@/utils/shipmentDisplay';
 import { SHIPMENT_STATUS_LABELS } from '@/utils/tripStatusLabels';
 import type { AppNotification } from '@/types/notifications.types';
 
-const UPCOMING_STATUSES = new Set(['PUBLISHED', 'DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS']);
+// Un trajet reste « en cours » jusqu'à sa clôture (COMPLETED) : ARRIVED = arrivé à destination mais dépose(s) pas encore validée(s).
+const UPCOMING_STATUSES = new Set(['PUBLISHED', 'BOOKING_PENDING', 'CONFIRMED', 'DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS', 'ARRIVED']);
+// Le trajet réellement entamé passe avant un trajet simplement programmé, même plus tôt dans la liste.
+const RUNNING_STATUSES = new Set(['DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS', 'ARRIVED']);
 const ACTIVITY_COUNT = 5;
 
 export default function DriverHomeScreen() {
@@ -93,10 +96,11 @@ export default function DriverHomeScreen() {
   const pendingInvitations = invitations ?? [];
   const markNotificationRead = useMarkNotificationRead();
 
-  // La liste arrive du plus lointain au plus proche : on trie pour que « en cours » soit le prochain départ.
-  const upcomingTrips = (tripsPage?.data.filter((trip) => UPCOMING_STATUSES.has(trip.status)) ?? []).sort(
-    (a, b) => new Date(a.departureAt).getTime() - new Date(b.departureAt).getTime(),
-  );
+  // La liste arrive du plus lointain au plus proche : on trie pour que « en cours » soit le trajet entamé, sinon le prochain départ.
+  const upcomingTrips = (tripsPage?.data.filter((trip) => UPCOMING_STATUSES.has(trip.status)) ?? []).sort((a, b) => {
+    const running = Number(RUNNING_STATUSES.has(b.status)) - Number(RUNNING_STATUSES.has(a.status));
+    return running !== 0 ? running : new Date(a.departureAt).getTime() - new Date(b.departureAt).getTime();
+  });
   const nextTripSummary = upcomingTrips[0];
   // La liste ne contient pas les adresses ; le détail, si : c'est lui qui donne les coordonnées de la carte.
   const { data: nextTripDetail } = useTrip(nextTripSummary?.id);
@@ -272,13 +276,14 @@ export default function DriverHomeScreen() {
                 origin={routePoint(nextTrip.originLocation, nextTrip.originCity)}
                 destination={routePoint(nextTrip.destinationLocation, nextTrip.destinationCity)}
                 columns={[
-                  { label: 'Date', value: `${formatDateShort(nextTrip.departureAt)} · ${formatTime(nextTrip.departureAt)}` },
-                  { label: 'Places libres', value: `${nextTrip.availableSeats}/${nextTrip.totalSeats}` },
-                  { label: 'Type', value: nextTrip.allowsShipments ? 'Passagers + colis' : 'Passagers' },
-                  { label: 'Prix', value: formatMoney(nextTrip.pricePerSeat, nextTrip.currency?.isoCode ?? walletCurrency) },
+                  { label: 'Date', value: `${formatDateShort(nextTrip.departureAt)} · ${formatTime(nextTrip.departureAt)}`, flex: 1.1 },
+                  { label: 'Places libres', value: `${nextTrip.availableSeats}/${nextTrip.totalSeats}`, flex: 0.8 },
+                  // « Passagers » sur la première ligne, « Colis » sur la deuxième : jamais coupé.
+                  { label: 'Type', value: nextTrip.allowsShipments ? 'Passagers\nColis' : 'Passagers', flex: 1.25 },
+                  { label: 'Prix', value: formatMoney(nextTrip.pricePerSeat, nextTrip.currency?.isoCode ?? walletCurrency), flex: 1.1 },
                 ]}
-                primary={{ label: 'Gérer le trajet', onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
-                secondary={{ label: 'Voir les passagers', onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
+                primary={{ label: nextTrip.status === 'ARRIVED' ? 'Valider la dépose' : 'Gérer le trajet', onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
+                secondary={{ label: nextTrip.status === 'ARRIVED' ? 'Voir les passagers à déposer' : 'Voir les passagers', onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
                 onPress={() => router.push(`/(driver)/trip/${nextTrip.id}`)}
               />
             ) : (

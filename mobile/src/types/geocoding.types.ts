@@ -18,3 +18,4 @@ export interface City {
   latitude?: number | null;
   longitude?: number | null;
 }
+
