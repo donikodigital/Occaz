@@ -30,6 +30,8 @@ const DEFAULT_ROLES: { key: string; name: string; permissionKeys: string[] }[] =
       PERMISSIONS.PAYMENT_READ,
       PERMISSIONS.DISPUTE_READ,
       PERMISSIONS.CONVERSATION_READ,
+      PERMISSIONS.USER_REPORT_READ,
+      PERMISSIONS.SOS_READ,
     ],
   },
   {
@@ -51,6 +53,10 @@ const DEFAULT_ROLES: { key: string; name: string; permissionKeys: string[] }[] =
       PERMISSIONS.DISPUTE_RESOLVE,
       PERMISSIONS.DISPUTE_ASSIGN,
       PERMISSIONS.CONVERSATION_READ,
+      PERMISSIONS.USER_REPORT_READ,
+      PERMISSIONS.USER_REPORT_MANAGE,
+      PERMISSIONS.SOS_READ,
+      PERMISSIONS.SOS_MANAGE,
     ],
   },
   {

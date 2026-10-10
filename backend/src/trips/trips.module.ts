@@ -1,4 +1,5 @@
 // backend/src/trips/trips.module.ts
+// [11/10/2026] v6 — TripReminderService (rappels de départ), UserSafetyModule (blocages).
 // [09/10/2026] v5 — TripArrivalService (notifications et codes envoyés à chaque arrivée du conducteur).
 // [23/09/2026] v4 — TripExpiryService (trajets publiés sans réservation, dont le départ est dépassé).
 // [23/09/2026] v3 — PromoCodesModule (code promo à la création d'une réservation).
@@ -12,6 +13,7 @@ import { BookingExpiryService } from './booking-expiry.service';
 import { TripExpiryService } from './trip-expiry.service';
 import { TripOtpService } from './trip-otp.service';
 import { TripArrivalService } from './trip-arrival.service';
+import { TripReminderService } from './trip-reminder.service';
 import { VehiclesModule } from '../vehicles/vehicles.module';
 import { LocationsModule } from '../locations/locations.module';
 import { DriverProfilesModule } from '../profiles/driver-profiles/driver-profiles.module';
@@ -22,6 +24,7 @@ import { WalletsModule } from '../wallets/wallets.module';
 import { PromoCodesModule } from '../promo-codes/promo-codes.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TripPricingModule } from '../trip-pricing/trip-pricing.module';
+import { UserSafetyModule } from '../user-safety/user-safety.module';
 
 /**
  * Trip, Booking et TripOtp partagent un seul module : Booking ne peut pas
@@ -41,9 +44,10 @@ import { TripPricingModule } from '../trip-pricing/trip-pricing.module';
     PromoCodesModule,
     NotificationsModule,
     TripPricingModule,
+    UserSafetyModule,
   ],
   controllers: [TripsController, BookingsController],
-  providers: [TripsService, BookingsService, TripOtpService, TripArrivalService, BookingExpiryService, TripExpiryService],
+  providers: [TripsService, BookingsService, TripOtpService, TripArrivalService, BookingExpiryService, TripExpiryService, TripReminderService],
   exports: [TripsService, BookingsService, TripOtpService],
 })
 export class TripsModule {}

@@ -58,6 +58,8 @@ import { ContactRow } from '@/components/screens/ContactRow';
 import { OtpCodeCard } from '@/components/screens/OtpCodeCard';
 import { OceanButton, OceanHeroCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
 import { PdfDownloadButton } from '@/components/screens/PdfDownloadButton';
+import { SosButton } from '@/components/safety/SosButton';
+import { ReportUserLink } from '@/components/safety/ReportUserLink';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import {
@@ -290,6 +292,8 @@ export default function BookingDetailScreen() {
 
       {trip ? <DriverPositionCard tripId={trip.id} isActive={trip.status === 'IN_PROGRESS'} /> : null}
 
+      {journeyMode && !arrived ? <SosButton tripId={booking.tripId} bookingId={booking.id} /> : null}
+
       {showPickupCode ? <PickupCodeCard bookingId={booking.id} /> : null}
 
       {showDropoffCode ? <DropoffCodeCard bookingId={booking.id} /> : null}
@@ -319,6 +323,13 @@ export default function BookingDetailScreen() {
             {booking.driverPhone ? (
               <ContactRow phone={booking.driverPhone} style={styles.contactRow} />
             ) : null}
+            <ReportUserLink
+              space="customer"
+              target={{ driverId: trip.driver.id }}
+              name={`${trip.driver.firstName} ${trip.driver.lastName[0] ?? ''}.`}
+              tripId={trip.id}
+              bookingId={booking.id}
+            />
           </View>
         </OceanSection>
       ) : null}

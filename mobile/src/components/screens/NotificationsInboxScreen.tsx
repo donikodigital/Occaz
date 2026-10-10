@@ -65,6 +65,7 @@ const TYPE_ICON: Record<NotificationType, React.ComponentType<{ size?: number; c
   SHIPMENT_EXTENSION: IconRefresh,
   SHIPMENT_INVITATION: IconPackage,
   CONVERSATION_MESSAGE: IconMessageCircle,
+  SAFETY: IconAlertTriangle,
 };
 
 type Tone = 'ocean' | 'gold' | 'danger' | 'success';
@@ -77,6 +78,7 @@ function toneFor(type: NotificationType): Tone {
     case 'REFUND':
       return 'gold';
     case 'DISPUTE':
+    case 'SAFETY':
       return 'danger';
     case 'DELIVERY':
       return 'success';

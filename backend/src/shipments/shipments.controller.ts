@@ -28,6 +28,7 @@ import { ShipmentInvitationsService } from './shipment-invitations.service';
 import { SearchShipmentDriversDto } from './dto/search-shipment-drivers.dto';
 import { InviteShipmentDriversDto } from './dto/invite-shipment-drivers.dto';
 import { hideContactsOnceDelivered } from './shipment-views';
+import { UserBlocksService } from '../user-safety/user-blocks.service';
 
 @ApiTags('Envois')
 @ApiBearerAuth()
@@ -40,6 +41,7 @@ export class ShipmentsController {
     private readonly shipmentOtpService: ShipmentOtpService,
     private readonly invitations: ShipmentInvitationsService,
     private readonly scope: CountryScopeService,
+    private readonly userBlocks: UserBlocksService,
   ) {}
 
   @Get('mine')
@@ -74,7 +76,8 @@ export class ShipmentsController {
   }
 
   @Post('invitations/:invitationId/accept')
-  acceptInvitation(@Param('invitationId') invitationId: string, @CurrentUser() user: AuthenticatedUser) {
+  async acceptInvitation(@Param('invitationId') invitationId: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.userBlocks.assertCanAcceptInvitation(user.id, invitationId);
     return this.invitations.accept(invitationId, user.id);
   }
 
@@ -113,7 +116,9 @@ export class ShipmentsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     const customer = await this.customerProfilesService.findByUserId(user.id);
-    return this.invitations.invite(id, customer.id, dto.tripIds);
+    // Les conducteurs bloqués (dans un sens ou dans l'autre) ne reçoivent pas l'invitation.
+    const tripIds = await this.userBlocks.filterTripIdsForCustomer(user.id, dto.tripIds);
+    return this.invitations.invite(id, customer.id, tripIds);
   }
 
   @Get(':id/invitations')
@@ -153,7 +158,8 @@ export class ShipmentsController {
    * trajet. Le premier qui accepte l'emporte : les suivants reçoivent 409.
    */
   @Post(':id/assign')
-  assign(@Param('id') id: string, @Body() dto: AssignShipmentDto, @CurrentUser() user: AuthenticatedUser) {
+  async assign(@Param('id') id: string, @Body() dto: AssignShipmentDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.userBlocks.assertCanAcceptShipment(user.id, id);
     return this.shipmentsService.accept(id, user.id, dto.tripId);
   }
 

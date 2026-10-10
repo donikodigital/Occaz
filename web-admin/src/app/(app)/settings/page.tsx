@@ -473,6 +473,16 @@ const KNOWN: Known[] = [
     onText: 'Les envois sans conducteur ou non payés sont traités automatiquement à la fin de leur période.',
     offText: 'Pause : aucune invitation, aucun remboursement automatique ni annulation d’envoi jusqu’à la réactivation.',
   },
+  {
+    key: 'jobs.trip_reminders_enabled',
+    title: 'Rappels de départ',
+    help: 'Envoie un rappel au conducteur et aux passagers la veille du départ, puis dans les dernières heures.',
+    kind: 'flag01',
+    group: 'jobs',
+    defaultValue: true,
+    onText: 'Les rappels de départ partent tout seuls (une seule fois par personne et par trajet).',
+    offText: 'Pause : plus aucun rappel de départ n’est envoyé jusqu’à la réactivation.',
+  },
 ];
 
 const KNOWN_BY_KEY = new Map(KNOWN.map((item) => [item.key, item]));

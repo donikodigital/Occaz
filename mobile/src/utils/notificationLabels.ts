@@ -27,4 +27,5 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   SHIPMENT_EXTENSION: 'Prolonger votre envoi',
   SHIPMENT_INVITATION: 'Un colis à transporter',
   CONVERSATION_MESSAGE: 'Nouveau message',
+  SAFETY: 'Sécurité',
 };

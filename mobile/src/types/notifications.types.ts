@@ -1,5 +1,5 @@
 // mobile/src/types/notifications.types.ts
-// [21/09/2026] v+ — types SHIPMENT_REQUEST et SHIPMENT_EXTENSION.
+// [21/09/2026] v+ — types SHIPMENT_REQUEST et SHIPMENT_EXTENSION. [11/10/2026] + SAFETY (alertes SOS, signalements).
 export type NotificationType =
   | 'BOOKING'
   | 'PAYMENT'
@@ -17,7 +17,8 @@ export type NotificationType =
   | 'SHIPMENT_REQUEST'
   | 'SHIPMENT_EXTENSION'
   | 'SHIPMENT_INVITATION'
-  | 'CONVERSATION_MESSAGE';
+  | 'CONVERSATION_MESSAGE'
+  | 'SAFETY';
 
 export type NotificationChannel = 'PUSH' | 'SMS' | 'EMAIL';
 

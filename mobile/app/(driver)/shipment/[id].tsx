@@ -34,6 +34,8 @@ import {
 import { AppText, ConfirmDialog, ScreenContainer, TextField } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
 import { ShipmentParcelsSection } from '@/components/screens/ShipmentParcelsSection';
+import { TicketScanButton } from '@/components/screens/TicketScanner';
+import { SosButton } from '@/components/safety/SosButton';
 import { OceanButton, OceanCard, OceanPill, OceanScreenHeader, OceanSection, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -596,6 +598,10 @@ export default function DriverShipmentDetailScreen() {
           style={styles.actionButton}
         />
       ) : null}
+
+      {['DRIVER_ASSIGNED', 'PICKUP_PENDING', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERY_PENDING'].includes(shipment.status) ? <TicketScanButton label="Scanner une étiquette" /> : null}
+
+      {['PICKED_UP', 'IN_TRANSIT', 'DELIVERY_PENDING'].includes(shipment.status) ? <SosButton shipmentId={shipment.id} /> : null}
 
       <OceanButton
         label="Signaler un problème"

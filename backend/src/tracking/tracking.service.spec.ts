@@ -1,4 +1,6 @@
 // backend/src/tracking/tracking.service.spec.ts
+// [11/10/2026] L'horloge est figée à NOW : le service lit `new Date()`, et les positions du test (12 h) cessaient d'être « fraîches » (6 h)
+// dès que le test tournait plus tard que le jour même — il échouait donc à partir de 18 h UTC, puis tous les jours suivants.
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TrackingService } from './tracking.service';
 import { shipmentTrackingNumber } from '../tickets/ticket-codes';
@@ -6,6 +8,19 @@ import { shipmentTrackingNumber } from '../tickets/ticket-codes';
 const SHIPMENT_ID = '7f3a91c2-b0aa-4c11-9d2e-111111111111';
 const NUMBER = shipmentTrackingNumber(SHIPMENT_ID); // OCZ7F3A91C2B0
 const NOW = new Date('2026-10-10T12:00:00Z');
+
+// Seule la date est simulée : les minuteries, les promesses et le reste restent réels.
+beforeAll(() => {
+  jest.useFakeTimers({
+    now: NOW,
+    doNotFake: [
+      'nextTick', 'setImmediate', 'clearImmediate', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout',
+      'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback',
+    ],
+  });
+});
+afterAll(() => jest.useRealTimers());
+
 const at = (hour: number) => new Date(`2026-10-10T${String(hour).padStart(2, '0')}:00:00Z`);
 
 function stop(id: string, sequence: number, cityId: string, name: string, arrivedAt: Date | null) {

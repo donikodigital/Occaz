@@ -1,18 +1,30 @@
 // backend/src/tickets/tickets.controller.ts
+// [11/10/2026] v2 — POST /tickets/scan (contrôle d'un billet ou d'une étiquette par le conducteur).
 // [10/10/2026] v1 — liens de téléchargement du billet (réservation) et des étiquettes (envoi), et téléchargement par lien signé.
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { TicketsService } from './tickets.service';
+import { TicketScanService } from './ticket-scan.service';
+import { ScanTicketDto } from './dto/scan-ticket.dto';
 
 @ApiTags('Billets et étiquettes')
 @ApiBearerAuth()
 @Controller('tickets')
 export class TicketsController {
-  constructor(private readonly tickets: TicketsService) {}
+  constructor(
+    private readonly tickets: TicketsService,
+    private readonly ticketScan: TicketScanService,
+  ) {}
+
+  /** Le conducteur scanne le QR code d'un billet ou d'une étiquette : authentique ? concerne-t-il l'un de ses trajets / envois ? */
+  @Post('scan')
+  scan(@Body() dto: ScanTicketDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.ticketScan.scan(user.id, dto.code);
+  }
 
   /** Lien (valable 10 minutes) pour télécharger le billet PDF d'une réservation payée. */
   @Get('bookings/:id/link')

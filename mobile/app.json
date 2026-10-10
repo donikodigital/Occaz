@@ -54,6 +54,14 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Autorisez l'accès à l'appareil photo pour scanner le billet ou l'étiquette d'un colis.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Autorisez la localisation pour utiliser votre position actuelle et la partager avec le passager pendant un trajet en cours.",

@@ -17,6 +17,7 @@ import { CustomerProfilesService } from '../profiles/customer-profiles/customer-
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { TripOtpService } from './trip-otp.service';
 import { hideContactsOnceCompleted } from './booking-contacts';
+import { UserBlocksService } from '../user-safety/user-blocks.service';
 
 @ApiTags('Réservations')
 @ApiBearerAuth()
@@ -28,6 +29,7 @@ export class BookingsController {
     private readonly driverProfilesService: DriverProfilesService,
     private readonly tripOtpService: TripOtpService,
     private readonly scope: CountryScopeService,
+    private readonly userBlocks: UserBlocksService,
   ) {}
 
   @Get('mine')
@@ -39,6 +41,8 @@ export class BookingsController {
   @Post()
   async create(@Body() dto: CreateBookingDto, @CurrentUser() user: AuthenticatedUser) {
     const customer = await this.customerProfilesService.findByUserId(user.id);
+    // Blocage dans un sens ou dans l'autre : pas de réservation chez ce conducteur.
+    await this.userBlocks.assertCanBookTrip(user.id, dto.tripId);
     return this.bookingsService.create(customer.id, dto);
   }
 

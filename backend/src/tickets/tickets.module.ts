@@ -5,6 +5,7 @@ import { EmailModule } from '../integrations/email/email.module';
 import { CustomerProfilesModule } from '../profiles/customer-profiles/customer-profiles.module';
 import { TicketsController } from './tickets.controller';
 import { TicketsService } from './tickets.service';
+import { TicketScanService } from './ticket-scan.service';
 
 /**
  * Écoute les événements « paiement confirmé » (BOOKING_PAID, SHIPMENT_PAID) sans que Trajets, Envois ou Paiements ne le connaissent :
@@ -13,7 +14,7 @@ import { TicketsService } from './tickets.service';
 @Module({
   imports: [EmailModule, CustomerProfilesModule],
   controllers: [TicketsController],
-  providers: [TicketsService],
+  providers: [TicketsService, TicketScanService],
   exports: [TicketsService],
 })
 export class TicketsModule {}

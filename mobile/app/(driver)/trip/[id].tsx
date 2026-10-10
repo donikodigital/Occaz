@@ -72,6 +72,9 @@ import {
 import { AppText, ConfirmDialog, FeedbackBanner, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
 import { DriverJourneyGuide } from '@/components/screens/DriverJourneyGuide';
+import { TicketScanButton } from '@/components/screens/TicketScanner';
+import { SosButton } from '@/components/safety/SosButton';
+import { ReportUserLink } from '@/components/safety/ReportUserLink';
 import { LocationAutocompleteField } from '@/components/screens/LocationAutocompleteField';
 import { OceanButton, OceanCard, OceanPill, OceanScreenHeader, OceanSection, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
@@ -1187,14 +1190,23 @@ export default function DriverTripDetailScreen() {
         >
           {activeBookings.length > 0 ? (
             <View style={styles.bookingsList}>
+              <TicketScanButton />
               {activeBookings.map((booking) => (
-                <BookingOtpCard
-                  key={booking.id}
-                  booking={booking}
-                  tripId={trip.id}
-                  phase={guided ? 'none' : getBookingPhase(booking, trip)}
-                  pickupMissed={!guided && isPickupMissed(booking, trip)}
-                />
+                <View key={booking.id}>
+                  <BookingOtpCard
+                    booking={booking}
+                    tripId={trip.id}
+                    phase={guided ? 'none' : getBookingPhase(booking, trip)}
+                    pickupMissed={!guided && isPickupMissed(booking, trip)}
+                  />
+                  <ReportUserLink
+                    space="driver"
+                    target={{ customerId: booking.customerId }}
+                    name={booking.passengers?.[0]?.fullName ?? 'Passager'}
+                    tripId={trip.id}
+                    bookingId={booking.id}
+                  />
+                </View>
               ))}
             </View>
           ) : (
@@ -1214,6 +1226,8 @@ export default function DriverTripDetailScreen() {
           )}
         </OceanSection>
       ) : null}
+
+      {['DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS'].includes(trip.status) ? <SosButton tripId={trip.id} /> : null}
 
       <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title="Détails">
         <View style={styles.detailCard}>

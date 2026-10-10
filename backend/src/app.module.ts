@@ -48,6 +48,7 @@ import { CookieConsentModule } from './cookie-consent/cookie-consent.module';
 import { CountryScopeModule } from './common/scope/country-scope.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { UserSafetyModule } from './user-safety/user-safety.module';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -112,6 +113,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     CountryScopeModule,
     TicketsModule,
     TrackingModule,
+    UserSafetyModule,
 
     // Toutes les Parties du cahier des charges sont couvertes — voir
     // README.md pour la correspondance Lot / section.

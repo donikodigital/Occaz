@@ -8,6 +8,7 @@ import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { CountryScopeService } from '../common/scope/country-scope.service';
 import { ConversationsService } from './conversations.service';
 import { SendMessageDto } from './dto/send-message.dto';
+import { UserBlocksService } from '../user-safety/user-blocks.service';
 
 @ApiTags('Conversations')
 @ApiBearerAuth()
@@ -16,6 +17,7 @@ export class ConversationsController {
   constructor(
     private readonly conversationsService: ConversationsService,
     private readonly scope: CountryScopeService,
+    private readonly userBlocks: UserBlocksService,
   ) {}
 
   @Get('mine')
@@ -58,6 +60,8 @@ export class ConversationsController {
     @Body() dto: SendMessageDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    // Plus de message entre deux comptes dont l'un a bloqué l'autre (le support n'est jamais concerné).
+    await this.userBlocks.assertCanMessage(user.id, id);
     return this.conversationsService.sendMessage(
       id,
       { id: user.id, hasSupportAccess: await this.scope.hasConversationAccess(user, id) },

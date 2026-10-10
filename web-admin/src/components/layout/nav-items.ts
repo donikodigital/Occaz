@@ -5,12 +5,14 @@
 // la finance, la configuration ni le système sans le rôle qui va avec). Pas de `permissions` = ouvert à tous.
 import {
   IconAdjustmentsDollar,
+  IconAlertOctagon,
   IconAlertTriangle,
   IconArrowsExchange,
   IconBooks,
   IconCash,
   IconCreditCard,
   IconDiscount2,
+  IconFlag3,
   IconGift,
   IconHistory,
   IconLayoutDashboard,
@@ -59,6 +61,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/trips', label: 'Trajets', icon: IconRoute, permissions: [PERMISSIONS.TRIP_READ] },
       { href: '/shipments', label: 'Envois', icon: IconTruckDelivery, permissions: [PERMISSIONS.SHIPMENT_READ] },
       { href: '/disputes', label: 'Litiges', icon: IconAlertTriangle, permissions: [PERMISSIONS.DISPUTE_READ] },
+      { href: '/sos', label: 'Alertes SOS', icon: IconAlertOctagon, permissions: [PERMISSIONS.SOS_READ] },
+      { href: '/reports', label: 'Signalements', icon: IconFlag3, permissions: [PERMISSIONS.USER_REPORT_READ] },
     ],
   },
   {

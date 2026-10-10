@@ -1,0 +1,136 @@
+# .github/workflows/ci.yml
+# [11/10/2026] v1 — Intégration continue Occa'Z. À chaque push et chaque pull request :
+#   • backend   : types, tests unitaires (Jest)
+#   • database  : applique TOUTES les migrations sur une vraie base PostgreSQL + PostGIS, vérifie que le schéma Prisma n'a pas dérivé
+#                 des migrations (informatif), puis lance le test de démarrage de l'application (health e2e)
+#   • mobile    : types (tsc)
+#   • web-admin : types (tsc) et compilation Next.js
+# Aucun secret requis : tout tourne avec des valeurs factices et une base jetable.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  backend:
+    name: Backend — types et tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Types (tsc)
+        run: npm run typecheck
+      - name: Tests unitaires
+        run: npm test -- --ci
+
+  database:
+    name: Backend — migrations et démarrage sur PostgreSQL
+    runs-on: ubuntu-latest
+    needs: backend
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: occaz
+          POSTGRES_PASSWORD: occaz
+          POSTGRES_DB: occaz_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U occaz -d occaz_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://occaz:occaz@localhost:5432/occaz_ci
+      SHADOW_DATABASE_URL: postgresql://occaz:occaz@localhost:5432/occaz_shadow
+      NODE_ENV: test
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+      OTP_HASH_PEPPER: ci-otp-pepper-ci-otp-pepper-ci-otp-pepper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Appliquer toutes les migrations (base vide)
+        run: npx prisma migrate deploy
+      - name: Le schéma Prisma correspond-il aux migrations ? (informatif)
+        # Une dérive signifie qu'on a modifié schema.prisma sans écrire la migration correspondante :
+        # la production n'aurait alors pas la colonne ou la table attendue. Non bloquant pour l'instant,
+        # à passer en bloquant (retirer continue-on-error) une fois le premier passage propre.
+        continue-on-error: true
+        run: |
+          PGPASSWORD=occaz psql -h localhost -U occaz -d occaz_ci -c 'CREATE DATABASE occaz_shadow;'
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --exit-code
+      - name: Test de démarrage de l'application (health e2e)
+        run: npm run test:e2e -- --ci
+
+  mobile:
+    name: Mobile — types
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      # --legacy-peer-deps : même option que celle utilisée pour générer package-lock.json (dépendances Expo).
+      - run: npm ci --legacy-peer-deps
+      - run: npm run typecheck
+
+  web-admin:
+    name: Back-office — types et compilation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web-admin/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Compilation Next.js
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'

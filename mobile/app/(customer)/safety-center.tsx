@@ -8,12 +8,13 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconAlertTriangle, IconLock, IconMessageStar, IconPhoneCall, IconShieldCheck } from '@tabler/icons-react-native';
+import { IconAlertTriangle, IconLock, IconMessageStar, IconPhoneCall, IconShieldCheck, IconUserOff, IconUsersGroup } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
 import { OceanButton, OceanCard } from '@/components/ocean/OceanKit';
 import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { SosButton } from '@/components/safety/SosButton';
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -36,7 +37,7 @@ const TIPS: { icon: IconComponent; title: string; text: string }[] = [
   {
     icon: IconAlertTriangle,
     title: 'Un problème pendant la prestation ?',
-    text: 'Utilisez « Signaler un problème » depuis l\'écran du trajet ou de l\'envoi — un agent du support prend le relais.',
+    text: 'Utilisez « Signaler un problème » depuis l\'écran du trajet ou de l\'envoi — un agent du support prend le relais. Pour signaler ou bloquer une personne, ouvrez « Signaler ou bloquer » sur sa fiche.',
   },
 ];
 
@@ -52,6 +53,8 @@ export default function SafetyCenterScreen() {
           faire passer pour vous ou pour votre conducteur.
         </AppText>
       </View>
+
+      <SosButton />
 
       <View style={styles.tips}>
         {TIPS.map((tip) => {
@@ -73,6 +76,22 @@ export default function SafetyCenterScreen() {
           );
         })}
       </View>
+
+      <OceanButton
+        label="Mes proches (alerte SOS)"
+        variant="soft"
+        icon={<IconUsersGroup size={18} color={OCEAN.base} />}
+        onPress={() => router.push('/(customer)/emergency-contacts')}
+        style={styles.button}
+      />
+
+      <OceanButton
+        label="Utilisateurs bloqués"
+        variant="soft"
+        icon={<IconUserOff size={18} color={OCEAN.base} />}
+        onPress={() => router.push('/(customer)/blocked-users')}
+        style={styles.button}
+      />
 
       <OceanButton
         label="Voir mes litiges"

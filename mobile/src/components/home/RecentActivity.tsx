@@ -45,6 +45,7 @@ const TYPE_ICON: Record<NotificationType, IconType> = {
   SHIPMENT_EXTENSION: IconRefresh,
   SHIPMENT_INVITATION: IconPackage,
   CONVERSATION_MESSAGE: IconMessageCircle,
+  SAFETY: IconAlertTriangle,
 };
 
 const GOLD_TYPES = new Set<NotificationType>(['PAYMENT', 'DRIVER_PAYMENT', 'REFUND', 'SHIPMENT_REQUEST', 'DELIVERY']);
@@ -66,7 +67,7 @@ export interface ActivityItem {
 
 /** Une notification devient une ligne de la chronologie. */
 export function notificationToActivity(notification: AppNotification, onPress: () => void): ActivityItem {
-  const tone: ActivityTone = notification.type === 'DISPUTE' ? 'danger' : GOLD_TYPES.has(notification.type) ? 'gold' : 'ocean';
+  const tone: ActivityTone = notification.type === 'DISPUTE' || notification.type === 'SAFETY' ? 'danger' : GOLD_TYPES.has(notification.type) ? 'gold' : 'ocean';
   return {
     key: `n-${notification.id}`,
     icon: TYPE_ICON[notification.type] ?? IconBell,

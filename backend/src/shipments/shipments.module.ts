@@ -19,6 +19,8 @@ import { OtpModule } from '../otp/otp.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PromoCodesModule } from '../promo-codes/promo-codes.module';
 
+import { UserSafetyModule } from '../user-safety/user-safety.module';
+
 @Module({
   imports: [
     ShipmentCategoriesModule,
@@ -30,6 +32,7 @@ import { PromoCodesModule } from '../promo-codes/promo-codes.module';
     OtpModule,
     NotificationsModule,
     PromoCodesModule,
+    UserSafetyModule,
   ],
   controllers: [ShipmentsController],
   providers: [ShipmentsService, ShipmentOtpService, ShipmentDispatchService, ShipmentWindowService, ShipmentInvitationsService],

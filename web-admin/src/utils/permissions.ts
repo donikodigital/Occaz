@@ -44,6 +44,10 @@ export const PERMISSIONS = {
   DISPUTE_ASSIGN: 'dispute.assign',
   NOTIFICATION_TEMPLATE_MANAGE: 'notification_template.manage',
   CONVERSATION_READ: 'conversation.read',
+  USER_REPORT_READ: 'user_report.read',
+  USER_REPORT_MANAGE: 'user_report.manage',
+  SOS_READ: 'sos.read',
+  SOS_MANAGE: 'sos.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
