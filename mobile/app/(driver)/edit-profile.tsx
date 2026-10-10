@@ -1,4 +1,5 @@
 // mobile/app/(driver)/edit-profile.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [21/09/2026] v2 — habillage bleu Ocean, comme l'espace client : en-tête,
 // photo de profil et champs dans une section à en-tête souligné.
 import React, { useState } from 'react';
@@ -6,7 +7,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconDeviceMobile, IconUserCircle } from '@tabler/icons-react-native';
 import { AppText, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
-import { OceanButton, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { LockedField } from '@/components/screens/LockedField';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -68,7 +70,7 @@ export default function DriverEditProfileScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader title="Modifier le profil" subtitle="Compte conducteur" onBack={() => router.back()} />
+      <OceanHeroHeader title="Modifier le profil" subtitle="Compte conducteur" icon={<IconUserCircle />} onBack={() => router.back()} />
 
       <ProfilePhotoField
         photoUrl={photoUrl}

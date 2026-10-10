@@ -1,4 +1,5 @@
 // mobile/src/components/screens/NotificationsInboxScreen.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [26/09/2026] v3 — Chaque notification s'ouvre en modale (texte complet,
 // jamais tronqué) au lieu de se contenter d'un aperçu sur 2 lignes.
 // Nouveau mode sélection (icône dans l'en-tête) : coche les notifications
@@ -31,7 +32,8 @@ import {
   IconX,
 } from '@tabler/icons-react-native';
 import { AppText, Button, ConfirmDialog, ResponsiveList, ScreenContainer } from '@/components/ui';
-import { OceanCard, OceanEmpty, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanCard, OceanEmpty } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, maxContentWidth, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import {
@@ -305,7 +307,7 @@ export function NotificationsInboxScreen() {
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.header}>
-        <OceanScreenHeader
+        <OceanHeroHeader
           title="Notifications"
           subtitle={subtitle}
           onBack={selectionMode ? exitSelectionMode : () => router.back()}

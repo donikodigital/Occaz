@@ -1,4 +1,5 @@
 // mobile/app/(customer)/shipment-tracking.tsx
+// [10/10/2026] v2 — padding ajouté à la carte « Copiez ce message » (OceanCard n'a pas de padding de base : le texte touchait le cadre).
 // [10/10/2026] v1 — Suivi en direct d'un envoi pour son expéditeur : position exacte du colis, villes traversées, historique daté, et
 // partage du numéro (ou du lien) de suivi avec le destinataire.
 import React, { useState } from 'react';
@@ -71,5 +72,5 @@ export default function ShipmentTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
-  shareCard: { gap: spacing.xs },
+  shareCard: { gap: spacing.xs, padding: spacing.md },
 });

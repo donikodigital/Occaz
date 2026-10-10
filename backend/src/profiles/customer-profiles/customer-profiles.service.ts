@@ -1,11 +1,12 @@
 // backend/src/profiles/customer-profiles/customer-profiles.service.ts
+// [10/10/2026] v4 — updateForUser accepte l'email (qui vit sur User, pas sur CustomerProfile), comme DriverProfilesService.updateForUser :
+// mise à jour de User.email dans la même transaction (409 si l'adresse est déjà utilisée), champs du profil listés explicitement
+// — un `...dto` ferait échouer Prisma dès que `email` est présent.
+//
 // [21/09/2026] v3 — photo de profil : upload-url puis confirmation, même flux que le conducteur (storageKey 'customer-avatar', URL publique).
 //
 // v2 — Ajout du champ address (texte libre, même esprit que Location.label)
-// sur CustomerProfile. Seul createForUser change : il liste ses champs
-// explicitement. updateForUser fait déjà `data: { ...dto }`, donc il
-// prend automatiquement en compte address dès qu'il est dans le DTO —
-// aucun changement nécessaire là.
+// sur CustomerProfile (createForUser liste ses champs explicitement).
 
 import {
   ConflictException,
@@ -123,12 +124,31 @@ export class CustomerProfilesService {
 
   async updateForUser(userId: string, dto: UpdateCustomerProfileDto) {
     const profile = await this.findByUserId(userId);
-    return this.prisma.customerProfile.update({
-      where: { id: profile.id },
-      data: {
-        ...dto,
-        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
-      },
+
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      if (dto.email) {
+        try {
+          await tx.user.update({ where: { id: userId }, data: { email: dto.email } });
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            throw new ConflictException('Cette adresse email est déjà utilisée par un autre compte.');
+          }
+          throw error;
+        }
+      }
+
+      return tx.customerProfile.update({
+        where: { id: profile.id },
+        data: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          photoUrl: dto.photoUrl,
+          countryId: dto.countryId,
+          cityId: dto.cityId,
+          address: dto.address,
+          dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+        },
+      });
     });
   }
 

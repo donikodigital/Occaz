@@ -4,6 +4,8 @@ import type { Paginated } from './types';
 import type {
   Article,
   Deal,
+  LookupPromoCodePayload,
+  PromoCodeTerms,
   PromoCodeValidation,
   Referral,
   SavedCard,
@@ -12,6 +14,8 @@ import type {
 
 export const promoCodesApi = {
   validate: (payload: ValidatePromoCodePayload) => api.post<PromoCodeValidation>('/promo-codes/validate', payload),
+  /** Le code seul suffit : décrit ce qu'il offre, sans montant. */
+  lookup: (payload: LookupPromoCodePayload) => api.post<PromoCodeTerms>('/promo-codes/lookup', payload),
 };
 
 export const referralsApi = {

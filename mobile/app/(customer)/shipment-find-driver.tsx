@@ -1,4 +1,8 @@
 // mobile/app/(customer)/shipment-find-driver.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
+//
+// [10/10/2026] v2 — padding ajouté aux cartes « conducteur » et « Payez d'abord votre envoi » : OceanCard n'a pas de padding de base,
+// leur contenu touchait le cadre.
 //
 // [09/10/2026] v1 — « Trouver un conducteur » : une fois son colis payé, le client peut chercher lui-même les conducteurs qui font
 // la route et leur envoyer une invitation (email, notification, bannière sur leur accueil). L'annonce à tous les conducteurs
@@ -21,7 +25,8 @@ import {
   IconX,
 } from '@tabler/icons-react-native';
 import { AppText, Avatar, ScreenContainer } from '@/components/ui';
-import { OceanButton, OceanCard, OceanEmpty, OceanPill, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard, OceanEmpty, OceanPill } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
@@ -257,9 +262,10 @@ export default function FindDriverScreen() {
         ) : undefined
       }
     >
-      <OceanScreenHeader
+      <OceanHeroHeader
         title="Trouver un conducteur"
         subtitle="Invitez ceux qui font déjà la route"
+        icon={<IconSearch />}
         onBack={() => router.back()}
       />
 
@@ -376,10 +382,10 @@ const styles = StyleSheet.create({
   },
   fieldActive: { borderColor: OCEAN.base, backgroundColor: OCEAN.mist },
   fieldText: { flex: 1, gap: 1 },
-  notice: { gap: spacing.xs },
+  notice: { gap: spacing.xs, padding: spacing.md },
   loader: { marginVertical: spacing.xl },
   listHeader: { marginBottom: spacing.sm },
-  driverCard: { gap: spacing.sm, marginBottom: spacing.sm, borderWidth: 1.5, borderColor: 'transparent' },
+  driverCard: { gap: spacing.sm, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1.5, borderColor: 'transparent' },
   driverCardSelected: { borderColor: OCEAN.base, backgroundColor: OCEAN.mist },
   driverCardMuted: { opacity: 0.7 },
   driverRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },

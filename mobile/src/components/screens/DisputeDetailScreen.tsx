@@ -1,4 +1,5 @@
 // mobile/src/components/screens/DisputeDetailScreen.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
 // retour rond, pastilles de statut et de priorité, carte verte « Litige
@@ -8,9 +9,10 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowLeft, IconCircleCheck, IconSend, IconX } from '@tabler/icons-react-native';
+import { IconCircleCheck, IconLifebuoy, IconSend } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
 import { OceanPill, type OceanPillTone } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useAddDisputeMessage, useDispute } from '@/hooks/useDisputes';
@@ -133,21 +135,15 @@ export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenP
         ) : undefined
       }
     >
-      <View style={styles.header}>
-        <Pressable
-          // Page affichée juste après la création du signalement : une croix qui revient à l'accueil, pas la flèche vers le
-          // formulaire et les écrans d'avant.
-          onPress={onClose ?? (() => router.back())}
-          accessibilityRole="button"
-          accessibilityLabel={onClose ? 'Fermer et revenir à l’accueil' : 'Retour'}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-        >
-          {onClose ? <IconX size={18} color={OCEAN.base} /> : <IconArrowLeft size={18} color={OCEAN.base} />}
-        </Pressable>
-        <AppText variant="lg" weight="bold" color={OCEAN.deep} numberOfLines={2} style={styles.title}>
-          {dispute.reason}
-        </AppText>
-      </View>
+      <OceanHeroHeader
+        title={dispute.reason}
+        subtitle="Signalement"
+        icon={<IconLifebuoy />}
+        // Page affichée juste après la création du signalement : une croix qui revient à l'accueil, pas la flèche vers le
+        // formulaire et les écrans d'avant.
+        onBack={() => router.back()}
+        onClose={onClose}
+      />
 
       <View style={styles.badgeRow}>
         <OceanPill label={DISPUTE_STATUS_LABELS[dispute.status]} tone={pillToneFor(DISPUTE_STATUS_TONE[dispute.status])} />
@@ -214,26 +210,6 @@ const styles = StyleSheet.create({
   center: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: OCEAN.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    flex: 1,
   },
   badgeRow: {
     flexDirection: 'row',

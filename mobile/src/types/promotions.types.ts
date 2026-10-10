@@ -19,6 +19,29 @@ export interface PromoCodeValidation {
   finalAmount: Money;
 }
 
+/** Consultation d'un code à partir du code seul — aucun montant à fournir. */
+export interface LookupPromoCodePayload {
+  code: string;
+  serviceType?: ServiceType;
+  countryId?: string;
+}
+
+/** Ce qu'offre un code : sa valeur, ses limites et sa portée (POST /promo-codes/lookup). */
+export interface PromoCodeTerms {
+  code: string;
+  description: string | null;
+  discountType: PromoDiscountType;
+  /** Pourcentage (0-100) si PERCENTAGE, montant si FIXED_AMOUNT. */
+  discountValue: number;
+  /** Devise du montant — renseignée pour un montant fixe. */
+  currencyCode: string | null;
+  maxDiscountAmount: Money | null;
+  minAmount: Money | null;
+  /** null = valable pour les trajets et les envois. */
+  serviceType: ServiceType | null;
+  expiresAt: string | null;
+}
+
 export type ReferralStatus = 'PENDING' | 'COMPLETED' | 'EXPIRED';
 
 interface ReferralPersonSummary {

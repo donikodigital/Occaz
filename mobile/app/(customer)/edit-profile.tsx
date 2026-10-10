@@ -1,4 +1,8 @@
 // mobile/app/(customer)/edit-profile.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
+// [10/10/2026] v7 — champ Email (optionnel) pour renseigner / modifier son adresse, comme côté conducteur.
+// L'email vit sur User : sa valeur actuelle vient du store d'authentification, et le store est mis à jour après enregistrement.
+//
 // [21/09/2026] v6 — photo de profil modifiable (galerie ou appareil photo), comme côté conducteur.
 //
 // v5 — Habillage bleu océan (en-tête de retour, sections à en-tête
@@ -14,7 +18,8 @@ import { IconChevronRight, IconDeviceMobile, IconMapPin, IconUserCircle } from '
 import { AppText, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { CountrySelectField } from '@/components/screens/CountrySelectField';
 import { LockedField } from '@/components/screens/LockedField';
-import { OceanButton, OceanCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCustomerProfile, useUpdateCustomerProfile } from '@/hooks/useCustomerProfile';
@@ -68,9 +73,12 @@ function isoToDateOfBirthDisplay(iso: string | null | undefined): string {
 
 export default function EditProfileScreen() {
   const { data: profile } = useCustomerProfile();
-  const accountPhone = useAuthStore((state) => state.user?.phone ?? '');
+  const authUser = useAuthStore((state) => state.user);
+  const updateAuthUser = useAuthStore((state) => state.updateUser);
+  const accountPhone = authUser?.phone ?? '';
   const [firstName, setFirstName] = useState(profile?.firstName ?? '');
   const [lastName, setLastName] = useState(profile?.lastName ?? '');
+  const [email, setEmail] = useState(authUser?.email ?? '');
   const [address, setAddress] = useState(profile?.address ?? '');
   const [dateOfBirth, setDateOfBirth] = useState(isoToDateOfBirthDisplay(profile?.dateOfBirth));
   const [country, setCountry] = useState<Country | null>(profile?.country ?? null);
@@ -97,6 +105,11 @@ export default function EditProfileScreen() {
       setErrorMessage('Renseignez votre prénom et votre nom.');
       return;
     }
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setErrorMessage('Adresse email invalide.');
+      return;
+    }
 
     let dateOfBirthIso: string | undefined;
     if (dateOfBirth.trim().length > 0) {
@@ -111,13 +124,21 @@ export default function EditProfileScreen() {
       {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        email: trimmedEmail || undefined,
         countryId: country?.id,
         cityId: city?.id,
         address: address.trim() || undefined,
         ...(dateOfBirthIso ? { dateOfBirth: dateOfBirthIso } : {}),
       },
       {
-        onSuccess: () => router.back(),
+        onSuccess: () => {
+          // Le profil client invalidé par le hook ne contient pas l'email (il vit sur User) : sans cette mise à jour,
+          // l'écran afficherait l'ancienne adresse jusqu'à la prochaine connexion.
+          if (trimmedEmail && authUser) {
+            updateAuthUser({ ...authUser, email: trimmedEmail });
+          }
+          router.back();
+        },
         onError: (error) => {
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },
@@ -127,7 +148,7 @@ export default function EditProfileScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader title="Modifier le profil" subtitle="Compte client" onBack={() => router.back()} />
+      <OceanHeroHeader title="Modifier le profil" subtitle="Compte client" icon={<IconUserCircle />} onBack={() => router.back()} />
 
       <ProfilePhotoField
         photoUrl={photoUrl}
@@ -142,6 +163,15 @@ export default function EditProfileScreen() {
       <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title="Identité">
         <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Fatoumata" />
         <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Diallo" />
+        <TextField
+          label="Email (optionnel)"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="vous@exemple.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
         <TextField
           label="Date de naissance (optionnel)"
           value={dateOfBirth}

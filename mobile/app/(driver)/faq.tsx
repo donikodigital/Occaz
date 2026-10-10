@@ -1,4 +1,5 @@
 // mobile/app/(driver)/faq.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v1 — Questions fréquentes côté conducteur : accordéon simple, contenu
 // reflétant les règles réellement codées (commission unique, premier
@@ -7,9 +8,10 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconChevronDown } from '@tabler/icons-react-native';
+import { IconChevronDown, IconQuestionMark } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
-import { OceanCard, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanCard } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 
@@ -70,7 +72,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 export default function DriverFaqScreen() {
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Questions fréquentes" onBack={() => router.back()} />
+      <OceanHeroHeader title="Questions fréquentes" subtitle="Les réponses à vos questions" icon={<IconQuestionMark />} onBack={() => router.back()} />
 
       <View style={styles.list}>
         {QUESTIONS.map((item) => (

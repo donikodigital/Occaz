@@ -1,4 +1,5 @@
 // mobile/app/(customer)/safety-center.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v1 — Centre de sécurité : conseils pratiques + rappel des mécanismes de
 // sécurité déjà en place dans l'app (codes de validation, notation,
@@ -9,7 +10,8 @@ import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconAlertTriangle, IconLock, IconMessageStar, IconPhoneCall, IconShieldCheck } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
-import { OceanButton, OceanCard, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 
@@ -41,7 +43,7 @@ const TIPS: { icon: IconComponent; title: string; text: string }[] = [
 export default function SafetyCenterScreen() {
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Centre de sécurité" onBack={() => router.back()} />
+      <OceanHeroHeader title="Centre de sécurité" subtitle="Voyager et envoyer en confiance" icon={<IconShieldCheck />} onBack={() => router.back()} />
 
       <View style={styles.hero}>
         <IconShieldCheck size={22} color={OCEAN.base} />

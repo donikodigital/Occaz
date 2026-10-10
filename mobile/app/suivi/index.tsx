@@ -1,12 +1,15 @@
 // mobile/app/suivi/index.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
+// [10/10/2026] v2 — padding ajouté à la carte de saisie (OceanCard n'a pas de padding de base : texte, champ et bouton touchaient le cadre).
 // [10/10/2026] v1 — « Suivre un colis » : on saisit le numéro de suivi (étiquette du colis, e-mail) et on ouvre la page de suivi.
 // Accessible sans compte, depuis l'accueil de bienvenue.
 import React, { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { IconSearch } from '@tabler/icons-react-native';
+import { IconPackage, IconSearch } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
-import { OceanButton, OceanCard, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { parseTrackingNumber } from '@/utils/tracking';
@@ -27,8 +30,10 @@ export default function TrackParcelScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader
+      <OceanHeroHeader
         title="Suivre un colis"
+        subtitle="Sans compte, avec votre numéro de suivi"
+        icon={<IconPackage />}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       />
       <OceanCard style={styles.card}>
@@ -56,5 +61,5 @@ export default function TrackParcelScreen() {
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.md },
+  card: { gap: spacing.md, padding: spacing.md },
 });

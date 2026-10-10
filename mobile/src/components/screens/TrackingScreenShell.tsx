@@ -1,4 +1,5 @@
 // mobile/src/components/screens/TrackingScreenShell.tsx
+// [10/10/2026] v2 — padding ajouté à la carte « Colis introuvable » (OceanCard n'a pas de padding de base : le contenu touchait le cadre).
 // [10/10/2026] v1 — Page de suivi d'un colis (chargement, erreur, résultat, actualisation) : même page pour le suivi public et pour
 // celui de l'expéditeur, seule la source des données change.
 import React from 'react';
@@ -84,5 +85,5 @@ export function TrackingScreenShell({
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', paddingVertical: spacing.xxl },
-  errorCard: { gap: spacing.sm },
+  errorCard: { gap: spacing.sm, padding: spacing.md },
 });

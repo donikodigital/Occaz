@@ -1,13 +1,20 @@
 // mobile/src/hooks/usePromotions.ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { articlesApi, dealsApi, promoCodesApi, referralsApi, savedCardsApi } from '@/services/api/promotions.api';
-import type { ValidatePromoCodePayload } from '@/types/promotions.types';
+import type { LookupPromoCodePayload, ValidatePromoCodePayload } from '@/types/promotions.types';
 
 // --- Codes promo ---
 
 export function useValidatePromoCode() {
   return useMutation({
     mutationFn: (payload: ValidatePromoCodePayload) => promoCodesApi.validate(payload),
+  });
+}
+
+/** Ce qu'offre un code, à partir du code seul (sans montant). */
+export function useLookupPromoCode() {
+  return useMutation({
+    mutationFn: (payload: LookupPromoCodePayload) => promoCodesApi.lookup(payload),
   });
 }
 

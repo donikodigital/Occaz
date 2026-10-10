@@ -1,28 +1,35 @@
 // mobile/app/(customer)/about.tsx
+// [10/10/2026] v3 — en-tête en bandeau (héro) bleu océan, comme les autres pages. Le logo et le reste de l'écran sont inchangés.
+//
+// [10/10/2026] v2 — le vrai logo de l'app (icon.png) remplace le pictogramme générique.
 //
 // v1 — Infos sur l'app : version (lue dynamiquement), liens vers les
 // conditions générales et la protection des données.
 
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
-import { IconFileText, IconRoute, IconShieldLock } from '@tabler/icons-react-native';
+import { IconFileText, IconInfoCircle, IconShieldLock } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
-import { OceanCard, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanCard } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+
+// Même image que l'icône de l'application (app.json).
+const APP_LOGO = require('../../assets/images/icon.png');
 
 export default function AboutScreen() {
   const appVersion = Constants.expoConfig?.version ?? '—';
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Infos sur l'app" onBack={() => router.back()} />
+      <OceanHeroHeader title="Infos sur l'app" subtitle="Version, conditions et données" icon={<IconInfoCircle />} onBack={() => router.back()} />
 
       <View style={styles.hero}>
-        <View style={styles.logo}>
-          <IconRoute size={30} color={OCEAN.onDark} />
+        <View style={styles.logoShadow}>
+          <Image source={APP_LOGO} resizeMode="cover" style={styles.logo} accessibilityLabel="Logo Occaz" />
         </View>
         <AppText variant="lg" weight="bold" color={OCEAN.deep}>
           Occaz
@@ -59,14 +66,22 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: spacing.lg,
   },
-  logo: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+  logoShadow: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
     backgroundColor: OCEAN.deep,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: spacing.xs,
+    shadowColor: OCEAN.deep,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  logo: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
   },
   row: {
     padding: spacing.md,

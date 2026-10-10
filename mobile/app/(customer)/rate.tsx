@@ -1,12 +1,14 @@
 // mobile/app/(customer)/rate.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [10/10/2026] v2 — « Merci ! » s'affiche dans la page (écran de remerciement avec « OK ») au lieu d'Alert.alert, sans effet sur le web :
 // avant, l'avis partait mais rien ne confirmait et l'écran restait ouvert.
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconArrowLeft } from '@tabler/icons-react-native';
-import { AppText, Button, FeedbackBanner, IconButton, RatingStars, ScreenContainer, TextField } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { IconStar } from '@tabler/icons-react-native';
+import { AppText, Button, FeedbackBanner, RatingStars, ScreenContainer, TextField } from '@/components/ui';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
+import { spacing } from '@/theme';
 import { useRateBooking, useRateShipment } from '@/hooks/useRatings';
 import { ApiError } from '@/services/api/ApiError';
 
@@ -63,17 +65,12 @@ export default function RateScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Laisser un avis
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+      <OceanHeroHeader
+        title="Laisser un avis"
+        subtitle="Votre avis aide la communauté"
+        icon={<IconStar />}
+        onBack={() => router.back()}
+      />
 
       <View style={styles.overallBlock}>
         <AppText variant="base" color="textSecondary" align="center" style={styles.overallLabel}>
@@ -121,13 +118,6 @@ const styles = StyleSheet.create({
   thanks: {
     gap: spacing.lg,
     paddingTop: spacing.xl,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.xl,
   },
   overallBlock: {
     alignItems: 'center',

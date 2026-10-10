@@ -1,4 +1,8 @@
 // mobile/app/(driver)/shipment-invitations.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
+//
+// [10/10/2026] v2 — la carte d'invitation n'avait aucun padding (OceanCard n'en a pas de base) : en-tête, message, montant et boutons
+// touchaient le cadre. Padding ajouté à la carte ; rien d'autre ne change.
 //
 // [09/10/2026] v1 — Invitations de colis reçues d'un client : son message, l'essentiel (d'où à où, ce que le conducteur recevra) et
 // deux boutons, « Accepter » et « Refuser ». Le reste (poids, dimensions, période, trajet concerné) est sous « Voir tous les détails ».
@@ -16,7 +20,8 @@ import {
   IconQuote,
 } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
-import { OceanButton, OceanCard, OceanEmpty, OceanPill, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard, OceanEmpty, OceanPill } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useAcceptInvitation, useDeclineInvitation, useMyInvitations } from '@/hooks/useShipmentInvitations';
@@ -152,7 +157,7 @@ export default function ShipmentInvitationsScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Invitations de colis" subtitle="Des clients vous demandent de les aider" onBack={() => router.back()} />
+      <OceanHeroHeader title="Invitations de colis" subtitle="Des clients vous demandent de les aider" icon={<IconMailOpened />} onBack={() => router.back()} />
 
       {errorText ? (
         <View style={styles.errorBox}>
@@ -205,7 +210,7 @@ export default function ShipmentInvitationsScreen() {
 
 const styles = StyleSheet.create({
   loader: { marginVertical: spacing.xl },
-  card: { gap: spacing.md, marginBottom: spacing.md },
+  card: { gap: spacing.md, padding: spacing.md, marginBottom: spacing.md },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardTopText: { flex: 1, gap: 2 },
   tile: {

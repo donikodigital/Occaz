@@ -1,4 +1,5 @@
 // mobile/src/components/screens/PhoneChangeScreen.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // Changement de numéro de téléphone, commun aux espaces Client et Conducteur (les deux écrans de route le réutilisent).
 //
@@ -13,7 +14,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconCircleCheck, IconDeviceMobile, IconMessage2 } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
-import { OceanButton, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanButton } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { LockedField } from '@/components/screens/LockedField';
 import { OTP_CODE_LENGTH, OtpCodeInput } from '@/components/screens/OtpCodeInput';
@@ -129,7 +131,7 @@ export function PhoneChangeScreen() {
   if (step === 'code') {
     return (
       <ScreenContainer maxWidth="form">
-        <OceanScreenHeader title="Changer mon numéro" subtitle="Étape 2 sur 2" onBack={backToNumber} />
+        <OceanHeroHeader title="Changer mon numéro" subtitle="Étape 2 sur 2" icon={<IconMessage2 />} onBack={backToNumber} />
 
         <View style={styles.body}>
           <AuthIllustration icon={<IconMessage2 size={26} color={OCEAN.onDark} />} size={104} style={styles.illustration} />
@@ -189,7 +191,7 @@ export function PhoneChangeScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader title="Changer mon numéro" subtitle="Étape 1 sur 2" onBack={() => router.back()} />
+      <OceanHeroHeader title="Changer mon numéro" subtitle="Étape 1 sur 2" icon={<IconDeviceMobile />} onBack={() => router.back()} />
 
       <View style={styles.body}>
         <AuthIllustration icon={<IconDeviceMobile size={26} color={OCEAN.onDark} />} size={104} style={styles.illustration} />

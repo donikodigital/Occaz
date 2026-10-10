@@ -1,5 +1,8 @@
 // mobile/app/(driver)/payout-new.tsx
 //
+// [10/10/2026] v4 — Habillage Ocean, comme les autres pages : bandeau (héro) en tête, solde dans une carte ombrée, champs dans une section
+// à en-tête souligné, bouton Ocean, message d'erreur en bandeau dans la page. Logique et écran de résultat inchangés.
+//
 // [07/10/2026] v3 — Retrait en mode Manuel : l'écran annonce « En attente de validation » (statut de la demande, même libellé que
 // dans l'historique du portefeuille) et dit que le montant est mis de côté en attendant la décision de l'équipe.
 //
@@ -11,19 +14,21 @@ import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   IconAlertTriangle,
-  IconArrowLeft,
+  IconCash,
   IconCircleCheck,
   IconClockHour4,
   IconSend,
+  IconWallet,
 } from '@tabler/icons-react-native';
-import { AppText, Button, Card, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, FeedbackBanner, ScreenContainer, TextField } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useMyWallet } from '@/hooks/useWallet';
 import { useRequestPayout } from '@/hooks/usePayouts';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
-import { OceanButton } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { OCEAN } from '@/theme/ocean';
 import type { Payout } from '@/types/payouts.types';
 
@@ -131,28 +136,28 @@ export default function NewPayoutScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-        />
-        <AppText variant="lg" weight="semibold">
-          Retirer des fonds
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+      <OceanHeroHeader
+        title="Retirer des fonds"
+        subtitle="Envoyez votre solde sur votre Mobile Money"
+        icon={<IconCash />}
+        onBack={() => router.back()}
+      />
 
-      <Card style={styles.balanceCard}>
-        <AppText variant="sm" color="textSecondary">
-          Solde disponible
-        </AppText>
-        <AppText variant="xl" weight="semibold">
-          {wallet ? formatMoney(wallet.balance, wallet.currency?.isoCode) : '…'}
-        </AppText>
-      </Card>
+      <OceanCard style={styles.balanceCard}>
+        <View style={styles.balanceTile}>
+          <IconWallet size={20} color={OCEAN.base} />
+        </View>
+        <View style={styles.balanceText}>
+          <AppText variant="xs" color="textSecondary">
+            Solde disponible
+          </AppText>
+          <AppText variant="xl" weight="bold" color={OCEAN.deep}>
+            {wallet ? formatMoney(wallet.balance, wallet.currency?.isoCode) : '…'}
+          </AppText>
+        </View>
+      </OceanCard>
 
-      <View style={styles.fields}>
+      <OceanSection icon={<IconSend size={17} color={OCEAN.base} />} title="Votre retrait">
         <TextField
           label="Montant à retirer"
           value={amount}
@@ -167,15 +172,15 @@ export default function NewPayoutScreen() {
           keyboardType="phone-pad"
           placeholder="+224620000000"
         />
-      </View>
+      </OceanSection>
 
       {errorMessage ? (
-        <AppText variant="sm" color="danger" style={styles.error}>
-          {errorMessage}
-        </AppText>
+        <View style={styles.error}>
+          <FeedbackBanner text={errorMessage} onDismiss={() => setErrorMessage(undefined)} />
+        </View>
       ) : null}
 
-      <Button
+      <OceanButton
         label="Confirmer le retrait"
         onPress={handleSubmit}
         loading={requestPayout.isPending}
@@ -186,23 +191,27 @@ export default function NewPayoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
+  balanceCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
+    gap: spacing.sm + 2,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
-  balanceCard: {
+  balanceTile: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    justifyContent: 'center',
   },
-  fields: {
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+  balanceText: {
+    flex: 1,
+    gap: 1,
   },
   error: {
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   submit: {
     marginBottom: spacing.md,

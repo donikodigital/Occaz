@@ -10,6 +10,7 @@ import { CustomerProfilesService } from '../profiles/customer-profiles/customer-
 import { PromoCodesService } from './promo-codes.service';
 import { UpsertPromoCodeDto } from './dto/upsert-promo-code.dto';
 import { ValidatePromoCodeDto } from './dto/validate-promo-code.dto';
+import { LookupPromoCodeDto } from './dto/lookup-promo-code.dto';
 
 @ApiTags('Codes promo')
 @ApiBearerAuth()
@@ -26,6 +27,13 @@ export class PromoCodesController {
     const customerId = await this.customerProfilesService.getProfileIdForUser(user.id);
     const result = await this.promoCodesService.validate(customerId, dto);
     return { discountAmount: result.discountAmount.toString(), finalAmount: result.finalAmount.toString() };
+  }
+
+  /** Décrit un code à partir du code seul (valeur, plafond, minimum, portée, validité) — sans montant à fournir. */
+  @Post('lookup')
+  async lookup(@Body() dto: LookupPromoCodeDto, @CurrentUser() user: AuthenticatedUser) {
+    const customerId = await this.customerProfilesService.getProfileIdForUser(user.id);
+    return this.promoCodesService.lookup(customerId, dto);
   }
 
   @Permissions(PERMISSIONS.PROMOTION_MANAGE)

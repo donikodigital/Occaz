@@ -1,4 +1,5 @@
 // mobile/app/(driver)/terms.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v1 — Conditions générales : brouillon à remplacer par Doniko (ou un
 // juriste), basé sur la loi guinéenne relative aux transactions
@@ -10,9 +11,9 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconAlertTriangle } from '@tabler/icons-react-native';
+import { IconAlertTriangle, IconFileText } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
-import { OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 
@@ -32,7 +33,7 @@ function Article({ title, children }: { title: string; children: React.ReactNode
 export default function TermsScreen() {
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Conditions générales" onBack={() => router.back()} />
+      <OceanHeroHeader title="Conditions générales" subtitle="Les règles d’utilisation" icon={<IconFileText />} onBack={() => router.back()} />
 
       <View style={styles.warning}>
         <IconAlertTriangle size={16} color={colors.dangerDark} />

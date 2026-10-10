@@ -1,4 +1,5 @@
 // mobile/app/(customer)/shipment-new.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [10/10/2026] v9 — Étape Destinataire : e-mail facultatif. Avec lui, le destinataire reçoit le suivi de son colis (prise en charge, route, livraison) sans compte.
 // [10/10/2026] v8 — Colis par colis : avec 2 colis ou plus, après l'étape « Colis » (catégorie, quantité, urgence) vient UNE ÉTAPE PAR COLIS
 // (poids, dimensions, valeur déclarée, description de ce colis seulement) ; chaque colis peut avoir ses propres mesures. Le coût de
@@ -45,10 +46,10 @@ import {
   OceanButton,
   OceanCard,
   OceanChip,
-  OceanScreenHeader,
   OceanStepper,
   OceanSwitchRow,
 } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { ShipmentQuoteCard } from '@/components/screens/ShipmentQuoteCard';
@@ -705,9 +706,10 @@ export default function NewShipmentScreen() {
   return (
     // Un nouveau conteneur à chaque étape : l'écran repart en haut.
     <ScreenContainer key={`step-${stepIndex}`} scroll maxWidth="detail" footer={footer}>
-      <OceanScreenHeader
+      <OceanHeroHeader
         title="Envoyer un colis"
         subtitle="Complétez les étapes, une à la fois"
+        icon={<IconPackage />}
         onBack={() => (stepIndex > 0 ? goBack() : router.back())}
       />
 

@@ -1,4 +1,5 @@
 // mobile/app/(driver)/news.tsx
+// [10/10/2026] v2 — en-tête en bandeau (héro) bleu océan, comme les autres pages. Le reste de l'écran est inchangé.
 //
 // v1 — Actualités : liste des articles publiés par l'admin.
 
@@ -7,7 +8,8 @@ import { Image, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconChevronRight, IconSpeakerphone } from '@tabler/icons-react-native';
 import { AppText, ResponsiveList, ScreenContainer } from '@/components/ui';
-import { OceanCard, OceanEmpty, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanCard, OceanEmpty } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { usePublishedArticles } from '@/hooks/usePromotions';
@@ -47,7 +49,7 @@ export default function NewsScreen() {
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.headerWrap}>
-        <OceanScreenHeader title="Actualités" onBack={() => router.back()} />
+        <OceanHeroHeader title="Actualités" subtitle="Les dernières nouvelles" icon={<IconSpeakerphone />} onBack={() => router.back()} />
       </View>
 
       <ResponsiveList

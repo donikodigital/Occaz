@@ -1,4 +1,5 @@
 // mobile/app/(customer)/delete-account.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v1 — Suppression de compte : avertissement clair, motif facultatif,
 // confirmation en deux temps. L'API refuse (message affiché ici) s'il
@@ -9,7 +10,8 @@ import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconAlertTriangle, IconTrash } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
-import { OceanButton, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanButton } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { useDeleteAccount } from '@/hooks/useDeleteAccount';
 import { useAuthStore } from '@/stores/authStore';
@@ -38,7 +40,7 @@ export default function DeleteAccountScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Supprimer votre compte" onBack={() => router.back()} />
+      <OceanHeroHeader title="Supprimer votre compte" subtitle="Lisez avant de continuer" icon={<IconTrash />} onBack={() => router.back()} />
 
       <View style={styles.warning}>
         <IconAlertTriangle size={20} color={colors.dangerDark} />

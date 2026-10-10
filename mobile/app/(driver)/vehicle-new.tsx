@@ -1,11 +1,13 @@
 // mobile/app/(driver)/vehicle-new.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [21/09/2026] v2 — habillage bleu Ocean (en-tête, sections), comme la modale de modification du véhicule.
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconCar, IconFileText, IconSteeringWheel } from '@tabler/icons-react-native';
 import { AppText, DocumentUploadField, ScreenContainer, TextField } from '@/components/ui';
-import { OceanButton, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { SeatsStepper } from '@/components/screens/SeatsStepper';
 import { VehicleTypePicker } from '@/components/screens/VehicleTypePicker';
 import { colors, radius, spacing } from '@/theme';
@@ -25,7 +27,7 @@ function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader title="Documents du véhicule" subtitle="Dernière étape" onBack={() => router.back()} />
+      <OceanHeroHeader title="Documents du véhicule" subtitle="Dernière étape" icon={<IconFileText />} onBack={() => router.back()} />
 
       <AppText variant="sm" color="textSecondary" style={styles.intro}>
         Véhicule ajouté. Envoyez sa carte grise et son assurance pour qu&apos;il soit validé par notre équipe.
@@ -101,7 +103,7 @@ export default function NewVehicleScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader title="Ajouter un véhicule" onBack={() => router.back()} />
+      <OceanHeroHeader title="Ajouter un véhicule" subtitle="Renseignez votre véhicule" icon={<IconCar />} onBack={() => router.back()} />
 
       <View style={styles.sections}>
         <OceanSection icon={<IconFileText size={17} color={OCEAN.base} />} title="Informations">

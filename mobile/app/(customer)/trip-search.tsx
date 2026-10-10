@@ -1,4 +1,5 @@
 // mobile/app/(customer)/trip-search.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // [07/10/2026] v3.1 — Les trois blocs (Itinéraire, Date, Passagers) prennent le bandeau « hero » des formulaires de création de trajet
 // et d'envoi de colis (HeroSection) : icône, « ÉTAPE n SUR 3 », titre et résumé de ce qui est choisi. Logique inchangée.
@@ -26,7 +27,8 @@ import {
   IconX,
 } from '@tabler/icons-react-native';
 import { AppText, CalendarPicker, ScreenContainer } from '@/components/ui';
-import { OceanButton, OceanScreenHeader, OceanStepper } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanStepper } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { HeroSection } from '@/components/screens/FormAccordion';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -206,7 +208,7 @@ export default function TripSearchScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Rechercher un trajet" subtitle="Où allez-vous ?" onBack={() => router.back()} />
+      <OceanHeroHeader title="Rechercher un trajet" subtitle="Où allez-vous ?" icon={<IconSearch />} onBack={() => router.back()} />
 
       <HeroSection
         step={1}

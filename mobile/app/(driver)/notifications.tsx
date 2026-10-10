@@ -2,3 +2,4 @@
 import { NotificationsInboxScreen } from '@/components/screens/NotificationsInboxScreen';
 
 export default NotificationsInboxScreen;
+

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/CreateDisputeScreen.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
 // retour, encadré qui rassure (le support répond ici), saisie dans une
@@ -8,7 +9,8 @@ import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconAlertTriangle, IconLifebuoy } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
-import { OceanButton, OceanCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanButton, OceanCard, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCreateDispute } from '@/hooks/useDisputes';
@@ -73,7 +75,7 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader title="Signaler un problème" subtitle="Notre équipe vous répond ici" onBack={() => router.back()} />
+      <OceanHeroHeader title="Signaler un problème" subtitle="Notre équipe vous répond ici" icon={<IconLifebuoy />} onBack={() => router.back()} />
 
       <OceanCard style={styles.intro}>
         <View style={styles.introIcon}>

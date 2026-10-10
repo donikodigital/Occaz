@@ -1,4 +1,5 @@
 // mobile/app/(driver)/trip-new.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // [09/10/2026] v7 — Parcours pas à pas sur téléphone : une seule étape à l'écran, « Continuer » (pied de page) valide l'étape puis ouvre
 // la suivante, « Retour » revient à la précédente ; la dernière étape rappelle l'essentiel (itinéraire, date, véhicule) puis « Créer le
@@ -26,7 +27,6 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import {
-  IconArrowLeft,
   IconArrowsUpDown,
   IconCalendarEvent,
   IconCar,
@@ -58,6 +58,7 @@ import { LocationAutocompleteField } from '@/components/screens/LocationAutocomp
 import { Disclosure, FormAccordionSection, WizardNav, WizardProgress, type StepStatus } from '@/components/screens/FormAccordion';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { useCity, useCountries } from '@/hooks/useCities';
@@ -496,17 +497,12 @@ export default function NewTripScreen() {
         </View>
       }
     >
-      <View style={styles.header}>
-        <IconButton
-          icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
-          onPress={() => (!isDesktop && stepIndex > 0 ? goBack() : router.back())}
-        />
-        <AppText variant="lg" weight="semibold">
-          Créer un trajet
-        </AppText>
-        <View style={{ width: 38 }} />
-      </View>
+      <OceanHeroHeader
+        title="Créer un trajet"
+        subtitle="Itinéraire, horaires et prix"
+        icon={<IconRoute />}
+        onBack={() => (!isDesktop && stepIndex > 0 ? goBack() : router.back())}
+      />
 
       {isDesktop ? (
         <View style={styles.previewWrap}>
@@ -939,13 +935,6 @@ const styles = StyleSheet.create({
   },
   stepRecapTitle: {
     letterSpacing: 0.8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
   },
   previewWrap: {
     marginBottom: spacing.lg,

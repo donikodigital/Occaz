@@ -1,4 +1,5 @@
 // mobile/app/(customer)/saved-cards.tsx
+// [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [10/10/2026] v2 — « Retirer cette carte ? » passe par ConfirmDialog (Alert.alert ne fait rien sur le web), erreur affichée sous la carte.
 //
 // v1 — Mes cartes bancaires. Aucun ajout n'est proposé ici : l'app n'a
@@ -11,7 +12,8 @@ import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconCreditCard, IconStar, IconTrash } from '@tabler/icons-react-native';
 import { AppText, ConfirmDialog, FeedbackBanner, IconButton, ResponsiveList, ScreenContainer } from '@/components/ui';
-import { OceanCard, OceanEmpty, OceanPill, OceanScreenHeader } from '@/components/ocean/OceanKit';
+import { OceanCard, OceanEmpty, OceanPill } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useMySavedCards, useRemoveSavedCard, useSetDefaultSavedCard } from '@/hooks/usePromotions';
@@ -74,7 +76,7 @@ export default function SavedCardsScreen() {
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.headerWrap}>
-        <OceanScreenHeader title="Mes cartes bancaires" onBack={() => router.back()} />
+        <OceanHeroHeader title="Mes cartes bancaires" subtitle="Vos moyens de paiement enregistrés" icon={<IconCreditCard />} onBack={() => router.back()} />
       </View>
 
       <ResponsiveList

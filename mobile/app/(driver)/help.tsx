@@ -1,4 +1,5 @@
 // mobile/app/(driver)/help.tsx
+// [10/10/2026] v2 — en-tête en bandeau (héro) bleu océan, comme les autres pages. Le reste de l'écran est inchangé.
 //
 // v1 — « Obtenir de l'aide » : contacter le support par email (nouveau,
 // demandé explicitement), puis les rubriques Centre de sécurité, FAQ,
@@ -13,13 +14,15 @@ import {
   IconChevronRight,
   IconFileText,
   IconInfoCircle,
+  IconLifebuoy,
   IconMail,
   IconQuestionMark,
   IconShieldCheck,
   IconTrash,
 } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
-import { OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { OceanSection } from '@/components/ocean/OceanKit';
+import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 
@@ -60,7 +63,7 @@ export default function HelpScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanScreenHeader title="Obtenir de l'aide" onBack={() => router.back()} />
+      <OceanHeroHeader title="Obtenir de l'aide" subtitle="Nous sommes là pour vous répondre" icon={<IconLifebuoy />} onBack={() => router.back()} />
 
       <OceanSection icon={<IconMail size={17} color={OCEAN.base} />} title="Nous contacter">
         <Row

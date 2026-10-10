@@ -1,11 +1,15 @@
 // mobile/src/components/ocean/OceanHeroHeader.tsx
 //
+// [10/10/2026] v2 — `onClose` (croix « Fermer » qui remplace la flèche, pour les pages affichées juste après une création) et `right`
+// (actions à droite, à la place de la tuile d'icône : sélection, « Tout lire »…) : mêmes props qu'OceanScreenHeader, pour que toutes
+// les pages puissent passer au bandeau. Les pages qui l'utilisent déjà ne changent pas.
+//
 // [07/10/2026] v1 — En-tête d'écran en bandeau (hero) bleu océan : le bouton Retour, le titre, un sous-titre facultatif et une grosse
 // icône dans une tuile, le tout sur le fond sombre aux reflets d'OceanHeroCard. C'est la version « bandeau » d'OceanScreenHeader
 // (mêmes props, plus `icon`) ; seul le titre est concerné, le reste de l'écran ne change pas.
 import React from 'react';
 import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { IconArrowLeft } from '@tabler/icons-react-native';
+import { IconArrowLeft, IconX } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -15,26 +19,32 @@ export function OceanHeroHeader({
   title,
   subtitle,
   onBack,
+  onClose,
   icon,
+  right,
   style,
 }: {
   title: string;
   subtitle?: string;
   onBack: () => void;
+  /** Page affichée juste après une création : une croix qui ferme (et revient à l'accueil) au lieu de la flèche vers les étapes d'avant. */
+  onClose?: () => void;
   /** Icône de la page, affichée à droite dans une tuile (la couleur et la taille sont celles du bandeau). */
   icon?: React.ReactElement<{ color?: string; size?: number }>;
+  /** Actions à droite ; remplacent la tuile d'icône quand elles sont fournies. */
+  right?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
   return (
     <OceanHeroCard style={[styles.card, style]}>
       <View style={styles.row}>
         <Pressable
-          onPress={onBack}
+          onPress={onClose ?? onBack}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={onClose ? 'Fermer et revenir à l’accueil' : 'Retour'}
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
         >
-          <IconArrowLeft size={20} color={OCEAN.onDark} />
+          {onClose ? <IconX size={20} color={OCEAN.onDark} /> : <IconArrowLeft size={20} color={OCEAN.onDark} />}
         </Pressable>
 
         <View style={styles.text}>
@@ -48,7 +58,9 @@ export function OceanHeroHeader({
           ) : null}
         </View>
 
-        {icon ? (
+        {right ? (
+          right
+        ) : icon ? (
           <View style={styles.tile} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             {React.cloneElement(icon, { color: OCEAN.onDark, size: 24 })}
           </View>
