@@ -67,6 +67,8 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://occaz:occaz@localhost:5432/occaz_ci
+      # Le schéma Prisma déclare aussi directUrl = env("DIRECT_URL") (connexion directe pour les migrations, ex. Neon).
+      DIRECT_URL: postgresql://occaz:occaz@localhost:5432/occaz_ci
       SHADOW_DATABASE_URL: postgresql://occaz:occaz@localhost:5432/occaz_shadow
       NODE_ENV: test
       JWT_ACCESS_SECRET: ci-access-secret
