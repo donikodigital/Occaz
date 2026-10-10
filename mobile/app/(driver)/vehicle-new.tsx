@@ -37,6 +37,7 @@ function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
           document={registrationDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('vehicle_registration')}
+          errorMessage={upload.errorFor('vehicle_registration')}
           onPickCamera={() => upload.pickFromCamera('vehicle_registration')}
         />
         <DocumentUploadField
@@ -44,6 +45,7 @@ function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
           document={insuranceDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('vehicle_insurance')}
+          errorMessage={upload.errorFor('vehicle_insurance')}
           onPickCamera={() => upload.pickFromCamera('vehicle_insurance')}
         />
       </View>

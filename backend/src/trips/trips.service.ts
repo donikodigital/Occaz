@@ -1,4 +1,5 @@
 // backend/src/trips/trips.service.ts
+// [10/10/2026] v+ — markArrivedAtStop annonce le passage dans la ville (suivi des colis).
 // [03/10/2026] v+ — Étapes (villes traversées) : un trajet Conakry → Labé peut desservir Kindia, Mamou… Chaque étape a
 // sa ville, son prix depuis le départ (calculé automatiquement au prorata de la distance, modifiable en brouillon) et son
 // heure de passage. La recherche trouve un trajet dès que la ville de montée précède la ville de descente sur la route,
@@ -8,7 +9,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   BookingStatus,
   CancellationInitiator,
@@ -26,6 +29,7 @@ import { PricingService } from '../pricing/pricing.service';
 import { TripPricingService } from '../trip-pricing/trip-pricing.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TripArrivalService } from './trip-arrival.service';
+import { DOMAIN_EVENTS, TripStopReachedEvent } from '../common/events/domain-events';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { toMoneyBigInt } from '../common/utils/money.util';
@@ -97,6 +101,8 @@ export class TripsService {
     private readonly notifications: NotificationsService,
     private readonly tripPricing: TripPricingService,
     private readonly arrivals: TripArrivalService,
+    // Facultatif : sans bus d'événements (tests unitaires), le suivi des colis n'est simplement pas alimenté.
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   /** Calculs de route qui demandent la base (distances, prix automatiques) — sans changer le constructeur injecté. */
@@ -980,6 +986,8 @@ export class TripsService {
       { kind: 'STOP', stopId, audience: alighting > 0 ? 'ALIGHTING' : 'BOTH' },
       stop.city?.name ?? 'votre point de montée',
     );
+    // Les colis transportés « passent » par cette ville : leur suivi s'enrichit d'une ligne datée et leur expéditeur est prévenu.
+    this.events?.emit(DOMAIN_EVENTS.TRIP_STOP_REACHED, new TripStopReachedEvent(tripId, stop.city?.name ?? 'une étape'));
     return updated;
   }
 

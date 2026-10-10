@@ -1,7 +1,7 @@
 // mobile/src/hooks/useDocumentUpload.ts
+// [10/10/2026] v2 — plus d'Alert.alert (sans effet sur le web) : l'erreur est gardée par type de pièce (errorFor) et affichée sous son champ.
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
 import type {
   AppDocument,
   CreateDocumentPayload,
@@ -35,14 +35,17 @@ function mimeTypeToContentType(mimeType: string | undefined): UploadableContentT
  */
 export function useDocumentUpload({ requestUploadUrl, confirmDocument, onUploaded }: UseDocumentUploadParams) {
   const [isUploading, setUploading] = useState(false);
+  // Une seule erreur à la fois, rattachée à la pièce concernée : chaque champ n'affiche que la sienne.
+  const [error, setError] = useState<{ documentType: string; message: string } | null>(null);
 
   async function uploadFromAsset(documentType: string, asset: ImagePicker.ImagePickerAsset) {
     const contentType = mimeTypeToContentType(asset.mimeType);
     if (!contentType) {
-      Alert.alert('Format non supporté', 'Choisissez une photo au format JPEG, PNG ou WebP.');
+      setError({ documentType, message: 'Format non supporté : choisissez une photo au format JPEG, PNG ou WebP.' });
       return;
     }
 
+    setError(null);
     setUploading(true);
     try {
       const { storageKey, uploadUrl } = await requestUploadUrl({ type: documentType, contentType });
@@ -62,16 +65,17 @@ export function useDocumentUpload({ requestUploadUrl, confirmDocument, onUploade
       const document = await confirmDocument({ type: documentType, storageKey });
       onUploaded?.(document);
     } catch {
-      Alert.alert('Échec de l\'envoi', "Le document n'a pas pu être envoyé — vérifiez votre connexion et réessayez.");
+      setError({ documentType, message: "Échec de l'envoi : le document n'a pas pu être envoyé — vérifiez votre connexion et réessayez." });
     } finally {
       setUploading(false);
     }
   }
 
   async function pickFromLibrary(documentType: string) {
+    setError(null);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Autorisation requise', 'Autorisez l\'accès à vos photos pour envoyer ce document.');
+      setError({ documentType, message: "Autorisation requise : autorisez l'accès à vos photos pour envoyer ce document." });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -84,9 +88,10 @@ export function useDocumentUpload({ requestUploadUrl, confirmDocument, onUploade
   }
 
   async function pickFromCamera(documentType: string) {
+    setError(null);
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Autorisation requise', "Autorisez l'accès à l'appareil photo pour envoyer ce document.");
+      setError({ documentType, message: "Autorisation requise : autorisez l'accès à l'appareil photo pour envoyer ce document." });
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: false });
@@ -94,5 +99,8 @@ export function useDocumentUpload({ requestUploadUrl, confirmDocument, onUploade
     await uploadFromAsset(documentType, result.assets[0]);
   }
 
-  return { pickFromLibrary, pickFromCamera, isUploading };
+  /** Message d'erreur à afficher sous le champ de cette pièce (null s'il n'y en a pas). */
+  const errorFor = (documentType: string): string | null => (error?.documentType === documentType ? error.message : null);
+
+  return { pickFromLibrary, pickFromCamera, isUploading, errorFor };
 }

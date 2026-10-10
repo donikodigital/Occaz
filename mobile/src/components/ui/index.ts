@@ -38,3 +38,5 @@ export { ResponsiveList } from './ResponsiveList';
 export type { ResponsiveListProps } from './ResponsiveList';
 export { ProgressRing } from './ProgressRing';
 export type { ProgressRingProps } from './ProgressRing';
+export { FeedbackBanner } from './FeedbackBanner';
+export type { FeedbackBannerProps, FeedbackTone } from './FeedbackBanner';

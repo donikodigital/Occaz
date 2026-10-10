@@ -1,4 +1,5 @@
 // mobile/src/types/shipments.types.ts
+// [10/10/2026] v5 — recipientEmail (facultatif) : le destinataire reçoit le suivi par e-mail.
 // [09/10/2026] v4 — invitations de conducteurs : DriverSearchResult, ShipmentInvitationSummary, DriverInvitation.
 // [23/09/2026] v3 — champ promoCode facultatif sur CreateShipmentPayload.
 // [21/09/2026] v2 — plage de dates, conducteur direct, devis, AvailableShipment, tripId facultatif à l'acceptation.
@@ -36,6 +37,24 @@ export interface ShipmentItem {
   label: string;
   weightKg: number | null;
   photoUrl: string | null;
+  /** Détail d'un colis d'un envoi multiple — nul pour les envois créés avant la saisie colis par colis. */
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  declaredValue?: Money | null;
+  description?: string | null;
+  /** Prix de ce colis (hors majoration d'urgence). */
+  price?: Money | null;
+}
+
+/** Un colis tel que saisi : mesures de CE colis, valeur déclarée et description facultatives. */
+export interface ParcelInput {
+  weightKg: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
+  declaredValue?: string;
+  description?: string;
 }
 
 export interface ShipmentTrackingEntry {
@@ -91,6 +110,8 @@ export interface Shipment {
   recipientName: string;
   /** null côté conducteur une fois le colis livré sans litige. */
   recipientPhone: string | null;
+  /** Facultatif ; jamais communiqué au conducteur. */
+  recipientEmail?: string | null;
   recipientLocationId: string;
   recipientLocation?: TripLocation;
   description: string | null;
@@ -132,6 +153,7 @@ export interface CreateShipmentPayload {
   senderLocationId: string;
   recipientName: string;
   recipientPhone: string;
+  recipientEmail?: string;
   recipientLocationId: string;
   description?: string;
   weightKg: number;
@@ -140,6 +162,8 @@ export interface CreateShipmentPayload {
   heightCm?: number;
   quantity?: number;
   declaredValue?: string;
+  /** Les colis, un par un : le serveur en tire quantité, poids total et valeur déclarée, et calcule le prix de chacun. */
+  parcels?: ParcelInput[];
   instructions?: string;
   isUrgent?: boolean;
   /** Plage de dates du départ (ISO) — obligatoire. */
@@ -160,11 +184,27 @@ export interface QuoteShipmentPayload {
   heightCm?: number;
   quantity?: number;
   declaredValue?: string;
+  parcels?: ParcelInput[];
   isUrgent?: boolean;
+}
+
+/** Prix d'un colis dans le devis (même ordre que la saisie). */
+export interface ShipmentParcelQuote {
+  index: number;
+  weightKg: number | null;
+  price: Money;
+  chargeableWeightKg: number;
+  volumetricWeightKg: number | null;
 }
 
 export interface ShipmentQuote {
   totalAmount: Money;
+  quantity?: number;
+  weightKg?: number;
+  /** Prix de chaque colis — vide pour un devis global. */
+  parcels?: ShipmentParcelQuote[];
+  /** Majoration d'urgence, comptée une seule fois pour tout l'envoi. */
+  urgentSurcharge?: Money;
   currencyId: string;
   currencyCode: string | null;
   distanceKm: number;

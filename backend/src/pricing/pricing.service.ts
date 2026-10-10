@@ -1,4 +1,6 @@
 // backend/src/pricing/pricing.service.ts
+// [10/10/2026] v3 — envoi colis par colis : chaque colis a son propre prix (base + poids facturé + distance, × catégorie, + frais de valeur
+// déclarée) ; la majoration d'urgence s'ajoute une seule fois à l'envoi. Sans liste de colis, l'ancien calcul global est inchangé.
 // [21/09/2026] v2 — devis d'envoi : poids volumétrique, valeur déclarée, distance routière ; repli sur les villes au lieu d'une distance de 0.
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ServiceType } from '@prisma/client';
@@ -17,7 +19,26 @@ import { PrismaService } from '../prisma/prisma.service';
  * dans ce dernier cas, un signal d'alerte devrait être remonté en
  * production (à brancher sur le système d'observabilité du Lot 9).
  */
+/** Un colis tel que pris en compte dans le devis. */
+export interface ShipmentParcelQuoteInput {
+  weightKg: number;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  /** Valeur déclarée de ce colis, plus petite unité de la devise. */
+  declaredValue?: bigint | null;
+}
+
+export interface ShipmentParcelQuote {
+  /** Prix de ce colis (hors majoration d'urgence). */
+  price: bigint;
+  chargeableWeightKg: number;
+  volumetricWeightKg: number | null;
+}
+
 export interface ShipmentQuoteInput {
+  /** Les colis, un par un. Quand la liste est fournie, elle remplace poids, dimensions, quantité et valeur déclarée globaux. */
+  parcels?: ShipmentParcelQuoteInput[];
   weightKg: number;
   lengthCm?: number | null;
   widthCm?: number | null;
@@ -39,6 +60,10 @@ export interface ShipmentQuote {
   /** Poids facturé : le plus grand du poids réel et du poids volumétrique. */
   chargeableWeightKg: number;
   volumetricWeightKg: number | null;
+  /** Prix colis par colis (même ordre que la saisie) — vide pour un devis global sans liste de colis. */
+  parcels: ShipmentParcelQuote[];
+  /** Majoration d'urgence, comptée une seule fois pour tout l'envoi (0 si l'envoi n'est pas urgent). */
+  urgentSurcharge: bigint;
 }
 
 @Injectable()
@@ -147,7 +172,7 @@ export class PricingService {
       basePrice,
       perKgRate,
       perKmRate,
-      urgentSurcharge,
+      urgentSurchargeRate,
       volumetricDivisor,
       roadDistanceFactor,
       declaredValueRatePercent,
@@ -175,6 +200,38 @@ export class PricingService {
     const straightLineKm = await this.computeDistanceKm(params.senderLocationId, params.recipientLocationId);
     const distanceKm = Math.max(straightLineKm * roadDistanceFactor, minDistanceKm);
 
+    if (params.parcels && params.parcels.length > 0) {
+      const parcels = params.parcels.map((parcel): ShipmentParcelQuote & { rawWeight: number } => {
+        const volumetric =
+          parcel.lengthCm && parcel.widthCm && parcel.heightCm && volumetricDivisor > 0
+            ? (parcel.lengthCm * parcel.widthCm * parcel.heightCm) / volumetricDivisor
+            : null;
+        const chargeable = Math.max(parcel.weightKg, volumetric ?? 0);
+        let parcelPrice = (basePrice + perKgRate * chargeable + perKmRate * distanceKm) * params.categoryPriceMultiplier;
+        if (parcel.declaredValue && parcel.declaredValue > 0n) {
+          const valueFee = (Number(parcel.declaredValue) * declaredValueRatePercent) / 100;
+          parcelPrice += Math.max(declaredValueMinFee, valueFee);
+        }
+        return {
+          price: BigInt(Math.round(parcelPrice)),
+          chargeableWeightKg: Math.round(chargeable * 100) / 100,
+          volumetricWeightKg: volumetric === null ? null : Math.round(volumetric * 100) / 100,
+          rawWeight: chargeable,
+        };
+      });
+      const urgentSurcharge = params.isUrgent ? BigInt(Math.round(urgentSurchargeRate)) : 0n;
+      const volumetricTotal = parcels.reduce((sum, parcel) => sum + (parcel.volumetricWeightKg ?? 0), 0);
+      return {
+        // Somme de montants déjà arrondis : le total affiché est exactement la somme des lignes affichées.
+        price: parcels.reduce((sum, parcel) => sum + parcel.price, 0n) + urgentSurcharge,
+        distanceKm: Math.round(distanceKm * 10) / 10,
+        chargeableWeightKg: Math.round(parcels.reduce((sum, parcel) => sum + parcel.rawWeight, 0) * 100) / 100,
+        volumetricWeightKg: volumetricTotal > 0 ? Math.round(volumetricTotal * 100) / 100 : null,
+        parcels: parcels.map(({ rawWeight: _rawWeight, ...parcel }) => parcel),
+        urgentSurcharge,
+      };
+    }
+
     // Dimensions données par colis : le volume total est multiplié par la quantité.
     const quantity = Math.max(1, params.quantity ?? 1);
     const { lengthCm, widthCm, heightCm } = params;
@@ -191,13 +248,15 @@ export class PricingService {
       const valueFee = (Number(params.declaredValue) * declaredValueRatePercent) / 100;
       price += Math.max(declaredValueMinFee, valueFee);
     }
-    if (params.isUrgent) price += urgentSurcharge;
+    if (params.isUrgent) price += urgentSurchargeRate;
 
     return {
       price: BigInt(Math.round(price)),
       distanceKm: Math.round(distanceKm * 10) / 10,
       chargeableWeightKg: Math.round(chargeableWeightKg * 100) / 100,
       volumetricWeightKg: volumetricWeightKg === null ? null : Math.round(volumetricWeightKg * 100) / 100,
+      parcels: [],
+      urgentSurcharge: params.isUrgent ? BigInt(Math.round(urgentSurchargeRate)) : 0n,
     };
   }
 

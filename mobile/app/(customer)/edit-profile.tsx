@@ -135,6 +135,7 @@ export default function EditProfileScreen() {
         isUploading={photoUpload.isUploading}
         onPickLibrary={photoUpload.pickFromLibrary}
         onPickCamera={photoUpload.pickFromCamera}
+        errorMessage={photoUpload.error}
       />
       <View style={{ height: spacing.lg }} />
 

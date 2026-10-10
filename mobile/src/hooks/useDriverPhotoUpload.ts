@@ -1,7 +1,6 @@
 // mobile/src/hooks/useDriverPhotoUpload.ts
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
 import { driverProfilesApi } from '@/services/api/driverProfiles.api';
 import type { UploadableContentType } from '@/types/documents.types';
 import type { DriverProfile } from '@/types/profiles.types';
@@ -21,14 +20,17 @@ function mimeTypeToContentType(mimeType: string | undefined): UploadableContentT
  */
 export function useDriverPhotoUpload(onUploaded?: (profile: DriverProfile) => void) {
   const [isUploading, setUploading] = useState(false);
+  // Message à afficher dans la page (Alert.alert ne fait rien sur le web) ; effacé au prochain essai.
+  const [error, setError] = useState<string | null>(null);
 
   async function uploadFromAsset(asset: ImagePicker.ImagePickerAsset) {
     const contentType = mimeTypeToContentType(asset.mimeType);
     if (!contentType) {
-      Alert.alert('Format non supporté', 'Choisissez une photo au format JPEG, PNG ou WebP.');
+      setError('Format non supporté : choisissez une photo au format JPEG, PNG ou WebP.');
       return;
     }
 
+    setError(null);
     setUploading(true);
     try {
       const { storageKey, uploadUrl } = await driverProfilesApi.requestPhotoUploadUrl({ type: 'profile_photo', contentType });
@@ -48,16 +50,17 @@ export function useDriverPhotoUpload(onUploaded?: (profile: DriverProfile) => vo
       const profile = await driverProfilesApi.confirmPhoto(storageKey);
       onUploaded?.(profile);
     } catch {
-      Alert.alert('Échec de l\'envoi', "La photo n'a pas pu être envoyée — vérifiez votre connexion et réessayez.");
+      setError("Échec de l'envoi : la photo n'a pas pu être envoyée — vérifiez votre connexion et réessayez.");
     } finally {
       setUploading(false);
     }
   }
 
   async function pickFromLibrary() {
+    setError(null);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Autorisation requise', 'Autorisez l\'accès à vos photos pour envoyer votre photo de profil.');
+      setError("Autorisation requise : autorisez l'accès à vos photos pour envoyer votre photo de profil.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -71,9 +74,10 @@ export function useDriverPhotoUpload(onUploaded?: (profile: DriverProfile) => vo
   }
 
   async function pickFromCamera() {
+    setError(null);
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Autorisation requise', "Autorisez l'accès à l'appareil photo pour envoyer votre photo de profil.");
+      setError("Autorisation requise : autorisez l'accès à l'appareil photo pour envoyer votre photo de profil.");
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true, aspect: [1, 1] });
@@ -81,5 +85,5 @@ export function useDriverPhotoUpload(onUploaded?: (profile: DriverProfile) => vo
     await uploadFromAsset(result.assets[0]);
   }
 
-  return { pickFromLibrary, pickFromCamera, isUploading };
+  return { pickFromLibrary, pickFromCamera, isUploading, error, clearError: () => setError(null) };
 }

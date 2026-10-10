@@ -49,6 +49,11 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
   return url.toString();
 }
 
+/** Adresse complète d'un chemin de l'API — pour ouvrir un lien (PDF) dans le navigateur ou la visionneuse du téléphone. */
+export function apiUrl(path: string, query?: RequestOptions['query']): string {
+  return buildUrl(path, query);
+}
+
 async function rawFetch<T>(path: string, options: RequestOptions, accessToken?: string | null): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

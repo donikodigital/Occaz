@@ -6,6 +6,12 @@
 //   2. les suggestions Mapbox ;
 //   3. « Ajouter … » : saisie manuelle en dernier recours.
 //
+// v3 — Look Ocean + mode « page » : l'écran peut héberger le champ dans son
+// bandeau (SearchHeroHeader). Il appelle alors lui-même useAddressSearch,
+// passe le résultat dans `search` et met `hideField` : ce composant ne rend
+// plus que les résultats. Sans ces deux props, il se comporte comme avant
+// (champ intégré, utilisé par LocationAutocompleteField sur desktop).
+//
 // Rétrocompatible : sans `onSelectSaved` ni `onManualEntry`, le composant
 // se comporte comme avant (suggestions Mapbox seules, champ vidé après
 // sélection). Les suggestions restent affichées en ligne sous le champ,
@@ -25,11 +31,15 @@ import {
 } from '@tabler/icons-react-native';
 import { AppText, TextField } from '@/components/ui';
 import { colors, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useAddressSearch } from '@/hooks/useAddressSearch';
 import { useSavedLocations } from '@/hooks/useSavedLocations';
 import { geocodingApi } from '@/services/api/geocoding.api';
 import type { GeocodingSuggestion } from '@/types/geocoding.types';
 import type { SavedLocation } from '@/types/location-picker.types';
+
+/** Ce que renvoie useAddressSearch — pour héberger le champ de saisie hors de ce composant. */
+export type AddressSearchState = ReturnType<typeof useAddressSearch>;
 
 export interface LocationSearchFieldProps {
   countryCode?: string;
@@ -42,6 +52,10 @@ export interface LocationSearchFieldProps {
   autoFocus?: boolean;
   /** Vide le champ après une sélection (comportement historique). Mettre false pour retrouver la saisie au retour arrière. */
   clearOnSelect?: boolean;
+  /** État de recherche piloté par l'écran (le champ est alors dans son bandeau). */
+  search?: AddressSearchState;
+  /** Ne pas afficher le champ de saisie : seuls les résultats sont rendus. */
+  hideField?: boolean;
 }
 
 function ResultRow({
@@ -68,7 +82,7 @@ function ResultRow({
     >
       <View style={[styles.rowIcon, tone === 'primary' ? styles.rowIconPrimary : styles.rowIconNeutral]}>{icon}</View>
       <View style={styles.rowText}>
-        <AppText variant="sm" weight="semibold" numberOfLines={1}>
+        <AppText variant="sm" weight="semibold" color={OCEAN.deep} numberOfLines={1}>
           {title}
         </AppText>
         {subtitle ? (
@@ -86,8 +100,8 @@ function ResultGroup({ title, children }: { title?: string; children: React.Reac
   return (
     <View style={styles.group}>
       {title ? (
-        <AppText variant="sm" weight="semibold" color="textSecondary" style={styles.groupTitle}>
-          {title}
+        <AppText variant="xs" weight="bold" color={OCEAN.base} style={styles.groupTitle}>
+          {title.toUpperCase()}
         </AppText>
       ) : null}
       <View style={styles.groupCard}>{children}</View>
@@ -103,8 +117,12 @@ export function LocationSearchField({
   placeholder,
   autoFocus,
   clearOnSelect = true,
+  search,
+  hideField = false,
 }: LocationSearchFieldProps) {
-  const { query, setQuery, suggestions, isSearching } = useAddressSearch(countryCode);
+  // Toujours appelé (règle des hooks) ; sans requête saisie il ne déclenche rien.
+  const ownSearch = useAddressSearch(countryCode);
+  const { query, setQuery, suggestions, isSearching } = search ?? ownSearch;
   const showSaved = Boolean(onSelectSaved);
   const { data: saved } = useSavedLocations(showSaved ? query : '', showSaved);
   const [isLocating, setIsLocating] = useState(false);
@@ -150,55 +168,65 @@ export function LocationSearchField({
 
   return (
     <View>
-      <View style={styles.inputWrapper}>
-        <IconSearch size={16} color={colors.textMuted} style={styles.searchIcon} />
-        <TextField
-          value={query}
-          onChangeText={setQuery}
-          placeholder={placeholder ?? 'Rechercher une adresse…'}
-          autoFocus={autoFocus}
-          style={styles.input}
-        />
-        {isSearching ? (
-          <ActivityIndicator size="small" color={colors.primary} style={styles.trailing} />
-        ) : hasQuery ? (
-          <Pressable
-            onPress={() => setQuery('')}
-            accessibilityRole="button"
-            accessibilityLabel="Effacer la recherche"
-            hitSlop={10}
-            style={styles.trailing}
-          >
-            <IconX size={16} color={colors.textMuted} />
-          </Pressable>
-        ) : null}
-      </View>
+      {hideField ? null : (
+        <View style={styles.inputWrapper}>
+          <IconSearch size={16} color={OCEAN.base} style={styles.searchIcon} />
+          <TextField
+            value={query}
+            onChangeText={setQuery}
+            placeholder={placeholder ?? 'Rechercher une adresse…'}
+            autoFocus={autoFocus}
+            style={styles.input}
+          />
+          {isSearching ? (
+            <ActivityIndicator size="small" color={OCEAN.base} style={styles.trailing} />
+          ) : hasQuery ? (
+            <Pressable
+              onPress={() => setQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel="Effacer la recherche"
+              hitSlop={10}
+              style={styles.trailing}
+            >
+              <IconX size={16} color={colors.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+      )}
 
       {!hasQuery ? (
-        <ResultGroup>
+        <View style={styles.group}>
           <Pressable
             onPress={handleUseCurrentLocation}
             disabled={isLocating}
             accessibilityRole="button"
             accessibilityLabel="Utiliser ma position actuelle"
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            style={({ pressed }) => [styles.locateCard, pressed && styles.rowPressed]}
           >
-            <View style={[styles.rowIcon, styles.rowIconPrimary]}>
-              {isLocating ? <ActivityIndicator size="small" color={colors.primary} /> : <IconCurrentLocation size={16} color={colors.primary} />}
+            <View style={styles.locateIcon}>
+              {isLocating ? (
+                <ActivityIndicator size="small" color={OCEAN.onDark} />
+              ) : (
+                <IconCurrentLocation size={20} color={OCEAN.onDark} />
+              )}
             </View>
             <View style={styles.rowText}>
-              <AppText variant="sm" weight="semibold" color="primary">
+              <AppText variant="sm" weight="bold" color={OCEAN.deep}>
                 Utiliser ma position actuelle
               </AppText>
               {locationError ? (
                 <AppText variant="xs" color="danger" numberOfLines={2}>
                   {locationError}
                 </AppText>
-              ) : null}
+              ) : (
+                <AppText variant="xs" color="textSecondary" numberOfLines={1}>
+                  Remplir l'adresse avec le GPS
+                </AppText>
+              )}
             </View>
-            {!isLocating ? <IconChevronRight size={16} color={colors.textMuted} /> : null}
+            {!isLocating ? <IconChevronRight size={16} color={OCEAN.base} /> : null}
           </Pressable>
-        </ResultGroup>
+        </View>
       ) : null}
 
       {savedItems.length > 0 ? (
@@ -209,9 +237,9 @@ export function LocationSearchField({
               tone="primary"
               icon={
                 hasQuery ? (
-                  <IconMapPin size={16} color={colors.primary} />
+                  <IconMapPin size={18} color={OCEAN.base} />
                 ) : (
-                  <IconHistory size={16} color={colors.primary} />
+                  <IconHistory size={18} color={OCEAN.base} />
                 )
               }
               title={item.label}
@@ -229,7 +257,7 @@ export function LocationSearchField({
             <ResultRow
               key={`${suggestion.latitude}-${suggestion.longitude}-${index}`}
               tone="neutral"
-              icon={<IconMapPin size={16} color={colors.textSecondary} />}
+              icon={<IconMapPin size={18} color={colors.textSecondary} />}
               title={suggestion.label}
               subtitle={suggestion.formattedAddress}
               onPress={() => handleSelect(suggestion)}
@@ -243,7 +271,7 @@ export function LocationSearchField({
         <ResultGroup>
           <ResultRow
             tone="neutral"
-            icon={<IconPencil size={16} color={colors.textSecondary} />}
+            icon={<IconPencil size={18} color={colors.textSecondary} />}
             title={`Ajouter « ${trimmed} »`}
             subtitle="Introuvable ? Gardez votre saisie et choisissez la ville."
             onPress={() => onManualEntry?.(trimmed)}
@@ -255,14 +283,14 @@ export function LocationSearchField({
       {!hasQuery && savedItems.length === 0 ? (
         <View style={styles.hint}>
           <View style={styles.hintIcon}>
-            <IconMapPin size={22} color={colors.primary} />
+            <IconMapPin size={26} color={OCEAN.base} strokeWidth={1.7} />
           </View>
-          <AppText variant="base" weight="semibold">
+          <AppText variant="md" weight="semibold" align="center">
             Où se trouve ce lieu ?
           </AppText>
-          <AppText variant="sm" color="textSecondary" style={styles.hintText}>
-            Tapez un quartier, un repère ou un lieu connu (marché, gare routière, station…).
-            Vos adresses déjà utilisées apparaîtront ici.
+          <AppText variant="sm" color="textSecondary" align="center">
+            Tapez un quartier, un repère ou un lieu connu (marché, gare routière, station…). Vos adresses déjà utilisées
+            apparaîtront ici.
           </AppText>
         </View>
       ) : null}
@@ -294,13 +322,37 @@ const styles = StyleSheet.create({
   groupTitle: {
     marginBottom: spacing.xs,
     marginLeft: spacing.xxs,
+    letterSpacing: 0.9,
   },
   groupCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
+    borderColor: OCEAN.line,
+    borderRadius: 22,
     overflow: 'hidden',
+    shadowColor: OCEAN.deep,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  locateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm + 2,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: OCEAN.line,
+    backgroundColor: OCEAN.mist,
+  },
+  locateIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    backgroundColor: OCEAN.base,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   row: {
     flexDirection: 'row',
@@ -311,20 +363,20 @@ const styles = StyleSheet.create({
   },
   rowDivider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: OCEAN.line,
   },
   rowPressed: {
-    backgroundColor: colors.surfaceMuted,
+    opacity: 0.75,
   },
   rowIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowIconPrimary: {
-    backgroundColor: colors.primaryLight,
+    backgroundColor: OCEAN.mist,
   },
   rowIconNeutral: {
     backgroundColor: colors.surfaceMuted,
@@ -340,15 +392,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   hintIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    backgroundColor: colors.primaryLight,
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
-  },
-  hintText: {
-    textAlign: 'center',
   },
 });

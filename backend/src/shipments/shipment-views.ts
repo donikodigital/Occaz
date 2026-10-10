@@ -1,4 +1,5 @@
 // backend/src/shipments/shipment-views.ts
+// [10/10/2026] v2 — l'e-mail du destinataire n'est jamais communiqué au conducteur.
 // [21/09/2026] v1 — vue des envois disponibles sans données personnelles (liste blanche).
 import { Prisma } from '@prisma/client';
 
@@ -82,8 +83,16 @@ export function hideContactsOnceDelivered<
   recipientPhone: string | null;
   driverPhone?: string | null;
 } {
-  if (!CONTACT_CLOSED_STATUSES.has(shipment.status)) return shipment;
+  // L'e-mail du destinataire ne sert qu'au suivi par e-mail : le conducteur ne le reçoit jamais, livré ou non.
+  const visible = viewer === 'driver' ? withoutRecipientEmail(shipment) : shipment;
+  if (!CONTACT_CLOSED_STATUSES.has(shipment.status)) return visible;
   return viewer === 'driver'
-    ? { ...shipment, senderPhone: null, recipientPhone: null }
-    : { ...shipment, driverPhone: shipment.driverPhone === undefined ? undefined : null };
+    ? { ...visible, senderPhone: null, recipientPhone: null }
+    : { ...visible, driverPhone: shipment.driverPhone === undefined ? undefined : null };
+}
+
+function withoutRecipientEmail<T extends object>(shipment: T): T {
+  if (!('recipientEmail' in shipment)) return shipment;
+  const { recipientEmail: _hidden, ...rest } = shipment as T & { recipientEmail?: unknown };
+  return rest as T;
 }

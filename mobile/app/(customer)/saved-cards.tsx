@@ -1,16 +1,16 @@
 // mobile/app/(customer)/saved-cards.tsx
+// [10/10/2026] v2 — « Retirer cette carte ? » passe par ConfirmDialog (Alert.alert ne fait rien sur le web), erreur affichée sous la carte.
 //
 // v1 — Mes cartes bancaires. Aucun ajout n'est proposé ici : l'app n'a
 // pas encore de SDK de tokenisation de carte intégré (le paiement repose
 // sur le mobile money) — cet écran liste et gère les cartes que ce SDK
 // ajoutera une fois branché (voir SavedCardsService, backend).
 
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { Alert } from 'react-native';
 import { IconCreditCard, IconStar, IconTrash } from '@tabler/icons-react-native';
-import { AppText, IconButton, ResponsiveList, ScreenContainer } from '@/components/ui';
+import { AppText, ConfirmDialog, FeedbackBanner, IconButton, ResponsiveList, ScreenContainer } from '@/components/ui';
 import { OceanCard, OceanEmpty, OceanPill, OceanScreenHeader } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -20,15 +20,14 @@ import type { SavedCard } from '@/types/promotions.types';
 function CardRow({ card }: { card: SavedCard }) {
   const removeCard = useRemoveSavedCard();
   const setDefault = useSetDefaultSavedCard();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function handleRemove() {
-    Alert.alert('Retirer cette carte ?', `Carte se terminant par ${card.last4}`, [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Retirer', style: 'destructive', onPress: () => removeCard.mutate(card.id) },
-    ]);
+    removeCard.mutate(card.id, { onSettled: () => setConfirmOpen(false) });
   }
 
   return (
+    <View style={styles.rowWrap}>
     <OceanCard style={styles.row}>
       <View style={styles.icon}>
         <IconCreditCard size={18} color={OCEAN.base} />
@@ -50,8 +49,22 @@ function CardRow({ card }: { card: SavedCard }) {
           onPress={() => setDefault.mutate(card.id)}
         />
       )}
-      <IconButton icon={<IconTrash size={16} color={colors.danger} />} accessibilityLabel="Retirer" onPress={handleRemove} />
+      <IconButton icon={<IconTrash size={16} color={colors.danger} />} accessibilityLabel="Retirer" onPress={() => setConfirmOpen(true)} />
     </OceanCard>
+    {removeCard.isError || setDefault.isError ? (
+      <FeedbackBanner tone="error" text="L’opération sur cette carte a échoué — réessayez dans un instant." />
+    ) : null}
+    <ConfirmDialog
+      visible={confirmOpen}
+      title="Retirer cette carte ?"
+      message={`Carte se terminant par ${card.last4}`}
+      confirmLabel="Retirer"
+      destructive
+      loading={removeCard.isPending}
+      onConfirm={handleRemove}
+      onCancel={() => setConfirmOpen(false)}
+    />
+    </View>
   );
 }
 
@@ -91,6 +104,9 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
+  },
+  rowWrap: {
+    gap: spacing.xs,
   },
   row: {
     padding: spacing.md,

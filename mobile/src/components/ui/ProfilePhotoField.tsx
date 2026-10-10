@@ -1,9 +1,11 @@
 // mobile/src/components/ui/ProfilePhotoField.tsx
+// [10/10/2026] v+ — errorMessage : l'échec d'un envoi s'affiche sous la photo (Alert.alert ne fait rien sur le web).
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { IconCamera, IconPhoto } from '@tabler/icons-react-native';
 import { AppText } from './AppText';
 import { Avatar } from './Avatar';
+import { FeedbackBanner } from './FeedbackBanner';
 import { IconButton } from './IconButton';
 import { colors, spacing } from '@/theme';
 
@@ -15,6 +17,8 @@ export interface ProfilePhotoFieldProps {
   onPickCamera: () => void;
   /** Affiche un rappel visuel tant qu'aucune photo n'est envoyée — la validation du compte en dépend (voir DriverProfilesService.verify). */
   isRequired?: boolean;
+  /** Échec du dernier envoi, affiché sous la photo. */
+  errorMessage?: string | null;
 }
 
 export function ProfilePhotoField({
@@ -24,6 +28,7 @@ export function ProfilePhotoField({
   onPickLibrary,
   onPickCamera,
   isRequired,
+  errorMessage,
 }: ProfilePhotoFieldProps) {
   return (
     <View style={styles.container}>
@@ -54,6 +59,12 @@ export function ProfilePhotoField({
           Obligatoire avant la validation de votre compte
         </AppText>
       ) : null}
+
+      {errorMessage ? (
+        <View style={styles.errorWrap}>
+          <FeedbackBanner tone="error" text={errorMessage} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -80,6 +91,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     marginTop: spacing.sm,
+  },
+  errorWrap: {
+    marginTop: spacing.sm,
+    alignSelf: 'stretch',
   },
   requiredNote: {
     marginTop: spacing.xs,

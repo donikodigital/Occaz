@@ -41,6 +41,7 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
         isUploading={photoUpload.isUploading}
         onPickLibrary={photoUpload.pickFromLibrary}
         onPickCamera={photoUpload.pickFromCamera}
+        errorMessage={photoUpload.error}
         isRequired
       />
 
@@ -50,6 +51,7 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
           document={nationalIdDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('national_id')}
+          errorMessage={upload.errorFor('national_id')}
           onPickCamera={() => upload.pickFromCamera('national_id')}
         />
         <DocumentUploadField
@@ -57,6 +59,7 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
           document={licenseDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('driver_license')}
+          errorMessage={upload.errorFor('driver_license')}
           onPickCamera={() => upload.pickFromCamera('driver_license')}
         />
       </View>

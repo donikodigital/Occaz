@@ -1,4 +1,6 @@
 // mobile/app/(customer)/(tabs)/home.tsx
+// [10/10/2026] v+ — « Message indisponible » s'affiche dans la page (bannière) au lieu d'Alert.alert, sans effet sur le web.
+// [10/10/2026] v+ — action « Suivre un colis » dans le bouton + (saisie d'un numéro de suivi).
 // [08/10/2026] v4 — (1) la carte de la route s'affiche aussi côté client : la liste des réservations ne contient pas les adresses, le trajet
 // est relu en détail (useTrip) pour en tirer les coordonnées ; (2) « Activité récente » mêle réservations, colis, recherches de trajet et
 // notifications, chaque ligne ouvrant son élément (une recherche se relance d'un geste).
@@ -18,10 +20,10 @@
 // « Envois disponibles » côté conducteur.
 
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { IconClockSearch, IconPackage, IconRoute, IconSearch, IconSend } from '@tabler/icons-react-native';
-import { AppText, ScreenContainer } from '@/components/ui';
+import { AppText, FeedbackBanner, ScreenContainer } from '@/components/ui';
 import { OceanButton, OceanEmpty } from '@/components/ocean/OceanKit';
 import { DashboardCard, HomeHero } from '@/components/home/HomeHero';
 import { HomeFab, HomeSearchBar, HomeSectionTitle } from '@/components/home/HomeParts';
@@ -109,6 +111,7 @@ export default function CustomerHomeScreen() {
   const markNotificationRead = useMarkNotificationRead();
   const getOrCreateConversation = useGetOrCreateConversationForBooking();
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+  const [contactError, setContactError] = useState<string | null>(null);
 
   // Une recherche faite puis annulée doit réapparaître dès le retour sur l'accueil.
   useFocusEffect(
@@ -206,9 +209,10 @@ export default function CustomerHomeScreen() {
   );
 
   function contactDriver(bookingId: string) {
+    setContactError(null);
     getOrCreateConversation.mutate(bookingId, {
       onSuccess: (conversation) => router.push(`/(customer)/conversation/${conversation.id}`),
-      onError: () => Alert.alert('Message indisponible', 'La conversation avec le conducteur n’a pas pu s’ouvrir. Réessayez dans un instant.'),
+      onError: () => setContactError('La conversation avec le conducteur n’a pas pu s’ouvrir. Réessayez dans un instant.'),
     });
   }
 
@@ -245,6 +249,11 @@ export default function CustomerHomeScreen() {
         />
 
         <View style={styles.content}>
+          {contactError ? (
+            <View style={styles.block}>
+              <FeedbackBanner tone="error" title="Message indisponible" text={contactError} onDismiss={() => setContactError(null)} />
+            </View>
+          ) : null}
           {messageAlert ? (
             <View style={styles.block}>
               <MessageAlertCard
@@ -342,6 +351,7 @@ export default function CustomerHomeScreen() {
         actions={[
           { label: 'Trouver un trajet', icon: <IconRoute size={20} color={OCEAN.base} />, onPress: openSearch },
           { label: 'Envoyer un colis', icon: <IconSend size={20} color={OCEAN.goldInk} />, onPress: openShipmentFlow },
+          { label: 'Suivre un colis', icon: <IconPackage size={20} color={OCEAN.base} />, onPress: () => router.push('/suivi' as never) },
           { label: 'Rechercher', icon: <IconSearch size={20} color={OCEAN.base} />, onPress: () => router.push('/(customer)/search') },
         ]}
       />

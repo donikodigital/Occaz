@@ -1,4 +1,8 @@
 // mobile/app/(customer)/shipment-new.tsx
+// [10/10/2026] v9 — Étape Destinataire : e-mail facultatif. Avec lui, le destinataire reçoit le suivi de son colis (prise en charge, route, livraison) sans compte.
+// [10/10/2026] v8 — Colis par colis : avec 2 colis ou plus, après l'étape « Colis » (catégorie, quantité, urgence) vient UNE ÉTAPE PAR COLIS
+// (poids, dimensions, valeur déclarée, description de ce colis seulement) ; chaque colis peut avoir ses propres mesures. Le coût de
+// chaque colis s'affiche à son étape, puis le coût de chacun et le total à régler à la dernière étape. Un seul colis : parcours inchangé.
 // [09/10/2026] v7 — Parcours pas à pas : une seule étape à l'écran (Expéditeur, Destinataire, Colis, Période). « Continuer » (pied de page)
 // contrôle l'étape puis ouvre la suivante, « Retour » revient à la précédente. Le prix à payer, le code promo et le détail du prix
 // n'apparaissent qu'à la dernière étape, avec « Confirmer l'envoi ». Tous les champs et règles sont conservés.
@@ -38,6 +42,7 @@ import {
 } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer, TextField } from '@/components/ui';
 import {
+  OceanButton,
   OceanCard,
   OceanChip,
   OceanScreenHeader,
@@ -47,6 +52,7 @@ import {
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { ShipmentQuoteCard } from '@/components/screens/ShipmentQuoteCard';
+import { ShipmentParcelCosts } from '@/components/screens/ShipmentParcelCosts';
 import { ShipmentWindowField, toShipmentWindow } from '@/components/screens/ShipmentWindowField';
 import { PromoCodeField } from '@/components/screens/PromoCodeField';
 import { LockedField } from '@/components/screens/LockedField';
@@ -57,12 +63,14 @@ import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useAuthStore } from '@/stores/authStore';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 import { formatMoney } from '@/utils/money';
 import { FLOW_DONE_PARAM } from '@/utils/navigation';
 import { formatCityCountry, formatWindow } from '@/utils/shipmentDisplay';
 import { locationsApi } from '@/services/api/locations.api';
 import { ApiError } from '@/services/api/ApiError';
-import type { QuoteShipmentPayload } from '@/types/shipments.types';
+import type { ParcelInput, QuoteShipmentPayload } from '@/types/shipments.types';
 import type { TripLocation } from '@/types/trips.types';
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -109,8 +117,185 @@ function AddressCard({
   );
 }
 
-type SectionKey = 'sender' | 'recipient' | 'parcel' | 'window';
-const SECTION_ORDER: SectionKey[] = ['sender', 'recipient', 'parcel', 'window'];
+/** Étapes : expéditeur, destinataire, colis (catégorie, quantité), un écran par colis si plusieurs (`parcel-0`, `parcel-1`…), période. */
+type SectionKey = 'sender' | 'recipient' | 'parcel' | `parcel-${number}` | 'window';
+
+/** Ce que la personne saisit pour UN colis — tout en texte tant qu'elle tape. */
+interface ParcelDraft {
+  weight: string;
+  length: string;
+  width: string;
+  height: string;
+  declared: string;
+  description: string;
+}
+
+const emptyParcel = (): ParcelDraft => ({ weight: '', length: '', width: '', height: '', declared: '', description: '' });
+const MAX_PARCELS = 20;
+
+const toNumber = (value: string) => Number(value.replace(',', '.'));
+
+function weightIsValid(parcel: ParcelDraft): boolean {
+  const weight = toNumber(parcel.weight);
+  return Number.isFinite(weight) && weight > 0;
+}
+
+/** Dimensions : aucune, les trois (valides), ou à moitié remplies (à corriger). */
+function dimensionsState(parcel: ParcelDraft): 'none' | 'ok' | 'partial' {
+  const filled = [parcel.length, parcel.width, parcel.height].filter((value) => value.trim().length > 0);
+  if (filled.length === 0) return 'none';
+  const allValid = filled.length === 3 && [parcel.length, parcel.width, parcel.height].every((value) => toNumber(value) > 0);
+  return allValid ? 'ok' : 'partial';
+}
+
+const parcelIsValid = (parcel: ParcelDraft) => weightIsValid(parcel) && dimensionsState(parcel) !== 'partial';
+
+function toParcelInput(parcel: ParcelDraft): ParcelInput {
+  const declared = parcel.declared.replace(/\D/g, '');
+  return {
+    weightKg: toNumber(parcel.weight),
+    ...(dimensionsState(parcel) === 'ok'
+      ? { lengthCm: toNumber(parcel.length), widthCm: toNumber(parcel.width), heightCm: toNumber(parcel.height) }
+      : {}),
+    ...(declared ? { declaredValue: declared } : {}),
+    ...(parcel.description.trim() ? { description: parcel.description.trim() } : {}),
+  };
+}
+
+/**
+ * Les champs d'UN colis. `inline` (envoi d'un seul colis, dans l'étape « Colis ») : poids d'abord, le reste sous « Plus de détails ».
+ * Sinon (une étape par colis) : poids et dimensions directement visibles — c'est le but de l'étape — valeur déclarée et description repliées.
+ */
+function ParcelFields({
+  parcel,
+  onChange,
+  inline,
+  cost,
+  costLoading,
+  onCopyPrevious,
+  previousLabel,
+  part = 'all',
+}: {
+  /** `inline` seulement : « weight » = le poids, « details » = le reste (repliable) — l'étape « Colis » les sépare par la quantité. */
+  part?: 'all' | 'weight' | 'details';
+  parcel: ParcelDraft;
+  onChange: (patch: Partial<ParcelDraft>) => void;
+  inline: boolean;
+  /** Coût de ce colis (texte déjà formaté), quand le devis est prêt. */
+  cost?: string | null;
+  costLoading?: boolean;
+  onCopyPrevious?: () => void;
+  previousLabel?: string;
+}) {
+  const optionalDetails = [
+    parcel.declared.trim() ? 'Valeur déclarée' : null,
+    parcel.description.trim() ? 'Description' : null,
+  ].filter(Boolean) as string[];
+
+  const dimensions = (
+    <View style={styles.block}>
+      <AppText variant="sm" weight="medium" color="textSecondary">
+        {inline ? "Dimensions d'un colis, en cm (optionnel)" : 'Dimensions de ce colis, en cm (optionnel)'}
+      </AppText>
+      <View style={styles.dimensionsRow}>
+        <View style={styles.dimensionCell}>
+          <TextField value={parcel.length} onChangeText={(length) => onChange({ length })} keyboardType="decimal-pad" placeholder="Long." />
+        </View>
+        <View style={styles.dimensionCell}>
+          <TextField value={parcel.width} onChangeText={(width) => onChange({ width })} keyboardType="decimal-pad" placeholder="Larg." />
+        </View>
+        <View style={styles.dimensionCell}>
+          <TextField value={parcel.height} onChangeText={(height) => onChange({ height })} keyboardType="decimal-pad" placeholder="Haut." />
+        </View>
+      </View>
+    </View>
+  );
+
+  const declared = (
+    <TextField
+      label="Valeur déclarée (optionnel)"
+      value={parcel.declared}
+      onChangeText={(declaredValue) => onChange({ declared: declaredValue })}
+      keyboardType="numeric"
+      placeholder="Montant en chiffres"
+    />
+  );
+
+  const description = (
+    <TextField
+      label="Description (optionnel)"
+      value={parcel.description}
+      onChangeText={(text) => onChange({ description: text })}
+      placeholder="Contenu du colis"
+      multiline
+      style={styles.multiline}
+    />
+  );
+
+  return (
+    <>
+      {onCopyPrevious ? (
+        <OceanButton label={previousLabel ?? 'Mêmes mesures que le colis précédent'} variant="soft" onPress={onCopyPrevious} />
+      ) : null}
+
+      {part !== 'details' ? (
+        <TextField
+          label="Poids (kg)"
+          value={parcel.weight}
+          onChangeText={(weight) => onChange({ weight })}
+          keyboardType="decimal-pad"
+          placeholder="Ex : 3"
+        />
+      ) : null}
+
+      {part === 'weight' ? null : inline ? null : dimensions}
+
+      {part === 'weight' ? null : inline ? (
+        <Disclosure
+          icon={<IconAdjustmentsHorizontal size={15} color={OCEAN.base} />}
+          label="Plus de détails (optionnel)"
+          preview={
+            [dimensionsState(parcel) === 'ok' ? 'Dimensions' : null, ...optionalDetails].filter(Boolean).join(' · ') ||
+            'Dimensions, valeur déclarée, description'
+          }
+        >
+          {dimensions}
+          {declared}
+          {description}
+        </Disclosure>
+      ) : (
+        <Disclosure
+          icon={<IconAdjustmentsHorizontal size={15} color={OCEAN.base} />}
+          label="Valeur et description (optionnel)"
+          preview={optionalDetails.join(' · ') || 'Valeur déclarée, description'}
+        >
+          {declared}
+          {description}
+        </Disclosure>
+      )}
+
+      {!inline && (cost || costLoading) ? (
+        <View style={styles.parcelCost}>
+          <AppText variant="xs" color="textSecondary">
+            Coût de ce colis
+          </AppText>
+          {cost ? (
+            <AppText variant="md" weight="bold" color={OCEAN.deep}>
+              {cost}
+            </AppText>
+          ) : (
+            <View style={styles.computing}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <AppText variant="xs" color="textSecondary">
+                Calcul…
+              </AppText>
+            </View>
+          )}
+        </View>
+      ) : null}
+    </>
+  );
+}
 
 export default function NewShipmentScreen() {
   const { data: profile } = useCustomerProfile();
@@ -159,16 +344,13 @@ export default function NewShipmentScreen() {
 
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('+224');
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [recipientLocation, setRecipientLocation] = useState<TripLocation | null>(null);
 
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [weightKg, setWeightKg] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [lengthCm, setLengthCm] = useState('');
-  const [widthCm, setWidthCm] = useState('');
-  const [heightCm, setHeightCm] = useState('');
-  const [declaredValue, setDeclaredValue] = useState('');
-  const [description, setDescription] = useState('');
+  // Un brouillon par colis : la quantité, c'est le nombre de colis. Chacun a ses propres poids, dimensions, valeur et description.
+  const [parcels, setParcels] = useState<ParcelDraft[]>([emptyParcel()]);
+  const quantity = parcels.length;
   const [windowStart, setWindowStart] = useState<Date | null>(null);
   const [windowEnd, setWindowEnd] = useState<Date | null>(null);
   const [isUrgent, setIsUrgent] = useState(false);
@@ -196,24 +378,51 @@ export default function NewShipmentScreen() {
     consumeLocationSelection();
   }, [locationSelection, consumeLocationSelection, profilePickup]);
 
-  // Devis en direct : `null` tant que adresses, catégorie et poids ne sont pas tous renseignés.
+  function setQuantity(count: number) {
+    const next = Math.max(1, Math.min(MAX_PARCELS, count));
+    setParcels((current) => (next <= current.length ? current.slice(0, next) : [...current, ...Array.from({ length: next - current.length }, emptyParcel)]));
+  }
+
+  function updateParcel(index: number, patch: Partial<ParcelDraft>) {
+    setParcels((current) => current.map((parcel, position) => (position === index ? { ...parcel, ...patch } : parcel)));
+  }
+
+  /** Reprend poids et dimensions du colis précédent : des colis identiques se saisissent en un geste. */
+  function copyFromPrevious(index: number) {
+    if (index === 0) return;
+    setParcels((current) =>
+      current.map((parcel, position) => {
+        if (position !== index) return parcel;
+        const previous = current[index - 1];
+        return { ...parcel, weight: previous.weight, length: previous.length, width: previous.width, height: previous.height };
+      }),
+    );
+  }
+
+  // Devis en direct : `null` tant que adresses, catégorie et au moins un colis (poids) ne sont pas renseignés. Les colis déjà complets,
+  // dans l'ordre, sont chiffrés au fur et à mesure : le coût d'un colis s'affiche dès que son étape est remplie.
+  const validParcels = useMemo(() => {
+    const leading: ParcelDraft[] = [];
+    for (const parcel of parcels) {
+      if (!parcelIsValid(parcel)) break;
+      leading.push(parcel);
+    }
+    return leading;
+  }, [parcels]);
+
   const quotePayload = useMemo<QuoteShipmentPayload | null>(() => {
-    const weight = Number(weightKg.replace(',', '.'));
-    if (!senderLocation || !recipientLocation || !categoryId || !Number.isFinite(weight) || weight <= 0) return null;
-    const dimensions = [lengthCm, widthCm, heightCm].map((value) => Number(value.replace(',', '.')));
-    const hasDimensions = dimensions.every((value) => Number.isFinite(value) && value > 0);
-    const declared = declaredValue.replace(/\D/g, '');
+    if (!senderLocation || !recipientLocation || !categoryId || validParcels.length === 0) return null;
+    const inputs = validParcels.map(toParcelInput);
     return {
       categoryId,
       senderLocationId: senderLocation.id,
       recipientLocationId: recipientLocation.id,
-      weightKg: weight,
-      ...(hasDimensions ? { lengthCm: dimensions[0], widthCm: dimensions[1], heightCm: dimensions[2] } : {}),
-      quantity,
-      ...(declared ? { declaredValue: declared } : {}),
+      weightKg: Math.round(inputs.reduce((sum, parcel) => sum + parcel.weightKg, 0) * 1000) / 1000,
+      quantity: inputs.length,
+      parcels: inputs,
       isUrgent,
     };
-  }, [senderLocation, recipientLocation, categoryId, weightKg, lengthCm, widthCm, heightCm, quantity, declaredValue, isUrgent]);
+  }, [senderLocation, recipientLocation, categoryId, validParcels, isUrgent]);
 
   // Même débounce que ShipmentQuoteCard (500 ms) : même clé de requête, donc
   // pas d'appel réseau supplémentaire — seulement un second abonnement au
@@ -221,25 +430,58 @@ export default function NewShipmentScreen() {
   const debouncedQuotePayload = useDebouncedValue(quotePayload, 500);
   const { data: quote, isFetching: isQuoteFetching, error: quoteError } = useShipmentQuote(debouncedQuotePayload);
 
+  // --- Les étapes : un écran « Colis n » en plus par colis dès qu'il y en a plusieurs --------------------------------------------
+  const steps = useMemo<SectionKey[]>(
+    () => [
+      'sender',
+      'recipient',
+      'parcel',
+      ...(quantity > 1 ? parcels.map((_, index): SectionKey => `parcel-${index}`) : []),
+      'window',
+    ],
+    [quantity, parcels],
+  );
+
   // --- État de chaque étape : complète, à faire ou à corriger -------------------------------------------------------------
-  const weight = Number(weightKg.replace(',', '.'));
-  const weightOk = Number.isFinite(weight) && weight > 0;
   const senderDone = senderName.length >= 2 && senderLocation !== null;
   const recipientDone = recipientName.trim().length >= 2 && isValidPhoneNumber(recipientPhone) && recipientLocation !== null;
-  const parcelDone = categoryId !== null && weightOk;
+  // Un seul colis : ses mesures se saisissent dans l'étape « Colis ». Plusieurs : chacun a la sienne.
+  const parcelDone = categoryId !== null && (quantity > 1 || parcelIsValid(parcels[0]));
   const windowDone = windowStart !== null && windowEnd !== null;
-  const done: Record<SectionKey, boolean> = { sender: senderDone, recipient: recipientDone, parcel: parcelDone, window: windowDone };
-  const visibleError = formError && (!formError.section || !done[formError.section]) ? formError : null;
-  const statusOf = (key: SectionKey): StepStatus =>
-    done[key] ? 'done' : visibleError?.section === key ? 'error' : 'todo';
+  function isDone(key: SectionKey): boolean {
+    if (key === 'sender') return senderDone;
+    if (key === 'recipient') return recipientDone;
+    if (key === 'parcel') return parcelDone;
+    if (key === 'window') return windowDone;
+    const parcel = parcels[Number(key.slice('parcel-'.length))];
+    return parcel ? parcelIsValid(parcel) : false;
+  }
+  const visibleError = formError && (!formError.section || !isDone(formError.section)) ? formError : null;
+  const statusOf = (key: SectionKey): StepStatus => (isDone(key) ? 'done' : visibleError?.section === key ? 'error' : 'todo');
 
-  const currentKey = SECTION_ORDER[stepIndex];
-  const isLastStep = stepIndex === SECTION_ORDER.length - 1;
+  const currentKey = steps[Math.min(stepIndex, steps.length - 1)];
+  const isLastStep = stepIndex >= steps.length - 1;
+  const currentParcelIndex = currentKey.startsWith('parcel-') ? Number(currentKey.slice('parcel-'.length)) : -1;
 
   /** Erreur de validation : ramène à l'étape concernée pour que la personne voie tout de suite quoi corriger. */
   function fail(section: SectionKey | undefined, message: string) {
-    if (section) setStepIndex(SECTION_ORDER.indexOf(section));
+    if (section) setStepIndex(Math.max(0, steps.indexOf(section)));
     setFormError({ message, section });
+  }
+
+  /** Les contrôles d'un colis : poids, puis dimensions (les trois ou aucune). */
+  function validateParcel(index: number, section: SectionKey): boolean {
+    const parcel = parcels[index];
+    const name = quantity > 1 ? `du colis ${index + 1}` : 'du colis';
+    if (!weightIsValid(parcel)) {
+      fail(section, `Indiquez le poids ${name}.`);
+      return false;
+    }
+    if (dimensionsState(parcel) === 'partial') {
+      fail(section, `Renseignez les trois dimensions ${name} (longueur, largeur, hauteur), ou aucune.`);
+      return false;
+    }
+    return true;
   }
 
   /** Les contrôles d'une étape, dans l'ordre. Renvoie false (et affiche pourquoi) si elle n'est pas prête. */
@@ -262,6 +504,10 @@ export default function NewShipmentScreen() {
         fail('recipient', 'Renseignez le téléphone du destinataire au format international, par exemple +224620000000.');
         return false;
       }
+      if (recipientEmail.trim() && !EMAIL_PATTERN.test(recipientEmail.trim())) {
+        fail('recipient', "L'adresse e-mail du destinataire n'est pas valide (laissez le champ vide si vous n'en avez pas).");
+        return false;
+      }
       if (!recipientLocation) {
         fail('recipient', "Choisissez l'adresse de livraison.");
         return false;
@@ -271,12 +517,13 @@ export default function NewShipmentScreen() {
         fail('parcel', 'Choisissez une catégorie de colis.');
         return false;
       }
-      if (!weightOk) {
-        fail('parcel', 'Indiquez le poids du colis.');
+      if (quantity === 1 && !validateParcel(0, 'parcel')) return false;
+    } else if (key === 'window') {
+      if (!windowStart || !windowEnd) {
+        fail('window', 'Indiquez la période pendant laquelle le colis peut partir.');
         return false;
       }
-    } else if (!windowStart || !windowEnd) {
-      fail('window', 'Indiquez la période pendant laquelle le colis peut partir.');
+    } else if (!validateParcel(Number(key.slice('parcel-'.length)), key)) {
       return false;
     }
     return true;
@@ -285,7 +532,7 @@ export default function NewShipmentScreen() {
   function goNext() {
     setFormError(null);
     if (!validateStep(currentKey)) return;
-    setStepIndex((index) => Math.min(index + 1, SECTION_ORDER.length - 1));
+    setStepIndex((index) => Math.min(index + 1, steps.length - 1));
   }
 
   function goBack() {
@@ -297,7 +544,8 @@ export default function NewShipmentScreen() {
   const categoryName = (categories ?? []).find((category) => category.id === categoryId)?.name;
   const pickupPlace = senderLocation ? formatCityCountry(senderLocation) : null;
   const deliveryPlace = recipientLocation ? formatCityCountry(recipientLocation) : null;
-  const summaries: Record<SectionKey, string> = {
+  const totalWeight = Math.round(validParcels.reduce((sum, parcel) => sum + toNumber(parcel.weight), 0) * 1000) / 1000;
+  const summaries: Record<'sender' | 'recipient' | 'parcel' | 'window', string> = {
     sender: senderLocation
       ? `${senderLocation.label}${pickupPlace ? ` · ${pickupPlace}` : ''}`
       : 'Adresse de récupération à choisir',
@@ -309,24 +557,40 @@ export default function NewShipmentScreen() {
       .filter(Boolean)
       .join(' · ') || 'À renseigner',
     parcel: parcelDone
-      ? `${categoryName ?? 'Colis'} · ${weight} kg${quantity > 1 ? ` × ${quantity}` : ''}${isUrgent ? ' · Urgent' : ''}`
-      : 'Catégorie et poids à indiquer',
+      ? `${categoryName ?? 'Colis'}${quantity > 1 ? ` · ${quantity} colis` : ''}${totalWeight > 0 ? ` · ${totalWeight} kg` : ''}${isUrgent ? ' · Urgent' : ''}`
+      : quantity > 1
+        ? 'Catégorie et nombre de colis'
+        : 'Catégorie et poids à indiquer',
     window: windowStart && windowEnd ? formatWindow(toShipmentWindow(windowStart, windowEnd)) : 'Dates à choisir',
   };
 
   const noop = () => undefined;
-  const optionalDetails = [
-    [lengthCm, widthCm, heightCm].every((value) => value.trim().length > 0) ? 'Dimensions' : null,
-    declaredValue.trim() ? 'Valeur déclarée' : null,
-    description.trim() ? 'Description' : null,
-  ].filter(Boolean) as string[];
+
+  /** Résumé d'un colis : « 3 kg · 40×30×20 cm ». */
+  function parcelSummary(index: number): string {
+    const parcel = parcels[index];
+    if (!parcel || !weightIsValid(parcel)) return 'Poids à indiquer';
+    return [
+      `${toNumber(parcel.weight)} kg`,
+      dimensionsState(parcel) === 'ok' ? `${toNumber(parcel.length)}×${toNumber(parcel.width)}×${toNumber(parcel.height)} cm` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  /** Coût de CE colis d'après le devis du serveur — seulement quand le devis correspond bien à ce qui est saisi. */
+  function parcelCost(index: number): string | null {
+    const line = quote?.parcels?.[index];
+    if (!line || isPriceComputing || !validParcels[index]) return null;
+    return formatMoney(line.price, quote?.currencyCode ?? undefined);
+  }
 
   // Ce qui manque pour afficher le prix — dit sous le « — » du pied de page.
   const missingForQuote = [
     !senderLocation ? 'adresse de récupération' : null,
     !recipientLocation ? 'adresse de livraison' : null,
     !categoryId ? 'catégorie' : null,
-    !weightOk ? 'poids' : null,
+    validParcels.length === 0 ? 'poids' : validParcels.length < quantity ? 'poids de chaque colis' : null,
   ].filter(Boolean) as string[];
   const isPriceComputing = quotePayload !== null && (quotePayload !== debouncedQuotePayload || !quote || isQuoteFetching);
   const discountNumber = promoDiscount ? Number(promoDiscount) : 0;
@@ -344,7 +608,7 @@ export default function NewShipmentScreen() {
     setFormError(null);
 
     // Dans l'ordre des étapes : la première à corriger s'affiche.
-    for (const key of SECTION_ORDER) {
+    for (const key of steps) {
       if (!validateStep(key)) return;
     }
     // Garde pour TypeScript : les contrôles ci-dessus garantissent ces valeurs.
@@ -356,14 +620,18 @@ export default function NewShipmentScreen() {
         senderLocationId: senderLocation.id,
         recipientName: recipientName.trim(),
         recipientPhone,
+        recipientEmail: recipientEmail.trim() || undefined,
         recipientLocationId: recipientLocation.id,
-        description: description.trim() || undefined,
-        weightKg: weight,
-        ...(quotePayload?.lengthCm !== undefined
-          ? { lengthCm: quotePayload.lengthCm, widthCm: quotePayload.widthCm, heightCm: quotePayload.heightCm }
-          : {}),
+        // Résumé pour le conducteur : la description de chaque colis qui en a une (le détail complet est dans `parcels`).
+        description:
+          parcels
+            .map((parcel, index) => (parcel.description.trim() ? (quantity > 1 ? `Colis ${index + 1} : ${parcel.description.trim()}` : parcel.description.trim()) : null))
+            .filter(Boolean)
+            .join(' · ') || undefined,
+        // Le serveur recalcule poids total, quantité et valeur déclarée à partir de `parcels` ; ils sont envoyés pour les anciennes validations.
+        weightKg: Math.round(parcels.reduce((sum, parcel) => sum + toNumber(parcel.weight), 0) * 1000) / 1000,
         quantity,
-        declaredValue: declaredValue.replace(/\D/g, '') || undefined,
+        parcels: parcels.map(toParcelInput),
         isUrgent,
         ...toShipmentWindow(windowStart, windowEnd),
         promoCode,
@@ -443,13 +711,13 @@ export default function NewShipmentScreen() {
         onBack={() => (stepIndex > 0 ? goBack() : router.back())}
       />
 
-      <WizardProgress current={stepIndex} total={SECTION_ORDER.length} />
+      <WizardProgress current={stepIndex} total={steps.length} />
 
       {/* 1 — Expéditeur : l'adresse de récupération d'abord ; les informations du profil, repliées */}
       {currentKey === 'sender' ? (
         <FormAccordionSection
           step={1}
-          total={SECTION_ORDER.length}
+          total={steps.length}
           icon={<IconUser size={15} color={OCEAN.base} />}
           title="Expéditeur"
           summary={summaries.sender}
@@ -522,7 +790,7 @@ export default function NewShipmentScreen() {
       {currentKey === 'recipient' ? (
         <FormAccordionSection
           step={2}
-          total={SECTION_ORDER.length}
+          total={steps.length}
           icon={<IconUserCheck size={15} color={OCEAN.base} />}
           title="Destinataire"
           summary={summaries.recipient}
@@ -544,15 +812,27 @@ export default function NewShipmentScreen() {
             keyboardType="phone-pad"
             placeholder="+224620000000"
           />
+          <TextField
+            label="E-mail (facultatif)"
+            value={recipientEmail}
+            onChangeText={setRecipientEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="destinataire@exemple.com"
+          />
+          <AppText variant="xs" color="textSecondary">
+            Avec son e-mail, le destinataire suit son colis en direct, sans compte.
+          </AppText>
           <AddressCard label="Adresse de livraison" location={recipientLocation} onPress={() => openAddressPicker('recipient')} />
         </FormAccordionSection>
       ) : null}
 
-      {/* 3 — Colis : l'essentiel d'abord ; dimensions, valeur et description, repliées */}
+      {/* 3 — Colis : catégorie, quantité, urgence ; avec un seul colis, ses mesures sont ici aussi */}
       {currentKey === 'parcel' ? (
         <FormAccordionSection
-          step={3}
-          total={SECTION_ORDER.length}
+          step={steps.indexOf('parcel') + 1}
+          total={steps.length}
           icon={<IconPackage size={15} color={OCEAN.base} />}
           title="Colis"
           summary={summaries.parcel}
@@ -577,19 +857,18 @@ export default function NewShipmentScreen() {
             </View>
           </View>
 
-          <TextField
-            label="Poids (kg)"
-            value={weightKg}
-            onChangeText={setWeightKg}
-            keyboardType="decimal-pad"
-            placeholder="Ex : 3"
-          />
+          {quantity === 1 ? <ParcelFields parcel={parcels[0]} onChange={(patch) => updateParcel(0, patch)} inline part="weight" /> : null}
 
           <View style={styles.block}>
             <AppText variant="sm" weight="medium" color="textSecondary">
-              Quantité
+              Nombre de colis
             </AppText>
-            <OceanStepper value={quantity} onChange={setQuantity} min={1} max={20} label="quantité" />
+            <OceanStepper value={quantity} onChange={setQuantity} min={1} max={MAX_PARCELS} label="quantité" />
+            {quantity > 1 ? (
+              <AppText variant="xs" color="textSecondary">
+                Vous renseignerez le poids et les dimensions de chaque colis, un par un, aux étapes suivantes.
+              </AppText>
+            ) : null}
           </View>
 
           <OceanSwitchRow
@@ -600,53 +879,40 @@ export default function NewShipmentScreen() {
             icon={<IconAlertCircle size={18} color={OCEAN.base} />}
           />
 
-          <Disclosure
-            icon={<IconAdjustmentsHorizontal size={15} color={OCEAN.base} />}
-            label="Plus de détails (optionnel)"
-            preview={optionalDetails.length > 0 ? optionalDetails.join(' · ') : 'Dimensions, valeur déclarée, description'}
-          >
-            <View style={styles.block}>
-              <AppText variant="sm" weight="medium" color="textSecondary">
-                Dimensions d'un colis, en cm (optionnel)
-              </AppText>
-              <View style={styles.dimensionsRow}>
-                <View style={styles.dimensionCell}>
-                  <TextField value={lengthCm} onChangeText={setLengthCm} keyboardType="decimal-pad" placeholder="Long." />
-                </View>
-                <View style={styles.dimensionCell}>
-                  <TextField value={widthCm} onChangeText={setWidthCm} keyboardType="decimal-pad" placeholder="Larg." />
-                </View>
-                <View style={styles.dimensionCell}>
-                  <TextField value={heightCm} onChangeText={setHeightCm} keyboardType="decimal-pad" placeholder="Haut." />
-                </View>
-              </View>
-            </View>
+          {quantity === 1 ? <ParcelFields parcel={parcels[0]} onChange={(patch) => updateParcel(0, patch)} inline part="details" /> : null}
+        </FormAccordionSection>
+      ) : null}
 
-            <TextField
-              label="Valeur déclarée (optionnel)"
-              value={declaredValue}
-              onChangeText={setDeclaredValue}
-              keyboardType="numeric"
-              placeholder="Montant en chiffres"
-            />
-
-            <TextField
-              label="Description (optionnel)"
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Contenu du colis"
-              multiline
-              style={styles.multiline}
-            />
-          </Disclosure>
+      {/* 3 bis — Un écran par colis quand il y en a plusieurs */}
+      {currentParcelIndex >= 0 && parcels[currentParcelIndex] ? (
+        <FormAccordionSection
+          step={stepIndex + 1}
+          total={steps.length}
+          icon={<IconPackage size={15} color={OCEAN.base} />}
+          title={`Colis ${currentParcelIndex + 1} sur ${quantity}`}
+          summary={parcelSummary(currentParcelIndex)}
+          status={statusOf(currentKey)}
+          expanded
+          collapsible={false}
+          onToggle={noop}
+        >
+          <ParcelFields
+            parcel={parcels[currentParcelIndex]}
+            onChange={(patch) => updateParcel(currentParcelIndex, patch)}
+            inline={false}
+            cost={parcelCost(currentParcelIndex)}
+            costLoading={isPriceComputing && !quoteError && Boolean(validParcels[currentParcelIndex])}
+            onCopyPrevious={currentParcelIndex > 0 ? () => copyFromPrevious(currentParcelIndex) : undefined}
+            previousLabel={`Mêmes mesures que le colis ${currentParcelIndex}`}
+          />
         </FormAccordionSection>
       ) : null}
 
       {/* 4 — Période */}
       {currentKey === 'window' ? (
         <FormAccordionSection
-          step={4}
-          total={SECTION_ORDER.length}
+          step={steps.length}
+          total={steps.length}
           icon={<IconCalendarEvent size={15} color={OCEAN.base} />}
           title="Période"
           summary={summaries.window}
@@ -681,6 +947,11 @@ export default function NewShipmentScreen() {
       {/* Facultatif : le code promo et le détail du prix restent à portée de main, repliés */}
       {isLastStep ? (
       <View style={styles.extras}>
+        {/* Plusieurs colis : le coût de chacun, puis le total — visible tout de suite, pas replié */}
+        {quantity > 1 && quote && !isPriceComputing ? (
+          <ShipmentParcelCosts quote={quote} labels={parcels.map((parcel) => parcel.description)} />
+        ) : null}
+
         <Disclosure
           icon={<IconDiscount2 size={15} color={OCEAN.base} />}
           label={promoCode ? `Code ${promoCode} appliqué` : "J'ai un code promo"}
@@ -769,6 +1040,12 @@ const styles = StyleSheet.create({
   multiline: {
     minHeight: 70,
     textAlignVertical: 'top',
+  },
+  parcelCost: {
+    gap: 2,
+    padding: spacing.md,
+    borderRadius: 16,
+    backgroundColor: OCEAN.mist,
   },
   extras: {
     gap: spacing.sm,

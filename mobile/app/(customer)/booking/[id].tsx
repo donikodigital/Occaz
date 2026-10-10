@@ -57,6 +57,7 @@ import { AppText, ConfirmDialog, DriverPositionCard, ScreenContainer } from '@/c
 import { ContactRow } from '@/components/screens/ContactRow';
 import { OtpCodeCard } from '@/components/screens/OtpCodeCard';
 import { OceanButton, OceanHeroCard, OceanScreenHeader, OceanSection } from '@/components/ocean/OceanKit';
+import { PdfDownloadButton } from '@/components/screens/PdfDownloadButton';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import {
@@ -144,6 +145,9 @@ function DropoffCodeCard({ bookingId }: { bookingId: string }) {
     />
   );
 }
+
+/** Réservations qui ont un billet : payées, et ni annulées ni remboursées. */
+const TICKET_STATUSES: BookingStatus[] = ['PAID', 'CONFIRMED', 'COMPLETED', 'DISPUTED'];
 
 export default function BookingDetailScreen() {
   const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
@@ -357,6 +361,11 @@ export default function BookingDetailScreen() {
           onPress={() => setShowDetails((value) => !value)}
           style={styles.actionButton}
         />
+      ) : null}
+
+      {/* Billet PDF A5 avec QR code : disponible dès que la réservation est payée (aussi envoyé par e-mail s'il y a une adresse). */}
+      {TICKET_STATUSES.includes(booking.status) && !journeyMode ? (
+        <PdfDownloadButton kind="booking" id={booking.id} label="Télécharger mon billet (PDF)" />
       ) : null}
 
       {booking.status === 'PENDING_PAYMENT' ? (

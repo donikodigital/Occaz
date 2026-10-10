@@ -33,6 +33,7 @@
     "@prisma/client": "^5.22.0",
     "@sentry/nestjs": "^11.4.0",
     "bcrypt": "^5.1.1",
+    "bwip-js": "^4.11.4",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "compression": "^1.8.1",
@@ -40,6 +41,7 @@
     "otplib": "^12.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdfkit": "^0.20.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "uuid": "^9.0.1"
@@ -53,6 +55,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^20.19.43",
     "@types/passport-jwt": "^4.0.1",
+    "@types/pdfkit": "^0.17.6",
     "@types/supertest": "^7.2.1",
     "@types/uuid": "^9.0.8",
     "jest": "^30.5.1",

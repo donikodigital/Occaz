@@ -1,13 +1,20 @@
 // backend/src/shipments/shipment-otp.service.ts
+// [10/10/2026] v4 — chaque étape visible du suivi (récupéré, en route, livraison imminente, livré) est annoncée par un événement, et la position du trajet est enregistrée dans l'historique.
 // [30/09/2026] v3 — requestDeliveryOtpForCustomer : l'expéditeur peut désormais revoir le code de livraison dans l'app, sur le modèle de requestPickupOtpForCustomer. Le destinataire continue de le recevoir par SMS.
 // [21/09/2026] v2 — propriété de l'envoi via Shipment.driverId.
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationChannel, NotificationType, OtpPurpose, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OtpService } from '../otp/otp.service';
 import { WalletsService } from '../wallets/wallets.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { DOMAIN_EVENTS, ShipmentStatusChangedEvent } from '../common/events/domain-events';
+import { freshTripPosition } from '../tracking/tracking-view';
+
+/** Une position plus vieille que ça n'est pas enregistrée dans l'historique : mieux vaut aucune position qu'une fausse. */
+const HISTORY_GPS_MAX_AGE_MS = 30 * 60 * 1000;
 
 /**
  * Section 17 : OTP récupération (l'expéditeur confirme la remise du
@@ -24,6 +31,7 @@ export class ShipmentOtpService {
     private readonly wallets: WalletsService,
     private readonly driverProfiles: DriverProfilesService,
     private readonly notifications: NotificationsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private async getShipmentWithContext(shipmentId: string) {
@@ -46,8 +54,29 @@ export class ShipmentOtpService {
     }
   }
 
+  /**
+   * Ajoute une ligne à l'historique du colis avec la position du trajet à cet instant (si le conducteur en partage une récente),
+   * puis annonce l'étape : l'expéditeur et le destinataire en sont prévenus sans que le conducteur n'attende l'envoi des e-mails.
+   */
   private async recordTracking(shipmentId: string, status: ShipmentStatus) {
-    await this.prisma.shipmentTracking.create({ data: { shipmentId, status } });
+    const position = await this.currentTripPosition(shipmentId);
+    await this.prisma.shipmentTracking.create({
+      data: { shipmentId, status, latitude: position?.latitude ?? null, longitude: position?.longitude ?? null },
+    });
+    this.eventEmitter.emit(DOMAIN_EVENTS.SHIPMENT_STATUS_CHANGED, new ShipmentStatusChangedEvent(shipmentId, status));
+  }
+
+  private async currentTripPosition(shipmentId: string) {
+    try {
+      const shipment = await this.prisma.shipment.findUnique({
+        where: { id: shipmentId },
+        select: { trip: { select: { currentLatitude: true, currentLongitude: true, currentPositionUpdatedAt: true } } },
+      });
+      return freshTripPosition(shipment?.trip, new Date(), HISTORY_GPS_MAX_AGE_MS);
+    } catch {
+      // La position est un plus : sans elle, l'étape s'enregistre quand même.
+      return null;
+    }
   }
 
   // ---------------------------------------------------------------------

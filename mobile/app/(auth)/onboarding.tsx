@@ -1,4 +1,5 @@
 // mobile/app/(auth)/onboarding.tsx
+// [10/10/2026] v4 — lien « Suivre un colis » (numéro de suivi, sans compte) sous « Créer votre compte ».
 // [22/09/2026] v2 — Habillage bleu Ocean, dans l'esprit Tiime : icône posée
 // sur un aplat doux à étincelles (AuthIllustration) au lieu du carré plein
 // indigo, cartes de rôle arrondies avec ombre douce, typographie plus
@@ -14,7 +15,7 @@
 import React, { useState } from 'react';
 import { Image, ImageBackground, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconArrowRight, IconSteeringWheel, IconUser, IconX } from '@tabler/icons-react-native';
+import { IconArrowRight, IconPackage, IconSteeringWheel, IconUser, IconX } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
 import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -185,6 +186,18 @@ export default function OnboardingScreen() {
             </AppText>
           </AppText>
         </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Suivre un colis"
+          onPress={() => router.push('/suivi' as never)}
+          style={styles.trackLink}
+        >
+          <IconPackage size={16} color={OCEAN.base} />
+          <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+            Suivre un colis
+          </AppText>
+        </Pressable>
       </ScreenContainer>
 
       <SignupSheet visible={signupOpen} onClose={() => setSignupOpen(false)} onSelect={selectSignupRole} />
@@ -193,6 +206,13 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
+  trackLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
   background: {
     flex: 1,
   },

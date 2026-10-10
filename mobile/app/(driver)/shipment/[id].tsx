@@ -33,6 +33,7 @@ import {
 } from '@tabler/icons-react-native';
 import { AppText, ConfirmDialog, ScreenContainer, TextField } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
+import { ShipmentParcelsSection } from '@/components/screens/ShipmentParcelsSection';
 import { OceanButton, OceanCard, OceanPill, OceanScreenHeader, OceanSection, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -355,7 +356,7 @@ export default function DriverShipmentDetailScreen() {
           <View style={styles.parcelChip}>
             <IconPackage size={13} color={colors.onPrimary} />
             <AppText variant="xs" weight="semibold" color={colors.onPrimary}>
-              {shipment.category?.name ?? 'Colis'} · {shipment.weightKg} kg
+              {shipment.category?.name ?? 'Colis'} · {shipment.weightKg} kg{shipment.quantity > 1 ? ` · ${shipment.quantity} colis` : ''}
             </AppText>
           </View>
         </View>
@@ -544,6 +545,8 @@ export default function DriverShipmentDetailScreen() {
 
       {showDetails ? (
         <>
+      <ShipmentParcelsSection items={shipment.items} currencyCode={currencyCode} />
+
       <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Personnes concernées">
         <View style={styles.people}>
           <PersonCard

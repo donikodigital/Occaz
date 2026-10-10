@@ -1,10 +1,12 @@
 // mobile/src/components/ui/DocumentUploadField.tsx
+// [10/10/2026] v+ — errorMessage : l'échec d'un envoi s'affiche sous le champ (Alert.alert ne fait rien sur le web).
 // [21/09/2026] v+ — strokeWidth au lieu de stroke.
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { IconAlertCircle, IconCamera, IconFileText, IconPhoto } from '@tabler/icons-react-native';
 import { AppText } from './AppText';
 import { Badge } from './Badge';
+import { FeedbackBanner } from './FeedbackBanner';
 import type { BadgeTone } from './Badge';
 import { colors, radius, spacing } from '@/theme';
 import type { AppDocument } from '@/types/documents.types';
@@ -15,6 +17,8 @@ export interface DocumentUploadFieldProps {
   isUploading: boolean;
   onPickLibrary: () => void;
   onPickCamera: () => void;
+  /** Échec du dernier envoi de cette pièce, affiché sous le champ. */
+  errorMessage?: string | null;
 }
 
 /** Statut affiché : celui du document, ou MISSING tant que rien n'a été envoyé. */
@@ -67,7 +71,7 @@ function ActionButton({
 }
 
 /** Un champ par type de pièce (CNI, permis, carte grise...) — la même pièce peut être renvoyée si rejetée, un nouvel envoi remplace simplement l'ancien statut à l'écran suivant. */
-export function DocumentUploadField({ label, document, isUploading, onPickLibrary, onPickCamera }: DocumentUploadFieldProps) {
+export function DocumentUploadField({ label, document, isUploading, onPickLibrary, onPickCamera, errorMessage }: DocumentUploadFieldProps) {
   const state: DisplayState = document?.status ?? 'MISSING';
   const tile = STATE_TILE[state];
 
@@ -115,6 +119,8 @@ export function DocumentUploadField({ label, document, isUploading, onPickLibrar
           />
         </View>
       )}
+
+      {errorMessage ? <FeedbackBanner tone="error" text={errorMessage} /> : null}
     </View>
   );
 }

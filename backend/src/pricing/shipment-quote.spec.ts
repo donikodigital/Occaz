@@ -111,4 +111,65 @@ describe('PricingService.computeShipmentQuote', () => {
     });
     await expect(service.computeShipmentQuote(baseInput)).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  describe('colis par colis', () => {
+    it("calcule le prix de chaque colis, sans mélanger leurs poids ni leurs dimensions", async () => {
+      const service = createService({ distanceMeters: 100_000 });
+      const quote = await service.computeShipmentQuote({
+        ...baseInput,
+        parcels: [
+          { weightKg: 5 },
+          { weightKg: 2, lengthCm: 50, widthCm: 40, heightCm: 30 }, // 12 kg volumétriques > 2 kg réels
+        ],
+      });
+      // Colis 1 : 2000 + 1000 × 5 + 300 × 130 = 46 000 ; colis 2 : 2000 + 1000 × 12 + 39 000 = 53 000
+      expect(quote.parcels.map((parcel) => parcel.price)).toEqual([46_000n, 53_000n]);
+      expect(quote.parcels[1].chargeableWeightKg).toBe(12);
+      expect(quote.parcels[1].volumetricWeightKg).toBe(12);
+      expect(quote.parcels[0].volumetricWeightKg).toBeNull();
+      expect(quote.price).toBe(99_000n);
+    });
+
+    it("applique la valeur déclarée à son seul colis et le multiplicateur de catégorie à chacun", async () => {
+      const service = createService({ distanceMeters: 100_000 });
+      const quote = await service.computeShipmentQuote({
+        ...baseInput,
+        categoryPriceMultiplier: 2,
+        parcels: [{ weightKg: 5, declaredValue: 200_000n }, { weightKg: 5 }],
+      });
+      expect(quote.parcels[0].price).toBe(92_000n + 2_000n);
+      expect(quote.parcels[1].price).toBe(92_000n);
+    });
+
+    it("compte la majoration d'urgence une seule fois pour tout l'envoi", async () => {
+      const service = createService({ distanceMeters: 100_000 });
+      const quote = await service.computeShipmentQuote({
+        ...baseInput,
+        isUrgent: true,
+        parcels: [{ weightKg: 5 }, { weightKg: 5 }, { weightKg: 5 }],
+      });
+      expect(quote.urgentSurcharge).toBe(5_000n);
+      expect(quote.price).toBe(46_000n * 3n + 5_000n);
+      // Le total est exactement la somme des lignes affichées.
+      expect(quote.price).toBe(quote.parcels.reduce((sum, parcel) => sum + parcel.price, 0n) + quote.urgentSurcharge);
+    });
+
+    it('un seul colis coûte comme un envoi global équivalent', async () => {
+      const service = createService({ distanceMeters: 100_000 });
+      const global = await service.computeShipmentQuote({ ...baseInput, declaredValue: 200_000n, isUrgent: true });
+      const single = await service.computeShipmentQuote({
+        ...baseInput,
+        isUrgent: true,
+        parcels: [{ weightKg: 5, declaredValue: 200_000n }],
+      });
+      expect(single.price).toBe(global.price);
+    });
+
+    it('sans liste de colis, le devis global reste inchangé et ne renvoie aucune ligne', async () => {
+      const service = createService({ distanceMeters: 100_000 });
+      const quote = await service.computeShipmentQuote(baseInput);
+      expect(quote.parcels).toEqual([]);
+      expect(quote.urgentSurcharge).toBe(0n);
+    });
+  });
 });

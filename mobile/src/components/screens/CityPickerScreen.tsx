@@ -1,16 +1,25 @@
 // mobile/src/components/screens/CityPickerScreen.tsx
-import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+//
+// v2 — Look Ocean : bandeau héro (icône, titre, aide, fermeture) qui porte le
+// champ de recherche ; en dessous, les résultats en carte ou une invitation à
+// taper les premières lettres. Le comportement ne change pas (2 lettres
+// minimum, sélection dans citySelectionStore puis retour).
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { IconX } from '@tabler/icons-react-native';
-import { AppText, IconButton, ScreenContainer } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { IconBuildingCommunity } from '@tabler/icons-react-native';
+import { ScreenContainer } from '@/components/ui';
+import { spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import type { City } from '@/types/geography.types';
 import { CitySearchPanel } from './CitySearchPanel';
+import { SearchHeroHeader, SearchHeroInput } from './SearchHeroHeader';
 
 export function CityPickerScreen() {
   const selectCity = useCitySelectionStore((state) => state.select);
+  const [search, setSearch] = useState('');
+  const [isLoading, setLoading] = useState(false);
 
   function handleSelect(city: City) {
     selectCity(city);
@@ -18,48 +27,44 @@ export function CityPickerScreen() {
   }
 
   return (
-    <ScreenContainer edges={['top', 'bottom']} maxWidth="form">
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <AppText variant="lg" weight="semibold">
-            Choisir une ville
-          </AppText>
-          <AppText variant="sm" color="textSecondary">
-            Tapez les premières lettres de son nom.
-          </AppText>
-        </View>
-        <IconButton
-          icon={<IconX size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Fermer"
-          onPress={() => router.back()}
+    <ScreenContainer edges={['top', 'bottom']} maxWidth="form" padded={false}>
+      <SearchHeroHeader
+        icon={<IconBuildingCommunity size={24} color={OCEAN.onDark} strokeWidth={1.7} />}
+        caption="Recherche de ville"
+        title="Choisir une ville"
+        subtitle="Tapez les premières lettres de son nom."
+        onClose={() => router.back()}
+      >
+        <SearchHeroInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Rechercher une ville…"
+          autoFocus
+          loading={isLoading}
         />
-      </View>
+      </SearchHeroHeader>
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <CitySearchPanel autoFocus onSelect={handleSelect} />
+        <CitySearchPanel
+          hideField
+          value={search}
+          onChangeValue={setSearch}
+          onLoadingChange={setLoading}
+          onSelect={handleSelect}
+        />
       </ScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  headerText: {
-    flex: 1,
-    gap: 2,
-  },
   content: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.xl,
   },
 });

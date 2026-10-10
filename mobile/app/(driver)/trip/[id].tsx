@@ -1,4 +1,5 @@
 // mobile/app/(driver)/trip/[id].tsx
+// [10/10/2026] v+ — Plus aucun Alert.alert (sans effet sur le web) : erreurs en bannière dans la page, « Retirer une ville », « Annuler le trajet » et « Prise en charge non validée » en boîte de confirmation. Une action du trajet qui échoue (publier, démarrer…) affiche maintenant son erreur au lieu de ne rien faire.
 //
 // [09/10/2026] v10 — Trajet en brouillon ou publié sans réservation : même simplification que le guide. L'écran ne montre que le billet
 // et l'action à faire (« Publier le trajet »). Villes traversées, colis, passagers, véhicule et annulation passent sous « Voir tous
@@ -46,7 +47,7 @@
 // structure du billet (coupon détachable, pastilles de sièges) inchangées.
 
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   IconAlertTriangle,
@@ -68,7 +69,7 @@ import {
   IconUsers,
   IconX,
 } from '@tabler/icons-react-native';
-import { AppText, IconButton, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, ConfirmDialog, FeedbackBanner, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
 import { DriverJourneyGuide } from '@/components/screens/DriverJourneyGuide';
 import { LocationAutocompleteField } from '@/components/screens/LocationAutocompleteField';
@@ -357,6 +358,8 @@ function BookingOtpCard({
 }) {
   const [codeVisible, setCodeVisible] = useState(false);
   const [code, setCode] = useState('');
+  // Message affiché dans la carte (Alert.alert ne fait rien sur le web).
+  const [feedback, setFeedback] = useState<{ tone: 'error' | 'info'; title: string; text: string } | null>(null);
 
   const requestPickup = useRequestPickupOtp(booking.id, tripId);
   const verifyPickup = useVerifyPickupOtp(booking.id, tripId);
@@ -377,6 +380,7 @@ function BookingOtpCard({
     : '';
 
   function handleRequest() {
+    setFeedback(null);
     const mutation = phase === 'pickup' ? requestPickup : requestDropoff;
     mutation.mutate(undefined, {
       onSuccess: (result) => {
@@ -386,25 +390,28 @@ function BookingOtpCard({
         // directement dans son app plutôt que d'attendre un SMS qui
         // n'arrivera pas.
         if (!result.smsSent) {
-          Alert.alert(
-            'Code généré',
-            "Le SMS n'a pas pu être envoyé au passager — demandez-lui de consulter son code directement dans l'application (bouton « Voir mon code » sur sa réservation).",
-          );
+          setFeedback({
+            tone: 'info',
+            title: 'Code généré',
+            text: "Le SMS n'a pas pu être envoyé au passager — demandez-lui de consulter son code directement dans l'application (bouton « Voir mon code » sur sa réservation).",
+          });
         }
       },
-      onError: () => Alert.alert('Erreur', 'La demande de code a échoué — réessayez.'),
+      onError: () => setFeedback({ tone: 'error', title: 'Erreur', text: 'La demande de code a échoué — réessayez.' }),
     });
   }
 
   function handleVerify() {
+    setFeedback(null);
     const mutation = phase === 'pickup' ? verifyPickup : verifyDropoff;
     mutation.mutate(code, {
       onSuccess: () => {
         setCodeVisible(false);
         setCode('');
+        setFeedback(null);
       },
       onError: (error) => {
-        Alert.alert('Code invalide', error instanceof ApiError ? error.message : 'Réessayez.');
+        setFeedback({ tone: 'error', title: 'Code invalide', text: error instanceof ApiError ? error.message : 'Réessayez.' });
       },
     });
   }
@@ -462,6 +469,7 @@ function BookingOtpCard({
           <AppText variant="sm" weight="semibold">
             {phase === 'pickup' ? 'Valider la prise en charge' : 'Valider la dépose'}
           </AppText>
+          {feedback ? <FeedbackBanner tone={feedback.tone} title={feedback.title} text={feedback.text} onDismiss={() => setFeedback(null)} /> : null}
           {phase === 'dropoff' && pickupMissed ? (
             <View style={styles.missedPickup}>
               <IconAlertTriangle size={15} color={colors.danger} />
@@ -558,22 +566,43 @@ function BookingOtpCard({
  * validé), le conducteur est prévenu. Une prise en charge oubliée ne se rattrape plus une fois l'étape dépassée ; il peut
  * quand même continuer (client absent), et la dépose de ce client restera possible.
  */
-function confirmIfPickupMissed(trip: Trip, bookings: Booking[], proceed: () => void): void {
-  const missed = unpickedBoarders(trip, bookings);
-  if (missed.length === 0) {
-    proceed();
-    return;
+function usePickupMissedConfirm() {
+  const [pending, setPending] = useState<{ title: string; message: string; proceed: () => void } | null>(null);
+
+  function confirm(trip: Trip, bookings: Booking[], proceed: () => void): void {
+    const missed = unpickedBoarders(trip, bookings);
+    if (missed.length === 0) {
+      proceed();
+      return;
+    }
+    setPending({
+      title: missed.length > 1 ? 'Prises en charge non validées' : 'Prise en charge non validée',
+      message: `${missed.map((booking) => describeUnpicked(booking, trip)).join(' ; ')} ${
+        missed.length > 1 ? "n'ont pas été pris en charge" : "n'a pas été pris en charge"
+      } (code non validé). Validez d'abord la prise en charge si le passager est à bord. Vous pourrez quand même valider sa dépose plus tard.`,
+      proceed,
+    });
   }
-  Alert.alert(
-    missed.length > 1 ? 'Prises en charge non validées' : 'Prise en charge non validée',
-    `${missed.map((booking) => describeUnpicked(booking, trip)).join(' ; ')} ${
-      missed.length > 1 ? "n'ont pas été pris en charge" : "n'a pas été pris en charge"
-    } (code non validé). Validez d'abord la prise en charge si le passager est à bord. Vous pourrez quand même valider sa dépose plus tard.`,
-    [
-      { text: "Valider d'abord", style: 'cancel' },
-      { text: 'Continuer quand même', style: 'destructive', onPress: proceed },
-    ],
+
+  // À afficher une fois dans l'écran qui appelle confirm() : boîte de confirmation (Alert.alert ne fait rien sur le web).
+  const dialog = (
+    <ConfirmDialog
+      visible={pending !== null}
+      title={pending?.title ?? ''}
+      message={pending?.message}
+      confirmLabel="Continuer quand même"
+      cancelLabel="Valider d'abord"
+      destructive
+      onConfirm={() => {
+        const next = pending;
+        setPending(null);
+        next?.proceed();
+      }}
+      onCancel={() => setPending(null)}
+    />
   );
+
+  return { confirm, dialog };
 }
 
 /**
@@ -608,6 +637,10 @@ function TripStopsSection({
   const [addFieldKey, setAddFieldKey] = useState(0);
   // Le champ d'ajout (avec ses suggestions et adresses récentes) ne se déplie que sur demande.
   const [adding, setAdding] = useState(false);
+  // Erreur / avertissement affiché dans la section, et ville dont le retrait attend confirmation (Alert.alert ne fait rien sur le web).
+  const [sectionError, setSectionError] = useState<string | null>(null);
+  const [stopToRemove, setStopToRemove] = useState<TripStop | null>(null);
+  const pickupMissed = usePickupMissedConfirm();
 
   // Rien à montrer sans étape, sauf en brouillon où le conducteur peut en ajouter.
   if (stops.length === 0 && !isDraft) return null;
@@ -616,7 +649,7 @@ function TripStopsSection({
   const nextStopToReach = isRunning && allowArrivalActions ? stops.find((stop) => !stop.arrivedAt) : undefined;
 
   function showError(error: unknown) {
-    Alert.alert('Erreur', error instanceof ApiError ? error.message : 'Réessayez.');
+    setSectionError(error instanceof ApiError ? error.message : 'Réessayez.');
   }
 
   function startEditing(stop: TripStop) {
@@ -627,9 +660,10 @@ function TripStopsSection({
   function saveFare(stop: TripStop) {
     const value = Number(fareText.replace(',', '.'));
     if (!Number.isFinite(value) || value <= 0) {
-      Alert.alert('Prix invalide', 'Indiquez un prix supérieur à zéro.');
+      setSectionError('Prix invalide : indiquez un prix supérieur à zéro.');
       return;
     }
+    setSectionError(null);
     updateStop.mutate(
       { stopId: stop.id, fareFromOrigin: String(Math.round(value)) },
       { onSuccess: () => setEditingStopId(null), onError: showError },
@@ -637,17 +671,16 @@ function TripStopsSection({
   }
 
   function confirmRemove(stop: TripStop) {
-    Alert.alert(`Retirer ${stopName(stop)} ?`, 'Les prix des autres villes ne changent pas.', [
-      { text: 'Garder', style: 'cancel' },
-      { text: 'Retirer', style: 'destructive', onPress: () => removeStop.mutate(stop.id, { onError: showError }) },
-    ]);
+    setSectionError(null);
+    setStopToRemove(stop);
   }
 
   function handleAdd(location: TripLocation | null) {
     if (!location) return;
     setAddFieldKey((value) => value + 1);
+    setSectionError(null);
     if (!location.cityId) {
-      Alert.alert('Ville manquante', 'Choisissez une adresse située dans la ville traversée.');
+      setSectionError('Ville manquante : choisissez une adresse située dans la ville traversée.');
       return;
     }
     if (
@@ -655,7 +688,7 @@ function TripStopsSection({
       location.cityId === trip.destinationCityId ||
       stops.some((stop) => stop.cityId === location.cityId)
     ) {
-      Alert.alert('Ville déjà sur la route', 'Cette ville est déjà le départ, l’arrivée ou une ville traversée.');
+      setSectionError('Ville déjà sur la route : cette ville est déjà le départ, l’arrivée ou une ville traversée.');
       return;
     }
     addStop.mutate(
@@ -674,6 +707,7 @@ function TripStopsSection({
 
   return (
     <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Villes traversées">
+      {sectionError ? <FeedbackBanner tone="error" text={sectionError} onDismiss={() => setSectionError(null)} /> : null}
       {isDraft ? (
         <AppText variant="xs" color="textSecondary">
           Les prix sont calculés automatiquement au prorata de la distance. Vous pouvez les modifier avant de publier ; ils
@@ -816,7 +850,10 @@ function TripStopsSection({
                 <OceanButton
                   label={`Je suis arrivé à ${stopName(stop)}`}
                   onPress={() =>
-                    confirmIfPickupMissed(trip, bookings, () => markArrivedAtStop.mutate(stop.id, { onError: showError }))
+                    pickupMissed.confirm(trip, bookings, () => {
+                      setSectionError(null);
+                      markArrivedAtStop.mutate(stop.id, { onError: showError });
+                    })
                   }
                   loading={markArrivedAtStop.isPending}
                 />
@@ -842,6 +879,29 @@ function TripStopsSection({
           <OceanButton label="Ajouter une ville traversée" variant="soft" onPress={() => setAdding(true)} />
         )
       ) : null}
+
+      {pickupMissed.dialog}
+      <ConfirmDialog
+        visible={stopToRemove !== null}
+        title={stopToRemove ? `Retirer ${stopName(stopToRemove)} ?` : ''}
+        message="Les prix des autres villes ne changent pas."
+        confirmLabel="Retirer"
+        cancelLabel="Garder"
+        destructive
+        loading={removeStop.isPending}
+        onConfirm={() => {
+          const stop = stopToRemove;
+          if (!stop) return;
+          removeStop.mutate(stop.id, {
+            onSuccess: () => setStopToRemove(null),
+            onError: (error) => {
+              setStopToRemove(null);
+              showError(error);
+            },
+          });
+        }}
+        onCancel={() => setStopToRemove(null)}
+      />
     </OceanSection>
   );
 }
@@ -864,6 +924,10 @@ export default function DriverTripDetailScreen() {
   const { error: positionError, mode: positionMode } = useTripPositionBroadcast(id ?? '', trip?.status === 'IN_PROGRESS');
   // Parcours guidé : le détail complet est replié par défaut, à la demande du conducteur.
   const [showDetails, setShowDetails] = useState(false);
+  // Annulation du trajet (boîte de confirmation) et erreur d'une action, affichées dans la page : Alert.alert ne fait rien sur le web.
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const pickupMissed = usePickupMissedConfirm();
 
   if (isLoading || !trip) {
     return (
@@ -895,40 +959,51 @@ export default function DriverTripDetailScreen() {
   const onlyStopBookings = waitingAtOrigin.length === 0 && waitingAtStops.length > 0;
 
   function handleCancel() {
-    Alert.alert('Annuler ce trajet ?', 'Toutes les réservations actives seront annulées.', [
-      { text: 'Retour', style: 'cancel' },
+    setActionError(null);
+    setCancelOpen(true);
+  }
+
+  function confirmCancel() {
+    cancelTrip.mutate(
+      { reason: "Annulé depuis l'application" },
       {
-        text: 'Annuler le trajet',
-        style: 'destructive',
-        onPress: () =>
-          cancelTrip.mutate(
-            { reason: "Annulé depuis l'application" },
-            { onError: () => Alert.alert('Erreur', "L'annulation a échoué.") },
-          ),
+        onSuccess: () => setCancelOpen(false),
+        onError: (error) => {
+          setCancelOpen(false);
+          setActionError(error instanceof ApiError ? error.message : "L'annulation a échoué — réessayez dans un instant.");
+        },
       },
-    ]);
+    );
+  }
+
+  /** Lance une action du trajet ; son échec s'affiche dans la page au lieu de passer inaperçu. */
+  function attempt(start: (options: { onError: (error: unknown) => void }) => void) {
+    setActionError(null);
+    start({
+      onError: (error) => setActionError(error instanceof ApiError ? error.message : "L'action a échoué — réessayez dans un instant."),
+    });
   }
 
   // Une seule action possible à la fois, selon l'état du trajet.
   let action: StageAction | null = null;
   if (trip.status === 'DRAFT') {
-    action = { label: 'Publier le trajet', run: () => publishTrip.mutate(), isPending: publishTrip.isPending };
+    action = { label: 'Publier le trajet', run: () => attempt((options) => publishTrip.mutate(undefined, options)), isPending: publishTrip.isPending };
   } else if (trip.status === 'PUBLISHED' && hasReservation) {
     action = {
       label: 'Signaler mon arrivée au départ',
-      run: () => markDriverArrived.mutate(),
+      run: () => attempt((options) => markDriverArrived.mutate(undefined, options)),
       isPending: markDriverArrived.isPending,
     };
   } else if (trip.status === 'PASSENGER_PICKED_UP' || (trip.status === 'DRIVER_ARRIVED' && onlyStopBookings)) {
-    action = { label: 'Démarrer le trajet', run: () => startTrip.mutate(), isPending: startTrip.isPending };
+    action = { label: 'Démarrer le trajet', run: () => attempt((options) => startTrip.mutate(undefined, options)), isPending: startTrip.isPending };
   } else if (trip.status === 'IN_PROGRESS') {
     action = {
       label: "Signaler l'arrivée à destination",
-      run: () => confirmIfPickupMissed(trip, activeBookings, () => markArrived.mutate()),
+      run: () => pickupMissed.confirm(trip, activeBookings, () => attempt((options) => markArrived.mutate(undefined, options))),
       isPending: markArrived.isPending,
     };
   } else if (trip.status === 'ARRIVED' && activeBookings.length === 0) {
-    action = { label: 'Clôturer le trajet', run: () => completeTrip.mutate(), isPending: completeTrip.isPending };
+    action = { label: 'Clôturer le trajet', run: () => attempt((options) => completeTrip.mutate(undefined, options)), isPending: completeTrip.isPending };
   }
 
   const stage = getStage(trip.status, trip.status === 'PUBLISHED' ? hasReservation : activeBookings.length > 0, positionError, positionMode, onlyStopBookings);
@@ -976,6 +1051,8 @@ export default function DriverTripDetailScreen() {
         // Affiché juste après la création du trajet : une croix qui revient à l'accueil, pas la flèche vers le formulaire.
         onClose={created ? () => closeToHome('/(driver)/(tabs)/home') : undefined}
       />
+
+      {actionError ? <FeedbackBanner tone="error" text={actionError} onDismiss={() => setActionError(null)} /> : null}
 
       {guided ? (
         <>
@@ -1188,6 +1265,19 @@ export default function DriverTripDetailScreen() {
       ) : null}
         </>
       ) : null}
+
+      {pickupMissed.dialog}
+      <ConfirmDialog
+        visible={cancelOpen}
+        title="Annuler ce trajet ?"
+        message="Toutes les réservations actives seront annulées."
+        confirmLabel="Annuler le trajet"
+        cancelLabel="Retour"
+        destructive
+        loading={cancelTrip.isPending}
+        onConfirm={confirmCancel}
+        onCancel={() => setCancelOpen(false)}
+      />
     </ScreenContainer>
   );
 }

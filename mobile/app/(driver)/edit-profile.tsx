@@ -76,6 +76,7 @@ export default function DriverEditProfileScreen() {
         isUploading={photoUpload.isUploading}
         onPickLibrary={photoUpload.pickFromLibrary}
         onPickCamera={photoUpload.pickFromCamera}
+        errorMessage={photoUpload.error}
         isRequired={!profile?.isVerifiedBadge}
       />
       <View style={{ height: spacing.lg }} />

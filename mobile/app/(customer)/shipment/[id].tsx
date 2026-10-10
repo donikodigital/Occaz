@@ -1,4 +1,5 @@
 // mobile/app/(customer)/shipment/[id].tsx
+// [10/10/2026] v6 — Carte « Suivre mon colis » (numéro de suivi + suivi en direct) dès que l'envoi est payé ; étiquettes PDF A5 par colis.
 // [09/10/2026] v5 — Page allégée, comme le suivi du conducteur : on ne montre que l'essentiel (statut, conducteur, code à donner,
 // action à faire) ; période, suivi détaillé, expéditeur, destinataire et montant passent sous « Voir tous les détails ».
 // « Annuler l'envoi » et « Être remboursé » ne passent plus par Alert.alert (sans effet sur le web) mais par ConfirmDialog, avec
@@ -38,6 +39,8 @@ import {
 } from '@/components/ocean/OceanKit';
 import { ShipmentExtensionCard } from '@/components/screens/ShipmentExtensionCard';
 import { ContactRow } from '@/components/screens/ContactRow';
+import { ShipmentParcelsSection } from '@/components/screens/ShipmentParcelsSection';
+import { PdfDownloadButton } from '@/components/screens/PdfDownloadButton';
 import { OtpCodeCard } from '@/components/screens/OtpCodeCard';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
@@ -50,8 +53,21 @@ import { formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { formatLocation, formatWindow } from '@/utils/shipmentDisplay';
 import { closeToHome } from '@/utils/navigation';
+import { formatTrackingNumber, trackingNumberOf } from '@/utils/tracking';
 import { ApiError } from '@/services/api/ApiError';
 import type { ShipmentStatus } from '@/types/shipments.types';
+
+/** Dès que l'envoi est payé (même sans conducteur), le colis a un numéro de suivi. */
+const TRACKABLE_STATUSES: ShipmentStatus[] = [
+  'SEARCHING_DRIVER',
+  'DRIVER_ASSIGNED',
+  'PICKUP_PENDING',
+  'PICKED_UP',
+  'IN_TRANSIT',
+  'DELIVERY_PENDING',
+  'DELIVERED',
+  'COMPLETED',
+];
 
 const STATUS_LABELS: Record<ShipmentStatus, string> = {
   CREATED: 'En attente de paiement',
@@ -112,6 +128,9 @@ function DeliveryCodeCard({ shipmentId }: { shipmentId: string }) {
     />
   );
 }
+
+/** Tant que le colis n'a pas été remis au conducteur, l'étiquette sert : payé, en recherche de conducteur ou en attente de récupération. */
+const LABEL_STATUSES: ShipmentStatus[] = ['SEARCHING_DRIVER', 'DRIVER_ASSIGNED', 'PICKUP_PENDING'];
 
 export default function ShipmentDetailScreen() {
   const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
@@ -231,7 +250,7 @@ export default function ShipmentDetailScreen() {
           </View>
         </View>
         <AppText variant="sm" color={OCEAN.onDark} style={styles.heroWeight}>
-          {shipment.category?.name ?? 'Colis'} · {shipment.weightKg} kg
+          {shipment.category?.name ?? 'Colis'} · {shipment.weightKg} kg{shipment.quantity > 1 ? ` · ${shipment.quantity} colis` : ''}
         </AppText>
         {!isPaid ? (
           <AppText variant="sm" weight="bold" color={OCEAN.onDark}>
@@ -282,6 +301,32 @@ export default function ShipmentDetailScreen() {
             onPress={() => router.push({ pathname: '/(customer)/shipment-find-driver', params: { id: shipment.id } })}
           />
         </OceanCard>
+      ) : null}
+
+      {/* Suivi en direct : position du colis, villes traversées ; le numéro se partage, le destinataire n'a pas besoin de compte. */}
+      {TRACKABLE_STATUSES.includes(shipment.status) ? (
+        <OceanCard style={styles.infoCard}>
+          <AppText variant="xs" color="textSecondary">
+            Numéro de suivi
+          </AppText>
+          <AppText variant="md" weight="bold" color={OCEAN.deep} selectable>
+            {formatTrackingNumber(trackingNumberOf(shipment.id))}
+          </AppText>
+          <OceanButton
+            label="Suivre mon colis en direct"
+            icon={<IconMapPin size={16} color={OCEAN.onDark} />}
+            onPress={() => router.push({ pathname: '/(customer)/shipment-tracking', params: { id: shipment.id } })}
+          />
+        </OceanCard>
+      ) : null}
+
+      {/* Étiquettes PDF A5, une par colis, à coller avant la remise au conducteur (aussi envoyées par e-mail s'il y a une adresse). */}
+      {LABEL_STATUSES.includes(shipment.status) ? (
+        <PdfDownloadButton
+          kind="shipment"
+          id={shipment.id}
+          label={shipment.quantity > 1 ? `Télécharger les ${shipment.quantity} étiquettes (PDF)` : "Télécharger l'étiquette (PDF)"}
+        />
       ) : null}
 
       {showDetails ? (
@@ -348,6 +393,8 @@ export default function ShipmentDetailScreen() {
           </AppText>
         </View>
       </OceanSection>
+
+      <ShipmentParcelsSection items={shipment.items} currencyCode={currencyCode} showPrice />
 
       <OceanSection icon={<IconCash size={17} color={OCEAN.base} />} title="Montant">
         <View style={styles.priceRow}>

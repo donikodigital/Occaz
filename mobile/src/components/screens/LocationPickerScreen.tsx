@@ -8,17 +8,24 @@
 //   - la recherche est limitée aux pays actifs de la plateforme.
 // Tout le parcours vit dans useLocationPicker (partagé avec le champ desktop
 // LocationAutocompleteField).
+//
+// v4 — Look Ocean : bandeau héro (icône, titre de l'étape — Point de départ,
+// Destination… —, aide, fermeture) qui porte le champ de recherche. Le champ
+// reste monté (masqué) à l'étape de confirmation pour retrouver la saisie.
 
 import React from 'react';
 import { Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconX } from '@tabler/icons-react-native';
-import { AppText, IconButton, ScreenContainer } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { IconMapPin } from '@tabler/icons-react-native';
+import { ScreenContainer } from '@/components/ui';
+import { spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
+import { useAddressSearch } from '@/hooks/useAddressSearch';
 import { useLocationPicker, useSearchCountryCodes } from '@/hooks/useLocationPicker';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { LocationConfirmCard } from './LocationConfirmCard';
 import { LocationSearchField } from './LocationSearchField';
+import { SearchHeroHeader, SearchHeroInput } from './SearchHeroHeader';
 
 /**
  * select-location s'ouvre en `presentation: 'modal'` (voir _layout.tsx) —
@@ -64,6 +71,7 @@ export function LocationPickerScreen({ countryCode }: LocationPickerScreenProps)
   const { title } = useLocalSearchParams<{ title?: string }>();
   const selectLocation = useLocationSelectionStore((state) => state.select);
   const searchCountryCodes = useSearchCountryCodes(countryCode);
+  const addressSearch = useAddressSearch(searchCountryCodes);
 
   const picker = useLocationPicker((location) => {
     selectLocation(location);
@@ -73,35 +81,36 @@ export function LocationPickerScreen({ countryCode }: LocationPickerScreenProps)
   const isSearchStep = picker.step === 'search';
 
   return (
-    <ScreenContainer edges={['top', 'bottom']} maxWidth="form">
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <AppText variant="lg" weight="semibold">
-            {title ?? 'Adresse'}
-          </AppText>
-          <AppText variant="sm" color="textSecondary">
-            {isSearchStep ? 'Recherchez un lieu, un quartier ou un repère.' : 'Vérifiez avant de confirmer.'}
-          </AppText>
-        </View>
-        <IconButton
-          icon={<IconX size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Fermer"
-          onPress={() => router.back()}
+    <ScreenContainer edges={['top', 'bottom']} maxWidth="form" padded={false}>
+      <SearchHeroHeader
+        icon={<IconMapPin size={24} color={OCEAN.onDark} strokeWidth={1.7} />}
+        caption="Recherche d'adresse"
+        title={title ?? 'Adresse'}
+        subtitle={isSearchStep ? 'Recherchez un lieu, un quartier ou un repère.' : 'Vérifiez avant de confirmer.'}
+        onClose={() => router.back()}
+        fieldHidden={!isSearchStep}
+      >
+        {/* Replié (pas démonté) à l'étape 2 : « Changer de lieu » retrouve la recherche et ses résultats. */}
+        <SearchHeroInput
+          value={addressSearch.query}
+          onChangeText={addressSearch.setQuery}
+          placeholder="Quartier, marché, gare routière…"
+          autoFocus
+          loading={addressSearch.isSearching}
         />
-      </View>
+      </SearchHeroHeader>
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        {/* Le champ reste monté (simplement masqué) à l'étape 2 : « Changer de lieu » retrouve la recherche et ses résultats. */}
         <View style={isSearchStep ? undefined : styles.hidden}>
           <LocationSearchField
-            autoFocus
+            hideField
+            search={addressSearch}
             clearOnSelect={false}
             countryCode={searchCountryCodes}
-            placeholder="Ex : marché, gare routière, quartier…"
             onSelect={picker.pickSuggestion}
             onSelectSaved={picker.pickSaved}
             onManualEntry={picker.startManual}
@@ -115,19 +124,9 @@ export function LocationPickerScreen({ countryCode }: LocationPickerScreenProps)
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  headerText: {
-    flex: 1,
-    gap: 2,
-  },
   content: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.xl,
   },
   hidden: {

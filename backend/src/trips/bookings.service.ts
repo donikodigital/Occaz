@@ -13,7 +13,7 @@ import { PromoCodesService } from '../promo-codes/promo-codes.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
-import { BookingCancelledEvent, DOMAIN_EVENTS } from '../common/events/domain-events';
+import { BookingCancelledEvent, BookingPaidEvent, DOMAIN_EVENTS } from '../common/events/domain-events';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { SEGMENT_FAILURE_MESSAGES, buildRoute, resolveSegment } from './trip-route';
 import { loadRouteSettings } from './trip-route.planner';
@@ -423,7 +423,11 @@ export class BookingsService {
       where: { id, status: BookingStatus.PENDING_PAYMENT },
       data: { status: BookingStatus.CONFIRMED },
     });
-    if (claimed.count === 1) return 'CONFIRMED';
+    if (claimed.count === 1) {
+      // Une seule fois par réservation (le passage de « à payer » à « confirmée » est atomique) : le billet part par e-mail.
+      this.eventEmitter.emit(DOMAIN_EVENTS.BOOKING_PAID, new BookingPaidEvent(id));
+      return 'CONFIRMED';
+    }
 
     const booking = await this.prisma.booking.findUnique({ where: { id }, select: { status: true } });
     if (!booking) return 'NOT_PAYABLE';

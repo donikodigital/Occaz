@@ -986,6 +986,8 @@ model Shipment {
 
   recipientName       String
   recipientPhone      String
+  // Facultatif : le destinataire reçoit alors le suivi de son colis par e-mail (jamais communiqué au conducteur).
+  recipientEmail      String?
   recipientLocationId String
   recipientLocation   Location @relation("ShipmentRecipientLocation", fields: [recipientLocationId], references: [id])
 
@@ -1072,6 +1074,14 @@ model ShipmentItem {
   label      String
   weightKg   Float?
   photoUrl   String?
+  // Un colis d'un envoi multiple : ses propres dimensions, sa valeur déclarée et le prix calculé pour lui (hors majoration
+  // d'urgence, appliquée une seule fois à l'envoi). Nuls pour les anciens envois, créés avant la saisie colis par colis.
+  lengthCm      Float?
+  widthCm       Float?
+  heightCm      Float?
+  declaredValue BigInt?
+  description   String?
+  price         BigInt?
 
   createdAt DateTime @default(now())
 

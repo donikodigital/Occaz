@@ -1,6 +1,6 @@
 // backend/src/integrations/email/resend-email.provider.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { EmailAction, EmailProvider } from './email-provider.interface';
+import { EmailAction, EmailAttachment, EmailProvider } from './email-provider.interface';
 import { renderNotificationEmailHtml } from './email-template';
 
 /**
@@ -17,7 +17,7 @@ export class ResendEmailProvider implements EmailProvider {
   private readonly logger = new Logger('Email');
   private readonly endpoint = 'https://api.resend.com/emails';
 
-  async send(toEmail: string, subject: string, body: string, action?: EmailAction): Promise<void> {
+  async send(toEmail: string, subject: string, body: string, action?: EmailAction, attachments?: EmailAttachment[]): Promise<void> {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       throw new Error(
@@ -50,6 +50,15 @@ export class ResendEmailProvider implements EmailProvider {
             actionUrl: action?.url,
             actionLabel: action?.label,
           }),
+          // Resend attend le contenu des fichiers en base64.
+          ...(attachments && attachments.length > 0
+            ? {
+                attachments: attachments.map((attachment) => ({
+                  filename: attachment.filename,
+                  content: attachment.content.toString('base64'),
+                })),
+              }
+            : {}),
         }),
       });
     } catch (error) {

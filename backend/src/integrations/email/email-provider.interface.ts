@@ -7,6 +7,13 @@ export interface EmailAction {
   label: string;
 }
 
+/** Pièce jointe d'un email (billet, étiquettes…). `content` est le fichier lui-même. */
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 export interface EmailProvider {
-  send(toEmail: string, subject: string, body: string, action?: EmailAction): Promise<void>;
+  send(toEmail: string, subject: string, body: string, action?: EmailAction, attachments?: EmailAttachment[]): Promise<void>;
 }

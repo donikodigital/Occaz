@@ -1,4 +1,5 @@
 // mobile/src/hooks/usePushNotifications.ts
+// [10/10/2026] v4 — SHIPMENT_TRACKING : le toucher ouvre le suivi en direct du colis ; reçue app ouverte, elle rafraîchit le suivi.
 // [21/09/2026] v2 — canal Android « shipment-requests » (importance max) et ouverture de l'écran concerné au toucher d'une notification.
 // [08/10/2026] v3 — son dédié aux messages d'échange : canal Android « messages », son joué à l'ouverture de l'app, pas de bannière si la
 // conversation est déjà affichée, ouverture de la conversation au toucher. Les autres notifications gardent leur son habituel.
@@ -132,6 +133,11 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
         void queryClient.invalidateQueries({ queryKey: ['shipments', 'invitations', 'mine'] });
         return;
       }
+      if (data?.type === 'SHIPMENT_TRACKING' && data.shipmentId) {
+        void queryClient.invalidateQueries({ queryKey: ['tracking', 'shipment', data.shipmentId] });
+        void queryClient.invalidateQueries({ queryKey: ['shipments', data.shipmentId] });
+        return;
+      }
       if (data?.type === 'SHIPMENT_INVITATION_DECLINED' && data.shipmentId) {
         void queryClient.invalidateQueries({ queryKey: ['shipments', data.shipmentId, 'invitations'] });
         return;
@@ -155,6 +161,9 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
       } else if (data?.type === 'SHIPMENT_INVITATION') {
         // Un client invite ce conducteur à prendre son colis : l'écran des invitations montre son message.
         router.push('/(driver)/shipment-invitations');
+      } else if (data?.type === 'SHIPMENT_TRACKING' && data.shipmentId) {
+        // Colis récupéré, passé dans une ville, arrivé : le suivi en direct s'ouvre.
+        router.push({ pathname: '/(customer)/shipment-tracking', params: { id: data.shipmentId } });
       } else if (
         data?.shipmentId &&
         (data.type === 'SHIPMENT_EXTENSION' || data.type === 'DRIVER_ACCEPTED' || data.type === 'SHIPMENT_INVITATION_DECLINED')

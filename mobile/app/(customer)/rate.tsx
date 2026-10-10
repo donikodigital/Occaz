@@ -1,9 +1,11 @@
 // mobile/app/(customer)/rate.tsx
+// [10/10/2026] v2 — « Merci ! » s'affiche dans la page (écran de remerciement avec « OK ») au lieu d'Alert.alert, sans effet sur le web :
+// avant, l'avis partait mais rien ne confirmait et l'écran restait ouvert.
 import React, { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconArrowLeft } from '@tabler/icons-react-native';
-import { AppText, Button, IconButton, RatingStars, ScreenContainer, TextField } from '@/components/ui';
+import { AppText, Button, FeedbackBanner, IconButton, RatingStars, ScreenContainer, TextField } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useRateBooking, useRateShipment } from '@/hooks/useRatings';
 import { ApiError } from '@/services/api/ApiError';
@@ -24,6 +26,7 @@ export default function RateScreen() {
   const [subScores, setSubScores] = useState<Partial<Record<SubCriterionKey, number>>>({});
   const [comment, setComment] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [submitted, setSubmitted] = useState(false);
 
   const rateBooking = useRateBooking(type === 'booking' ? id : '');
   const rateShipment = useRateShipment(type === 'shipment' ? id : '');
@@ -39,15 +42,22 @@ export default function RateScreen() {
     mutation.mutate(
       { score, comment: comment.trim() || undefined, ...subScores },
       {
-        onSuccess: () => {
-          Alert.alert('Merci !', 'Votre avis a bien été enregistré.', [
-            { text: 'OK', onPress: () => router.back() },
-          ]);
-        },
+        onSuccess: () => setSubmitted(true),
         onError: (error) => {
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },
       },
+    );
+  }
+
+  if (submitted) {
+    return (
+      <ScreenContainer scroll maxWidth="form">
+        <View style={styles.thanks}>
+          <FeedbackBanner tone="success" title="Merci !" text="Votre avis a bien été enregistré." />
+          <Button label="OK" onPress={() => router.back()} />
+        </View>
+      </ScreenContainer>
     );
   }
 
@@ -108,6 +118,10 @@ export default function RateScreen() {
 }
 
 const styles = StyleSheet.create({
+  thanks: {
+    gap: spacing.lg,
+    paddingTop: spacing.xl,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -3,7 +3,7 @@
 // [21/09/2026] v2 — plage de dates obligatoire ; champs de prix hérités de QuoteShipmentDto.
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsDateString, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsEmail, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { ShipmentItemInputDto } from './shipment-item-input.dto';
 import { QuoteShipmentDto } from './quote-shipment.dto';
 
@@ -57,6 +57,14 @@ export class CreateShipmentDto extends QuoteShipmentDto {
   @ApiProperty({ example: '+224620000002' })
   @IsString()
   recipientPhone: string;
+
+  @ApiPropertyOptional({
+    example: 'aissatou@example.com',
+    description: 'Facultatif : le destinataire reçoit le suivi de son colis par e-mail. Jamais communiqué au conducteur.',
+  })
+  @IsOptional()
+  @IsEmail({}, { message: "L'adresse e-mail du destinataire n'est pas valide." })
+  recipientEmail?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

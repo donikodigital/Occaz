@@ -8,8 +8,10 @@
 import React from 'react';
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { IconArrowLeft, IconMapPin, IconPencil } from '@tabler/icons-react-native';
-import { AppText, Button, TextField } from '@/components/ui';
+import { AppText, TextField } from '@/components/ui';
+import { OceanButton } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
+import { OCEAN } from '@/theme/ocean';
 import type { LocationPickerController } from '@/hooks/useLocationPicker';
 import { CitySearchPanel } from './CitySearchPanel';
 
@@ -42,7 +44,7 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
       <View style={styles.card}>
         <View style={styles.placeRow}>
           <View style={styles.placeIcon}>
-            <IconMapPin size={20} color={colors.primary} />
+            <IconMapPin size={20} color={OCEAN.base} />
           </View>
           <View style={styles.placeText}>
             <AppText variant="sm" weight="semibold">
@@ -83,7 +85,7 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
           {!isDetecting && city && !isChangingCity ? (
             <View style={styles.cityRow}>
               <View style={styles.cityChip}>
-                <IconMapPin size={14} color={colors.primary} />
+                <IconMapPin size={14} color={OCEAN.base} />
                 <AppText variant="sm" weight="semibold" color="primary">
                   {city.name}
                 </AppText>
@@ -137,7 +139,7 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
         ) : null}
       </View>
 
-      <Button
+      <OceanButton
         label="Confirmer l'adresse"
         onPress={() => {
           // Le champ « Nom du lieu » a souvent encore le focus ici (voir
@@ -169,11 +171,16 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: OCEAN.line,
     padding: spacing.lg,
     gap: spacing.md,
+    shadowColor: OCEAN.deep,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   placeRow: {
     flexDirection: 'row',
@@ -184,7 +191,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: OCEAN.mist,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -213,7 +220,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: OCEAN.mist,
     borderRadius: radius.pill,
     paddingVertical: 8,
     paddingHorizontal: spacing.sm + 2,

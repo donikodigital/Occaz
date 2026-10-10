@@ -1,4 +1,6 @@
 // backend/src/shipments/shipments.service.ts
+// [10/10/2026] v6 — saisie colis par colis : `parcels` (poids, dimensions, valeur de chacun) ; le serveur en tire quantité, poids total et
+// valeur déclarée totale, calcule le prix de chaque colis (devis : `parcels`, `urgentSurcharge`) et enregistre chaque colis (ShipmentItem).
 // [03/10/2026] v5 — colis et villes traversées : « Colis sur mon trajet » (findAvailable avec tripId) ne garde que les envois
 // dont le ramassage précède la livraison sur la route du trajet (étapes comprises), et l'acceptation avec un trajet vérifie
 // la même chose — le passage au ramassage (ex. Kindia) doit tomber dans la plage de dates du client.
@@ -40,10 +42,13 @@ import { toMoneyBigInt } from '../common/utils/money.util';
 import {
   DOMAIN_EVENTS,
   ShipmentCancelledEvent,
+  ShipmentPaidEvent,
   ShipmentSearchOpenedEvent,
+  ShipmentStatusChangedEvent,
 } from '../common/events/domain-events';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { QuoteShipmentDto } from './dto/quote-shipment.dto';
+import { ShipmentParcelInputDto } from './dto/shipment-parcel-input.dto';
 import { SearchAvailableShipmentsDto } from './dto/search-available-shipments.dto';
 import { hideContactsOnceDelivered, toAvailableShipmentView } from './shipment-views';
 
@@ -123,7 +128,7 @@ export class ShipmentsService {
         currency: CURRENCY_SELECT,
         senderLocation: { include: { city: { include: { country: true } } } },
         recipientLocation: { include: { city: { include: { country: true } } } },
-        items: true,
+        items: { orderBy: { createdAt: 'asc' } },
         tracking: { orderBy: { recordedAt: 'asc' } },
       },
     });
@@ -143,10 +148,21 @@ export class ShipmentsService {
    * (buildQuote) : le montant annoncé est celui qui sera facturé.
    */
   async quote(dto: QuoteShipmentDto) {
-    const { quote, currencyId } = await this.buildQuote(dto);
+    const { quote, currencyId, parcels, weightKg, quantity } = await this.buildQuote(dto);
     const currency = await this.prisma.currency.findUnique({ where: { id: currencyId }, select: { isoCode: true } });
     return {
       totalAmount: quote.price,
+      quantity,
+      weightKg,
+      // Prix de chaque colis (même ordre que la saisie) ; vide pour un devis global sans liste de colis.
+      parcels: (quote.parcels ?? []).map((parcelQuote, index) => ({
+        index: index + 1,
+        weightKg: parcels?.[index]?.weightKg ?? null,
+        price: parcelQuote.price,
+        chargeableWeightKg: parcelQuote.chargeableWeightKg,
+        volumetricWeightKg: parcelQuote.volumetricWeightKg,
+      })),
+      urgentSurcharge: quote.urgentSurcharge,
       currencyId,
       currencyCode: currency?.isoCode ?? null,
       distanceKm: quote.distanceKm,
@@ -163,7 +179,27 @@ export class ShipmentsService {
       );
     }
 
-    const declaredValue = dto.declaredValue ? toMoneyBigInt(dto.declaredValue) : undefined;
+    // Saisie colis par colis : quantité, poids total et valeur déclarée totale viennent de la liste, jamais des champs globaux
+    // (un client modifié ne peut pas annoncer un poids différent de la somme de ses colis).
+    const parcels = dto.parcels?.length ? dto.parcels.map((parcel, index) => this.normalizeParcel(parcel, index)) : undefined;
+    const quantity = parcels ? parcels.length : (dto.quantity ?? 1);
+    const weightKg = parcels ? Math.round(parcels.reduce((sum, parcel) => sum + parcel.weightKg, 0) * 1000) / 1000 : dto.weightKg;
+    const declaredValue = parcels
+      ? parcels.some((parcel) => parcel.declaredValue !== undefined)
+        ? parcels.reduce((sum, parcel) => sum + (parcel.declaredValue ?? 0n), 0n)
+        : undefined
+      : dto.declaredValue
+        ? toMoneyBigInt(dto.declaredValue)
+        : undefined;
+    // Dimensions gardées sur l'envoi (vues par les conducteurs) : celles du colis le plus volumineux ; le détail de chaque colis est
+    // dans ShipmentItem.
+    const biggest = parcels
+      ?.filter((parcel) => parcel.lengthCm && parcel.widthCm && parcel.heightCm)
+      .sort((a, b) => b.lengthCm! * b.widthCm! * b.heightCm! - a.lengthCm! * a.widthCm! * a.heightCm!)[0];
+    const dimensions = parcels
+      ? { lengthCm: biggest?.lengthCm, widthCm: biggest?.widthCm, heightCm: biggest?.heightCm }
+      : { lengthCm: dto.lengthCm, widthCm: dto.widthCm, heightCm: dto.heightCm };
+
     if (declaredValue !== undefined && category.maxDeclaredValue !== null && category.maxDeclaredValue !== undefined) {
       if (declaredValue > category.maxDeclaredValue) {
         throw new BadRequestException(
@@ -192,11 +228,10 @@ export class ShipmentsService {
     }
 
     const quote = await this.pricing.computeShipmentQuote({
-      weightKg: dto.weightKg,
-      lengthCm: dto.lengthCm,
-      widthCm: dto.widthCm,
-      heightCm: dto.heightCm,
-      quantity: dto.quantity,
+      parcels,
+      weightKg,
+      ...dimensions,
+      quantity,
       declaredValue,
       isUrgent: dto.isUrgent ?? false,
       categoryPriceMultiplier: category.priceMultiplier,
@@ -204,7 +239,24 @@ export class ShipmentsService {
       recipientLocationId: dto.recipientLocationId,
     });
 
-    return { category, declaredValue, senderLocation, quote, currencyId };
+    return { category, declaredValue, senderLocation, quote, currencyId, parcels, weightKg, quantity, dimensions };
+  }
+
+  /** Un colis de la saisie : dimensions toutes présentes ou toutes absentes, valeur déclarée convertie en montant. */
+  private normalizeParcel(parcel: ShipmentParcelInputDto, index: number) {
+    const dims = [parcel.lengthCm, parcel.widthCm, parcel.heightCm];
+    const given = dims.filter((value) => value !== undefined && value !== null && value > 0).length;
+    if (given !== 0 && given !== 3) {
+      throw new BadRequestException(`Colis ${index + 1} : indiquez les trois dimensions (longueur, largeur, hauteur), ou aucune.`);
+    }
+    return {
+      weightKg: parcel.weightKg,
+      lengthCm: given === 3 ? parcel.lengthCm : undefined,
+      widthCm: given === 3 ? parcel.widthCm : undefined,
+      heightCm: given === 3 ? parcel.heightCm : undefined,
+      declaredValue: parcel.declaredValue ? toMoneyBigInt(parcel.declaredValue) : undefined,
+      description: parcel.description?.trim() || undefined,
+    };
   }
 
   private parseWindow(windowStart: string, windowEnd: string): { start: Date; end: Date } {
@@ -242,7 +294,7 @@ export class ShipmentsService {
   async create(customerId: string, dto: CreateShipmentDto) {
     const { senderName, senderPhone } = await this.senderIdentityOf(customerId);
     const { start: windowStart, end: windowEnd } = this.parseWindow(dto.windowStart, dto.windowEnd);
-    const { declaredValue, senderLocation, quote, currencyId } = await this.buildQuote(dto);
+    const { declaredValue, senderLocation, quote, currencyId, parcels, weightKg, quantity, dimensions } = await this.buildQuote(dto);
 
     // Un seul montant pour le client : c'est le prix calculé. La commission
     // de la plateforme (règle configurée dans l'admin) en est prélevée sur
@@ -299,9 +351,9 @@ export class ShipmentsService {
           where: {
             id: trip.id,
             status: TripStatus.PUBLISHED,
-            availableShipmentWeightKg: { gte: dto.weightKg },
+            availableShipmentWeightKg: { gte: weightKg },
           },
-          data: { availableShipmentWeightKg: { decrement: dto.weightKg } },
+          data: { availableShipmentWeightKg: { decrement: weightKg } },
         });
         if (capacityUpdate.count === 0) {
           throw new ConflictException("Plus assez de capacité de transport sur ce trajet.");
@@ -319,13 +371,14 @@ export class ShipmentsService {
           senderLocationId: dto.senderLocationId,
           recipientName: dto.recipientName,
           recipientPhone: dto.recipientPhone,
+          recipientEmail: dto.recipientEmail?.trim().toLowerCase() || null,
           recipientLocationId: dto.recipientLocationId,
           description: dto.description,
-          weightKg: dto.weightKg,
-          lengthCm: dto.lengthCm,
-          widthCm: dto.widthCm,
-          heightCm: dto.heightCm,
-          quantity: dto.quantity ?? 1,
+          weightKg,
+          lengthCm: dimensions.lengthCm,
+          widthCm: dimensions.widthCm,
+          heightCm: dimensions.heightCm,
+          quantity,
           declaredValue,
           instructions: dto.instructions,
           isUrgent: dto.isUrgent ?? false,
@@ -354,7 +407,25 @@ export class ShipmentsService {
         });
       }
 
-      if (dto.items?.length) {
+      if (parcels) {
+        const itemsBaseTime = Date.now();
+        // Un enregistrement par colis : ses mesures, sa valeur et son prix (hors urgence), dans l'ordre de la saisie.
+        await tx.shipmentItem.createMany({
+          data: parcels.map((parcel, index) => ({
+            shipmentId: shipment.id,
+            label: parcel.description ?? `Colis ${index + 1}`,
+            weightKg: parcel.weightKg,
+            lengthCm: parcel.lengthCm,
+            widthCm: parcel.widthCm,
+            heightCm: parcel.heightCm,
+            declaredValue: parcel.declaredValue,
+            description: parcel.description,
+            price: quote.parcels?.[index]?.price,
+            // Dates décalées d'une milliseconde : l'ordre de saisie des colis reste celui de l'affichage.
+            createdAt: new Date(itemsBaseTime + index),
+          })),
+        });
+      } else if (dto.items?.length) {
         await tx.shipmentItem.createMany({
           data: dto.items.map((item) => ({
             shipmentId: shipment.id,
@@ -371,7 +442,7 @@ export class ShipmentsService {
 
       return tx.shipment.findUnique({
         where: { id: shipment.id },
-        include: { items: true, tracking: true },
+        include: { items: { orderBy: { createdAt: 'asc' } }, tracking: true },
       });
     });
   }
@@ -392,6 +463,9 @@ export class ShipmentsService {
       this.prisma.shipment.update({ where: { id }, data: { status: nextStatus } }),
       this.prisma.shipmentTracking.create({ data: { shipmentId: id, status: nextStatus } }),
     ]);
+
+    // Les étiquettes des colis partent par e-mail dès que l'envoi est payé (une seule fois : le statut CREATED n'est quitté qu'ici).
+    this.eventEmitter.emit(DOMAIN_EVENTS.SHIPMENT_PAID, new ShipmentPaidEvent(id));
 
     if (nextStatus === ShipmentStatus.SEARCHING_DRIVER) {
       this.eventEmitter.emit(DOMAIN_EVENTS.SHIPMENT_SEARCH_OPENED, new ShipmentSearchOpenedEvent(id));
@@ -581,6 +655,9 @@ export class ShipmentsService {
 
       return tx.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
     });
+
+    // Le destinataire (s'il a donné son e-mail) apprend qu'un colis lui est destiné et peut le suivre.
+    this.eventEmitter.emit(DOMAIN_EVENTS.SHIPMENT_STATUS_CHANGED, new ShipmentStatusChangedEvent(shipmentId, ShipmentStatus.DRIVER_ASSIGNED));
 
     // Le client a payé un montant unique (Shipment.totalAmount, déjà net
     // d'un éventuel code promo — voir create()) ; la commission
