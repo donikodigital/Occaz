@@ -1,4 +1,8 @@
 // mobile/app/(auth)/onboarding.tsx
+// [11/10/2026] v6 — Correctifs d'affichage (vus sur le web à 353 px de large) :
+//   - le ciel de fond gardait la taille de l'image (827 × 778) au lieu de remplir l'écran : il débordait à droite et s'arrêtait avant le
+//     bas. Il est maintenant une image posée en absolu sur toute la page (View + Image), identique sur mobile et sur le web ;
+//   - la feuille « Créer votre compte » est une carte centrée sur l'écran (et non plus collée en bas), quelle que soit la largeur.
 // [11/10/2026] v5 — Les cartes de rôle ouvrent la connexion (numéro + mot de passe) ; la feuille « Créer votre compte » ouvre l'inscription
 // en étapes (signup). Plus de paramètre `mode`.
 // [10/10/2026] v4 — lien « Suivre un colis » (numéro de suivi, sans compte) sous « Créer votre compte ».
@@ -14,12 +18,11 @@
 // déjà inscrites se connectent immédiatement.
 // Les cartes ouvrent la connexion ; la modale ouvre l'inscription en étapes.
 import React, { useState } from 'react';
-import { Image, ImageBackground, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { IconArrowRight, IconPackage, IconSteeringWheel, IconUser, IconX } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
 import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
-import { useResponsive } from '@/hooks/useResponsive';
 import { colors, maxContentWidth, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import type { AccountType } from '@/types/auth.types';
@@ -73,18 +76,16 @@ interface SignupSheetProps {
 // bas sur mobile, centrée dès le seuil tablette). Un appui sur le fond assombri
 // ou sur la croix referme la feuille.
 function SignupSheet({ visible, onClose, onSelect }: SignupSheetProps) {
-  const { isTablet } = useResponsive();
-
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={[styles.overlay, isTablet && styles.overlayCentered]}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.overlay}>
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Fermer"
         />
-        <View style={[styles.sheet, isTablet && styles.sheetCentered]}>
+        <View style={styles.sheet}>
           <View style={styles.sheetHeader}>
             <View style={styles.sheetHeaderText}>
               <AppText variant="xl" weight="bold" color={OCEAN.deep}>
@@ -142,7 +143,8 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <ImageBackground source={SKY_BACKGROUND} resizeMode="cover" style={styles.background}>
+    <View style={styles.background}>
+      <Image source={SKY_BACKGROUND} resizeMode="cover" style={styles.sky} />
       <View style={styles.scrim} />
       <ScreenContainer transparent style={styles.container} maxWidth="form">
         <View style={styles.hero}>
@@ -202,7 +204,7 @@ export default function OnboardingScreen() {
       </ScreenContainer>
 
       <SignupSheet visible={signupOpen} onClose={() => setSignupOpen(false)} onSelect={selectSignupRole} />
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -216,6 +218,15 @@ const styles = StyleSheet.create({
   },
   background: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  // Le ciel remplit toute la page, quelle que soit la taille de l'image d'origine.
+  sky: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
   },
   // Voile clair semi-transparent entre la photo et le contenu : le ciel
   // reste visible en fond mais le texte (sans carte derrière) garde un
@@ -282,34 +293,26 @@ const styles = StyleSheet.create({
   },
 
   // --- Modale « Créer votre compte » ---------------------------------------
+  // Carte centrée sur l'écran, avec une marge de chaque côté.
   overlay: {
     flex: 1,
     backgroundColor: colors.overlay,
-    justifyContent: 'flex-end',
-  },
-  overlayCentered: {
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
   },
   sheet: {
+    width: '100%',
+    maxWidth: maxContentWidth.form,
     backgroundColor: colors.background,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
     gap: spacing.lg,
     shadowColor: OCEAN.deep,
     shadowOpacity: 0.2,
     shadowRadius: 18,
-    shadowOffset: { width: 0, height: -6 },
+    shadowOffset: { width: 0, height: 8 },
     elevation: 12,
-  },
-  sheetCentered: {
-    maxWidth: maxContentWidth.form,
-    width: '100%',
-    alignSelf: 'center',
-    borderBottomLeftRadius: radius.xl,
-    borderBottomRightRadius: radius.xl,
   },
   sheetHeader: {
     flexDirection: 'row',

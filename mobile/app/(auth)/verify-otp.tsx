@@ -14,7 +14,7 @@ import { ApiError } from '@/services/api/ApiError';
 import { useAuthStore } from '@/stores/authStore';
 import { useAuthFlowStore } from '@/stores/authFlowStore';
 import { useCreateCustomerProfile } from '@/hooks/useCustomerProfile';
-import { SIGNUP_STEPS } from './signup';
+import { SIGNUP_STEP, SIGNUP_STEPS } from '@/components/auth/signupSteps';
 
 export default function VerifyPhoneCodeScreen() {
   const { phone, accountType, firstName, lastName, country } = useAuthFlowStore();
@@ -56,7 +56,7 @@ export default function VerifyPhoneCodeScreen() {
       title="Entrez le code"
       subtitle={`Code envoyé par SMS au ${phone}`}
       onBack={() => router.back()}
-      step={{ current: 2, total: SIGNUP_STEPS, label: 'Vérification du numéro' }}
+      step={{ current: SIGNUP_STEP.phoneCode, total: SIGNUP_STEPS, label: 'Vérification du numéro' }}
       onSubmit={handleSubmit}
       isSubmitting={verify.isPending}
       errorMessage={errorMessage}

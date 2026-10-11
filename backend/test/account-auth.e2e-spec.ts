@@ -1,4 +1,6 @@
 // backend/test/account-auth.e2e-spec.ts
+// [11/10/2026] v2 — Nettoyage complet : le compte de test et ses lignes du journal d'audit sont supprimés à la fin ; les comptes laissés par
+// d'anciennes exécutions (adresse « e2e.<nombre>@exemple.com ») sont supprimés au début.
 // [11/10/2026] v1 — Parcours complet client, de bout en bout, sur l'application Nest réelle et une VRAIE base PostgreSQL (celle de la CI) :
 //   inscription (SMS → e-mail → mot de passe) → connexion → verrouillage après 5 erreurs → mot de passe oublié par e-mail → changement
 //   du mot de passe connecté → mot de passe oublié par SMS.
@@ -20,6 +22,41 @@ const API = '/api/v1/auth';
 /** Numéro guinéen valide et unique à chaque exécution (+224 62 + 7 chiffres). */
 const PHONE = `+22462${String(Math.floor(Math.random() * 1e7)).padStart(7, '0')}`;
 const EMAIL = `e2e.${Date.now()}@exemple.com`;
+
+/**
+ * Supprime un compte de test et tout ce que le parcours a écrit à son sujet, y compris ses lignes du journal d'audit (clé étrangère
+ * vers le compte : sans elles, la suppression échouait et le compte restait). Ne touche qu'à des comptes de test : le numéro de CETTE
+ * exécution, ou une adresse « e2e.<nombre>@exemple.com » (jamais une vraie personne).
+ */
+async function purgeTestUsers(prisma: PrismaService | undefined, target: { phone?: string; emailLike?: boolean }) {
+  if (!prisma) return; // l'application n'a pas démarré : rien à nettoyer
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          ...(target.phone ? [{ phone: target.phone }] : []),
+          ...(target.emailLike ? [{ email: { startsWith: 'e2e.', endsWith: '@exemple.com' } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (users.length === 0) return;
+    // Un seul passage par table (et non un passage par compte) : la base de test peut être distante, chaque aller-retour compte.
+    const ids = users.map((user) => user.id);
+    await prisma.auditLog.deleteMany({ where: { OR: [{ actorId: { in: ids } }, { entityType: 'User', entityId: { in: ids } }] } });
+    await prisma.otpCode.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.session.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.device.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+  } catch (error) {
+    // Nettoyage au mieux : on le signale sans faire échouer les tests.
+    console.warn('[e2e] Comptes de test non supprimés :', error instanceof Error ? error.message : error);
+  }
+}
+
+// Démarrer l'application et joindre une base distante peut dépasser les 5 secondes de Jest par défaut.
+jest.setTimeout(60_000);
+const STARTUP_TIMEOUT_MS = 180_000;
 
 describe('Compte client — inscription, connexion, mot de passe (e2e)', () => {
   let app: INestApplication;
@@ -54,23 +91,18 @@ describe('Compte client — inscription, connexion, mot de passe (e2e)', () => {
     app.setGlobalPrefix('api/v1');
     await app.init();
     prisma = app.get(PrismaService);
-  });
+  }, STARTUP_TIMEOUT_MS);
+
+  // Comptes de test laissés par d'anciennes exécutions (avant ce nettoyage, ou exécution interrompue).
+  beforeAll(async () => {
+    await purgeTestUsers(prisma, { emailLike: true });
+  }, STARTUP_TIMEOUT_MS);
 
   afterAll(async () => {
     jest.restoreAllMocks();
-    try {
-      const user = await prisma.user.findUnique({ where: { phone: PHONE } });
-      if (user) {
-        await prisma.otpCode.deleteMany({ where: { userId: user.id } });
-        await prisma.session.deleteMany({ where: { userId: user.id } });
-        await prisma.device.deleteMany({ where: { userId: user.id } });
-        await prisma.user.delete({ where: { id: user.id } });
-      }
-    } catch {
-      // Nettoyage au mieux (journaux d'audit liés, etc.) : la base de la CI est jetable, et le numéro est unique à l'exécution.
-    }
-    await app.close();
-  });
+    await purgeTestUsers(prisma, { phone: PHONE });
+    await app?.close();
+  }, STARTUP_TIMEOUT_MS);
 
   it('refuse un numéro mal formé avant d’envoyer le moindre SMS', async () => {
     await post('signup/phone', { phone: '12', accountType: 'CUSTOMER' }).expect(400);

@@ -3,7 +3,7 @@
 // est fourni, la pastille ouvre la liste des pays ; sinon l'indicatif suit le pays choisi plus haut sur l'écran (inscription).
 // Un numéro déjà international (« +33612345678 ») est accepté tel quel.
 import React from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { IconChevronDown } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
@@ -93,16 +93,21 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     paddingHorizontal: spacing.md,
     alignSelf: 'stretch',
+    // Ne se rétrécit jamais : sans cela, le champ de saisie (largeur propre sur le web) écrasait « 🇬🇳 +224 ».
+    flexShrink: 0,
     backgroundColor: OCEAN.mist,
     borderRightWidth: 1,
     borderRightColor: colors.border,
   },
   input: {
     flex: 1,
+    minWidth: 0,
     paddingHorizontal: spacing.md,
     fontFamily: fontFamily.medium,
     fontSize: fontSize.md,
     color: colors.textPrimary,
+    // Pas de cadre noir du navigateur : c'est le contour du champ entier qui sert de repère.
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
   },
   error: { marginTop: spacing.xxs },
 });

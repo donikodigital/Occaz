@@ -10,7 +10,7 @@ import { OCEAN } from '@/theme/ocean';
 import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { useAuthStore } from '@/stores/authStore';
-import { SIGNUP_STEPS } from './signup';
+import { SIGNUP_STEP, SIGNUP_STEPS } from '@/components/auth/signupSteps';
 
 export default function VerifyEmailCodeScreen() {
   const { email = '' } = useLocalSearchParams<{ email?: string }>();
@@ -39,7 +39,7 @@ export default function VerifyEmailCodeScreen() {
       title="Vérifiez votre e-mail"
       subtitle={`Code à 6 chiffres envoyé à ${email}. Pensez à regarder dans vos courriers indésirables.`}
       onBack={() => router.back()}
-      step={{ current: 3, total: SIGNUP_STEPS, label: 'Vérification de l’e-mail' }}
+      step={{ current: SIGNUP_STEP.email, total: SIGNUP_STEPS, label: 'Vérification de l’e-mail' }}
       onSubmit={handleSubmit}
       isSubmitting={verify.isPending}
       errorMessage={errorMessage}

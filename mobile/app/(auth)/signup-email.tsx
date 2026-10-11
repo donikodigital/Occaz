@@ -14,7 +14,7 @@ import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
-import { SIGNUP_STEPS } from './signup';
+import { SIGNUP_STEP, SIGNUP_STEPS } from '@/components/auth/signupSteps';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -52,7 +52,7 @@ export default function SignupEmailScreen() {
       icon={<IconMail size={26} color={OCEAN.onDark} />}
       title="Votre adresse e-mail"
       subtitle="Facultatif, mais très utile."
-      step={{ current: 3, total: SIGNUP_STEPS, label: 'E-mail (facultatif)' }}
+      step={{ current: SIGNUP_STEP.email, total: SIGNUP_STEPS, label: 'E-mail (facultatif)' }}
       footer={
         <View style={styles.footer}>
           <OceanButton label="Recevoir le code" onPress={handleSend} loading={sendCode.isPending} />

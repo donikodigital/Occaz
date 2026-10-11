@@ -17,11 +17,14 @@ export function CountryPickerModal({
   selectedId,
   onSelect,
   onClose,
+  showDialCode = true,
 }: {
   visible: boolean;
   selectedId?: string | null;
   onSelect: (country: Country) => void;
   onClose: () => void;
+  /** Faux à l'étape « Pays de résidence » de l'inscription : l'indicatif n'y sert à rien, il apparaît à l'étape du téléphone. */
+  showDialCode?: boolean;
 }) {
   const { data: countries, isLoading } = useCountries();
   const { isTablet } = useResponsive();
@@ -57,9 +60,11 @@ export function CountryPickerModal({
                 <AppText variant="base" weight={selected ? 'semibold' : 'medium'} style={styles.rowName}>
                   {item.name}
                 </AppText>
-                <AppText variant="sm" color="textSecondary">
-                  {formatDialCode(item.phoneCode)}
-                </AppText>
+                {showDialCode ? (
+                  <AppText variant="sm" color="textSecondary">
+                    {formatDialCode(item.phoneCode)}
+                  </AppText>
+                ) : null}
                 {selected ? <IconCheck size={18} color={OCEAN.base} /> : null}
               </Pressable>
             );
@@ -75,11 +80,13 @@ export function CountryField({
   value,
   onSelect,
   error,
+  showDialCode = true,
 }: {
   label: string;
   value: Country | null;
   onSelect: (country: Country) => void;
   error?: string;
+  showDialCode?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -97,7 +104,7 @@ export function CountryField({
         <AppText variant="base" color={value ? 'textPrimary' : 'textSecondary'} style={styles.fieldText}>
           {value?.name ?? 'Choisir un pays'}
         </AppText>
-        {value ? (
+        {value && showDialCode ? (
           <AppText variant="sm" weight="semibold" color={OCEAN.base}>
             {formatDialCode(value.phoneCode)}
           </AppText>
@@ -109,7 +116,13 @@ export function CountryField({
           {error}
         </AppText>
       ) : null}
-      <CountryPickerModal visible={open} selectedId={value?.id} onSelect={onSelect} onClose={() => setOpen(false)} />
+      <CountryPickerModal
+        visible={open}
+        selectedId={value?.id}
+        onSelect={onSelect}
+        onClose={() => setOpen(false)}
+        showDialCode={showDialCode}
+      />
     </View>
   );
 }

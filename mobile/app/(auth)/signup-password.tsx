@@ -17,7 +17,7 @@ import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { useAuthStore } from '@/stores/authStore';
 import { useAuthFlowStore } from '@/stores/authFlowStore';
-import { SIGNUP_STEPS } from './signup';
+import { SIGNUP_STEP, SIGNUP_STEPS } from '@/components/auth/signupSteps';
 
 export default function SignupPasswordScreen() {
   const user = useAuthStore((state) => state.user);
@@ -78,7 +78,7 @@ export default function SignupPasswordScreen() {
           ? 'Saisissez-le une seconde fois.'
           : '6 chiffres. Il vous sera demandé à chaque connexion, à la place d’un code SMS.'
       }
-      step={{ current: 4, total: SIGNUP_STEPS, label: 'Mot de passe' }}
+      step={{ current: SIGNUP_STEP.password, total: SIGNUP_STEPS, label: 'Mot de passe' }}
       footer={
         confirming ? (
           <OceanButton

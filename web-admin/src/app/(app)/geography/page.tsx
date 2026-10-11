@@ -1,5 +1,8 @@
 // web-admin/src/app/(app)/geography/page.tsx
 //
+// [11/10/2026] v6 — Villes : la liste est repliée par défaut (41 cartes d'un coup, c'est long à parcourir) ; une carte « Voir les villes »
+// la déroule. Elle s'ouvre toute seule dès qu'on cherche ou qu'on filtre « Sans GPS », et se replie quand on change de pays.
+//
 // [11/10/2026] v5 — Pays : interrupteur « Proposé en premier à l'inscription » (le pays présélectionné dans l'application, avec son indicatif
 // et son drapeau) et pastille « Par défaut » sur la carte du pays.
 //
@@ -26,6 +29,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   IconAlertTriangle,
+  IconChevronDown,
   IconChevronRight,
   IconCircleCheck,
   IconCoin,
@@ -114,7 +118,7 @@ interface HeroStat {
 
 function Hero({ stats, onSelectTab }: { stats: HeroStat[]; onSelectTab: (tab: TabId) => void }) {
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/75 p-5 shadow-lg sm:p-7">
+    <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-primary via-primary to-primary/75 p-5 shadow-lg sm:p-7">
       <span className="pointer-events-none absolute -right-12 -top-16 h-52 w-52 rounded-full bg-[rgba(255,255,255,0.10)]" />
       <span className="pointer-events-none absolute -bottom-20 left-8 h-44 w-44 rounded-full bg-[rgba(255,255,255,0.07)]" />
 
@@ -278,7 +282,7 @@ function CountryCard({ country, currencies, onClick }: { country: Country; curre
     <button
       type="button"
       onClick={onClick}
-      className={`${CARD_CLASSES} items-center gap-3 !p-3 ${country.isActive ? '' : 'opacity-70'} ${
+      className={`${CARD_CLASSES} items-center gap-3 p-3! ${country.isActive ? '' : 'opacity-70'} ${
         missingCurrency ? 'border-danger-light' : ''
       }`}
     >
@@ -424,10 +428,13 @@ function CitiesTab({
 }) {
   const [search, setSearch] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
+  // Repliée par défaut : un pays peut avoir des dizaines de villes.
+  const [listOpen, setListOpen] = useState(false);
 
   useEffect(() => {
     setSearch('');
     setOnlyMissing(false);
+    setListOpen(false);
   }, [countryId]);
 
   const sorted = useMemo(() => [...cities].sort((a, b) => a.name.localeCompare(b.name)), [cities]);
@@ -506,7 +513,10 @@ function CitiesTab({
 
       <Toolbar
         search={search}
-        onSearch={setSearch}
+        onSearch={(value) => {
+          setSearch(value);
+          if (value.trim()) setListOpen(true);
+        }}
         searchPlaceholder="Rechercher une ville…"
         showSearch={sorted.length > 5}
         actionLabel="Ajouter une ville"
@@ -527,7 +537,10 @@ function CitiesTab({
           </button>
           <button
             type="button"
-            onClick={() => setOnlyMissing(true)}
+            onClick={() => {
+              setOnlyMissing(true);
+              setListOpen(true);
+            }}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
               onlyMissing ? 'border-primary bg-primary-light text-primary' : 'border-border bg-surface text-text-secondary'
             }`}
@@ -551,14 +564,47 @@ function CitiesTab({
             </Button>
           }
         />
-      ) : filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-text-muted">Aucune ville ne correspond.</p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((city) => (
-            <CityCard key={city.id} city={city} onClick={() => onEditCity(city)} />
-          ))}
-        </div>
+        <>
+          <button
+            type="button"
+            onClick={() => setListOpen((open) => !open)}
+            aria-expanded={listOpen}
+            className="group flex w-full items-center gap-3 rounded-2xl border border-border bg-surface p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-light text-primary">
+              <IconMapPin size={20} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold text-text-primary">
+                {listOpen ? 'Masquer les villes' : 'Voir les villes'}
+              </span>
+              <span className="block text-xs text-text-secondary">
+                {sorted.length} ville{sorted.length > 1 ? 's' : ''}
+                {listOpen && filtered.length !== sorted.length
+                  ? ` · ${filtered.length} affichée${filtered.length > 1 ? 's' : ''}`
+                  : ''}
+                {!listOpen ? ' · touche pour dérouler la liste' : ''}
+              </span>
+            </span>
+            <IconChevronDown
+              size={20}
+              className={`shrink-0 text-text-muted transition-transform duration-200 ${listOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {listOpen ? (
+            filtered.length === 0 ? (
+              <p className="py-8 text-center text-sm text-text-muted">Aucune ville ne correspond.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {filtered.map((city) => (
+                  <CityCard key={city.id} city={city} onClick={() => onEditCity(city)} />
+                ))}
+              </div>
+            )
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -716,7 +762,7 @@ function ToggleRow({
       >
         <span
           className={`inline-block h-5 w-5 rounded-full bg-[#ffffff] shadow transition-transform ${
-            checked ? 'translate-x-[22px]' : 'translate-x-0.5'
+            checked ? 'translate-x-5.5' : 'translate-x-0.5'
           }`}
         />
       </span>
