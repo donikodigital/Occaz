@@ -96,7 +96,7 @@ export default function SignupScreen() {
       if (!country) return setError('Choisissez votre pays de résidence.');
       setIndex(3);
     } else {
-      const international = buildInternationalPhone(country?.phoneCode ?? '', phone);
+      const international = buildInternationalPhone(country?.phoneCode ?? '', phone, country?.isoCode);
       if (!country || !isValidPhoneNumber(international)) return setError('Numéro invalide. Vérifiez-le sans l’indicatif du pays.');
       sendCode.mutate(international);
     }

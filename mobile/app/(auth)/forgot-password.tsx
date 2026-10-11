@@ -1,7 +1,7 @@
 // mobile/app/(auth)/forgot-password.tsx
 // [11/10/2026] v1 — Mot de passe oublié, étape 1 : le numéro de téléphone, puis le choix de l'envoi du code — par SMS au numéro, ou par
 // e-mail (si le compte a une adresse vérifiée ; sinon le serveur l'explique et on propose le SMS).
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
@@ -16,7 +16,7 @@ import { OCEAN } from '@/theme/ocean';
 import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { useDefaultSignupCountry } from '@/hooks/useSignupCountry';
-import { buildInternationalPhone, isValidPhoneNumber } from '@/utils/phone';
+import { buildInternationalPhone, isValidPhoneNumber, splitInternationalPhone } from '@/utils/phone';
 import type { Country } from '@/types/geography.types';
 import type { PasswordResetChannel } from '@/types/auth.types';
 
@@ -24,12 +24,24 @@ export default function ForgotPasswordScreen() {
   const { accountType = 'CUSTOMER', phone: phoneParam } = useLocalSearchParams<{ accountType?: string; phone?: string }>();
   const [country, setCountry] = useState<Country | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [phone, setPhone] = useState(phoneParam && phoneParam.length > 5 ? phoneParam : '');
+  const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | undefined>();
   const [pendingChannel, setPendingChannel] = useState<PasswordResetChannel | null>(null);
 
-  useDefaultSignupCountry(country, setCountry);
+  const countriesQuery = useDefaultSignupCountry(country, setCountry);
+
+  // Numéro déjà saisi à l'écran de connexion (« +224622343234 ») : on retrouve son pays et on remet la partie nationale en forme.
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !phoneParam || !countriesQuery.data) return;
+    prefilled.current = true;
+    const split = splitInternationalPhone(countriesQuery.data, phoneParam);
+    if (split) {
+      setCountry(split.country);
+      setPhone(split.national);
+    }
+  }, [phoneParam, countriesQuery.data]);
 
   const request = useMutation({
     mutationFn: (vars: { international: string; channel: PasswordResetChannel }) =>
@@ -48,7 +60,7 @@ export default function ForgotPasswordScreen() {
 
   function send(channel: PasswordResetChannel) {
     setFormError(undefined);
-    const international = buildInternationalPhone(country?.phoneCode ?? '', phone);
+    const international = buildInternationalPhone(country?.phoneCode ?? '', phone, country?.isoCode);
     if (!country || !isValidPhoneNumber(international)) {
       setPhoneError('Numéro invalide. Vérifiez-le sans l’indicatif du pays.');
       return;

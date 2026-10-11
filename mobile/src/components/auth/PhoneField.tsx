@@ -1,14 +1,15 @@
 // mobile/src/components/auth/PhoneField.tsx
 // [11/10/2026] v1 — Champ téléphone : pastille « 🇬🇳 +224 » (indicatif du pays choisi) suivie du numéro sans indicatif. Si `onPressCountry`
 // est fourni, la pastille ouvre la liste des pays ; sinon l'indicatif suit le pays choisi plus haut sur l'écran (inscription).
-// Un numéro déjà international (« +33612345678 ») est accepté tel quel.
+// Les espaces sont insérés pendant la frappe selon le pays (utils/phone.ts). Un numéro collé avec son indicatif est ramené à sa partie
+// nationale ; celui d'un autre pays (« +33612345678 ») est accepté tel quel.
 import React from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { IconChevronDown } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
-import { flagEmoji, formatDialCode } from '@/utils/phone';
+import { flagEmoji, formatDialCode, formatPhoneTyping, phonePlaceholder } from '@/utils/phone';
 import type { Country } from '@/types/geography.types';
 
 export function PhoneField({
@@ -53,8 +54,9 @@ export function PhoneField({
         )}
         <TextInput
           value={value}
-          onChangeText={(text) => onChangeText(text.replace(/[^\d+\s]/g, ''))}
-          placeholder="620 00 00 00"
+          // Les espaces sont posés au fil de la frappe, selon le pays (Guinée : 622 34 32 34 ; Sénégal : 77 509 99 95).
+          onChangeText={(text) => onChangeText(formatPhoneTyping(country, text))}
+          placeholder={phonePlaceholder(country?.isoCode)}
           placeholderTextColor={colors.textMuted}
           keyboardType="phone-pad"
           autoComplete="tel-national"

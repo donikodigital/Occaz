@@ -1,6 +1,6 @@
 // mobile/app/(auth)/forgot-password-new.tsx
 // [11/10/2026] v1 — Mot de passe oublié, étape 3 : choisir un nouveau mot de passe à 6 chiffres (saisi, puis confirmé). Ensuite retour à
-// la connexion, numéro prérempli, avec un message de confirmation.
+// l'écran « Mot de passe » de la connexion, numéro conservé, avec un message de confirmation.
 import React, { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
@@ -48,7 +48,8 @@ export default function ForgotPasswordNewScreen() {
     reset.mutate(pin, {
       onSuccess: () => {
         setResetToken(null);
-        router.replace({ pathname: '/(auth)/login', params: { phone, accountType, notice: 'password-changed' } });
+        // Retour à l'écran du mot de passe de la connexion, déjà ouvert plus bas dans la pile : le numéro est conservé.
+        router.dismissTo({ pathname: '/(auth)/login-password', params: { phone, accountType, notice: String(Date.now()) } });
       },
       onError: (error) => {
         setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.');
