@@ -1,5 +1,8 @@
 // web-admin/src/app/(app)/geography/page.tsx
 //
+// [11/10/2026] v5 — Pays : interrupteur « Proposé en premier à l'inscription » (le pays présélectionné dans l'application, avec son indicatif
+// et son drapeau) et pastille « Par défaut » sur la carte du pays.
+//
 // v4 — Modales modernisées (pays, devise, ville) : carte d'identité qui se
 // met à jour pendant la saisie, champs regroupés par sections, interrupteur
 // « Transfrontalier » avec son explication (le composant Switch cachait le
@@ -290,6 +293,7 @@ function CountryCard({ country, currencies, onClick }: { country: Country; curre
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         {!country.isActive ? <Badge label="Désactivé" tone="neutral" /> : null}
+        {country.isSignupDefault ? <Badge label="Par défaut à l’inscription" tone="success" /> : null}
         {missingCurrency ? <Badge label="Devise manquante" tone="danger" /> : <Badge label={currency?.isoCode ?? '—'} tone="primary" />}
         <IconChevronRight size={18} className="text-text-muted transition-transform group-hover:translate-x-0.5" />
       </div>
@@ -817,6 +821,7 @@ function CountryFormModal({
   const [phoneCode, setPhoneCode] = useState('');
   const [defaultCurrencyId, setDefaultCurrencyId] = useState('');
   const [isCrossBorderEnabled, setIsCrossBorderEnabled] = useState(false);
+  const [isSignupDefault, setIsSignupDefault] = useState(false);
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
@@ -827,6 +832,7 @@ function CountryFormModal({
     setPhoneCode(country?.phoneCode ?? '');
     setDefaultCurrencyId(country?.defaultCurrencyId ?? '');
     setIsCrossBorderEnabled(country?.isCrossBorderEnabled ?? false);
+    setIsSignupDefault(country?.isSignupDefault ?? false);
     setConfirmingDeactivate(false);
     setErrorMessage(undefined);
   }, [open, country]);
@@ -843,6 +849,7 @@ function CountryFormModal({
           phoneCode,
           defaultCurrencyId: defaultCurrencyId || null,
           isCrossBorderEnabled,
+          isSignupDefault,
         });
       } else {
         await createCountry.mutateAsync({
@@ -851,6 +858,7 @@ function CountryFormModal({
           phoneCode,
           defaultCurrencyId: defaultCurrencyId || undefined,
           isCrossBorderEnabled,
+          isSignupDefault,
         });
       }
       onClose();
@@ -950,6 +958,17 @@ function CountryFormModal({
             description="Autorise les trajets et les envois entre ce pays et d’autres pays."
           />
         </FormSection>
+
+        {!country || country.isActive ? (
+          <FormSection title="Inscription dans l’application">
+            <ToggleRow
+              checked={isSignupDefault}
+              onChange={setIsSignupDefault}
+              label="Proposé en premier à l’inscription"
+              description="Ce pays est présélectionné, avec son indicatif et son drapeau, quand une personne crée son compte. Un seul pays à la fois : en choisir un retire le précédent."
+            />
+          </FormSection>
+        ) : null}
 
         <FormError message={errorMessage} />
       </form>

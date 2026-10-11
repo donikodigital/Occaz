@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconDeviceMobile, IconUserCircle } from '@tabler/icons-react-native';
+import { IconDeviceMobile, IconLock, IconUserCircle } from '@tabler/icons-react-native';
 import { AppText, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { OceanButton, OceanSection } from '@/components/ocean/OceanKit';
 import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
@@ -104,6 +104,16 @@ export default function DriverEditProfileScreen() {
           <IconDeviceMobile size={15} color={OCEAN.base} />
           <AppText variant="sm" weight="semibold" color={OCEAN.base}>
             Changer mon numéro
+          </AppText>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(driver)/change-password')}
+          style={({ pressed }) => [styles.changePhone, pressed && styles.pressed]}
+        >
+          <IconLock size={15} color={OCEAN.base} />
+          <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+            Changer mon mot de passe
           </AppText>
         </Pressable>
         <TextField

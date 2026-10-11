@@ -1,6 +1,7 @@
 // mobile/app/(driver)/_layout.tsx
-import { Stack } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import { colors } from '@/theme';
+import { useAuthStore } from '@/stores/authStore';
 
 /**
  * Stack racine de l'espace conducteur : héberge le groupe (tabs)
@@ -8,6 +9,10 @@ import { colors } from '@/theme';
  * aux onglets (création de véhicule/trajet, détail d'un trajet).
  */
 export default function DriverLayout() {
+  // Compte créé avant le mot de passe à 6 chiffres : on le fait définir une fois, avant d'ouvrir l'espace.
+  const mustSetPassword = useAuthStore((state) => state.user?.mustSetPassword);
+  if (mustSetPassword) return <Redirect href="/(auth)/signup-password" />;
+
   return (
     <Stack
       screenOptions={{
@@ -19,6 +24,7 @@ export default function DriverLayout() {
       <Stack.Screen name="complete-profile" />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="change-phone" />
+      <Stack.Screen name="change-password" />
       <Stack.Screen name="select-city" options={{ presentation: 'modal' }} />
       <Stack.Screen name="select-location" options={{ presentation: 'modal' }} />
       <Stack.Screen name="vehicle-new" />

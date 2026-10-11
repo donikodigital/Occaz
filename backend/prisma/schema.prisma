@@ -194,6 +194,7 @@ enum OtpPurpose {
   LOGIN
   PHONE_VERIFICATION
   PASSWORD_RESET
+  EMAIL_VERIFICATION
 }
 
 enum OtpStatus {
@@ -331,10 +332,18 @@ model User {
   passwordHash    String?
   accountType     AccountType
   isPhoneVerified Boolean     @default(false)
+  // L'adresse e-mail n'est enregistrée sur le compte qu'une fois vérifiée par un code (inscription) ; les adresses saisies avant
+  // cette règle restent à false jusqu'à vérification.
+  isEmailVerified Boolean     @default(false)
   isActive        Boolean     @default(true)
   isSuspended     Boolean     @default(false)
   suspendedReason String?
   lastLoginAt     DateTime?
+
+  // Connexion par numéro + mot de passe à 6 chiffres : après trop d'erreurs, le compte est verrouillé quelques minutes
+  // (un code à 6 chiffres n'a que 1 000 000 de valeurs, le verrouillage est ce qui empêche de les essayer toutes).
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
 
   // 2FA obligatoire pour SuperAdmin / recommandé pour Support (section 3.1).
   // twoFactorSecret est chiffré au repos — jamais loggé ni renvoyé en clair.
@@ -625,6 +634,8 @@ model Country {
   defaultCurrency      Currency? @relation("CountryDefaultCurrency", fields: [defaultCurrencyId], references: [id])
   isActive             Boolean   @default(true)
   isCrossBorderEnabled Boolean   @default(false)
+  // Pays présélectionné sur l'écran d'inscription (un seul à la fois, géré par l'administration).
+  isSignupDefault      Boolean   @default(false)
 
   regions              Region[]
   cities               City[]
@@ -1412,6 +1423,9 @@ model OtpCode {
   shipment   Shipment? @relation(fields: [shipmentId], references: [id])
   userId     String?
   user       User?     @relation(fields: [userId], references: [id])
+
+  // Ce que le code vérifie quand ce n'est pas le compte lui-même : l'adresse e-mail en cours de vérification (EMAIL_VERIFICATION).
+  target     String?
 
   attempts    Int       @default(0)
   maxAttempts Int       @default(3)

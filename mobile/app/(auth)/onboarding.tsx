@@ -1,4 +1,6 @@
 // mobile/app/(auth)/onboarding.tsx
+// [11/10/2026] v5 — Les cartes de rôle ouvrent la connexion (numéro + mot de passe) ; la feuille « Créer votre compte » ouvre l'inscription
+// en étapes (signup). Plus de paramètre `mode`.
 // [10/10/2026] v4 — lien « Suivre un colis » (numéro de suivi, sans compte) sous « Créer votre compte ».
 // [22/09/2026] v2 — Habillage bleu Ocean, dans l'esprit Tiime : icône posée
 // sur un aplat doux à étincelles (AuthIllustration) au lieu du carré plein
@@ -10,8 +12,7 @@
 // ou conducteur ? Créer votre compte », qui ouvre une modale pour choisir son
 // type de compte. Les deux cartes du haut restent là pour que les personnes
 // déjà inscrites se connectent immédiatement.
-// Les cartes ouvrent l'écran téléphone en mode « login » (un numéro inconnu
-// est refusé), la modale l'ouvre en mode « signup » (le compte est créé).
+// Les cartes ouvrent la connexion ; la modale ouvre l'inscription en étapes.
 import React, { useState } from 'react';
 import { Image, ImageBackground, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
@@ -131,13 +132,13 @@ function SignupSheet({ visible, onClose, onSelect }: SignupSheetProps) {
 export default function OnboardingScreen() {
   const [signupOpen, setSignupOpen] = useState(false);
 
-  function goToPhoneScreen(accountType: AccountType, mode: 'login' | 'signup') {
-    router.push({ pathname: '/(auth)/login', params: { accountType, mode } });
+  function goToLogin(accountType: AccountType) {
+    router.push({ pathname: '/(auth)/login', params: { accountType } });
   }
 
   function selectSignupRole(accountType: Extract<AccountType, 'CUSTOMER' | 'DRIVER'>) {
     setSignupOpen(false);
-    goToPhoneScreen(accountType, 'signup');
+    router.push({ pathname: '/(auth)/signup', params: { accountType } });
   }
 
   return (
@@ -161,7 +162,7 @@ export default function OnboardingScreen() {
             icon={<IconUser size={19} color={OCEAN.onDark} />}
             iconBackground="rgba(255,255,255,0.16)"
             tone="ocean"
-            onPress={() => goToPhoneScreen('CUSTOMER', 'login')}
+            onPress={() => goToLogin('CUSTOMER')}
           />
           <RoleOption
             title="Je suis conducteur"
@@ -169,7 +170,7 @@ export default function OnboardingScreen() {
             icon={<IconSteeringWheel size={19} color={colors.successDark} />}
             iconBackground={colors.successLight}
             tone="surface"
-            onPress={() => goToPhoneScreen('DRIVER', 'login')}
+            onPress={() => goToLogin('DRIVER')}
           />
         </View>
 

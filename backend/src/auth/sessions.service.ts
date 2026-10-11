@@ -82,4 +82,12 @@ export class SessionsService {
       data: { isRevoked: true },
     });
   }
+
+  /** Coupe toutes les sessions sauf celle en cours (changement de mot de passe : l'appareil utilisé reste connecté). */
+  async revokeOthersForUser(userId: string, keepSessionId: string) {
+    await this.prisma.session.updateMany({
+      where: { userId, isRevoked: false, id: { not: keepSessionId } },
+      data: { isRevoked: true },
+    });
+  }
 }

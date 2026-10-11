@@ -23,6 +23,7 @@ export interface UpdateCountryPayload {
   phoneCode?: string;
   defaultCurrencyId?: string | null;
   isCrossBorderEnabled?: boolean;
+  isSignupDefault?: boolean;
 }
 
 export const geographyApi = {

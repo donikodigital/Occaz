@@ -1,5 +1,6 @@
 // web-admin/src/types/geography.types.ts
 // [21/09/2026] v+ — latitude et longitude sur City et CreateCityPayload (utilisées par la page Géographie v4).
+// [11/10/2026] v+ — isSignupDefault sur Country : pays présélectionné à l'inscription dans l'application.
 export interface Country {
   id: string;
   isoCode: string;
@@ -7,6 +8,8 @@ export interface Country {
   phoneCode: string;
   defaultCurrencyId: string | null;
   isCrossBorderEnabled: boolean;
+  /** Pays présélectionné sur l'écran d'inscription de l'application (un seul à la fois). */
+  isSignupDefault: boolean;
   isActive: boolean;
 }
 
@@ -47,6 +50,7 @@ export interface CreateCountryPayload {
   phoneCode: string;
   defaultCurrencyId?: string;
   isCrossBorderEnabled?: boolean;
+  isSignupDefault?: boolean;
 }
 
 export interface CreateCurrencyPayload {

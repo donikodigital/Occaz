@@ -20,11 +20,14 @@ import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
+import { isTestPhone } from '../common/utils/test-mode.util';
 
 /** Vue "sûre" d'un utilisateur — ne contient jamais passwordHash / twoFactorSecret. */
-export type SafeUser = Omit<User, 'passwordHash' | 'twoFactorSecret'> & {
+export type SafeUser = Omit<User, 'passwordHash' | 'twoFactorSecret' | 'failedLoginAttempts' | 'lockedUntil'> & {
   firstName: string | null;
   lastName: string | null;
+  /** Client ou conducteur sans mot de passe (inscription non terminée, ou compte antérieur) : l'app l'envoie le définir. Jamais vrai pour un numéro de test. */
+  mustSetPassword: boolean;
 };
 
 /**
@@ -52,9 +55,15 @@ export class UsersService {
   ) {}
 
   toSafeUser(user: UserWithProfileNames): SafeUser {
-    const { passwordHash, twoFactorSecret, customerProfile, driverProfile, ...safe } = user;
+    const { passwordHash, twoFactorSecret, failedLoginAttempts, lockedUntil, customerProfile, driverProfile, ...safe } = user;
     const profile = customerProfile ?? driverProfile ?? null;
-    return { ...safe, firstName: profile?.firstName ?? null, lastName: profile?.lastName ?? null };
+    const isCustomerOrDriver = user.accountType === AccountType.CUSTOMER || user.accountType === AccountType.DRIVER;
+    return {
+      ...safe,
+      firstName: profile?.firstName ?? null,
+      lastName: profile?.lastName ?? null,
+      mustSetPassword: isCustomerOrDriver && !passwordHash && !isTestPhone(user.phone),
+    };
   }
 
   async findById(id: string): Promise<User | null> {

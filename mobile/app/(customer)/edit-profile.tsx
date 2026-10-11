@@ -14,7 +14,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconChevronRight, IconDeviceMobile, IconMapPin, IconUserCircle } from '@tabler/icons-react-native';
+import { IconChevronRight, IconDeviceMobile, IconLock, IconMapPin, IconUserCircle } from '@tabler/icons-react-native';
 import { AppText, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { CountrySelectField } from '@/components/screens/CountrySelectField';
 import { LockedField } from '@/components/screens/LockedField';
@@ -191,6 +191,16 @@ export default function EditProfileScreen() {
           <IconDeviceMobile size={15} color={OCEAN.base} />
           <AppText variant="sm" weight="semibold" color={OCEAN.base}>
             Changer mon numéro
+          </AppText>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(customer)/change-password')}
+          style={({ pressed }) => [styles.changePhone, pressed && styles.pressed]}
+        >
+          <IconLock size={15} color={OCEAN.base} />
+          <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+            Changer mon mot de passe
           </AppText>
         </Pressable>
       </OceanSection>

@@ -25,4 +25,9 @@ export class CreateCountryDto {
   @IsOptional()
   @IsBoolean()
   isCrossBorderEnabled?: boolean;
+
+  @ApiPropertyOptional({ default: false, description: "Pays présélectionné à l'inscription. Un seul à la fois : en choisir un retire l'ancien." })
+  @IsOptional()
+  @IsBoolean()
+  isSignupDefault?: boolean;
 }

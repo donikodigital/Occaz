@@ -10,6 +10,8 @@ import { useCreateDriverProfile } from '@/hooks/useDriverProfile';
 import { useDriverDocumentUpload, useMyDriverDocuments } from '@/hooks/useDriverDocuments';
 import { useDriverPhotoUpload } from '@/hooks/useDriverPhotoUpload';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
+import { useAuthStore } from '@/stores/authStore';
+import { useAuthFlowStore } from '@/stores/authFlowStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { City, Country } from '@/types/geography.types';
 
@@ -75,10 +77,14 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
  * précise, contrairement à un client qui peut réserver depuis n'importe où.
  */
 export default function DriverCompleteProfileScreen() {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  // Nom, prénom et pays déjà saisis à l'inscription : on les reprend ; l'e-mail aussi est déjà géré à l'inscription (étape facultative).
+  const draft = useAuthFlowStore();
+  const accountEmail = useAuthStore((state) => state.user?.email);
+  const hasEmail = Boolean(accountEmail);
+  const [firstName, setFirstName] = useState(draft.firstName);
+  const [lastName, setLastName] = useState(draft.lastName);
   const [email, setEmail] = useState('');
-  const [country, setCountry] = useState<Country | null>(null);
+  const [country, setCountry] = useState<Country | null>(draft.country);
   const [city, setCity] = useState<City | null>(null);
   const [mobileMoneyNumber, setMobileMoneyNumber] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
@@ -120,13 +126,16 @@ export default function DriverCompleteProfileScreen() {
       {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        email: trimmedEmail || undefined,
+        email: hasEmail ? undefined : trimmedEmail || undefined,
         countryId: country.id,
         cityId: city.id,
         mobileMoneyNumber: mobileMoneyNumber.trim() || undefined,
       },
       {
-        onSuccess: () => setProfileCreated(true),
+        onSuccess: () => {
+          draft.reset();
+          setProfileCreated(true);
+        },
         onError: (error) => {
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },
@@ -144,19 +153,23 @@ export default function DriverCompleteProfileScreen() {
       </AppText>
 
       <View style={styles.fields}>
-        <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Mamadou" autoFocus />
+        <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Mamadou" autoFocus={!draft.firstName} />
         <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Barry" />
-        <TextField
-          label="Email (optionnel)"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="vous@exemple.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <AppText variant="xs" color="textMuted">
-          Pour recevoir aussi vos notifications par email.
-        </AppText>
+        {hasEmail ? null : (
+          <>
+            <TextField
+              label="Email (optionnel)"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="vous@exemple.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <AppText variant="xs" color="textMuted">
+              Pour recevoir aussi vos notifications par email.
+            </AppText>
+          </>
+        )}
 
         <CountrySelectField label="Pays" value={country} onSelect={setCountry} />
 

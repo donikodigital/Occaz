@@ -6,6 +6,8 @@ export interface Country {
   phoneCode: string;
   isActive: boolean;
   isCrossBorderEnabled: boolean;
+  /** Pays présélectionné à l'inscription (réglé par l'administration). */
+  isSignupDefault?: boolean;
   defaultCurrencyId: string | null;
 }
 

@@ -22,3 +22,32 @@ export function guessCountryPrefix(phone: string | null | undefined): string {
   const normalized = (phone ?? '').trim();
   return COUNTRY_PREFIXES.find((prefix) => normalized.startsWith(prefix)) ?? '+';
 }
+
+// ---------------------------------------------------------------------------
+// Pays, indicatif et drapeau (inscription, connexion, mot de passe oublié)
+// ---------------------------------------------------------------------------
+
+/** « GN » → 🇬🇳. Les drapeaux sont des emojis : rien à télécharger, et ils suivent la langue de l'appareil. */
+export function flagEmoji(isoCode: string | null | undefined): string {
+  if (!isoCode || !/^[A-Za-z]{2}$/.test(isoCode)) return '🏳️';
+  return isoCode.toUpperCase().replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
+}
+
+/** L'indicatif est enregistré avec ou sans « + » selon le pays : on l'affiche toujours avec. */
+export function formatDialCode(phoneCode: string | null | undefined): string {
+  const digits = (phoneCode ?? '').replace(/[^\d]/g, '');
+  return digits ? `+${digits}` : '+';
+}
+
+/**
+ * Numéro international à partir de l'indicatif du pays et de ce que la personne a tapé.
+ *  « 620 00 00 10 »          → « +224620000010 »
+ *  « 0620000010 » (zéro initial) → « +224620000010 »
+ *  « +33612345678 » (numéro déjà international) → laissé tel quel.
+ */
+export function buildInternationalPhone(dialCode: string, typed: string): string {
+  const trimmed = typed.trim();
+  if (trimmed.startsWith('+')) return normalizePhoneInput(trimmed);
+  const national = trimmed.replace(/[^\d]/g, '').replace(/^0+/, '');
+  return `${formatDialCode(dialCode)}${national}`;
+}

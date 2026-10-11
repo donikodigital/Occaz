@@ -8,6 +8,12 @@ export interface SafeUser {
   email: string | null;
   accountType: AccountType;
   isPhoneVerified: boolean;
+  /** L'adresse e-mail n'est enregistrée sur le compte qu'une fois vérifiée par un code. */
+  isEmailVerified: boolean;
+  /** Client ou conducteur sans mot de passe : l'app l'envoie le définir avant de continuer. */
+  mustSetPassword: boolean;
+  firstName?: string | null;
+  lastName?: string | null;
   isActive: boolean;
   isSuspended: boolean;
   suspendedReason: string | null;
@@ -27,6 +33,29 @@ export interface RequestOtpPayload {
   signupAccountType?: 'CUSTOMER' | 'DRIVER';
   /** LOGIN : le numéro doit déjà être inscrit. SIGNUP : un compte est créé si besoin. */
   intent?: 'LOGIN' | 'SIGNUP';
+}
+
+/** Inscription — étape du téléphone : un code SMS part tout de suite vers ce numéro. */
+export interface SignupPhonePayload {
+  phone: string;
+  accountType: 'CUSTOMER' | 'DRIVER';
+}
+
+export interface LoginPhonePayload {
+  phone: string;
+  /** Mot de passe à 6 chiffres. */
+  password: string;
+  /** Espace choisi à l'écran d'accueil : sert à expliquer l'erreur quand le compte est de l'autre type. */
+  expectedAccountType?: 'CUSTOMER' | 'DRIVER';
+  device?: DeviceInfo;
+}
+
+export type PasswordResetChannel = 'SMS' | 'EMAIL';
+
+export interface PasswordResetRequestResult {
+  expiresInSeconds: number;
+  /** Où le code est parti, masqué (« +224•••0010 », « f•••a@exemple.com »). */
+  destination: string;
 }
 
 export interface VerifyOtpPayload {

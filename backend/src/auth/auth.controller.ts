@@ -7,6 +7,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { AuthService } from './auth.service';
 import { PhoneChangeService } from './phone-change.service';
+import { AccountAuthService } from './account-auth.service';
 import { RequestPhoneChangeDto } from './dto/request-phone-change.dto';
 import { ConfirmPhoneChangeDto } from './dto/confirm-phone-change.dto';
 import { RequestOtpDto } from './dto/request-otp.dto';
@@ -23,6 +24,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly phoneChangeService: PhoneChangeService,
+    private readonly accountAuth: AccountAuthService,
   ) {}
 
   // Chaque demande de code coûte un SMS : 5 par minute et par adresse IP (en plus de la limite par numéro dans le service).
@@ -30,7 +32,9 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('otp/request')
-  requestOtp(@Body() dto: RequestOtpDto) {
+  async requestOtp(@Body() dto: RequestOtpDto) {
+    // Plus de SMS à chaque connexion pour les clients et conducteurs (voir AccountAuthService.assertLegacyOtpAllowed).
+    await this.accountAuth.assertLegacyOtpAllowed(dto.phone);
     return this.authService.requestOtp(dto);
   }
 
@@ -38,11 +42,12 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('otp/verify')
-  verifyOtp(
+  async verifyOtp(
     @Body() dto: VerifyOtpDto,
     @Ip() ip: string,
     @Headers('user-agent') userAgent?: string,
   ) {
+    await this.accountAuth.assertLegacyOtpAllowed(dto.phone);
     return this.authService.verifyOtpAndLogin(dto, { ipAddress: ip, userAgent });
   }
 

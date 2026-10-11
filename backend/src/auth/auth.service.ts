@@ -598,7 +598,8 @@ export class AuthService {
   // Interne
   // ---------------------------------------------------------------------
 
-  private async issueTokens(
+  /** Ouvre une session (jetons + enregistrement) : aussi utilisé par AccountAuthService (inscription, connexion par mot de passe). */
+  async issueTokens(
     user: User,
     params: { deviceId?: string | null; ipAddress?: string; userAgent?: string },
   ): Promise<AuthResult> {

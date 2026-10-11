@@ -57,6 +57,8 @@ export function OtpCodeInput({
         maxLength={OTP_CODE_LENGTH}
         autoFocus
         textContentType="oneTimeCode"
+        // iOS et Android proposent alors le code reçu par SMS au-dessus du clavier (saisie en un geste).
+        autoComplete="sms-otp"
         style={styles.hidden}
       />
     </View>

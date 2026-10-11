@@ -1,5 +1,5 @@
 // backend/src/geography/countries.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateCountryDto } from './dto/create-country.dto';
@@ -35,6 +35,7 @@ export class CountriesService {
         isCrossBorderEnabled: dto.isCrossBorderEnabled ?? false,
       },
     });
+    if (dto.isSignupDefault) await this.setSignupDefault(country.id);
     await this.audit.log({
       actorId,
       entityType: 'Country',
@@ -46,11 +47,17 @@ export class CountriesService {
   }
 
   async update(id: string, dto: UpdateCountryDto, actorId: string) {
-    await this.findOne(id);
-    const country = await this.prisma.country.update({
+    const existing = await this.findOne(id);
+    const { isSignupDefault, ...rest } = dto;
+    if (isSignupDefault === true && !existing.isActive) {
+      throw new BadRequestException('Un pays désactivé ne peut pas être le pays par défaut.');
+    }
+    let country = await this.prisma.country.update({
       where: { id },
-      data: dto,
+      data: rest,
     });
+    if (isSignupDefault === true) country = await this.setSignupDefault(id);
+    if (isSignupDefault === false) country = await this.prisma.country.update({ where: { id }, data: { isSignupDefault: false } });
     await this.audit.log({
       actorId,
       entityType: 'Country',
@@ -58,6 +65,15 @@ export class CountriesService {
       action: 'UPDATE',
       diff: { ...dto },
     });
+    return country;
+  }
+
+  /** Un seul pays est présélectionné à l'inscription : en choisir un retire l'ancien. */
+  private async setSignupDefault(id: string) {
+    const [, country] = await this.prisma.$transaction([
+      this.prisma.country.updateMany({ where: { isSignupDefault: true, id: { not: id } }, data: { isSignupDefault: false } }),
+      this.prisma.country.update({ where: { id }, data: { isSignupDefault: true } }),
+    ]);
     return country;
   }
 
@@ -70,7 +86,7 @@ export class CountriesService {
     await this.findOne(id);
     const country = await this.prisma.country.update({
       where: { id },
-      data: { isActive: false },
+      data: { isActive: false, isSignupDefault: false },
     });
     await this.audit.log({
       actorId,

@@ -4,6 +4,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
+import { AccountAuthController } from './account-auth.controller';
+import { AccountAuthService } from './account-auth.service';
 import { AuthService } from './auth.service';
 import { SessionsService } from './sessions.service';
 import { TwoFactorService } from './two-factor.service';
@@ -37,8 +39,8 @@ import { OtpModule } from '../otp/otp.module';
       }),
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, SessionsService, TwoFactorService, PhoneChangeService, JwtStrategy],
+  controllers: [AuthController, AccountAuthController],
+  providers: [AuthService, AccountAuthService, SessionsService, TwoFactorService, PhoneChangeService, JwtStrategy],
   exports: [AuthService, SessionsService],
 })
 export class AuthModule {}
