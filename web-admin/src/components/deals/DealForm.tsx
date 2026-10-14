@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { Button, Select, TextArea, TextField } from '@/components/ui';
 import { Chip, FormError, SavedNotice, SectionCard, ToggleRow } from '@/components/admin/AdminUi';
+import { DealImage } from './DealImage';
 import type { Country } from '@/types/geography.types';
 import type { Deal, PromoCode, UpsertDealPayload } from '@/types/promotions.types';
 
@@ -34,6 +35,7 @@ export function DealForm({ mode, countries, promoCodes, initial, isSubmitting, e
   const [expiresAt, setExpiresAt] = useState(toDateInput(initial?.expiresAt));
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [sortOrder, setSortOrder] = useState(String(initial?.sortOrder ?? 0));
+  const [imageOk, setImageOk] = useState(true);
   const [validationError, setValidationError] = useState<string | undefined>();
 
   async function handleSubmit(event: React.FormEvent) {
@@ -45,6 +47,15 @@ export function DealForm({ mode, countries, promoCodes, initial, isSubmitting, e
     }
     if (description.trim().length < 3) {
       setValidationError('Renseigne une description.');
+      return;
+    }
+    const image = imageUrl.trim();
+    if (image && !/^https?:\/\//i.test(image)) {
+      setValidationError('L’adresse de l’image doit commencer par https://');
+      return;
+    }
+    if (image && !imageOk) {
+      setValidationError('Cette adresse ne mène pas à une image. Colle le lien direct d’une image (se terminant souvent par .jpg ou .png), ou vide le champ.');
       return;
     }
     await onSubmit({
@@ -63,11 +74,7 @@ export function DealForm({ mode, countries, promoCodes, initial, isSubmitting, e
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="flex items-center gap-4 rounded-2xl border border-border bg-primary-light/40 p-4 shadow-md">
-        {imageUrl ? (
-          <img src={imageUrl} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-sm" />
-        ) : (
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-surface text-2xl shadow-sm">🎟️</span>
-        )}
+        <DealImage src={imageUrl.trim() || null} onStatusChange={setImageOk} className="h-14 w-14 rounded-2xl text-2xl shadow-sm" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-semibold text-text-primary">{title.trim() || 'Nouveau bon plan'}</p>
           <p className="truncate text-sm text-text-secondary">{description.trim() || '—'}</p>
@@ -78,7 +85,14 @@ export function DealForm({ mode, countries, promoCodes, initial, isSubmitting, e
       <SectionCard title="Contenu">
         <TextField label="Titre" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Offre de bienvenue" required />
         <TextArea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Ce que le client va découvrir" />
-        <TextField label="Image (URL, optionnel)" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…" />
+        <TextField
+          label="Image (URL, optionnel)"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          placeholder="https://…/offre.jpg"
+          hint="Lien direct d’une image (.jpg, .png…), pas l’adresse d’un site. Sans image, la carte s’affiche sans visuel."
+          error={imageUrl.trim() && !imageOk ? 'Ce lien ne mène pas à une image : elle ne s’affichera pas.' : undefined}
+        />
       </SectionCard>
 
       <SectionCard title="Lien avec un code promo" description="Facultatif — la réduction elle-même reste gérée par le code promo choisi.">

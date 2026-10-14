@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { IconChevronRight, IconPlus, IconSearch, IconTicket } from '@tabler/icons-react';
 import { Chip, EmptyState, FilterChips, LinkButton, ListSkeleton, Notice, PageHero } from '@/components/admin/AdminUi';
 import { useDeals } from '@/hooks/usePromotions';
+import { DealImage } from '@/components/deals/DealImage';
 import type { Deal } from '@/types/promotions.types';
 
 type StatusFilter = 'active' | 'inactive';
@@ -20,11 +21,7 @@ function DealCard({ deal }: { deal: Deal }) {
       }`}
     >
       <div className="flex items-start gap-3">
-        {deal.imageUrl ? (
-          <img src={deal.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-2xl object-cover" />
-        ) : (
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent-light text-xl">🎟️</span>
-        )}
+        <DealImage src={deal.imageUrl} className="h-12 w-12 rounded-2xl text-xl" />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-text-primary">{deal.title}</p>
           <p className="line-clamp-2 text-xs text-text-secondary">{deal.description}</p>
