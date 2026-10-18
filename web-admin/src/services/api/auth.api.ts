@@ -3,18 +3,22 @@ import { api } from './client';
 import type {
   AuthResult,
   LoginPasswordPayload,
-  RequestOtpPayload,
+  RequestStaffCodePayload,
+  RequestStaffCodeResult,
   SetupTwoFactorResult,
-  VerifyOtpPayload,
+  VerifyStaffCodePayload,
 } from '@/types/auth.types';
 
 export const authApi = {
   loginWithPassword: (payload: LoginPasswordPayload) =>
     api.post<AuthResult>('/auth/login', payload, { auth: false }),
 
-  requestOtp: (payload: RequestOtpPayload) => api.post<{ expiresInSeconds: number }>('/auth/otp/request', payload, { auth: false }),
+  /** Code de connexion envoyé par e-mail à l'adresse du compte (aucun SMS pour l'équipe). */
+  requestStaffCode: (payload: RequestStaffCodePayload) =>
+    api.post<RequestStaffCodeResult>('/auth/staff/code/request', payload, { auth: false }),
 
-  verifyOtp: (payload: VerifyOtpPayload) => api.post<AuthResult>('/auth/otp/verify', payload, { auth: false }),
+  verifyStaffCode: (payload: VerifyStaffCodePayload) =>
+    api.post<AuthResult>('/auth/staff/code/verify', payload, { auth: false }),
 
   logout: () => api.post<void>('/auth/logout'),
 

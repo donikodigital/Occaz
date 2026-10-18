@@ -89,16 +89,15 @@ export class AccountAuthService {
   /**
    * L'ancien parcours « un SMS à chaque connexion » ne reste ouvert que pour :
    *  - les numéros de test (aucun SMS n'est envoyé) ;
-   *  - l'équipe du back-office (Support / SuperAdmin), qui s'y connecte encore par téléphone ;
-   *  - tout le monde si AUTH_LEGACY_OTP_LOGIN=true (retour en arrière d'urgence, sans redéployer le code).
-   * Un numéro inconnu est refusé : plus aucun compte n'est créé par cette porte, l'inscription a la sienne.
+   *  - tout le monde si AUTH_LEGACY_OTP_LOGIN=true (retour en arrière d'urgence, sans redéployer le code) — sauf l'équipe du
+   *    back-office, qui ne reçoit jamais de SMS (AuthService.requestOtp la refuse).
+   * L'équipe (Support, Superviseur, Finance, SuperAdmin) se connecte avec un code envoyé par e-mail. Un numéro inconnu est refusé :
+   * plus aucun compte n'est créé par cette porte, l'inscription a la sienne.
    */
   async assertLegacyOtpAllowed(phone: string): Promise<void> {
     if (isTestPhone(phone) || process.env.AUTH_LEGACY_OTP_LOGIN === 'true') return;
-    const user = await this.usersService.findByPhone(phone);
-    if (user && !isCustomerOrDriver(user)) return;
     throw new BadRequestException(
-      'La connexion par SMS n’est plus utilisée. Connectez-vous avec votre numéro et votre mot de passe, ou créez votre compte.',
+      'La connexion par SMS n’est plus utilisée. Clients et conducteurs : connectez-vous avec votre numéro et votre mot de passe, ou créez votre compte. Équipe : demandez un code par e-mail.',
     );
   }
 

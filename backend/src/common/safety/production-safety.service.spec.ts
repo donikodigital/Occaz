@@ -56,6 +56,16 @@ describe('ProductionSafetyService.collectIssues', () => {
     expect(issues).toEqual([]);
   });
 
+  it('accepte Orange (Guinée) seul comme prestataire SMS', () => {
+    const issues = build(false).collectIssues({
+      ...SAFE_ENV,
+      TEXTBEE_API_KEY: undefined,
+      ORANGE_SMS_CLIENT_ID: 'id',
+      ORANGE_SMS_CLIENT_SECRET: 'secret',
+    });
+    expect(issues).toEqual([]);
+  });
+
   it('signale un secret trop court et des secrets identiques', () => {
     const short = build(false).collectIssues({ ...SAFE_ENV, JWT_ACCESS_SECRET: 'court' });
     expect(short.join(' ')).toContain('JWT_ACCESS_SECRET trop court');

@@ -1,4 +1,6 @@
 // web-admin/src/app/login/page.tsx
+// [18/10/2026] v3 — La connexion de l'équipe sans mot de passe se fait par un code reçu par e-mail (plus de SMS, plus de numéro de
+// téléphone à saisir). Le reste de la page est inchangé.
 // [02/10/2026] v2 — Refonte visuelle : même habillage Ocean que l'app Client /
 // Conducteur (ciel en fond sous un voile clair, illustration à étincelles avec
 // le vrai logo pin, titre bleu profond, carte ombrée). Les anciens logos
@@ -13,7 +15,6 @@ import {
   IconKey,
   IconLock,
   IconMail,
-  IconPhone,
   IconShieldCheck,
 } from '@tabler/icons-react';
 import { Button, PasswordField, TextField } from '@/components/ui';
@@ -23,7 +24,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { AuthResult } from '@/types/auth.types';
 
-type Mode = 'password' | 'phone-request' | 'phone-verify' | 'reset-request' | 'reset-confirm';
+type Mode = 'password' | 'code-request' | 'code-verify' | 'reset-request' | 'reset-confirm';
 
 /** Champs de la carte : fond bleu très clair et bord océan, comme les champs de l'app. */
 const FIELD_CLASS = 'rounded-xl! border-primary-accent! bg-primary-light/40! py-3!';
@@ -37,12 +38,13 @@ const LINK_CLASS =
 
 /**
  * Email + mot de passe en mode principal (public professionnel), avec
- * un repli "Se connecter par téléphone" — nécessaire pour un premier
+ * un repli "Recevoir un code par e-mail" — nécessaire pour un premier
  * accès SuperAdmin : la 2FA est obligatoire pour ce rôle (section 3.1)
  * mais /auth/2fa/setup exige déjà une session active, et la connexion
  * par mot de passe reste bloquée tant qu'elle n'est pas configurée.
- * Seule la connexion par téléphone (sans contrainte 2FA côté backend,
+ * Seule la connexion par code e-mail (sans contrainte 2FA côté backend,
  * vérifié dans auth.service.ts) permet d'amorcer ce premier réglage.
+ * L'équipe ne reçoit jamais de SMS : le code part à l'adresse du compte.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -53,8 +55,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
-  const [phone, setPhone] = useState('+224');
   const [otpCode, setOtpCode] = useState('');
+  const [codeDestination, setCodeDestination] = useState('');
   const [resetEmail, setResetEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -92,13 +94,15 @@ export default function LoginPage() {
     }
   }
 
-  async function handleRequestOtp(event: React.FormEvent) {
+  async function handleRequestCode(event: React.FormEvent) {
     event.preventDefault();
     setErrorMessage(undefined);
     setSubmitting(true);
     try {
-      await authApi.requestOtp({ phone });
-      setMode('phone-verify');
+      const { destination } = await authApi.requestStaffCode({ email });
+      setCodeDestination(destination);
+      setOtpCode('');
+      setMode('code-verify');
     } catch (error) {
       setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
     } finally {
@@ -106,12 +110,12 @@ export default function LoginPage() {
     }
   }
 
-  async function handleVerifyOtp(event: React.FormEvent) {
+  async function handleVerifyCode(event: React.FormEvent) {
     event.preventDefault();
     setErrorMessage(undefined);
     setSubmitting(true);
     try {
-      const result = await authApi.verifyOtp({ phone, code: otpCode });
+      const result = await authApi.verifyStaffCode({ email, code: otpCode });
       handleAuthSuccess(result);
     } catch (error) {
       setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
@@ -155,9 +159,9 @@ export default function LoginPage() {
   const title =
     mode === 'password'
       ? 'Connexion'
-      : mode === 'phone-request'
-        ? 'Connexion par téléphone'
-        : mode === 'phone-verify'
+      : mode === 'code-request'
+        ? 'Connexion par code'
+        : mode === 'code-verify'
           ? 'Vérification'
           : mode === 'reset-request'
             ? 'Mot de passe oublié'
@@ -166,10 +170,10 @@ export default function LoginPage() {
   const subtitle =
     mode === 'password'
       ? 'Accédez à votre espace Support ou Administration.'
-      : mode === 'phone-request'
-        ? 'Un code de vérification vous sera envoyé par SMS.'
-        : mode === 'phone-verify'
-          ? `Entrez le code reçu au ${phone}.`
+      : mode === 'code-request'
+        ? "Un code de connexion vous sera envoyé par e-mail, à l'adresse de votre compte."
+        : mode === 'code-verify'
+          ? `Entrez le code envoyé à ${codeDestination || 'votre adresse e-mail'}.`
           : mode === 'reset-request'
             ? 'Recevez un code par email pour réinitialiser votre mot de passe.'
             : (resetMessage ?? `Entrez le code reçu à ${resetEmail} et votre nouveau mot de passe.`);
@@ -253,24 +257,25 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setMode('phone-request');
+                  setMode('code-request');
                   setErrorMessage(undefined);
                 }}
                 className={LINK_CLASS}
               >
-                <IconPhone size={15} />
-                Se connecter par téléphone
+                <IconMail size={15} />
+                Recevoir un code par e-mail
               </button>
             </form>
           ) : null}
 
-          {mode === 'phone-request' ? (
-            <form onSubmit={handleRequestOtp} className="space-y-5">
+          {mode === 'code-request' ? (
+            <form onSubmit={handleRequestCode} className="space-y-5">
               <TextField
-                label="Numéro de téléphone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+224620000000"
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vous@exemple.com"
                 autoFocus
                 required
                 className={FIELD_CLASS}
@@ -279,7 +284,7 @@ export default function LoginPage() {
                 <p className="rounded-xl bg-danger-light px-3.5 py-2.5 text-sm text-danger-dark">{errorMessage}</p>
               ) : null}
               <Button type="submit" loading={isSubmitting} className={SUBMIT_CLASS}>
-                <IconPhone size={18} />
+                <IconMail size={18} />
                 Recevoir un code
               </Button>
               <button
@@ -290,16 +295,16 @@ export default function LoginPage() {
                 }}
                 className={LINK_CLASS}
               >
-                <IconMail size={15} />
-                Se connecter par email
+                <IconLock size={15} />
+                Se connecter avec un mot de passe
               </button>
             </form>
           ) : null}
 
-          {mode === 'phone-verify' ? (
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
+          {mode === 'code-verify' ? (
+            <form onSubmit={handleVerifyCode} className="space-y-5">
               <TextField
-                label="Code reçu par SMS"
+                label="Code reçu par email"
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="123456"
@@ -317,13 +322,13 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setMode('phone-request');
+                  setMode('code-request');
                   setErrorMessage(undefined);
                 }}
                 className={LINK_CLASS}
               >
                 <IconArrowLeft size={15} />
-                Changer de numéro
+                Redemander un code
               </button>
             </form>
           ) : null}

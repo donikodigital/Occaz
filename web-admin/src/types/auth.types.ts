@@ -34,12 +34,19 @@ export interface LoginPasswordPayload {
   twoFactorCode?: string;
 }
 
-export interface RequestOtpPayload {
-  phone: string;
+/** Connexion de l'équipe par code reçu par e-mail (jamais par SMS). */
+export interface RequestStaffCodePayload {
+  email: string;
 }
 
-export interface VerifyOtpPayload {
-  phone: string;
+export interface RequestStaffCodeResult {
+  expiresInSeconds: number;
+  /** Adresse masquée où le code a été envoyé (« a•••t@occaz.sarl »). */
+  destination: string;
+}
+
+export interface VerifyStaffCodePayload {
+  email: string;
   code: string;
 }
 

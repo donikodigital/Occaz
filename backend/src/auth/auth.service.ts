@@ -23,6 +23,7 @@ import { TwoFactorService } from './two-factor.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
 import { EMAIL_PROVIDER, EmailProvider } from '../integrations/email/email-provider.interface';
 import { generateOtpCode, hashOtpCode, maskPhone, verifyOtpCode } from '../common/utils/otp.util';
+import { maskEmail } from '../common/utils/mask.util';
 import { OtpSettings, OtpSettingsService } from '../otp/otp-settings.service';
 import { addDuration } from '../common/utils/duration.util';
 import { JwtAccessPayload, JwtRefreshPayload } from '../common/types/jwt-payload.interface';
@@ -31,8 +32,13 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginPasswordDto } from './dto/login-password.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
+import { RequestStaffCodeDto, VerifyStaffCodeDto } from './dto/staff-code.dto';
 
 const DAY_MS = 24 * 3_600_000;
+
+/** Équipe du back-office : Support, Superviseur et Finance (compte SUPPORT avec un rôle) et SuperAdmin. */
+const isStaffAccount = (user: Pick<User, 'accountType'>) =>
+  user.accountType === AccountType.SUPPORT || user.accountType === AccountType.SUPERADMIN;
 
 export interface AuthTokens {
   accessToken: string;
@@ -205,6 +211,14 @@ export class AuthService {
 
     this.assertRequestedRoleMatches(user, dto);
 
+    // L'équipe du back-office ne reçoit jamais de SMS : son code part par e-mail (requestStaffEmailCode). Seuls les numéros de test,
+    // qui n'envoient rien, gardent cette porte.
+    if (isStaffAccount(user) && !isTestPhone) {
+      throw new BadRequestException(
+        "Les comptes de l'équipe reçoivent leur code par e-mail. Choisissez « Recevoir un code par e-mail ».",
+      );
+    }
+
     if (user.isSuspended) {
       throw new BadRequestException('Ce compte est suspendu.');
     }
@@ -278,34 +292,7 @@ export class AuthService {
       throw new BadRequestException("Aucune demande de code n'a été faite pour ce numéro.");
     }
 
-    const otp = await this.prisma.otpCode.findFirst({
-      where: { userId: user.id, purpose: OtpPurpose.LOGIN, status: OtpStatus.PENDING },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!otp || otp.expiresAt < new Date()) {
-      throw new UnauthorizedException('Code expiré ou introuvable, veuillez en redemander un.');
-    }
-    if (otp.attempts >= otp.maxAttempts) {
-      await this.prisma.otpCode.update({
-        where: { id: otp.id },
-        data: { status: OtpStatus.FAILED },
-      });
-      throw new UnauthorizedException('Trop de tentatives, veuillez redemander un code.');
-    }
-
-    // L'essai est consommé AVANT la comparaison, en une seule opération atomique : des requêtes envoyées en parallèle ne
-    // peuvent plus dépasser le nombre d'essais autorisés (avant : lecture puis incrément, donc plusieurs essais « gratuits »).
-    if (!(await this.claimOtpAttempt(otp))) {
-      throw new UnauthorizedException('Trop de tentatives, veuillez redemander un code.');
-    }
-    if (!verifyOtpCode(dto.code, otp.code)) {
-      throw new UnauthorizedException('Code invalide.');
-    }
-    // Usage unique : si deux requêtes portent le bon code en même temps, une seule ouvre une session.
-    if (!(await this.consumeOtp(otp.id))) {
-      throw new UnauthorizedException('Ce code a déjà été utilisé, veuillez en redemander un.');
-    }
+    await this.consumeLoginCode(user.id, dto.code);
 
     if (!user.isPhoneVerified) {
       await this.prisma.user.update({
@@ -327,6 +314,131 @@ export class AuthService {
       entityType: 'User',
       entityId: user.id,
       action: 'LOGIN_OTP',
+      ipAddress: context.ipAddress,
+    });
+
+    return result;
+  }
+
+  /**
+   * Vérifie le dernier code de connexion en attente puis le consomme, une seule fois. Commun à la connexion par téléphone et à
+   * celle de l'équipe par e-mail : seul le canal d'envoi diffère.
+   */
+  private async consumeLoginCode(userId: string, code: string): Promise<void> {
+    const otp = await this.prisma.otpCode.findFirst({
+      where: { userId, purpose: OtpPurpose.LOGIN, status: OtpStatus.PENDING },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otp || otp.expiresAt < new Date()) {
+      throw new UnauthorizedException('Code expiré ou introuvable, veuillez en redemander un.');
+    }
+    if (otp.attempts >= otp.maxAttempts) {
+      await this.prisma.otpCode.update({
+        where: { id: otp.id },
+        data: { status: OtpStatus.FAILED },
+      });
+      throw new UnauthorizedException('Trop de tentatives, veuillez redemander un code.');
+    }
+
+    // L'essai est consommé AVANT la comparaison, en une seule opération atomique : des requêtes envoyées en parallèle ne
+    // peuvent plus dépasser le nombre d'essais autorisés (avant : lecture puis incrément, donc plusieurs essais « gratuits »).
+    if (!(await this.claimOtpAttempt(otp))) {
+      throw new UnauthorizedException('Trop de tentatives, veuillez redemander un code.');
+    }
+    if (!verifyOtpCode(code, otp.code)) {
+      throw new UnauthorizedException('Code invalide.');
+    }
+    // Usage unique : si deux requêtes portent le bon code en même temps, une seule ouvre une session.
+    if (!(await this.consumeOtp(otp.id))) {
+      throw new UnauthorizedException('Ce code a déjà été utilisé, veuillez en redemander un.');
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Code par e-mail — connexion de l'équipe du back-office (Support, Superviseur, Finance, SuperAdmin)
+  // ---------------------------------------------------------------------
+
+  /**
+   * L'équipe ne reçoit aucun SMS : son code de connexion part à l'adresse e-mail du compte (gratuit, et indépendant du crédit SMS).
+   * Ne révèle jamais si l'adresse existe : même réponse dans tous les cas (inconnue, compte client, suspendu), et seul un compte
+   * d'équipe valide reçoit réellement un e-mail. Mêmes plafonds de demandes que la connexion par téléphone.
+   */
+  async requestStaffEmailCode(dto: RequestStaffCodeDto): Promise<{ expiresInSeconds: number; destination: string }> {
+    const email = dto.email.trim().toLowerCase();
+    const settings = await this.otpSettings.get();
+    const response = { expiresInSeconds: settings.expirySeconds, destination: maskEmail(email) };
+
+    const user = await this.usersService.findByEmail(email);
+    if (!user || !isStaffAccount(user) || user.isSuspended) return response;
+
+    const isTest = this.isTestStaffEmail(email);
+    if (!isTest) await this.assertOtpRequestAllowed(user.id, settings);
+
+    const code = isTest ? '000000' : generateOtpCode();
+    const otp = await this.prisma.otpCode.create({
+      data: {
+        userId: user.id,
+        code: hashOtpCode(code),
+        purpose: OtpPurpose.LOGIN,
+        status: OtpStatus.PENDING,
+        maxAttempts: settings.maxAttempts,
+        expiresAt: addDuration(`${settings.expirySeconds}s`),
+      },
+    });
+
+    if (isTest) {
+      this.logger.warn(
+        `[MODE TEST] Code fixe pour ${maskEmail(email)} : 000000 — aucun e-mail envoyé. Ne jamais laisser AUTH_TEST_MODE_ENABLED=true en production réelle.`,
+      );
+      return response;
+    }
+
+    try {
+      await this.emailProvider.send(
+        email,
+        'Votre code de connexion Occa’Z',
+        `Votre code de connexion est ${code}. Il expire dans ${Math.round(settings.expirySeconds / 60)} minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email et prévenez un administrateur.`,
+      );
+    } catch (error) {
+      // L'e-mail n'est pas parti : ce code ne servirait à rien et ne doit pas compter dans les plafonds.
+      await this.prisma.otpCode.delete({ where: { id: otp.id } }).catch(() => undefined);
+      this.logger.error(`E-mail de connexion non envoyé à ${maskEmail(email)} : ${(error as Error).message}`);
+      throw new ServiceUnavailableException("L'e-mail n'a pas pu être envoyé. Réessayez dans un instant.");
+    }
+    return response;
+  }
+
+  /** Le bon code ouvre une session ; les messages d'erreur sont les mêmes qu'on connaisse l'adresse ou non (aucune énumération). */
+  async verifyStaffEmailCodeAndLogin(
+    dto: VerifyStaffCodeDto,
+    context: { ipAddress?: string; userAgent?: string },
+  ): Promise<AuthResult> {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.usersService.findByEmail(email);
+    if (!user || !isStaffAccount(user)) {
+      throw new UnauthorizedException('Code expiré ou introuvable, veuillez en redemander un.');
+    }
+
+    await this.consumeLoginCode(user.id, dto.code);
+
+    if (user.isSuspended) {
+      throw new UnauthorizedException('Ce compte est suspendu.');
+    }
+
+    const device = await this.devicesService.findOrCreateForLogin(user.id, dto.device);
+    const result = await this.issueTokens(user, {
+      deviceId: device?.id,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
+
+    await this.usersService.updateLastLogin(user.id);
+    await this.audit.log({
+      actorId: user.id,
+      entityType: 'User',
+      entityId: user.id,
+      action: 'LOGIN_EMAIL_OTP',
       ipAddress: context.ipAddress,
     });
 

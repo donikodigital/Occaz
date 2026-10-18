@@ -10,6 +10,7 @@ import { PaymentProviderType } from '@prisma/client';
 import { PaymentProviderRegistry } from '../../payments/providers/payment-provider-registry.service';
 import { SimulatedPaymentProvider } from '../../payments/providers/simulated-payment.provider';
 import { PayoutProviderRegistry } from '../../wallets/providers/payout-provider.registry';
+import { isOrangeSmsConfigured } from '../../integrations/sms/orange-sms.provider';
 
 const MIN_SECRET_LENGTH = 32;
 
@@ -48,9 +49,9 @@ export class ProductionSafetyService implements OnApplicationBootstrap {
         'Retraits simulés (PAYOUT_PROVIDER absent ou « simulated ») : un retrait automatique est marqué payé sans qu\'aucun argent réel ne parte vers le conducteur. Définir PAYOUT_PROVIDER=orange_money et les variables ORANGE_MONEY_* (voir .env.example).',
       );
     }
-    if (!env.INFOBIP_API_KEY && !env.TEXTBEE_API_KEY) {
+    if (!env.INFOBIP_API_KEY && !env.TEXTBEE_API_KEY && !isOrangeSmsConfigured(env)) {
       issues.push(
-        "Aucun prestataire SMS configuré (INFOBIP_API_KEY et TEXTBEE_API_KEY absents) : les codes de vérification ne sont pas envoyés, ils s'écrivent seulement dans les logs.",
+        "Aucun prestataire SMS configuré (ORANGE_SMS_CLIENT_ID / ORANGE_SMS_CLIENT_SECRET, INFOBIP_API_KEY et TEXTBEE_API_KEY absents) : les codes de vérification ne sont pas envoyés, ils s'écrivent seulement dans les logs.",
       );
     }
     if (!env.RESEND_API_KEY) {

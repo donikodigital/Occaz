@@ -17,6 +17,7 @@ import { LoginPasswordDto } from './dto/login-password.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { EnableTwoFactorDto } from './dto/enable-two-factor.dto';
+import { RequestStaffCodeDto, VerifyStaffCodeDto } from './dto/staff-code.dto';
 
 @ApiTags('Authentification')
 @Controller('auth')
@@ -49,6 +50,27 @@ export class AuthController {
   ) {
     await this.accountAuth.assertLegacyOtpAllowed(dto.phone);
     return this.authService.verifyOtpAndLogin(dto, { ipAddress: ip, userAgent });
+  }
+
+  /** Connexion de l'équipe du back-office : code envoyé par e-mail (jamais par SMS). */
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('staff/code/request')
+  requestStaffCode(@Body() dto: RequestStaffCodeDto) {
+    return this.authService.requestStaffEmailCode(dto);
+  }
+
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('staff/code/verify')
+  verifyStaffCode(
+    @Body() dto: VerifyStaffCodeDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.authService.verifyStaffEmailCodeAndLogin(dto, { ipAddress: ip, userAgent });
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })

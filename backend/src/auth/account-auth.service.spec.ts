@@ -536,10 +536,10 @@ describe('Ancienne connexion par SMS', () => {
     await expect(service.assertLegacyOtpAllowed('+224620000099')).rejects.toThrow(/n’est plus utilisée/);
   });
 
-  it('ouverte pour l’équipe du back-office', async () => {
+  it('fermée aussi pour l’équipe du back-office : elle reçoit ses codes par e-mail, jamais par SMS', async () => {
     const { service, addUser } = build();
     addUser({ accountType: AccountType.SUPPORT });
-    await expect(service.assertLegacyOtpAllowed(PHONE)).resolves.toBeUndefined();
+    await expect(service.assertLegacyOtpAllowed(PHONE)).rejects.toThrow(/Équipe : demandez un code par e-mail/);
   });
 
   it('rouvrable en urgence pour tous par AUTH_LEGACY_OTP_LOGIN', async () => {

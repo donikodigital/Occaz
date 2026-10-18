@@ -469,10 +469,19 @@ qu'un contournement général :
   ces trois variables n'ont aucune raison d'exister une fois de vrais
   utilisateurs sur la plateforme.
 
-## SMS réel (Infobip, ou TextBee en dépannage)
+## SMS réel (Orange Guinée, Infobip, ou TextBee en dépannage)
 
-- Choix automatique (`sms.module.ts`, fonction `createSmsProvider`) : `INFOBIP_API_KEY` → **Infobip** ; sinon `TEXTBEE_API_KEY` → TextBee ;
-  sinon la console (les SMS s'écrivent dans les logs).
+- Choix automatique (`sms.module.ts`, fonction `createSmsProvider`). Fournisseur international : `INFOBIP_API_KEY` → **Infobip** ; sinon
+  `TEXTBEE_API_KEY` → TextBee ; sinon la console (les SMS s'écrivent dans les logs). Si `ORANGE_SMS_CLIENT_ID` et `ORANGE_SMS_CLIENT_SECRET`
+  sont renseignées, `CountryRoutingSmsProvider` envoie les numéros **+224 par Orange** et tous les autres par le fournisseur international.
+- `OrangeSmsProvider` (API SMS Guinée d'Orange Developer) : jeton OAuth `POST https://api.orange.com/oauth/v3/token` (valable une heure, gardé
+  en mémoire, renouvelé avant l'échéance et sur un 401), puis `POST /smsmessaging/v1/outbound/{senderAddress}/requests`. Coût : environ 100 à
+  200 GNF par SMS selon le pack, packs de 15 à 50 000 SMS achetés dans « My apps » (crédit téléphonique ou Orange Money). Variables :
+  `ORANGE_SMS_CLIENT_ID`, `ORANGE_SMS_CLIENT_SECRET` (ou `ORANGE_SMS_AUTHORIZATION_HEADER`), et facultatives `ORANGE_SMS_SENDER_ADDRESS`
+  (`tel:+224000` par défaut, à confirmer dans ta documentation), `ORANGE_SMS_SENDER_NAME` (nom d'expéditeur à faire approuver par Orange).
+- Quand partent des SMS : inscription (code du numéro), mot de passe oublié par SMS, changement de numéro, remise des colis/trajets, SOS. Plus
+  aucun SMS à la connexion : clients et conducteurs se connectent avec numéro + mot de passe, et l'équipe du back-office (Support,
+  Superviseur, Finance, SuperAdmin) reçoit un code par **e-mail** (`POST /auth/staff/code/request` puis `/auth/staff/code/verify`).
 - `InfobipSmsProvider` : `POST {INFOBIP_BASE_URL}/sms/3/messages`, en-tête `Authorization: App {clé}`. `INFOBIP_BASE_URL` est l'adresse
   personnelle du compte (page d'accueil du portail Infobip) ; `INFOBIP_SENDER` est le nom d'expéditeur, à faire enregistrer pour la Guinée.
 - Essai gratuit Infobip : SMS uniquement vers le numéro vérifié à l'inscription, avec l'expéditeur de test d'Infobip (ne pas renseigner
