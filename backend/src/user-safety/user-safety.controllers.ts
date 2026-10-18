@@ -1,4 +1,5 @@
 // backend/src/user-safety/user-safety.controllers.ts
+// [16/10/2026] v2 — POST /reports/:id/remind : message de rappel du service client.
 // [11/10/2026] v1 — routes de la sécurité : /blocks, /reports, /emergency-contacts, /sos. Les routes d'administration (support) demandent une
 // permission (user_report.* / sos.*) et respectent la portée par pays ; les autres ne concernent que l'utilisateur connecté.
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
@@ -21,6 +22,7 @@ import {
   CreateSosDto,
   CreateUserReportDto,
   HandleSosDto,
+  RemindUserReportDto,
   UpdateSosLocationDto,
   UpdateUserReportDto,
 } from './dto/user-safety.dto';
@@ -77,6 +79,15 @@ export class UserReportsController {
     @Query('reportedUserId') reportedUserId?: string,
   ) {
     return this.reports.findAll(query, { status, reportedUserId }, this.scope.userWhere(user, PERMISSIONS.USER_REPORT_READ));
+  }
+
+  /** Rappel envoyé par le service client à la personne signalée (ou à celle qui a signalé). */
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Permissions(PERMISSIONS.USER_REPORT_MANAGE)
+  @Post(':id/remind')
+  async remind(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RemindUserReportDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertUser(user, PERMISSIONS.USER_REPORT_MANAGE, await this.reports.reportedUserIdOf(id));
+    return this.reports.remind(id, dto, user.id);
   }
 
   @Permissions(PERMISSIONS.USER_REPORT_MANAGE)

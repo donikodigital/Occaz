@@ -40,6 +40,14 @@ export interface UserReportItem {
   };
 }
 
+/** Qui reçoit le message de rappel : la personne signalée ou celle qui a signalé. */
+export type ReportReminderRecipient = 'REPORTED' | 'REPORTER';
+
+export interface RemindReportPayload {
+  recipient: ReportReminderRecipient;
+  message: string;
+}
+
 export interface UpdateUserReportPayload {
   status: UserReportStatus;
   resolutionNote?: string;

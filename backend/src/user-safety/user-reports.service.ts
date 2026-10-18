@@ -1,4 +1,5 @@
 // backend/src/user-safety/user-reports.service.ts
+// [16/10/2026] v2 — remind() : message de rappel du support à la personne signalée (ou à celle qui a signalé), tracé dans le journal d'audit.
 // [11/10/2026] v1 — signalement d'un utilisateur par un autre, puis traitement par le support (statut + note, tracés dans le journal d'audit).
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AccountType, NotificationType, Prisma, UserReportStatus } from '@prisma/client';
@@ -9,7 +10,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { UserBlocksService } from './user-blocks.service';
-import { CreateUserReportDto, UpdateUserReportDto } from './dto/user-safety.dto';
+import { CreateUserReportDto, RemindUserReportDto, UpdateUserReportDto } from './dto/user-safety.dto';
 import { REPORT_REASON_LABELS, fullName } from './user-safety.utils';
 
 /** Au plus ce nombre de signalements par personne et par jour : freine les signalements en rafale. */
@@ -181,6 +182,47 @@ export class UserReportsService {
       diff: { from: existing.status, to: dto.status },
     });
     return updated;
+  }
+
+  /** Identifiant du compte signalé : sert au contrôle de périmètre (pays) avant d'agir sur le signalement. */
+  async reportedUserIdOf(id: string): Promise<string> {
+    const report = await this.prisma.userReport.findUnique({ where: { id }, select: { reportedUserId: true } });
+    if (!report) throw new NotFoundException('Signalement introuvable.');
+    return report.reportedUserId;
+  }
+
+  /**
+   * Message de rappel du service client, après un signalement : une notification dans l'application de la personne signalée (rappel des
+   * règles, avertissement) ou de celle qui a signalé (suite donnée). Le texte est celui de l'agent ; l'envoi est tracé.
+   */
+  async remind(id: string, dto: RemindUserReportDto, actorId: string): Promise<{ sent: true }> {
+    const report = await this.prisma.userReport.findUnique({
+      where: { id },
+      select: { id: true, reporterId: true, reportedUserId: true },
+    });
+    if (!report) throw new NotFoundException('Signalement introuvable.');
+
+    const recipientId = dto.recipient === 'REPORTED' ? report.reportedUserId : report.reporterId;
+    const message = dto.message.trim();
+    if (message.length < 10) throw new BadRequestException('Le message est trop court.');
+
+    await this.notifications.notify({
+      userId: recipientId,
+      type: NotificationType.SUPPORT_MESSAGE,
+      fallbackTitle: 'Message du service client',
+      fallbackBody: message,
+      payload: { reportId: report.id },
+      pushData: { type: 'SUPPORT_MESSAGE', reportId: report.id },
+    });
+
+    await this.audit.log({
+      actorId,
+      entityType: 'UserReport',
+      entityId: id,
+      action: 'user_report.remind',
+      diff: { recipient: dto.recipient, recipientId },
+    });
+    return { sent: true };
   }
 
   /** Nombre de signalements en attente (pastille du back-office). */

@@ -180,6 +180,8 @@ export default function DisputeDetailPage() {
       return can(PERMISSIONS.REFUND_CREATE);
     }
     if (type === 'SUSPENSION') return can(PERMISSIONS.USER_SUSPEND);
+    // Libérer d'office l'argent d'un conducteur relève de la finance, pas du service client (le serveur le refuse aussi).
+    if (type === 'DRIVER_PAYOUT') return can(PERMISSIONS.PAYOUT_MANAGE);
     return true;
   });
 

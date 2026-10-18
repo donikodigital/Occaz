@@ -1,5 +1,6 @@
 // web-admin/src/app/(app)/shipments/[id]/page.tsx
 //
+// [16/10/2026] v2 — le service client voit ce que le client a payé, pas la commission ni le gain du conducteur (réservés à l'administration).
 // v1 — Détail d'un envoi pour l'équipe : montants (payé, gain du conducteur,
 // commission), période demandée, expéditeur et destinataire, colis, conducteur
 // et frise de suivi. Lecture seule : un désaccord se traite depuis « Litiges »,
@@ -12,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { IconPackage } from '@tabler/icons-react';
 import { BackHeader, Chip, Notice, SectionCard } from '@/components/admin/AdminUi';
 import { useShipmentDetail } from '@/hooks/useShipments';
+import { usePermissions } from '@/hooks/usePermissions';
 import { formatMoney } from '@/utils/money';
 import {
   SHIPMENT_STATUS_LABELS,
@@ -61,6 +63,7 @@ function Loading() {
 export default function ShipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: shipment, isLoading, isError } = useShipmentDetail(id);
+  const { canSeeEarnings } = usePermissions();
 
   if (isError) {
     return (
@@ -105,14 +108,25 @@ export default function ShipmentDetailPage() {
         </Notice>
       ) : null}
 
-      <SectionCard title="Montants" description="Le client paie un seul montant ; la commission est prélevée sur le gain du conducteur.">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <SectionCard
+        title="Montants"
+        description={
+          canSeeEarnings
+            ? 'Le client paie un seul montant ; la commission est prélevée sur le gain du conducteur.'
+            : 'Le client paie un seul montant.'
+        }
+      >
+        <div className={`grid grid-cols-1 gap-2 ${canSeeEarnings ? 'sm:grid-cols-3' : ''}`}>
           <MoneyTile label="Payé par le client" value={formatMoney(shipment.totalAmount, currencyCode)} highlight />
-          <MoneyTile
-            label="Gain du conducteur"
-            value={formatMoney(driverNet(shipment.totalAmount, shipment.platformFee), currencyCode)}
-          />
-          <MoneyTile label="Commission" value={formatMoney(shipment.platformFee, currencyCode)} />
+          {canSeeEarnings && shipment.platformFee != null ? (
+            <>
+              <MoneyTile
+                label="Gain du conducteur"
+                value={formatMoney(driverNet(shipment.totalAmount, shipment.platformFee), currencyCode)}
+              />
+              <MoneyTile label="Commission" value={formatMoney(shipment.platformFee, currencyCode)} />
+            </>
+          ) : null}
         </div>
       </SectionCard>
 

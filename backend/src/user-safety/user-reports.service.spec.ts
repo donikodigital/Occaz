@@ -12,7 +12,7 @@ function build(options: { target?: unknown; duplicate?: unknown; recent?: number
       findFirst: jest.fn().mockResolvedValue(options.duplicate ?? null),
       count: jest.fn().mockResolvedValue(options.recent ?? 0),
       create: jest.fn().mockResolvedValue({ id: 'r1' }),
-      findUnique: jest.fn().mockResolvedValue({ id: 'r1', status: UserReportStatus.OPEN }),
+      findUnique: jest.fn().mockResolvedValue({ id: 'r1', status: UserReportStatus.OPEN, reporterId: 'u1', reportedUserId: 'u2' }),
       update: jest.fn().mockResolvedValue({ id: 'r1', status: UserReportStatus.RESOLVED }),
     },
   };
@@ -20,7 +20,7 @@ function build(options: { target?: unknown; duplicate?: unknown; recent?: number
     block: jest.fn().mockResolvedValue({ blocked: true }),
     resolveTargetUserId: jest.fn().mockImplementation((target: { userId?: string }) => Promise.resolve(target.userId ?? 'u2')),
   };
-  const notifications = { notifyStaff: jest.fn().mockResolvedValue(undefined) };
+  const notifications = { notifyStaff: jest.fn().mockResolvedValue(undefined), notify: jest.fn().mockResolvedValue(undefined) };
   const audit = { log: jest.fn().mockResolvedValue(undefined) };
   const service = new UserReportsService(prisma as never, blocks as never, notifications as never, audit as never);
   return { service, prisma, blocks, notifications, audit };
@@ -89,5 +89,32 @@ describe('UserReportsService.update', () => {
     const { service, prisma } = build();
     prisma.userReport.findUnique.mockResolvedValue(null);
     await expect(service.update('nope', { status: UserReportStatus.DISMISSED }, 'agent1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+
+describe('UserReportsService.remind', () => {
+  const message = '  Rappel : merci de respecter les autres utilisateurs.  ';
+
+  it('envoie le rappel à la personne signalée et le trace', async () => {
+    const { service, notifications, audit } = build();
+    await expect(service.remind('r1', { recipient: 'REPORTED', message }, 'agent1')).resolves.toEqual({ sent: true });
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'u2', fallbackBody: 'Rappel : merci de respecter les autres utilisateurs.' }),
+    );
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ actorId: 'agent1', action: 'user_report.remind' }));
+  });
+
+  it('peut aussi écrire à la personne qui a signalé', async () => {
+    const { service, notifications } = build();
+    await service.remind('r1', { recipient: 'REPORTER', message }, 'agent1');
+    expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1' }));
+  });
+
+  it('refuse un signalement introuvable', async () => {
+    const { service, prisma, notifications } = build();
+    prisma.userReport.findUnique.mockResolvedValueOnce(null);
+    await expect(service.remind('r9', { recipient: 'REPORTED', message }, 'agent1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 });

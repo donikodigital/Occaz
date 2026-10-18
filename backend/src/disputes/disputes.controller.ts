@@ -1,4 +1,6 @@
 // backend/src/disputes/disputes.controller.ts
+// [16/10/2026] v+ — libérer d'office l'argent d'un conducteur (DRIVER_PAYOUT) exige aussi `payout.manage` : le service client valide un code ou
+// suspend un compte, il ne déplace pas de fonds. Le SuperAdmin et la finance passent toujours.
 // [02/10/2026] v+ — résolution : un remboursement exige aussi `refund.create` et une suspension `user.suspend`
 // (le rôle « Superviseur clientèle » les a déjà tous les deux ; le SuperAdmin passe toujours).
 // [02/10/2026] v+ — Portée par pays : liste, fiche et actions limitées aux litiges du périmètre de l'agent.
@@ -11,6 +13,7 @@ import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { CountryScopeService } from '../common/scope/country-scope.service';
+import { canSeePlatformEarnings, withoutDisputeFinance } from '../common/utils/platform-earnings';
 import { DisputesService } from './disputes.service';
 import { CreateDisputeDto } from './dto/create-dispute.dto';
 import { AddDisputeMessageDto } from './dto/add-dispute-message.dto';
@@ -48,7 +51,9 @@ export class DisputesController {
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     await this.disputesService.assertCanAccess(id, user.id, await this.scope.hasDisputeAccess(user, id));
-    return this.disputesService.findOne(id);
+    const dispute = await this.disputesService.findOne(id);
+    // Les parties au litige gardent leur vue ; c'est le personnel sans permission financière qui ne voit pas la commission.
+    return user.accountType === AccountType.SUPPORT && !canSeePlatformEarnings(user) ? withoutDisputeFinance(dispute) : dispute;
   }
 
   @Post(':id/messages')
@@ -118,6 +123,9 @@ export class DisputesController {
 
     if (REFUND_TYPES.includes(type) && !user.permissions.includes(PERMISSIONS.REFUND_CREATE)) {
       throw new ForbiddenException(`Permission manquante : ${PERMISSIONS.REFUND_CREATE}.`);
+    }
+    if (type === DisputeResolutionType.DRIVER_PAYOUT && !user.permissions.includes(PERMISSIONS.PAYOUT_MANAGE)) {
+      throw new ForbiddenException(`Permission manquante : ${PERMISSIONS.PAYOUT_MANAGE}.`);
     }
     if (type === DisputeResolutionType.SUSPENSION && !user.permissions.includes(PERMISSIONS.USER_SUSPEND)) {
       throw new ForbiddenException(`Permission manquante : ${PERMISSIONS.USER_SUSPEND}.`);

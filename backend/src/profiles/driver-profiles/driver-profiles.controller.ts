@@ -1,10 +1,12 @@
 // backend/src/profiles/driver-profiles/driver-profiles.controller.ts
+// [16/10/2026] v+ — fiche conducteur : le portefeuille (solde) n'est montré qu'aux comptes ayant une permission financière, pas au service client.
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../../common/constants/permissions.constants';
 import { AuthenticatedUser } from '../../common/types/request-with-user.interface';
+import { canSeePlatformEarnings, withoutWallet } from '../../common/utils/platform-earnings';
 import { CountryScopeService } from '../../common/scope/country-scope.service';
 import { DriverProfilesService } from './driver-profiles.service';
 import { CreateDriverProfileDto } from './dto/create-driver-profile.dto';
@@ -66,19 +68,22 @@ export class DriverProfilesController {
 
   @Permissions(PERMISSIONS.DRIVER_READ)
   @Get()
-  findAll(@Query() query: ListDriverProfilesQueryDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.driverProfilesService.findAll(
+  async findAll(@Query() query: ListDriverProfilesQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    const page = await this.driverProfilesService.findAll(
       query,
       { status: query.status, countryId: query.countryId },
       this.scope.driverWhere(user, PERMISSIONS.DRIVER_READ),
     );
+    if (!canSeePlatformEarnings(user)) page.data = page.data.map((driver) => withoutWallet(driver));
+    return page;
   }
 
   @Permissions(PERMISSIONS.DRIVER_READ)
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     await this.scope.assertDriver(user, PERMISSIONS.DRIVER_READ, id);
-    return this.driverProfilesService.findOne(id);
+    const driver = await this.driverProfilesService.findOne(id);
+    return canSeePlatformEarnings(user) ? driver : withoutWallet(driver);
   }
 
   @Permissions(PERMISSIONS.DRIVER_VERIFY)

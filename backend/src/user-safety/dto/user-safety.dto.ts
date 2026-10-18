@@ -85,6 +85,22 @@ export class UpdateUserReportDto {
   resolutionNote?: string;
 }
 
+/** Qui reçoit le message de rappel envoyé depuis un signalement. */
+export const REPORT_REMINDER_RECIPIENTS = ['REPORTED', 'REPORTER'] as const;
+export type ReportReminderRecipient = (typeof REPORT_REMINDER_RECIPIENTS)[number];
+
+export class RemindUserReportDto {
+  @ApiProperty({ enum: REPORT_REMINDER_RECIPIENTS, description: 'REPORTED : la personne signalée ; REPORTER : celle qui a signalé.' })
+  @IsIn(REPORT_REMINDER_RECIPIENTS)
+  recipient: ReportReminderRecipient;
+
+  @ApiProperty({ minLength: 10, maxLength: 500, description: 'Message de rappel affiché dans les notifications de la personne.' })
+  @IsString()
+  @MinLength(10)
+  @MaxLength(500)
+  message: string;
+}
+
 export class CreateEmergencyContactDto {
   @ApiProperty({ example: 'Mariama (sœur)' })
   @IsString()

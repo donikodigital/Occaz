@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.controller.ts
+// [16/10/2026] v5 — le personnel Support ne voit plus la commission (platformFee) : voir common/utils/platform-earnings.ts.
 // [09/10/2026] v4 — invitations : le client cherche des conducteurs (/:id/drivers) et les invite (/:id/invitations) ; le conducteur répond (/invitations/…).
 // [30/09/2026] v3 — route otp/delivery/reveal-for-sender : l'expéditeur peut revoir le code de livraison, sur le modèle de otp/pickup/reveal-for-sender.
 // [21/09/2026] v2 — /quote, /extend, /available réservé aux conducteurs validés, assign = acceptation.
@@ -11,6 +12,7 @@ import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { CountryScopeService } from '../common/scope/country-scope.service';
+import { canSeePlatformEarnings, withoutPlatformFee } from '../common/utils/platform-earnings';
 import { ShipmentsService } from './shipments.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { AssignShipmentDto } from './dto/assign-shipment.dto';
@@ -132,7 +134,7 @@ export class ShipmentsController {
     const shipment = await this.shipmentsService.findOne(id);
 
     // Le personnel du support garde tout ; un client ou un conducteur ne voit plus les numéros une fois le colis livré.
-    if (await this.scope.hasShipmentAccess(user, id)) return shipment;
+    if (await this.scope.hasShipmentAccess(user, id)) return canSeePlatformEarnings(user) ? shipment : withoutPlatformFee(shipment);
 
     {
       const customer = await this.customerProfilesService.findByUserId(user.id).catch(() => null);
@@ -262,11 +264,13 @@ export class ShipmentsController {
 
   @Permissions(PERMISSIONS.SHIPMENT_READ)
   @Get()
-  findAll(@Query() query: ListShipmentsQueryDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.shipmentsService.findAll(
+  async findAll(@Query() query: ListShipmentsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    const page = await this.shipmentsService.findAll(
       query,
       { status: query.status },
       this.scope.shipmentWhere(user, PERMISSIONS.SHIPMENT_READ),
     );
+    if (!canSeePlatformEarnings(user)) page.data = page.data.map((shipment) => withoutPlatformFee(shipment));
+    return page;
   }
 }

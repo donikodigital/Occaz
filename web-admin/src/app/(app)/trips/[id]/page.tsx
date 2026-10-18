@@ -1,5 +1,6 @@
 // web-admin/src/app/(app)/trips/[id]/page.tsx
 //
+// [16/10/2026] v2 — le service client voit le prix payé par le passager ; le prix conducteur (dont on déduit la commission) est réservé à l'administration.
 // v1 — Détail d'un trajet pour l'équipe : itinéraire complet (avec étapes
 // intermédiaires), conducteur, véhicule, places, prix, et les réservations
 // (passagers) qui y sont rattachées. Lecture seule : un désaccord se
@@ -12,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { IconRoute } from '@tabler/icons-react';
 import { BackHeader, Chip, Notice, SectionCard } from '@/components/admin/AdminUi';
 import { useTripBookings, useTripDetail } from '@/hooks/useTrips';
+import { usePermissions } from '@/hooks/usePermissions';
 import { formatMoney } from '@/utils/money';
 import { TRIP_STATUS_LABELS, TRIP_STATUS_TONE, formatDateTime, routeLabel } from '@/utils/tripLabels';
 import type { BookingStatus } from '@/types/trips.types';
@@ -68,6 +70,7 @@ export default function TripDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: trip, isLoading, isError } = useTripDetail(id);
   const { data: bookings } = useTripBookings(id);
+  const { canSeeEarnings } = usePermissions();
 
   if (isError) {
     return (
@@ -91,9 +94,16 @@ export default function TripDetailPage() {
         badge={<Chip tone={TRIP_STATUS_TONE[trip.status]}>{TRIP_STATUS_LABELS[trip.status]}</Chip>}
       />
 
-      <SectionCard title="Prix" description="Le passager paie le prix par place fixé par le conducteur, plus la commission de la plateforme.">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <MoneyTile label="Prix conducteur (par place)" value={formatMoney(trip.pricePerSeat, currencyCode)} />
+      <SectionCard
+        title="Prix"
+        description={
+          canSeeEarnings
+            ? 'Le passager paie le prix par place fixé par le conducteur, plus la commission de la plateforme.'
+            : 'Le prix que paie un passager, par place.'
+        }
+      >
+        <div className={`grid grid-cols-1 gap-2 ${canSeeEarnings ? 'sm:grid-cols-2' : ''}`}>
+          {canSeeEarnings ? <MoneyTile label="Prix conducteur (par place)" value={formatMoney(trip.pricePerSeat, currencyCode)} /> : null}
           <MoneyTile label="Prix passager (par place)" value={formatMoney(trip.customerPricePerSeat, currencyCode)} highlight />
         </div>
       </SectionCard>

@@ -66,7 +66,7 @@ export interface AdminShipmentListItem {
   /** Ce que le client a payé (un seul montant). */
   totalAmount: Money;
   /** Commission de la plateforme, prélevée sur le gain du conducteur. */
-  platformFee: Money;
+  platformFee?: Money;
   driver?: ShipmentDriverSummary | null;
   createdAt: string;
 }

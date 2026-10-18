@@ -1,9 +1,11 @@
 // web-admin/src/services/api/safety.api.ts
+// [16/10/2026] v2 — remindReport : message de rappel après un signalement.
 // [11/10/2026] v1 — signalements d'utilisateurs et alertes SOS.
 import { api } from './client';
 import type { Paginated } from './types';
 import type {
   HandleSosPayload,
+  RemindReportPayload,
   SosAlertItem,
   SosStatus,
   UpdateUserReportPayload,
@@ -14,6 +16,8 @@ import type {
 export const safetyApi = {
   listReports: (params: { page?: number; limit?: number; status?: UserReportStatus }) =>
     api.get<Paginated<UserReportItem>>('/reports', { query: params }),
+
+  remindReport: (id: string, payload: RemindReportPayload) => api.post<{ sent: true }>(`/reports/${id}/remind`, payload),
 
   reportsOpenCount: () => api.get<{ count: number }>('/reports/open-count'),
 
