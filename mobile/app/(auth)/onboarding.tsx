@@ -1,4 +1,9 @@
 // mobile/app/(auth)/onboarding.tsx
+// [18/10/2026] v7 — Habillage « cadre blanc » : le logo reste au-dessus, et tout le contenu (Bienvenue, phrase, cartes de rôle,
+// « Créer votre compte », « Suivre un colis ») est posé dans une grande carte blanche aux coins arrondis avec ombre douce.
+// Design uniquement : textes, boutons et logique inchangés. La carte « Je suis conducteur » reçoit un contour bleu clair et une
+// ombre légère pour rester lisible sur le blanc (la feuille « Créer votre compte » garde son style d'origine). La page défile
+// si l'écran est trop court pour afficher la carte en entier.
 // [11/10/2026] v6 — Correctifs d'affichage (vus sur le web à 353 px de large) :
 //   - le ciel de fond gardait la taille de l'image (827 × 778) au lieu de remplir l'écran : il débordait à droite et s'arrêtait avant le
 //     bas. Il est maintenant une image posée en absolu sur toute la page (View + Image), identique sur mobile et sur le web ;
@@ -37,9 +42,11 @@ interface RoleOptionProps {
   iconBackground: string;
   tone: 'ocean' | 'surface';
   onPress: () => void;
+  /** Posée sur la carte blanche : la variante claire gagne un contour bleu clair et une ombre légère. */
+  onCard?: boolean;
 }
 
-function RoleOption({ title, subtitle, icon, iconBackground, tone, onPress }: RoleOptionProps) {
+function RoleOption({ title, subtitle, icon, iconBackground, tone, onPress, onCard = false }: RoleOptionProps) {
   const isOcean = tone === 'ocean';
   return (
     <Pressable
@@ -49,6 +56,7 @@ function RoleOption({ title, subtitle, icon, iconBackground, tone, onPress }: Ro
       style={({ pressed }) => [
         styles.option,
         isOcean ? styles.optionOcean : styles.optionSurface,
+        !isOcean && onCard ? styles.optionSurfaceOnCard : null,
         { opacity: pressed ? 0.92 : 1 },
       ]}
     >
@@ -146,61 +154,68 @@ export default function OnboardingScreen() {
     <View style={styles.background}>
       <Image source={SKY_BACKGROUND} resizeMode="cover" style={styles.sky} />
       <View style={styles.scrim} />
-      <ScreenContainer transparent style={styles.container} maxWidth="form">
+      <ScreenContainer transparent scroll style={styles.container} maxWidth="form">
         <View style={styles.hero}>
           <AuthIllustration icon={<Image source={LOGO_SOURCE} resizeMode="contain" style={styles.logo} />} />
-          <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>
-            Bienvenue
-          </AppText>
-          <AppText variant="base" color="textSecondary" align="center" style={styles.tagline}>
-            Trajets partagés et envois de colis,{'\n'}partout où vous allez.
-          </AppText>
         </View>
 
-        <View style={styles.options}>
-          <RoleOption
-            title="Je suis client"
-            subtitle="Réserver un trajet ou un envoi"
-            icon={<IconUser size={19} color={OCEAN.onDark} />}
-            iconBackground="rgba(255,255,255,0.16)"
-            tone="ocean"
-            onPress={() => goToLogin('CUSTOMER')}
-          />
-          <RoleOption
-            title="Je suis conducteur"
-            subtitle="Rentabiliser mes trajets"
-            icon={<IconSteeringWheel size={19} color={colors.successDark} />}
-            iconBackground={colors.successLight}
-            tone="surface"
-            onPress={() => goToLogin('DRIVER')}
-          />
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Créer votre compte"
-          onPress={() => setSignupOpen(true)}
-          style={styles.signupLink}
-        >
-          <AppText variant="sm" color="textSecondary" align="center">
-            Pas encore client ou conducteur ?{'\n'}
-            <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-              Créer votre compte
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center">
+              Bienvenue
             </AppText>
-          </AppText>
-        </Pressable>
+            <AppText variant="base" color="textSecondary" align="center" style={styles.tagline}>
+              Trajets partagés et envois de colis,{'\n'}partout où vous allez.
+            </AppText>
+          </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Suivre un colis"
-          onPress={() => router.push('/suivi' as never)}
-          style={styles.trackLink}
-        >
-          <IconPackage size={16} color={OCEAN.base} />
-          <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-            Suivre un colis
-          </AppText>
-        </Pressable>
+          <View style={styles.options}>
+            <RoleOption
+              title="Je suis client"
+              subtitle="Réserver un trajet ou un envoi"
+              icon={<IconUser size={19} color={OCEAN.onDark} />}
+              iconBackground="rgba(255,255,255,0.16)"
+              tone="ocean"
+              onPress={() => goToLogin('CUSTOMER')}
+              onCard
+            />
+            <RoleOption
+              title="Je suis conducteur"
+              subtitle="Rentabiliser mes trajets"
+              icon={<IconSteeringWheel size={19} color={colors.successDark} />}
+              iconBackground={colors.successLight}
+              tone="surface"
+              onPress={() => goToLogin('DRIVER')}
+              onCard
+            />
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Créer votre compte"
+            onPress={() => setSignupOpen(true)}
+            style={styles.signupLink}
+          >
+            <AppText variant="sm" color="textSecondary" align="center">
+              Pas encore client ou conducteur ?{'\n'}
+              <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+                Créer votre compte
+              </AppText>
+            </AppText>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Suivre un colis"
+            onPress={() => router.push('/suivi' as never)}
+            style={styles.trackLink}
+          >
+            <IconPackage size={16} color={OCEAN.base} />
+            <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+              Suivre un colis
+            </AppText>
+          </Pressable>
+        </View>
       </ScreenContainer>
 
       <SignupSheet visible={signupOpen} onClose={() => setSignupOpen(false)} onSelect={selectSignupRole} />
@@ -239,19 +254,36 @@ const styles = StyleSheet.create({
     width: 32,
     height: 41,
   },
+  // Page défilante : le contenu est centré à l'écran, et la carte reste
+  // accessible en entier sur les petits téléphones.
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: spacing.lg,
   },
   hero: {
     alignItems: 'center',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
   },
-  title: {
-    marginTop: spacing.lg,
+  // Grand cadre blanc qui porte tout le contenu de l'écran.
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 32,
+    paddingTop: spacing.xl + 6,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    shadowColor: OCEAN.deep,
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 10,
+  },
+  cardHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
   },
   tagline: {
-    marginTop: spacing.xxs,
+    marginTop: spacing.xs,
   },
   options: {
     gap: spacing.sm,
@@ -276,6 +308,15 @@ const styles = StyleSheet.create({
   optionSurface: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
+  },
+  // Variante claire posée sur le cadre blanc : contour bleu clair + ombre douce.
+  optionSurfaceOnCard: {
+    borderColor: OCEAN.line,
+    shadowColor: OCEAN.deep,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   optionIcon: {
     width: 38,
