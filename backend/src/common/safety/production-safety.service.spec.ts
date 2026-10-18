@@ -51,6 +51,11 @@ describe('ProductionSafetyService.collectIssues', () => {
     expect(issues).toHaveLength(4);
   });
 
+  it('accepte Infobip seul comme prestataire SMS', () => {
+    const issues = build(false).collectIssues({ ...SAFE_ENV, TEXTBEE_API_KEY: undefined, INFOBIP_API_KEY: 'k' });
+    expect(issues).toEqual([]);
+  });
+
   it('signale un secret trop court et des secrets identiques', () => {
     const short = build(false).collectIssues({ ...SAFE_ENV, JWT_ACCESS_SECRET: 'court' });
     expect(short.join(' ')).toContain('JWT_ACCESS_SECRET trop court');

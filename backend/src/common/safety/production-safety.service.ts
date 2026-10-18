@@ -48,9 +48,9 @@ export class ProductionSafetyService implements OnApplicationBootstrap {
         'Retraits simulés (PAYOUT_PROVIDER absent ou « simulated ») : un retrait automatique est marqué payé sans qu\'aucun argent réel ne parte vers le conducteur. Définir PAYOUT_PROVIDER=orange_money et les variables ORANGE_MONEY_* (voir .env.example).',
       );
     }
-    if (!env.TEXTBEE_API_KEY) {
+    if (!env.INFOBIP_API_KEY && !env.TEXTBEE_API_KEY) {
       issues.push(
-        "Aucun prestataire SMS configuré (TEXTBEE_API_KEY absent) : les codes de connexion ne sont pas envoyés, ils s'écrivent seulement dans les logs.",
+        "Aucun prestataire SMS configuré (INFOBIP_API_KEY et TEXTBEE_API_KEY absents) : les codes de vérification ne sont pas envoyés, ils s'écrivent seulement dans les logs.",
       );
     }
     if (!env.RESEND_API_KEY) {

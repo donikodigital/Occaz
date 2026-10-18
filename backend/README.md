@@ -469,6 +469,16 @@ qu'un contournement général :
   ces trois variables n'ont aucune raison d'exister une fois de vrais
   utilisateurs sur la plateforme.
 
+## SMS réel (Infobip, ou TextBee en dépannage)
+
+- Choix automatique (`sms.module.ts`, fonction `createSmsProvider`) : `INFOBIP_API_KEY` → **Infobip** ; sinon `TEXTBEE_API_KEY` → TextBee ;
+  sinon la console (les SMS s'écrivent dans les logs).
+- `InfobipSmsProvider` : `POST {INFOBIP_BASE_URL}/sms/3/messages`, en-tête `Authorization: App {clé}`. `INFOBIP_BASE_URL` est l'adresse
+  personnelle du compte (page d'accueil du portail Infobip) ; `INFOBIP_SENDER` est le nom d'expéditeur, à faire enregistrer pour la Guinée.
+- Essai gratuit Infobip : SMS uniquement vers le numéro vérifié à l'inscription, avec l'expéditeur de test d'Infobip (ne pas renseigner
+  `INFOBIP_SENDER` pendant l'essai). Ajouter des fonds au compte lève ces limites.
+- Un envoi que l'API refuse (numéro invalide, expéditeur non autorisé) lève une erreur lisible ; la remise au téléphone, elle, est asynchrone.
+
 ## SMS réel (TextBee)
 
 - `TextBeeSmsProvider` — même principe d'initialisation différée que
