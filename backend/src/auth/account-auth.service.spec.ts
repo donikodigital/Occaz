@@ -1,4 +1,5 @@
 // backend/src/auth/account-auth.service.spec.ts
+// [19/10/2026] v+ — compte à deux profils : la connexion « en tant que » est acceptée si le compte a ce profil.
 // Inscription en étapes, connexion par numéro + mot de passe (verrouillage, numéros de test), mot de passe oublié.
 // bcrypt est simulé : son module natif n'a rien à prouver ici, et ce test doit tourner partout.
 jest.mock('bcrypt', () => ({
@@ -52,7 +53,11 @@ function build() {
     }
   };
 
+  // Profils du compte (un compte peut avoir les deux) : par défaut aucun profil supplémentaire.
+  const profiles = { customer: false, driver: false };
   const prisma = {
+    customerProfile: { findUnique: jest.fn(async () => (profiles.customer ? { id: 'cp1' } : null)) },
+    driverProfile: { findUnique: jest.fn(async () => (profiles.driver ? { id: 'dp1' } : null)) },
     user: {
       update: jest.fn(async ({ where, data }: Row) => {
         const row = users.find((u) => u.id === where.id)!;
@@ -155,7 +160,7 @@ function build() {
     const [, ...message] = calls[calls.length - 1]!;
     return /(\d{6})/.exec(message.join(' '))![1]!;
   };
-  return { service, users, otps, prisma, usersService, sms, email, sessions, audit, authService, addUser, lastCode, otpSettings };
+  return { profiles, service, users, otps, prisma, usersService, sms, email, sessions, audit, authService, addUser, lastCode, otpSettings };
 }
 
 const env = { ...process.env };
@@ -394,6 +399,20 @@ describe('Connexion — numéro + mot de passe', () => {
     await expect(service.loginWithPhone({ phone: PHONE, password: '482913', expectedAccountType: 'CUSTOMER' }, {})).rejects.toThrow(
       /Je suis conducteur/,
     );
+  });
+
+  it('un conducteur qui a aussi un profil client peut se connecter en tant que client (un seul compte, deux profils)', async () => {
+    const { service, addUser, profiles } = build();
+    addUser({ accountType: AccountType.DRIVER });
+    profiles.customer = true;
+    await expect(service.loginWithPhone({ phone: PHONE, password: '482913', expectedAccountType: 'CUSTOMER' }, {})).resolves.toBeDefined();
+  });
+
+  it('un client qui a aussi un profil conducteur peut se connecter en tant que conducteur', async () => {
+    const { service, addUser, profiles } = build();
+    addUser({ accountType: AccountType.CUSTOMER });
+    profiles.driver = true;
+    await expect(service.loginWithPhone({ phone: PHONE, password: '482913', expectedAccountType: 'DRIVER' }, {})).resolves.toBeDefined();
   });
 
   it('les comptes de l’équipe ne se connectent pas par ici', async () => {

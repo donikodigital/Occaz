@@ -360,6 +360,7 @@ model User {
   sessions  Session[]
 
   phoneChangeRequests PhoneChangeRequest[]
+  onboardingReminders OnboardingReminderLog[]
 
   verificationsAsSubject  Verification[] @relation("VerificationSubject")
   verificationsAsReviewer Verification[] @relation("VerificationReviewer")
@@ -2041,4 +2042,22 @@ model TripReminderLog {
   @@unique([tripId, userId, kind])
   @@index([sentAt])
   @@map("trip_reminder_logs")
+}
+
+// Journal des rappels d'intégration déjà envoyés (dossier conducteur incomplet, adresse e-mail à renseigner). La contrainte d'unicité sert de
+// verrou : même avec plusieurs instances du serveur, un rappel n'est envoyé qu'une fois par (personne, type, numéro d'ordre).
+model OnboardingReminderLog {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  // DRIVER_DOCUMENTS = dossier conducteur à compléter ; EMAIL_ADDRESS = adresse e-mail à renseigner.
+  kind     String
+  // DRIVER_DOCUMENTS : numéro de la période de rappel écoulée depuis la création du profil ; EMAIL_ADDRESS : 1 = premier rappel, 2 = second.
+  sequence Int
+
+  sentAt DateTime @default(now())
+
+  @@unique([userId, kind, sequence])
+  @@index([sentAt])
+  @@map("onboarding_reminder_logs")
 }

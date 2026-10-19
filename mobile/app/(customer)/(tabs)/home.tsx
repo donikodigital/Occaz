@@ -1,4 +1,5 @@
 // mobile/app/(customer)/(tabs)/home.tsx
+// [19/10/2026] v+ — rappel d'ajouter une adresse e-mail (carte facultative, affichée tant qu'aucune adresse n'est vérifiée).
 // [10/10/2026] v+ — « Message indisponible » s'affiche dans la page (bannière) au lieu d'Alert.alert, sans effet sur le web.
 // [10/10/2026] v+ — action « Suivre un colis » dans le bouton + (saisie d'un numéro de suivi).
 // [08/10/2026] v4 — (1) la carte de la route s'affiche aussi côté client : la liste des réservations ne contient pas les adresses, le trajet
@@ -42,6 +43,7 @@ import { useMyShipments } from '@/hooks/useShipments';
 import { useGetOrCreateConversationForBooking } from '@/hooks/useConversations';
 import { useLatestMessageAlert, useMarkNotificationRead, useMyNotifications } from '@/hooks/useNotifications';
 import { MessageAlertCard } from '@/components/screens/MessageAlertCard';
+import { AddEmailReminderCard } from '@/components/screens/AddEmailReminderCard';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { currencyOf, formatMoney } from '@/utils/money';
 import { customerCodeVisibility } from '@/utils/bookingPhase';
@@ -254,6 +256,7 @@ export default function CustomerHomeScreen() {
               <FeedbackBanner tone="error" title="Message indisponible" text={contactError} onDismiss={() => setContactError(null)} />
             </View>
           ) : null}
+          <AddEmailReminderCard space="CUSTOMER" />
           {messageAlert ? (
             <View style={styles.block}>
               <MessageAlertCard

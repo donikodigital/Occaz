@@ -1,5 +1,7 @@
 // web-admin/src/app/(app)/settings/page.tsx
 //
+// v5 — Nouveau thème « Dossier des conducteurs » : délai de tolérance pour régulariser un dossier (création de trajets), fréquence des rappels
+//   automatiques et interrupteur des rappels (documents, adresse e-mail).
 // v4 — Nouveau thème « Connexion et SMS » : durée et essais des codes, limites de demandes, plafonds quotidiens, SMS de
 //   remise, pays acceptés et délai entre deux changements de numéro. Ces réglages étaient jusqu'ici dans des variables
 //   d'environnement ; ils se modifient maintenant ici (le backend les lit à chaque demande, repli sur l'environnement).
@@ -38,6 +40,7 @@ import {
   IconDeviceMobileMessage,
   IconGauge,
   IconGift,
+  IconUserCheck,
   IconHash,
   IconMinus,
   IconPackage,
@@ -126,6 +129,7 @@ type GroupId =
   | 'payouts'
   | 'referral'
   | 'otp'
+  | 'drivers'
   | 'jobs'
   | 'other';
 
@@ -138,6 +142,7 @@ const GROUPS: { id: GroupId; title: string; description: string; icon: IconCompo
   { id: 'payouts', title: 'Retraits', description: 'Retraits des conducteurs vers leur compte Mobile Money.', icon: IconWallet },
   { id: 'referral', title: 'Parrainage', description: 'Récompense des parrains.', icon: IconGift },
   { id: 'otp', title: 'Connexion et SMS', description: 'Codes reçus par SMS, limites d’envoi et pays acceptés.', icon: IconDeviceMobileMessage },
+  { id: 'drivers', title: 'Dossier des conducteurs', description: 'Délai pour régulariser le dossier et rappels automatiques.', icon: IconUserCheck },
   { id: 'jobs', title: 'Tâches automatiques', description: 'Expirations réalisées toutes seules par la plateforme.', icon: IconRefresh },
   { id: 'other', title: 'Autres réglages', description: 'Réglages ajoutés manuellement.', icon: IconSettings },
 ];
@@ -442,6 +447,34 @@ const KNOWN: Known[] = [
     group: 'otp',
     defaultValue: 30,
     zeroLabel: 'Aucun délai',
+  },
+  {
+    key: 'driver.pending_grace_days',
+    title: 'Délai pour régulariser un dossier conducteur',
+    help: 'Un conducteur dont le dossier n’est pas validé peut créer des trajets (passagers uniquement) pendant ce délai, compté depuis la création de son profil. Passé ce délai, la création de trajets est bloquée tant que photo, permis, véhicule et carte grise ne sont pas envoyés. Les colis restent réservés aux conducteurs validés.',
+    kind: 'days',
+    group: 'drivers',
+    defaultValue: 7,
+    zeroLabel: 'Aucune tolérance',
+  },
+  {
+    key: 'driver.reminder_interval_days',
+    title: 'Rappel automatique de régularisation',
+    help: 'Intervalle entre deux rappels (notification, et e-mail si l’adresse est renseignée) envoyés au conducteur dont le dossier est incomplet, tant qu’il n’est pas en règle.',
+    kind: 'days',
+    group: 'drivers',
+    defaultValue: 2,
+    min: 1,
+  },
+  {
+    key: 'jobs.onboarding_reminders_enabled',
+    title: 'Rappels de dossier et d’adresse e-mail',
+    help: 'Rappelle aux conducteurs de compléter leur dossier, et aux clients comme aux conducteurs de renseigner une adresse e-mail (facultative).',
+    kind: 'flag01',
+    group: 'drivers',
+    defaultValue: true,
+    onText: 'Les rappels partent tout seuls (dossier incomplet, adresse e-mail non renseignée).',
+    offText: 'Pause : plus aucun rappel de dossier ni d’adresse e-mail jusqu’à la réactivation.',
   },
   {
     key: 'jobs.booking_expiry_enabled',

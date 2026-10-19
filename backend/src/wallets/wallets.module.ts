@@ -1,4 +1,5 @@
 // backend/src/wallets/wallets.module.ts
+// [19/10/2026] v+ — PinConfirmationService exporté (confirmation par PIN de l'ouverture d'un second profil, voir AccountRolesService).
 import { Module } from '@nestjs/common';
 import { WalletsController } from './wallets.controller';
 import { WalletsService } from './wallets.service';
@@ -16,6 +17,6 @@ import { PayoutGuardrailsService } from './payout-guardrails.service';
   imports: [DriverProfilesModule, NotificationsModule, ExchangeRateModule],
   controllers: [WalletsController, PayoutsController],
   providers: [WalletsService, PayoutsService, SimulatedPayoutProvider, PayoutProviderRegistry, PinConfirmationService, PayoutGuardrailsService],
-  exports: [WalletsService, PayoutsService, PayoutProviderRegistry],
+  exports: [WalletsService, PayoutsService, PayoutProviderRegistry, PinConfirmationService],
 })
 export class WalletsModule {}

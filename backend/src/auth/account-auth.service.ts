@@ -1,4 +1,5 @@
 // backend/src/auth/account-auth.service.ts
+// [19/10/2026] v3 — Compte à deux profils : la connexion « en tant que client / conducteur » est acceptée dès que le compte a ce profil ; l'inscription d'un numéro déjà utilisé oriente vers l'ouverture du second espace depuis le profil.
 // [19/10/2026] v2 — Politique SMS : chaque SMS précise son motif (inscription ou mot de passe oublié, les deux seuls motifs ouverts pour les
 // comptes Client et Conducteur) ; voir integrations/sms/sms-purpose.ts.
 // [11/10/2026] v1 — Inscription en étapes, connexion par numéro + mot de passe à 6 chiffres, mot de passe oublié (SMS ou e-mail).
@@ -124,7 +125,7 @@ export class AccountAuthService {
       }
       if (user.accountType !== dto.accountType) {
         throw new BadRequestException(
-          `Ce numéro est déjà associé à un compte ${accountLabel(user.accountType)}. Utilisez un autre numéro pour créer un compte ${accountLabel(dto.accountType as AccountType)}, ou connectez-vous en tant que ${accountLabel(user.accountType).toLowerCase()}.`,
+          `Ce numéro est déjà associé à un compte ${accountLabel(user.accountType)}. Connectez-vous avec ce numéro, puis ouvrez votre espace ${accountLabel(dto.accountType as AccountType).toLowerCase()} depuis votre profil : un seul compte suffit pour les deux usages.`,
         );
       }
       if (user.passwordHash) {
@@ -360,7 +361,8 @@ export class AccountAuthService {
     }
 
     if (user.isSuspended) throw new UnauthorizedException('Ce compte est suspendu.');
-    if (dto.expectedAccountType && dto.expectedAccountType !== user.accountType) {
+    // Un compte peut avoir les deux profils : le type demandé est accepté dès que le compte possède ce profil.
+    if (dto.expectedAccountType && dto.expectedAccountType !== user.accountType && !(await this.hasProfile(user.id, dto.expectedAccountType))) {
       const existing = accountLabel(user.accountType);
       throw new BadRequestException(
         `Ce numéro est associé à un compte ${existing}. Appuyez sur « Je suis ${existing.toLowerCase()} » pour vous connecter.`,
@@ -387,6 +389,15 @@ export class AccountAuthService {
       ipAddress: context.ipAddress,
     });
     return result;
+  }
+
+  /** Le compte a-t-il ce profil (client ou conducteur) ? */
+  private async hasProfile(userId: string, type: 'CUSTOMER' | 'DRIVER'): Promise<boolean> {
+    const found =
+      type === 'CUSTOMER'
+        ? await this.prisma.customerProfile.findUnique({ where: { userId }, select: { id: true } })
+        : await this.prisma.driverProfile.findUnique({ where: { userId }, select: { id: true } });
+    return Boolean(found);
   }
 
   /** Compte une erreur ; à la {MAX_LOGIN_FAILURES}e de suite, verrouille le compte et renvoie la fin du verrouillage. */

@@ -3,11 +3,12 @@
 import { Module } from '@nestjs/common';
 import { ShipmentsModule } from '../shipments/shipments.module';
 import { TripsModule } from '../trips/trips.module';
+import { OnboardingRemindersModule } from '../onboarding-reminders/onboarding-reminders.module';
 import { JobsController } from './jobs.controller';
 import { JobsService } from './jobs.service';
 
 @Module({
-  imports: [TripsModule, ShipmentsModule],
+  imports: [TripsModule, ShipmentsModule, OnboardingRemindersModule],
   controllers: [JobsController],
   providers: [JobsService],
 })

@@ -1,4 +1,5 @@
 // backend/src/profiles/customer-profiles/customer-profiles.service.ts
+// [19/10/2026] v5 — createForUser accepte aussi un compte conducteur (compte à deux profils).
 // [10/10/2026] v4 — updateForUser accepte l'email (qui vit sur User, pas sur CustomerProfile), comme DriverProfilesService.updateForUser :
 // mise à jour de User.email dans la même transaction (409 si l'adresse est déjà utilisée), champs du profil listés explicitement
 // — un `...dto` ferait échouer Prisma dès que `email` est présent.
@@ -75,9 +76,10 @@ export class CustomerProfilesService {
     accountType: AccountType,
     dto: CreateCustomerProfileDto,
   ) {
-    if (accountType !== AccountType.CUSTOMER) {
+    // Un compte conducteur peut aussi avoir un profil client (voir AccountRolesService) ; seule l'équipe du back-office en est exclue.
+    if (accountType !== AccountType.CUSTOMER && accountType !== AccountType.DRIVER) {
       throw new ConflictException(
-        "Seul un compte de type CUSTOMER peut créer un profil client.",
+        "Seul un compte client ou conducteur peut créer un profil client.",
       );
     }
     const existing = await this.prisma.customerProfile.findUnique({ where: { userId } });

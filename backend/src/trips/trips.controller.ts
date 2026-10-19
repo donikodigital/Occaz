@@ -1,7 +1,7 @@
 // backend/src/trips/trips.controller.ts
+// [19/10/2026] v+ — getPosition : le rôle se déduit des profils (compte à deux profils), plus du type de compte.
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AccountType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
@@ -114,15 +114,13 @@ export class TripsController {
 
   @Get(':id/position')
   async getPosition(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    if (user.accountType === AccountType.DRIVER) {
-      const driverProfileId = await this.driverProfilesService.getProfileIdForUser(user.id);
-      return this.tripsService.getPosition(id, { driverProfileId });
+    // Le rôle se déduit des profils : un compte peut être conducteur de ce trajet, ou passager d'une réservation dessus.
+    const driverProfileId = await this.driverProfilesService.getProfileIdForUser(user.id).catch(() => undefined);
+    const customerProfile = await this.customerProfilesService.findByUserId(user.id).catch(() => null);
+    if (!driverProfileId && !customerProfile) {
+      throw new ForbiddenException("Vous n'avez pas accès à la position de ce trajet.");
     }
-    if (user.accountType === AccountType.CUSTOMER) {
-      const customerProfile = await this.customerProfilesService.findByUserId(user.id);
-      return this.tripsService.getPosition(id, { customerProfileId: customerProfile.id });
-    }
-    throw new ForbiddenException("Vous n'avez pas accès à la position de ce trajet.");
+    return this.tripsService.getPosition(id, { driverProfileId, customerProfileId: customerProfile?.id });
   }
 
   @Post(':id/complete')

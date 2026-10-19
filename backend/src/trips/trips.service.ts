@@ -1,4 +1,5 @@
 // backend/src/trips/trips.service.ts
+// [19/10/2026] v+ — create() et publish() vérifient la régularisation du dossier conducteur (DriverComplianceService, délai de tolérance).
 // [10/10/2026] v+ — markArrivedAtStop annonce le passage dans la ville (suivi des colis).
 // [03/10/2026] v+ — Étapes (villes traversées) : un trajet Conakry → Labé peut desservir Kindia, Mamou… Chaque étape a
 // sa ville, son prix depuis le départ (calculé automatiquement au prorata de la distance, modifiable en brouillon) et son
@@ -25,6 +26,7 @@ import { AuditService } from '../audit/audit.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import { LocationsService } from '../locations/locations.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
+import { DriverComplianceService } from '../profiles/driver-profiles/driver-compliance.service';
 import { PricingService } from '../pricing/pricing.service';
 import { TripPricingService } from '../trip-pricing/trip-pricing.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -103,6 +105,8 @@ export class TripsService {
     private readonly arrivals: TripArrivalService,
     // Facultatif : sans bus d'événements (tests unitaires), le suivi des colis n'est simplement pas alimenté.
     @Optional() private readonly events?: EventEmitter2,
+    // Facultatif de la même façon : sans lui (tests unitaires), aucune règle de régularisation du dossier conducteur.
+    @Optional() private readonly compliance?: DriverComplianceService,
   ) {}
 
   /** Calculs de route qui demandent la base (distances, prix automatiques) — sans changer le constructeur injecté. */
@@ -236,6 +240,8 @@ export class TripsService {
   }
 
   async create(driverId: string, dto: CreateTripDto) {
+    // Conducteur en attente de validation : trajets permis pendant le délai de tolérance, puis bloqués jusqu'à régularisation.
+    await this.compliance?.assertCanCreateTrips(driverId);
     const vehicle = await this.vehiclesService.assertOwnership(dto.vehicleId, driverId);
     if (dto.totalSeats > vehicle.totalSeats) {
       throw new BadRequestException(
@@ -462,6 +468,7 @@ export class TripsService {
   }
 
   async publish(id: string, driverId: string) {
+    await this.compliance?.assertCanCreateTrips(driverId);
     const trip = await this.assertOwnership(id, driverId);
     if (trip.status !== TripStatus.DRAFT) {
       throw new BadRequestException('Seul un trajet DRAFT peut être publié.');

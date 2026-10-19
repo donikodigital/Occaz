@@ -1,4 +1,5 @@
 // mobile/app/(customer)/_layout.tsx
+// [19/10/2026] v+ — écran « Adresse e-mail ».
 import { Redirect, Stack } from 'expo-router';
 import { colors } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
@@ -22,6 +23,7 @@ export default function CustomerLayout() {
     >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="complete-profile" />
+      <Stack.Screen name="add-email" />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="change-phone" />
       <Stack.Screen name="change-password" />

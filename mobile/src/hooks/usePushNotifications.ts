@@ -1,4 +1,5 @@
 // mobile/src/hooks/usePushNotifications.ts
+// [19/10/2026] v5 — notifications DRIVER_COMPLIANCE (ouvre « Mon dossier ») et ADD_EMAIL (ouvre l'ajout d'adresse e-mail) ; l'espace des conversations suit l'espace actif.
 // [10/10/2026] v4 — SHIPMENT_TRACKING : le toucher ouvre le suivi en direct du colis ; reçue app ouverte, elle rafraîchit le suivi.
 // [21/09/2026] v2 — canal Android « shipment-requests » (importance max) et ouverture de l'écran concerné au toucher d'une notification.
 // [08/10/2026] v3 — son dédié aux messages d'échange : canal Android « messages », son joué à l'ouverture de l'app, pas de bannière si la
@@ -11,6 +12,8 @@ import Constants from 'expo-constants';
 import { devicesApi } from '@/services/api/devices.api';
 import { queryClient } from '@/services/queryClient';
 import { useAuthStore } from '@/stores/authStore';
+import { useActiveSpaceStore } from '@/stores/activeSpaceStore';
+import { groupOfSpace, spaceOfAccountType } from '@/utils/spaces';
 import { getActiveConversation, playMessageSound } from '@/utils/messageSound';
 
 /**
@@ -133,6 +136,10 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
         void queryClient.invalidateQueries({ queryKey: ['shipments', 'invitations', 'mine'] });
         return;
       }
+      if (data?.type === 'DRIVER_COMPLIANCE') {
+        void queryClient.invalidateQueries({ queryKey: ['driver-compliance', 'mine'] });
+        return;
+      }
       if (data?.type === 'SHIPMENT_TRACKING' && data.shipmentId) {
         void queryClient.invalidateQueries({ queryKey: ['tracking', 'shipment', data.shipmentId] });
         void queryClient.invalidateQueries({ queryKey: ['shipments', data.shipmentId] });
@@ -154,8 +161,16 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
       const data = response.notification.request.content.data as PushData;
       if (data?.type === 'CONVERSATION_MESSAGE' && data.conversationId) {
         // Les conversations vivent dans le groupe de l'utilisateur : conducteur ou client.
-        const group = useAuthStore.getState().user?.accountType === 'DRIVER' ? '(driver)' : '(customer)';
+        const group = groupOfSpace(useActiveSpaceStore.getState().space ?? spaceOfAccountType(useAuthStore.getState().user?.accountType));
         router.push(`/${group}/conversation/${data.conversationId}` as never);
+      } else if (data?.type === 'DRIVER_COMPLIANCE') {
+        // Rappel de régularisation du dossier : l'écran « Mon dossier » s'ouvre.
+        useActiveSpaceStore.getState().setSpace('DRIVER');
+        router.push('/(driver)/documents');
+      } else if (data?.type === 'ADD_EMAIL') {
+        // Rappel d'ajouter son adresse e-mail : l'écran d'ajout s'ouvre dans l'espace en cours.
+        const group = groupOfSpace(useActiveSpaceStore.getState().space ?? spaceOfAccountType(useAuthStore.getState().user?.accountType));
+        router.push(`/${group}/add-email` as never);
       } else if (data?.type === 'SHIPMENT_REQUEST') {
         router.push('/(driver)/shipment-available');
       } else if (data?.type === 'SHIPMENT_INVITATION') {

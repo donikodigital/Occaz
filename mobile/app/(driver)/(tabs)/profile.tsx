@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/profile.tsx
+// [19/10/2026] v+ — section « Mes espaces » (passer d'un espace à l'autre avec le même compte) et rappel d'ajouter une adresse e-mail.
 //
 // v8 — Même refonte que côté client : cet onglet affiche désormais un menu
 // plutôt que directement la fiche de profil (déménagée sur
@@ -15,6 +16,7 @@ import {
   IconAlertTriangle,
   IconChevronRight,
   IconCompass,
+  IconFileCheck,
   IconGift,
   IconHelpCircle,
   IconLogout,
@@ -29,6 +31,8 @@ import { OceanButton, OceanCard, OceanHeroCard, OceanSection } from '@/component
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useAuthStore } from '@/stores/authStore';
+import { SpaceSwitchSection } from '@/components/screens/SpaceSwitchSection';
+import { AddEmailReminderCard } from '@/components/screens/AddEmailReminderCard';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 
 interface MenuRowProps {
@@ -89,12 +93,22 @@ export default function DriverMenuScreen() {
         </OceanHeroCard>
       </Pressable>
 
+      <AddEmailReminderCard space="DRIVER" />
+
+      <SpaceSwitchSection current="DRIVER" />
+
       <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Espace personnel">
         <MenuRow
           icon={<IconUser size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
           label="Mon profil"
           onPress={() => router.push('/(driver)/my-profile')}
+        />
+        <MenuRow
+          icon={<IconFileCheck size={18} color={OCEAN.base} />}
+          iconBackground={OCEAN.mist}
+          label="Mon dossier"
+          onPress={() => router.push('/(driver)/documents')}
         />
         <MenuRow
           icon={<IconMessageStar size={18} color={OCEAN.base} />}

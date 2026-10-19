@@ -1,4 +1,5 @@
 // backend/src/jobs/jobs.service.ts
+// [19/10/2026] v2 — + rappels d'intégration (dossier conducteur tous les 2 jours, adresse e-mail).
 // [19/10/2026] v1 — Lance, un par un, les traitements automatiques (réservations impayées, trajets sans réservation, rappels de départ, plages
 // de dates des envois). Chaque traitement garde son propre garde-fou (verrou « déjà en cours » + mises à jour conditionnelles en base) :
 // l'appeler deux fois en même temps, ou depuis plusieurs instances, ne traite jamais deux fois la même ligne.
@@ -7,6 +8,7 @@ import { BookingExpiryService } from '../trips/booking-expiry.service';
 import { TripExpiryService } from '../trips/trip-expiry.service';
 import { TripReminderService } from '../trips/trip-reminder.service';
 import { ShipmentWindowService } from '../shipments/shipment-window.service';
+import { OnboardingReminderService } from '../onboarding-reminders/onboarding-reminder.service';
 
 export interface JobResult {
   job: string;
@@ -24,6 +26,7 @@ export class JobsService {
     private readonly tripExpiry: TripExpiryService,
     private readonly tripReminder: TripReminderService,
     private readonly shipmentWindow: ShipmentWindowService,
+    private readonly onboardingReminders: OnboardingReminderService,
   ) {}
 
   /** Les traitements, dans l'ordre. Un échec n'empêche jamais les suivants. */
@@ -33,6 +36,7 @@ export class JobsService {
       ['trip-expiry', () => this.tripExpiry.runOnce()],
       ['trip-reminders', () => this.tripReminder.runOnce()],
       ['shipment-window', () => this.shipmentWindow.runOnce()],
+      ['onboarding-reminders', () => this.onboardingReminders.runOnce()],
     ];
   }
 

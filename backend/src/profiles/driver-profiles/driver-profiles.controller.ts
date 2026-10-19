@@ -1,4 +1,5 @@
 // backend/src/profiles/driver-profiles/driver-profiles.controller.ts
+// [19/10/2026] v+ — GET /driver-profiles/me/compliance : pièces manquantes, jours restants avant le blocage des trajets.
 // [16/10/2026] v+ — fiche conducteur : le portefeuille (solde) n'est montré qu'aux comptes ayant une permission financière, pas au service client.
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -9,6 +10,7 @@ import { AuthenticatedUser } from '../../common/types/request-with-user.interfac
 import { canSeePlatformEarnings, withoutWallet } from '../../common/utils/platform-earnings';
 import { CountryScopeService } from '../../common/scope/country-scope.service';
 import { DriverProfilesService } from './driver-profiles.service';
+import { DriverComplianceService } from './driver-compliance.service';
 import { CreateDriverProfileDto } from './dto/create-driver-profile.dto';
 import { UpdateDriverProfileDto } from './dto/update-driver-profile.dto';
 import { SuspendDriverDto } from './dto/suspend-driver.dto';
@@ -24,6 +26,7 @@ export class DriverProfilesController {
   constructor(
     private readonly driverProfilesService: DriverProfilesService,
     private readonly scope: CountryScopeService,
+    private readonly compliance: DriverComplianceService,
   ) {}
 
   @Post('me')
@@ -34,6 +37,13 @@ export class DriverProfilesController {
   @Get('me')
   findMine(@CurrentUser() user: AuthenticatedUser) {
     return this.driverProfilesService.findByUserId(user.id);
+  }
+
+  /** Où en est mon dossier : pièces à fournir, jours restants avant le blocage de la création de trajets, droits actuels. */
+  @Get('me/compliance')
+  async myCompliance(@CurrentUser() user: AuthenticatedUser) {
+    const driverProfileId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    return this.compliance.evaluate(driverProfileId);
   }
 
   @Patch('me')

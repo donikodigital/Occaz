@@ -1,7 +1,8 @@
 // backend/src/verifications/verifications.controller.ts
+// [19/10/2026] v+ — le profil conducteur se déduit de l'existence du profil, plus du type de compte.
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AccountType, VerificationStatus, VerificationType } from '@prisma/client';
+import { VerificationStatus, VerificationType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
@@ -30,10 +31,8 @@ export class VerificationsController {
 
   @Post()
   async request(@Body() dto: CreateVerificationDto, @CurrentUser() user: AuthenticatedUser) {
-    const driverId =
-      user.accountType === AccountType.DRIVER
-        ? await this.driverProfilesService.getProfileIdForUser(user.id)
-        : undefined;
+    // Le profil conducteur existe-t-il ? (un client devenu conducteur peut aussi demander une vérification)
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id).catch(() => undefined);
     return this.verificationsService.request(user.id, driverId, dto);
   }
 

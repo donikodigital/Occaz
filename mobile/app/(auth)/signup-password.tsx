@@ -1,4 +1,5 @@
 // mobile/app/(auth)/signup-password.tsx
+// [19/10/2026] v+ — l'espace ouvert est mémorisé (activeSpaceStore).
 // [11/10/2026] v1 — Création de compte, dernière étape : choisir son mot de passe à 6 chiffres (saisi, puis confirmé). Il sert désormais à
 // CHAQUE connexion, à la place du code SMS. Cet écran n'a pas de bouton retour : le compte est déjà ouvert et ne doit pas rester sans mot
 // de passe. Il sert aussi aux comptes créés avant ce changement (`mustSetPassword`).
@@ -15,6 +16,7 @@ import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
+import { useActiveSpaceStore } from '@/stores/activeSpaceStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useAuthFlowStore } from '@/stores/authFlowStore';
 import { SIGNUP_STEP, SIGNUP_STEPS } from '@/components/auth/signupSteps';
@@ -34,6 +36,7 @@ export default function SignupPasswordScreen() {
   function goHome(accountType: string | undefined) {
     // Le conducteur garde ses informations en mémoire : « Complétez votre profil » les reprend (voir complete-profile.tsx).
     if (accountType !== 'DRIVER') resetFlow();
+    useActiveSpaceStore.getState().setSpace(accountType === 'DRIVER' ? 'DRIVER' : 'CUSTOMER');
     router.replace(accountType === 'DRIVER' ? '/(driver)/(tabs)/home' : '/(customer)/(tabs)/home');
   }
 

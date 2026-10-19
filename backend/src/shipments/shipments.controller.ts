@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.controller.ts
+// [19/10/2026] v+ — compte à deux profils : le rôle (client / conducteur) se déduit de l'appartenance de l'envoi ; pas d'auto-transport (SelfDealingService).
 // [19/10/2026] v6 — GET/POST /:id/documents réservés à l'expéditeur, au conducteur de l'envoi et au personnel autorisé (ShipmentAccessService).
 // [16/10/2026] v5 — le personnel Support ne voit plus la commission (platformFee) : voir common/utils/platform-earnings.ts.
 // [09/10/2026] v4 — invitations : le client cherche des conducteurs (/:id/drivers) et les invite (/:id/invitations) ; le conducteur répond (/invitations/…).
@@ -6,7 +7,7 @@
 // [21/09/2026] v2 — /quote, /extend, /available réservé aux conducteurs validés, assign = acceptation.
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AccountType, CancellationInitiator } from '@prisma/client';
+import { CancellationInitiator } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
@@ -33,6 +34,7 @@ import { SearchShipmentDriversDto } from './dto/search-shipment-drivers.dto';
 import { InviteShipmentDriversDto } from './dto/invite-shipment-drivers.dto';
 import { hideContactsOnceDelivered } from './shipment-views';
 import { UserBlocksService } from '../user-safety/user-blocks.service';
+import { SelfDealingService } from '../account-roles/self-dealing.service';
 
 @ApiTags('Envois')
 @ApiBearerAuth()
@@ -47,6 +49,7 @@ export class ShipmentsController {
     private readonly scope: CountryScopeService,
     private readonly userBlocks: UserBlocksService,
     private readonly access: ShipmentAccessService,
+    private readonly selfDealing: SelfDealingService,
   ) {}
 
   @Get('mine')
@@ -83,6 +86,7 @@ export class ShipmentsController {
   @Post('invitations/:invitationId/accept')
   async acceptInvitation(@Param('invitationId') invitationId: string, @CurrentUser() user: AuthenticatedUser) {
     await this.userBlocks.assertCanAcceptInvitation(user.id, invitationId);
+    await this.selfDealing.assertNotOwnInvitation(user.id, invitationId);
     return this.invitations.accept(invitationId, user.id);
   }
 
@@ -144,7 +148,7 @@ export class ShipmentsController {
       const isOwningCustomer = customer?.id === shipment.customerId;
 
       let isOwningDriver = false;
-      if (!isOwningCustomer && user.accountType === AccountType.DRIVER && shipment.driverId) {
+      if (!isOwningCustomer && shipment.driverId) {
         const driverId = await this.driverProfilesService
           .getProfileIdForUser(user.id)
           .catch(() => null);
@@ -165,6 +169,8 @@ export class ShipmentsController {
   @Post(':id/assign')
   async assign(@Param('id') id: string, @Body() dto: AssignShipmentDto, @CurrentUser() user: AuthenticatedUser) {
     await this.userBlocks.assertCanAcceptShipment(user.id, id);
+    // Un client qui est aussi conducteur ne transporte pas son propre envoi.
+    await this.selfDealing.assertNotOwnShipment(user.id, id);
     return this.shipmentsService.accept(id, user.id, dto.tripId);
   }
 
@@ -181,9 +187,13 @@ export class ShipmentsController {
     @Body() dto: CancelShipmentDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    if (user.accountType === AccountType.DRIVER) {
-      const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
-      return this.shipmentsService.cancel(id, dto.reason, CancellationInitiator.DRIVER, { driverId });
+    // Annule-t-il en tant que conducteur de cet envoi, ou en tant que client ? Se déduit des profils : un compte peut avoir les deux.
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id).catch(() => null);
+    if (driverId) {
+      const shipment = await this.shipmentsService.findOne(id);
+      if (shipment.driverId === driverId) {
+        return this.shipmentsService.cancel(id, dto.reason, CancellationInitiator.DRIVER, { driverId });
+      }
     }
     const customer = await this.customerProfilesService.findByUserId(user.id);
     return this.shipmentsService.cancel(id, dto.reason, CancellationInitiator.CUSTOMER, {

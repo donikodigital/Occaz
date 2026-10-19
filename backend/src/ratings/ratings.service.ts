@@ -1,4 +1,5 @@
 // backend/src/ratings/ratings.service.ts
+// [19/10/2026] v+ — refuse la note d'un compte qui serait à la fois le client et le conducteur de la prestation.
 // [22/09/2026] v3 — findGivenByUser() : « Mes avis », les notations données par l'utilisateur (et non reçues).
 // [21/09/2026] v2 — note d'un envoi via Shipment.driverId.
 import {
@@ -248,6 +249,10 @@ export class RatingsService {
     customerUserId: string,
     driverUserId: string,
   ): { role: RatingRole; fromUserId: string; toUserId: string } {
+    // Compte à deux profils : on ne se note pas soi-même (avis fictif).
+    if (customerUserId === driverUserId) {
+      throw new ForbiddenException('Vous ne pouvez pas vous noter vous-même.');
+    }
     if (raterUserId === customerUserId) {
       return { role: RatingRole.CUSTOMER_TO_DRIVER, fromUserId: customerUserId, toUserId: driverUserId };
     }

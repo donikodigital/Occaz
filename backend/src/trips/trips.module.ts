@@ -1,4 +1,5 @@
 // backend/src/trips/trips.module.ts
+// [19/10/2026] v7 — AccountRolesModule (SelfDealingService : pas de réservation de son propre trajet).
 // [11/10/2026] v6 — TripReminderService (rappels de départ), UserSafetyModule (blocages).
 // [09/10/2026] v5 — TripArrivalService (notifications et codes envoyés à chaque arrivée du conducteur).
 // [23/09/2026] v4 — TripExpiryService (trajets publiés sans réservation, dont le départ est dépassé).
@@ -25,6 +26,7 @@ import { PromoCodesModule } from '../promo-codes/promo-codes.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TripPricingModule } from '../trip-pricing/trip-pricing.module';
 import { UserSafetyModule } from '../user-safety/user-safety.module';
+import { AccountRolesModule } from '../account-roles/account-roles.module';
 
 /**
  * Trip, Booking et TripOtp partagent un seul module : Booking ne peut pas
@@ -45,6 +47,7 @@ import { UserSafetyModule } from '../user-safety/user-safety.module';
     NotificationsModule,
     TripPricingModule,
     UserSafetyModule,
+    AccountRolesModule,
   ],
   controllers: [TripsController, BookingsController],
   providers: [TripsService, BookingsService, TripOtpService, TripArrivalService, BookingExpiryService, TripExpiryService, TripReminderService],

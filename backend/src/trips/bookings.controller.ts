@@ -1,7 +1,7 @@
 // backend/src/trips/bookings.controller.ts
+// [19/10/2026] v+ — un conducteur ne réserve pas son propre trajet (SelfDealingService) ; le rôle se déduit des profils, plus du type de compte.
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AccountType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
@@ -18,6 +18,7 @@ import { DriverProfilesService } from '../profiles/driver-profiles/driver-profil
 import { TripOtpService } from './trip-otp.service';
 import { hideContactsOnceCompleted } from './booking-contacts';
 import { UserBlocksService } from '../user-safety/user-blocks.service';
+import { SelfDealingService } from '../account-roles/self-dealing.service';
 
 @ApiTags('Réservations')
 @ApiBearerAuth()
@@ -30,6 +31,7 @@ export class BookingsController {
     private readonly tripOtpService: TripOtpService,
     private readonly scope: CountryScopeService,
     private readonly userBlocks: UserBlocksService,
+    private readonly selfDealing: SelfDealingService,
   ) {}
 
   @Get('mine')
@@ -43,6 +45,8 @@ export class BookingsController {
     const customer = await this.customerProfilesService.findByUserId(user.id);
     // Blocage dans un sens ou dans l'autre : pas de réservation chez ce conducteur.
     await this.userBlocks.assertCanBookTrip(user.id, dto.tripId);
+    // Un conducteur qui a aussi un profil passager ne réserve pas son propre trajet.
+    await this.selfDealing.assertNotOwnTrip(user.id, dto.tripId);
     return this.bookingsService.create(customer.id, dto);
   }
 
@@ -64,7 +68,7 @@ export class BookingsController {
       const isOwningCustomer = customer?.id === booking.customerId;
 
       let isOwningDriver = false;
-      if (!isOwningCustomer && user.accountType === AccountType.DRIVER) {
+      if (!isOwningCustomer) {
         const driverId = await this.driverProfilesService
           .getProfileIdForUser(user.id)
           .catch(() => null);

@@ -1,4 +1,5 @@
 // mobile/app/(customer)/(tabs)/profile.tsx
+// [19/10/2026] v+ — section « Mes espaces » (passer d'un espace à l'autre avec le même compte) et rappel d'ajouter une adresse e-mail.
 // v7 — Sections Promotions (codes promo, parrainage, bons plans) et Actualités/Cartes bancaires ajoutées, maintenant que ces écrans existent.
 // v6 — Refonte : cet onglet affiche désormais un menu (à la CityGo) plutôt
 // que directement la fiche de profil détaillée — celle-ci a déménagé sur
@@ -32,6 +33,8 @@ import { OceanButton, OceanCard, OceanHeroCard, OceanSection } from '@/component
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useAuthStore } from '@/stores/authStore';
+import { SpaceSwitchSection } from '@/components/screens/SpaceSwitchSection';
+import { AddEmailReminderCard } from '@/components/screens/AddEmailReminderCard';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 
 interface MenuRowProps {
@@ -91,6 +94,10 @@ export default function CustomerMenuScreen() {
           <IconChevronRight size={18} color={OCEAN.sky} />
         </OceanHeroCard>
       </Pressable>
+
+      <AddEmailReminderCard space="CUSTOMER" />
+
+      <SpaceSwitchSection current="CUSTOMER" />
 
       <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Espace personnel">
         <MenuRow

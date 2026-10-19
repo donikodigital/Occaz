@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/home.tsx
+// [19/10/2026] v13 — bandeau de régularisation du dossier (jours restants, pièces manquantes) à la place du texte fixe « en cours de vérification » ; rappel d'ajouter une adresse e-mail.
 // [09/10/2026] v12 — bannière clignotante « Un client vous invite » quand un client demande au conducteur de prendre son colis (ShipmentInvitationBanner).
 // [08/10/2026] v11 — (1) la carte de la route s'affiche enfin : GET /trips/mine ne renvoie pas les adresses (donc pas de coordonnées), le trajet
 // affiché est maintenant relu en détail (useTrip) ; (2) le « prochain trajet » est le plus PROCHE dans le temps (la liste arrive triée du
@@ -67,6 +68,8 @@ import { useMyWallet } from '@/hooks/useWallet';
 import { useLatestMessageAlert, useMarkNotificationRead, useMyNotifications } from '@/hooks/useNotifications';
 import { MessageAlertCard } from '@/components/screens/MessageAlertCard';
 import { ShipmentInvitationBanner } from '@/components/screens/ShipmentInvitationBanner';
+import { DriverComplianceBanner } from '@/components/screens/DriverComplianceBanner';
+import { AddEmailReminderCard } from '@/components/screens/AddEmailReminderCard';
 import { useMyInvitations } from '@/hooks/useShipmentInvitations';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { formatMoney } from '@/utils/money';
@@ -189,6 +192,8 @@ export default function DriverHomeScreen() {
             </View>
           ) : null}
 
+          <AddEmailReminderCard space="DRIVER" />
+
           {messageAlert ? (
             <View style={styles.block}>
               <MessageAlertCard
@@ -207,15 +212,19 @@ export default function DriverHomeScreen() {
             </View>
           ) : null}
 
-          {profile && profile.status !== 'VALIDATED' ? (
+          {profile && (profile.status === 'PENDING' || profile.status === 'IN_VERIFICATION') ? (
+            <View style={styles.block}>
+              <DriverComplianceBanner />
+            </View>
+          ) : null}
+
+          {profile && profile.status !== 'VALIDATED' && profile.status !== 'PENDING' && profile.status !== 'IN_VERIFICATION' ? (
             <Card style={[styles.statusBanner, styles.block]}>
               <IconAlertTriangle size={18} color={colors.accentDark} />
               <AppText variant="sm" color={colors.accentDark} style={{ flex: 1 }}>
-                {profile.status === 'PENDING'
-                  ? 'Votre profil est en cours de vérification par notre équipe.'
-                  : profile.status === 'SUSPENDED'
-                    ? 'Votre compte est suspendu — contactez le support.'
-                    : 'Votre dossier a été rejeté — contactez le support pour en savoir plus.'}
+                {profile.status === 'SUSPENDED'
+                  ? 'Votre compte est suspendu — contactez le support.'
+                  : 'Votre dossier a été rejeté — contactez le support pour en savoir plus.'}
               </AppText>
             </Card>
           ) : null}

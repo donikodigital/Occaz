@@ -1,10 +1,12 @@
 // mobile/src/stores/authStore.ts
+// [19/10/2026] v+ — la déconnexion vide aussi l'espace actif (activeSpaceStore).
 import { create } from 'zustand';
 import { authApi } from '@/services/api/auth.api';
 import { usersApi } from '@/services/api/users.api';
 import { registerSessionExpiredHandler } from '@/services/api/client';
 import { ApiError } from '@/services/api/ApiError';
 import { secureStorage } from '@/services/storage/secureStorage';
+import { useActiveSpaceStore } from '@/stores/activeSpaceStore';
 import type { AuthResult, SafeUser } from '@/types/auth.types';
 
 interface AuthState {
@@ -57,10 +59,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     await authApi.logout().catch(() => undefined);
     await secureStorage.clearTokens();
+    useActiveSpaceStore.getState().setSpace(null);
     set({ user: null, isAuthenticated: false });
   },
 
   clearSession: () => {
+    useActiveSpaceStore.getState().setSpace(null);
     set({ user: null, isAuthenticated: false });
   },
 }));

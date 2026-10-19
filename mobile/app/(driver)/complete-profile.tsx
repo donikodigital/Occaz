@@ -1,4 +1,5 @@
 // mobile/app/(driver)/complete-profile.tsx
+// [19/10/2026] v+ — reprend nom, pays et ville du profil passager quand un passager devient conducteur ; l'étape des pièces rappelle le délai de régularisation.
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
@@ -7,6 +8,7 @@ import { AppText, Button, Card, DocumentUploadField, ProfilePhotoField, ScreenCo
 import { CountrySelectField } from '@/components/screens/CountrySelectField';
 import { colors, spacing } from '@/theme';
 import { useCreateDriverProfile } from '@/hooks/useDriverProfile';
+import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useDriverDocumentUpload, useMyDriverDocuments } from '@/hooks/useDriverDocuments';
 import { useDriverPhotoUpload } from '@/hooks/useDriverPhotoUpload';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
@@ -34,7 +36,7 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
         Vos pièces d&apos;identité
       </AppText>
       <AppText variant="base" color="textSecondary" style={styles.subtitle}>
-        Envoyez votre photo de profil, votre CNI et votre permis de conduire pour que votre compte soit validé.
+        Envoyez votre photo de profil, votre CNI et votre permis de conduire pour que votre compte soit validé. Vous pouvez créer des trajets de passagers dès maintenant, mais les pièces doivent être envoyées dans la semaine : vous recevrez des rappels tous les 2 jours.
       </AppText>
 
       <ProfilePhotoField
@@ -101,6 +103,16 @@ export default function DriverCompleteProfileScreen() {
       consumeCitySelection();
     }
   }, [citySelection, consumeCitySelection]);
+
+  // Un passager qui devient conducteur : son nom, son pays et sa ville sont repris de son profil passager.
+  const { data: customerProfile } = useCustomerProfile();
+  useEffect(() => {
+    if (!customerProfile) return;
+    setFirstName((current) => current || customerProfile.firstName);
+    setLastName((current) => current || customerProfile.lastName);
+    setCountry((current) => current ?? customerProfile.country);
+    setCity((current) => current ?? customerProfile.city);
+  }, [customerProfile]);
 
   if (isProfileCreated) {
     return <IdentityDocumentsStep firstName={firstName} lastName={lastName} />;

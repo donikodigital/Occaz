@@ -1,4 +1,5 @@
 // backend/src/profiles/driver-profiles/driver-profiles.service.ts
+// [19/10/2026] v+ — createForUser accepte aussi un compte client (compte à deux profils).
 import {
   BadRequestException,
   ConflictException,
@@ -80,9 +81,10 @@ export class DriverProfilesService {
     accountType: AccountType,
     dto: CreateDriverProfileDto,
   ) {
-    if (accountType !== AccountType.DRIVER) {
+    // Un compte client peut aussi devenir conducteur (voir AccountRolesService) ; seule l'équipe du back-office en est exclue.
+    if (accountType !== AccountType.DRIVER && accountType !== AccountType.CUSTOMER) {
       throw new ConflictException(
-        "Seul un compte de type DRIVER peut créer un profil conducteur.",
+        "Seul un compte client ou conducteur peut créer un profil conducteur.",
       );
     }
     const existing = await this.prisma.driverProfile.findUnique({ where: { userId } });
