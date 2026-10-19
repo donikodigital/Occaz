@@ -92,14 +92,10 @@
     ],
     "extra": {
       "apiUrl": "https://api.transport-partage.example.com/api/v1",
-      "router": {},
-      "eas": {
-        "projectId": "b13ae6b7-f4d4-4f84-8cc5-22875d1dd2d9"
-      }
+      "router": {}
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "owner": "digital-occaz-app"
+    }
   }
 }
