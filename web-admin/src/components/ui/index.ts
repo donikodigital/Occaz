@@ -1,4 +1,5 @@
 // web-admin/src/components/ui/index.ts
+// [19/10/2026] Export de Table retiré : le composant Table.tsx est supprimé (le back-office n'utilise que des cartes, jamais de tableaux).
 export { Button } from './Button';
 export type { ButtonVariant, ButtonProps } from './Button';
 export { Card } from './Card';
@@ -15,7 +16,6 @@ export { Select } from './Select';
 export type { SelectProps } from './Select';
 export { Switch } from './Switch';
 export type { SwitchProps } from './Switch';
-export { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from './Table';
 export { Modal } from './Modal';
 export type { ModalProps } from './Modal';
 export { Disclosure } from './Disclosure';
