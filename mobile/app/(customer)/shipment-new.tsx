@@ -1,4 +1,6 @@
 // mobile/app/(customer)/shipment-new.tsx
+// [19/10/2026] v10 — Étape « Photos du colis » (facultative, 2 photos au plus : appareil photo ou galerie) avant la période. Les photos
+// partent au stockage dès qu'elles sont prises ; l'envoi n'est validé qu'une fois elles toutes arrivées (clés `photoKeys` envoyées à la création).
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [10/10/2026] v9 — Étape Destinataire : e-mail facultatif. Avec lui, le destinataire reçoit le suivi de son colis (prise en charge, route, livraison) sans compte.
 // [10/10/2026] v8 — Colis par colis : avec 2 colis ou plus, après l'étape « Colis » (catégorie, quantité, urgence) vient UNE ÉTAPE PAR COLIS
@@ -31,6 +33,7 @@ import {
   IconAdjustmentsHorizontal,
   IconAlertCircle,
   IconCalendarEvent,
+  IconCamera,
   IconCheck,
   IconChevronRight,
   IconDiscount2,
@@ -56,11 +59,13 @@ import { ShipmentQuoteCard } from '@/components/screens/ShipmentQuoteCard';
 import { ShipmentParcelCosts } from '@/components/screens/ShipmentParcelCosts';
 import { ShipmentWindowField, toShipmentWindow } from '@/components/screens/ShipmentWindowField';
 import { PromoCodeField } from '@/components/screens/PromoCodeField';
+import { ParcelPhotosField } from '@/components/screens/ParcelPhotosField';
 import { LockedField } from '@/components/screens/LockedField';
 import { Disclosure, FormAccordionSection, WizardNav, WizardProgress, type StepStatus } from '@/components/screens/FormAccordion';
 import { useShipmentCategories } from '@/hooks/useShipmentCategories';
 import { useCreateShipment, useShipmentQuote } from '@/hooks/useShipments';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
+import { useParcelPhotoDrafts } from '@/hooks/useShipmentPhotos';
 import { useAuthStore } from '@/stores/authStore';
 import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
@@ -118,8 +123,8 @@ function AddressCard({
   );
 }
 
-/** Étapes : expéditeur, destinataire, colis (catégorie, quantité), un écran par colis si plusieurs (`parcel-0`, `parcel-1`…), période. */
-type SectionKey = 'sender' | 'recipient' | 'parcel' | `parcel-${number}` | 'window';
+/** Étapes : expéditeur, destinataire, colis (catégorie, quantité), un écran par colis si plusieurs (`parcel-0`, `parcel-1`…), photos, période. */
+type SectionKey = 'sender' | 'recipient' | 'parcel' | `parcel-${number}` | 'photos' | 'window';
 
 /** Ce que la personne saisit pour UN colis — tout en texte tant qu'elle tape. */
 interface ParcelDraft {
@@ -355,6 +360,8 @@ export default function NewShipmentScreen() {
   const [windowStart, setWindowStart] = useState<Date | null>(null);
   const [windowEnd, setWindowEnd] = useState<Date | null>(null);
   const [isUrgent, setIsUrgent] = useState(false);
+  // Photos du colis (2 au plus), envoyées au stockage dès qu'elles sont prises.
+  const photoDrafts = useParcelPhotoDrafts();
   const [promoCode, setPromoCode] = useState<string | undefined>();
   const [promoDiscount, setPromoDiscount] = useState<string | undefined>();
   // Étape affichée (une seule à la fois) et dernière erreur de validation, rattachée à son étape quand elle en a une.
@@ -438,6 +445,7 @@ export default function NewShipmentScreen() {
       'recipient',
       'parcel',
       ...(quantity > 1 ? parcels.map((_, index): SectionKey => `parcel-${index}`) : []),
+      'photos',
       'window',
     ],
     [quantity, parcels],
@@ -449,11 +457,14 @@ export default function NewShipmentScreen() {
   // Un seul colis : ses mesures se saisissent dans l'étape « Colis ». Plusieurs : chacun a la sienne.
   const parcelDone = categoryId !== null && (quantity > 1 || parcelIsValid(parcels[0]));
   const windowDone = windowStart !== null && windowEnd !== null;
+  // Facultatives : l'étape est « bonne » sans photo, mais pas pendant un envoi en cours ni après un échec non réglé.
+  const photosDone = !photoDrafts.isUploading && !photoDrafts.hasFailed;
   function isDone(key: SectionKey): boolean {
     if (key === 'sender') return senderDone;
     if (key === 'recipient') return recipientDone;
     if (key === 'parcel') return parcelDone;
     if (key === 'window') return windowDone;
+    if (key === 'photos') return photosDone;
     const parcel = parcels[Number(key.slice('parcel-'.length))];
     return parcel ? parcelIsValid(parcel) : false;
   }
@@ -519,6 +530,15 @@ export default function NewShipmentScreen() {
         return false;
       }
       if (quantity === 1 && !validateParcel(0, 'parcel')) return false;
+    } else if (key === 'photos') {
+      if (photoDrafts.isUploading) {
+        fail('photos', "Patientez : une photo est encore en cours d'envoi.");
+        return false;
+      }
+      if (photoDrafts.hasFailed) {
+        fail('photos', "Une photo n'a pas pu être envoyée : touchez-la pour réessayer, ou retirez-la.");
+        return false;
+      }
     } else if (key === 'window') {
       if (!windowStart || !windowEnd) {
         fail('window', 'Indiquez la période pendant laquelle le colis peut partir.');
@@ -546,7 +566,7 @@ export default function NewShipmentScreen() {
   const pickupPlace = senderLocation ? formatCityCountry(senderLocation) : null;
   const deliveryPlace = recipientLocation ? formatCityCountry(recipientLocation) : null;
   const totalWeight = Math.round(validParcels.reduce((sum, parcel) => sum + toNumber(parcel.weight), 0) * 1000) / 1000;
-  const summaries: Record<'sender' | 'recipient' | 'parcel' | 'window', string> = {
+  const summaries: Record<'sender' | 'recipient' | 'parcel' | 'photos' | 'window', string> = {
     sender: senderLocation
       ? `${senderLocation.label}${pickupPlace ? ` · ${pickupPlace}` : ''}`
       : 'Adresse de récupération à choisir',
@@ -562,6 +582,7 @@ export default function NewShipmentScreen() {
       : quantity > 1
         ? 'Catégorie et nombre de colis'
         : 'Catégorie et poids à indiquer',
+    photos: photoDrafts.photos.length === 0 ? 'Aucune photo (facultatif)' : `${photoDrafts.photos.length} photo${photoDrafts.photos.length > 1 ? 's' : ''}`,
     window: windowStart && windowEnd ? formatWindow(toShipmentWindow(windowStart, windowEnd)) : 'Dates à choisir',
   };
 
@@ -636,6 +657,7 @@ export default function NewShipmentScreen() {
         isUrgent,
         ...toShipmentWindow(windowStart, windowEnd),
         promoCode,
+        photoKeys: photoDrafts.readyKeys.length > 0 ? photoDrafts.readyKeys : undefined,
       },
       {
         onSuccess: (shipment) =>
@@ -910,7 +932,24 @@ export default function NewShipmentScreen() {
         </FormAccordionSection>
       ) : null}
 
-      {/* 4 — Période */}
+      {/* 4 — Photos du colis (facultatif) */}
+      {currentKey === 'photos' ? (
+        <FormAccordionSection
+          step={steps.indexOf('photos') + 1}
+          total={steps.length}
+          icon={<IconCamera size={15} color={OCEAN.base} />}
+          title="Photos du colis"
+          summary={summaries.photos}
+          status={statusOf('photos')}
+          expanded
+          collapsible={false}
+          onToggle={noop}
+        >
+          <ParcelPhotosField drafts={photoDrafts} />
+        </FormAccordionSection>
+      ) : null}
+
+      {/* 5 — Période */}
       {currentKey === 'window' ? (
         <FormAccordionSection
           step={steps.length}

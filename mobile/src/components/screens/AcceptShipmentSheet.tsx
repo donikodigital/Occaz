@@ -15,6 +15,7 @@ import { driverNetAmount, formatDimensions, formatWindow, getEligibleTrips, isSa
 import type { AvailableShipment } from '@/types/shipments.types';
 import type { Trip } from '@/types/trips.types';
 import { FactChip, ShipmentRoute } from './ShipmentParts';
+import { ShipmentPhotosGallery } from './ShipmentPhotosGallery';
 
 export interface AcceptShipmentSheetProps {
   shipment: AvailableShipment | null;
@@ -191,6 +192,8 @@ function AcceptShipmentContent({
                 {shipment.description}
               </AppText>
             ) : null}
+
+            <ShipmentPhotosGallery shipmentId={shipment.id} variant="plain" />
 
             <View style={styles.privacy}>
               <IconLock size={14} color={colors.textSecondary} />

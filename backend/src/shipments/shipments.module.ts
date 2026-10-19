@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.module.ts
+// [19/10/2026] v6 — photos du colis (ShipmentPhotosService, ShipmentPhotosController, StorageModule).
 // [19/10/2026] v5 — ShipmentAccessService (accès aux preuves d'un envoi).
 // [09/10/2026] v4 — ShipmentInvitationsService (le client invite des conducteurs).
 // [23/09/2026] v3 — PromoCodesModule (code promo à la création d'un envoi).
@@ -10,6 +11,9 @@ import { ShipmentOtpService } from './shipment-otp.service';
 import { ShipmentDispatchService } from './shipment-dispatch.service';
 import { ShipmentWindowService } from './shipment-window.service';
 import { ShipmentAccessService } from './shipment-access.service';
+import { ShipmentPhotosService } from './shipment-photos.service';
+import { ShipmentPhotosController } from './shipment-photos.controller';
+import { StorageModule } from '../storage/storage.module';
 import { ShipmentInvitationsService } from './shipment-invitations.service';
 import { ShipmentCategoriesModule } from '../shipment-categories/shipment-categories.module';
 import { DocumentsModule } from '../documents/documents.module';
@@ -35,9 +39,10 @@ import { UserSafetyModule } from '../user-safety/user-safety.module';
     NotificationsModule,
     PromoCodesModule,
     UserSafetyModule,
+    StorageModule,
   ],
-  controllers: [ShipmentsController],
-  providers: [ShipmentsService, ShipmentOtpService, ShipmentDispatchService, ShipmentWindowService, ShipmentInvitationsService, ShipmentAccessService],
+  controllers: [ShipmentsController, ShipmentPhotosController],
+  providers: [ShipmentsService, ShipmentOtpService, ShipmentDispatchService, ShipmentWindowService, ShipmentInvitationsService, ShipmentAccessService, ShipmentPhotosService],
   exports: [ShipmentsService, ShipmentOtpService, ShipmentWindowService],
 })
 export class ShipmentsModule {}

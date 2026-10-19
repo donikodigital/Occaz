@@ -1,4 +1,5 @@
 // web-admin/src/types/shipments.types.ts
+// [19/10/2026] v3 — ShipmentPhoto : photos du colis (URL signées de 5 minutes).
 // [21/09/2026] v2 — conducteur direct (avec ou sans trajet), types de la liste et du détail admin des envois.
 import type { Money } from '@/services/api/types';
 
@@ -95,4 +96,11 @@ export interface AdminShipmentDetail extends AdminShipmentListItem {
   cancelledBy: string | null;
   cancellationReason: string | null;
   tracking?: ShipmentTrackingEntry[];
+}
+
+/** Photo du colis (2 au plus) prise par l'expéditeur : une URL signée, valable quelques minutes. */
+export interface ShipmentPhoto {
+  id: string;
+  url: string;
+  expiresInSeconds: number;
 }

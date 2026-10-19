@@ -40,6 +40,7 @@ import {
 import { ShipmentExtensionCard } from '@/components/screens/ShipmentExtensionCard';
 import { ContactRow } from '@/components/screens/ContactRow';
 import { ShipmentParcelsSection } from '@/components/screens/ShipmentParcelsSection';
+import { ShipmentPhotosGallery } from '@/components/screens/ShipmentPhotosGallery';
 import { PdfDownloadButton } from '@/components/screens/PdfDownloadButton';
 import { OtpCodeCard } from '@/components/screens/OtpCodeCard';
 import { colors, spacing } from '@/theme';
@@ -330,6 +331,8 @@ export default function ShipmentDetailScreen() {
           label={shipment.quantity > 1 ? `Télécharger les ${shipment.quantity} étiquettes (PDF)` : "Télécharger l'étiquette (PDF)"}
         />
       ) : null}
+
+      <ShipmentPhotosGallery shipmentId={shipment.id} />
 
       {showDetails ? (
         <>

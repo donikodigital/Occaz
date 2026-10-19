@@ -35,6 +35,7 @@ import {
 import { AppText, ConfirmDialog, ScreenContainer, TextField } from '@/components/ui';
 import { ContactRow } from '@/components/screens/ContactRow';
 import { ShipmentParcelsSection } from '@/components/screens/ShipmentParcelsSection';
+import { ShipmentPhotosGallery } from '@/components/screens/ShipmentPhotosGallery';
 import { TicketScanButton } from '@/components/screens/TicketScanner';
 import { SosButton } from '@/components/safety/SosButton';
 import { OceanButton, OceanCard, OceanPill, OceanScreenHeader, OceanSection, type OceanPillTone } from '@/components/ocean/OceanKit';
@@ -534,6 +535,9 @@ export default function DriverShipmentDetailScreen() {
           }
         />
       ) : null}
+
+      {/* Photos du colis : toujours visibles, pour reconnaître le colis à la récupération */}
+      <ShipmentPhotosGallery shipmentId={shipment.id} />
 
       {/* La personne concernée par cette étape ; les deux fiches complètes sont sous « Voir tous les détails » */}
       {!showDetails && meetSender && !contactsClosed ? (

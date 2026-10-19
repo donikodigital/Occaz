@@ -1,5 +1,6 @@
 // web-admin/src/app/(app)/shipments/[id]/page.tsx
 //
+// [19/10/2026] v3 — carte « Photos du colis » (2 au plus, prises par l'expéditeur).
 // [16/10/2026] v2 — le service client voit ce que le client a payé, pas la commission ni le gain du conducteur (réservés à l'administration).
 // v1 — Détail d'un envoi pour l'équipe : montants (payé, gain du conducteur,
 // commission), période demandée, expéditeur et destinataire, colis, conducteur
@@ -12,6 +13,7 @@ import React from 'react';
 import { useParams } from 'next/navigation';
 import { IconPackage } from '@tabler/icons-react';
 import { BackHeader, Chip, Notice, SectionCard } from '@/components/admin/AdminUi';
+import { ShipmentPhotosCard } from '@/components/admin/ShipmentPhotosCard';
 import { useShipmentDetail } from '@/hooks/useShipments';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatMoney } from '@/utils/money';
@@ -177,6 +179,8 @@ export default function ShipmentDetailPage() {
         {shipment.description ? <Field label="Description">{shipment.description}</Field> : null}
         {shipment.instructions ? <Field label="Consignes">{shipment.instructions}</Field> : null}
       </SectionCard>
+
+      <ShipmentPhotosCard shipmentId={shipment.id} />
 
       <SectionCard title="Conducteur">
         {shipment.driver ? (

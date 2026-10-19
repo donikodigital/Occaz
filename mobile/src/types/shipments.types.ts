@@ -1,4 +1,5 @@
 // mobile/src/types/shipments.types.ts
+// [19/10/2026] v6 — photoKeys (facultatif) sur CreateShipmentPayload : 2 photos du colis au plus.
 // [10/10/2026] v5 — recipientEmail (facultatif) : le destinataire reçoit le suivi par e-mail.
 // [09/10/2026] v4 — invitations de conducteurs : DriverSearchResult, ShipmentInvitationSummary, DriverInvitation.
 // [23/09/2026] v3 — champ promoCode facultatif sur CreateShipmentPayload.
@@ -171,6 +172,8 @@ export interface CreateShipmentPayload {
   windowEnd: string;
   /** Code promo à appliquer, s'il y en a un — voir /promo-codes/validate pour l'aperçu avant envoi. */
   promoCode?: string;
+  /** Photos du colis (2 au plus) : les clés de stockage renvoyées par POST /shipments/photos/upload-url, après le dépôt des fichiers. */
+  photoKeys?: string[];
 }
 
 /** Ce qui entre dans le calcul du prix — sert au devis affiché avant paiement. */

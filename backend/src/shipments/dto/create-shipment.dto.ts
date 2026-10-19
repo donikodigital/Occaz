@@ -1,9 +1,10 @@
 // backend/src/shipments/dto/create-shipment.dto.ts
+// [19/10/2026] v4 — photoKeys : 2 photos du colis au plus, déposées d'avance via POST /shipments/photos/upload-url.
 // [23/09/2026] v3 — champ promoCode facultatif.
 // [21/09/2026] v2 — plage de dates obligatoire ; champs de prix hérités de QuoteShipmentDto.
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsDateString, IsEmail, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsDateString, IsEmail, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { ShipmentItemInputDto } from './shipment-item-input.dto';
 import { QuoteShipmentDto } from './quote-shipment.dto';
 
@@ -82,6 +83,17 @@ export class CreateShipmentDto extends QuoteShipmentDto {
   @ValidateNested({ each: true })
   @Type(() => ShipmentItemInputDto)
   items?: ShipmentItemInputDto[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      "Photos du colis (2 au plus) : les `storageKey` renvoyés par POST /shipments/photos/upload-url, après le dépôt des fichiers. Visibles de l'expéditeur, du conducteur et du support.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(2, { message: 'Vous pouvez joindre 2 photos au plus.' })
+  @IsString({ each: true })
+  photoKeys?: string[];
 
   @ApiPropertyOptional({ description: 'Code promo à appliquer, s’il y en a un.' })
   @IsOptional()

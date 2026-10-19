@@ -1,6 +1,7 @@
 // backend/src/shipments/shipments.service.ts
 // [10/10/2026] v6 — saisie colis par colis : `parcels` (poids, dimensions, valeur de chacun) ; le serveur en tire quantité, poids total et
 // valeur déclarée totale, calcule le prix de chaque colis (devis : `parcels`, `urgentSurcharge`) et enregistre chaque colis (ShipmentItem).
+// [19/10/2026] v6 — create() rattache les photos du colis (photoKeys) à l'envoi, dans la même transaction.
 // [03/10/2026] v5 — colis et villes traversées : « Colis sur mon trajet » (findAvailable avec tripId) ne garde que les envois
 // dont le ramassage précède la livraison sur la route du trajet (étapes comprises), et l'acceptation avec un trajet vérifie
 // la même chose — le passage au ramassage (ex. Kindia) doit tomber dans la plage de dates du client.
@@ -32,6 +33,7 @@ import { PricingService } from '../pricing/pricing.service';
 import { WalletsService } from '../wallets/wallets.service';
 import { ShipmentCategoriesService } from '../shipment-categories/shipment-categories.service';
 import { DocumentsService } from '../documents/documents.service';
+import { PARCEL_PHOTO_TYPE, validateParcelPhotoKeys } from './shipment-photos.util';
 import { CreateDocumentDto } from '../documents/dto/create-document.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PromoCodesService } from '../promo-codes/promo-codes.service';
@@ -294,6 +296,8 @@ export class ShipmentsService {
   async create(customerId: string, dto: CreateShipmentDto) {
     const { senderName, senderPhone } = await this.senderIdentityOf(customerId);
     const { start: windowStart, end: windowEnd } = this.parseWindow(dto.windowStart, dto.windowEnd);
+    // Photos du colis : validées AVANT toute écriture (2 au plus, fabriquées pour ce client).
+    const photoKeys = validateParcelPhotoKeys(customerId, dto.photoKeys);
     const { declaredValue, senderLocation, quote, currencyId, parcels, weightKg, quantity, dimensions } = await this.buildQuote(dto);
 
     // Un seul montant pour le client : c'est le prix calculé. La commission
@@ -432,6 +436,20 @@ export class ShipmentsService {
             label: item.label,
             weightKg: item.weightKg,
             photoUrl: item.photoUrl,
+          })),
+        });
+      }
+
+      if (photoKeys.length > 0) {
+        const photosBaseTime = Date.now();
+        await tx.document.createMany({
+          data: photoKeys.map((storageKey, index) => ({
+            ownerType: DocumentOwnerType.SHIPMENT,
+            ownerId: shipment.id,
+            type: PARCEL_PHOTO_TYPE,
+            storageKey,
+            // Dates décalées d'une milliseconde : l'ordre pris au formulaire est l'ordre d'affichage.
+            createdAt: new Date(photosBaseTime + index),
           })),
         });
       }

@@ -16,6 +16,7 @@ function build(maxDeclaredValue: bigint | null = null) {
       findUnique: jest.fn().mockImplementation(({ where }) => Promise.resolve({ id: where.id })),
     },
     shipmentItem: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    document: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
     shipmentTracking: { create: jest.fn().mockResolvedValue({}) },
   };
   const prisma = {
@@ -126,5 +127,29 @@ describe('ShipmentsService.quote — colis par colis', () => {
       expect.objectContaining({ index: 2, weightKg: 1.5, price: 50_000n }),
     ]);
     expect(quote.urgentSurcharge).toBe(0n);
+  });
+});
+
+describe('ShipmentsService.create — photos du colis', () => {
+  const photo = (n: number) => `shipment-photo/cust1/0000000${n}-aaaa-bbbb-cccc-dddddddddddd.jpg`;
+
+  it('rattache les photos à l\'envoi dans la transaction, dans l\'ordre de la saisie', async () => {
+    const { service, tx } = build();
+    await service.create('cust1', dto({ photoKeys: [photo(1), photo(2)] }));
+    const rows = tx.document.createMany.mock.calls[0][0].data;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ ownerType: 'SHIPMENT', ownerId: 's1', type: 'parcel_photo', storageKey: photo(1) });
+    expect(rows[1]).toMatchObject({ storageKey: photo(2) });
+    expect(rows[0].createdAt.getTime()).toBeLessThan(rows[1].createdAt.getTime());
+  });
+  it('sans photo : aucune écriture de document', async () => {
+    const { service, tx } = build();
+    await service.create('cust1', dto());
+    expect(tx.document.createMany).not.toHaveBeenCalled();
+  });
+  it('refuse une photo d\'un autre client avant toute écriture', async () => {
+    const { service, tx } = build();
+    await expect(service.create('cust1', dto({ photoKeys: [photo(1).replace('cust1', 'cust2')] }))).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.shipment.create).not.toHaveBeenCalled();
   });
 });
