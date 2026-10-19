@@ -1,4 +1,11 @@
 // backend/src/common/utils/money.util.ts
+// [19/10/2026] v2 — une saisie invalide renvoie maintenant une erreur 400 claire (avant : Error simple => réponse 500 « Internal server error »),
+// et un montant démesuré est refusé avant d'atteindre la base (colonne BIGINT : 9 223 372 036 854 775 807 au maximum).
+import { BadRequestException } from '@nestjs/common';
+
+/** 15 chiffres au plus : très au-delà de tout montant réel (999 999 999 999 999) et très en deçà de la limite BIGINT. */
+export const MAX_MONEY_DIGITS = 15;
+
 /**
  * Toute somme d'argent transite en BigInt côté serveur/DB (plus petite
  * unité de la devise — voir en-tête de schema.prisma). Ces helpers
@@ -11,11 +18,21 @@
  * sans décimales) en BigInt. Rejette les valeurs non entières ou négatives.
  */
 export function toMoneyBigInt(value: number | string): bigint {
-  const asString = typeof value === 'number' ? value.toString() : value;
+  const asString = String(value ?? '');
   if (!/^\d+$/.test(asString)) {
-    throw new Error(`Montant invalide : "${asString}" doit être un entier positif.`);
+    throw new BadRequestException('Montant invalide : saisis un nombre entier positif, sans virgule ni signe.');
+  }
+  if (asString.replace(/^0+(?=\d)/, '').length > MAX_MONEY_DIGITS) {
+    throw new BadRequestException('Montant invalide : il est beaucoup trop grand.');
   }
   return BigInt(asString);
+}
+
+/** Comme toMoneyBigInt, mais exige un montant STRICTEMENT positif (retraits, remboursements : zéro n'a aucun sens). */
+export function toPositiveMoneyBigInt(value: number | string): bigint {
+  const amount = toMoneyBigInt(value);
+  if (amount <= 0n) throw new BadRequestException('Le montant doit être supérieur à zéro.');
+  return amount;
 }
 
 /** Formate un montant BigInt pour affichage/API (string, jamais number). */

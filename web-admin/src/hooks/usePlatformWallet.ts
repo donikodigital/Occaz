@@ -1,7 +1,7 @@
 // web-admin/src/hooks/usePlatformWallet.ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformWalletApi } from '@/services/api/platform-wallet.api';
-import type { BeneficiaryInput, PlatformWithdrawalStatus, WithdrawalInput } from '@/types/platform-wallet.types';
+import type { BeneficiaryInput, PlatformWithdrawalStatus, WithdrawalCodeRequest, WithdrawalInput } from '@/types/platform-wallet.types';
 
 export function usePlatformWallet() {
   return useQuery({
@@ -31,6 +31,11 @@ function useWalletInvalidation() {
       queryClient.invalidateQueries({ queryKey: ['platform-wallet'] }),
       queryClient.invalidateQueries({ queryKey: ['platform-withdrawals'] }),
     ]);
+}
+
+/** Étape 1 d'un retrait : envoie le code de confirmation par e-mail (ne change ni le solde ni l'historique). */
+export function useRequestWithdrawalCode() {
+  return useMutation({ mutationFn: (input: WithdrawalCodeRequest) => platformWalletApi.requestWithdrawalCode(input) });
 }
 
 export function useWithdrawCommissions() {

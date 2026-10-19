@@ -1,4 +1,6 @@
 // backend/src/shipments/shipment-otp.service.ts
+// [19/10/2026] v5 — Politique SMS : le code de RÉCUPÉRATION n'est plus envoyé par SMS à l'expéditeur (il a un compte) : une notification dans l'application
+// l'envoie vers « Voir mon code ». Le code de LIVRAISON part toujours par SMS vers le destinataire, qui n'a pas besoin de compte.
 // [10/10/2026] v4 — chaque étape visible du suivi (récupéré, en route, livraison imminente, livré) est annoncée par un événement, et la position du trajet est enregistrée dans l'historique.
 // [30/09/2026] v3 — requestDeliveryOtpForCustomer : l'expéditeur peut désormais revoir le code de livraison dans l'app, sur le modèle de requestPickupOtpForCustomer. Le destinataire continue de le recevoir par SMS.
 // [21/09/2026] v2 — propriété de l'envoi via Shipment.driverId.
@@ -135,10 +137,30 @@ export class ShipmentOtpService {
     if (shipment.status !== ShipmentStatus.PICKUP_PENDING) {
       throw new BadRequestException("L'envoi doit être en attente de récupération pour demander ce code.");
     }
-    return this.otpService.generateAndSend(
+    const result = await this.otpService.generateAndSend(
       { purpose: OtpPurpose.SHIPMENT_PICKUP, phone: shipment.senderPhone, shipmentId },
       'Communiquez ce code au conducteur pour confirmer la remise du colis :',
     );
+    await this.tellSenderCodeIsReady(shipment);
+    return result;
+  }
+
+  /** Prévient l'expéditeur (compte Occa'Z) que le conducteur attend son code de remise ; meilleur effort, n'échoue jamais. */
+  private async tellSenderCodeIsReady(shipment: { id: string; customerId: string }): Promise<void> {
+    try {
+      const customer = await this.prisma.customerProfile.findUnique({ where: { id: shipment.customerId }, select: { userId: true } });
+      if (!customer) return;
+      await this.notifications.notify({
+        userId: customer.userId,
+        type: NotificationType.STATUS_CHANGE,
+        channels: [NotificationChannel.PUSH],
+        fallbackTitle: 'Votre code de remise est prêt',
+        fallbackBody: "Votre conducteur est là pour récupérer le colis. Ouvrez « Voir mon code » sur votre envoi, puis donnez-le lui.",
+        pushData: { type: 'STATUS_CHANGE', shipmentId: shipment.id },
+      });
+    } catch {
+      // volontairement ignoré : la demande du conducteur ne doit pas échouer pour une notification manquée
+    }
   }
 
   /**

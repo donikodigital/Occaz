@@ -1,6 +1,6 @@
 // backend/src/auth/phone-change.service.spec.ts
-// Changement de numéro : code SMS envoyé au NOUVEAU numéro, adopté seulement après la bonne saisie.
-import { BadRequestException, ConflictException, ForbiddenException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
+// Changement de numéro : code SMS envoyé au NOUVEAU numéro (Client, Conducteur) ou code par e-mail (Support, SuperAdmin), adopté seulement après la bonne saisie.
+import { BadRequestException, ConflictException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { AccountType, OtpStatus, Prisma } from '@prisma/client';
 import { hashOtpCode } from '../common/utils/otp.util';
 import { OtpSettingsService } from '../otp/otp-settings.service';
@@ -9,6 +9,11 @@ import { PhoneChangeService } from './phone-change.service';
 const OLD = '+224620000001';
 const NEW = '+224620000009';
 const FUTURE = () => new Date(Date.now() + 5 * 60_000);
+
+const customer = (extra: Record<string, unknown> = {}) => ({ id: 'u1', phone: OLD, accountType: AccountType.CUSTOMER, isSuspended: false, ...extra });
+const staffUser = (accountType: AccountType, extra: Record<string, unknown> = {}) => ({
+  id: 'u1', phone: OLD, accountType, isSuspended: false, email: 'agent@occaz.sarl', ...extra,
+});
 
 type Row = { id: string; userId: string; newPhone: string; codeHash: string; attempts: number; maxAttempts: number; expiresAt: Date; status: OtpStatus };
 
@@ -20,6 +25,7 @@ function build(options: {
   recentByPhone?: number;
   lastChange?: Date | null;
   smsFails?: boolean;
+  emailFails?: boolean;
   updateFails?: unknown;
   /** Réglages enregistrés dans l'administration (PlatformSetting), par clé. */
   settings?: Record<string, unknown>;
@@ -63,8 +69,11 @@ function build(options: {
   const sms = {
     send: jest.fn().mockImplementation(() => (options.smsFails ? Promise.reject(new Error('gateway down')) : Promise.resolve())),
   };
-  const service = new PhoneChangeService(prisma as never, otpSettings as never, users as never, audit as never, sms as never);
-  return { service, prisma, tx, users, audit, sms };
+  const email = {
+    send: jest.fn().mockImplementation(() => (options.emailFails ? Promise.reject(new Error('mail down')) : Promise.resolve())),
+  };
+  const service = new PhoneChangeService(prisma as never, otpSettings as never, users as never, audit as never, sms as never, email as never);
+  return { service, prisma, tx, users, audit, sms, email };
 }
 
 afterEach(() => {
@@ -72,13 +81,15 @@ afterEach(() => {
   delete process.env.AUTH_TEST_PHONE_NUMBERS;
   delete process.env.PHONE_CHANGE_COOLDOWN_DAYS;
   delete process.env.OTP_ALLOWED_PHONE_PREFIXES;
+  delete process.env.AUTH_TEST_STAFF_EMAILS;
+  delete process.env.SMS_EXTRA_PURPOSES;
 });
 
 describe('PhoneChangeService.request — étape 1', () => {
   it('envoie le code par SMS au NOUVEAU numéro et en garde seulement le hash', async () => {
     const { service, prisma, sms } = build();
     const result = await service.request('u1', NEW);
-    expect(result).toEqual({ expiresInSeconds: 300 });
+    expect(result).toMatchObject({ expiresInSeconds: 300, channel: 'SMS' });
     expect(sms.send).toHaveBeenCalledTimes(1);
     expect(sms.send.mock.calls[0][0]).toBe(NEW);
     const sentCode = /(\d{6})/.exec(sms.send.mock.calls[0][1])?.[1] as string;
@@ -97,11 +108,16 @@ describe('PhoneChangeService.request — étape 1', () => {
     });
   });
 
-  it('refuse le numéro actuel, un numéro déjà pris, un compte suspendu et un compte équipe', async () => {
+  it('refuse le numéro actuel, un numéro déjà pris et un compte suspendu', async () => {
     await expect(build().service.request('u1', OLD)).rejects.toBeInstanceOf(BadRequestException);
     await expect(build({ owner: { id: 'other' } }).service.request('u1', NEW)).rejects.toBeInstanceOf(ConflictException);
     await expect(build({ user: { id: 'u1', phone: OLD, accountType: AccountType.CUSTOMER, isSuspended: true } }).service.request('u1', NEW)).rejects.toBeInstanceOf(BadRequestException);
-    await expect(build({ user: { id: 'u1', phone: OLD, accountType: AccountType.SUPPORT, isSuspended: false } }).service.request('u1', NEW)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('le SMS part avec le motif PHONE_CHANGE (ouvert par défaut)', async () => {
+    const { service, sms } = build();
+    await service.request('u1', NEW);
+    expect(sms.send).toHaveBeenCalledWith(NEW, expect.stringContaining('changer de numéro'), 'PHONE_CHANGE');
   });
 
   it('un numéro refusé ne déclenche aucun SMS', async () => {
@@ -198,15 +214,24 @@ describe('PhoneChangeService.confirm — étape 2', () => {
     expect(call.data).toEqual({ senderPhone: NEW });
   });
 
-  it('journalise le changement et prévient l\'ANCIEN numéro par SMS', async () => {
-    const { service, audit, sms } = build();
+  it('journalise le changement ; l\'alerte part par e-mail, pas par SMS (motif PHONE_CHANGE_ALERT fermé par défaut)', async () => {
+    const { service, audit, sms, email } = build({ user: customer({ email: 'awa@example.com' }) });
     await service.confirm('u1', NEW, '123456', { ipAddress: '1.2.3.4' });
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'PHONE_CHANGED', entityId: 'u1', diff: { oldPhone: OLD, newPhone: NEW }, ipAddress: '1.2.3.4' }));
-    expect(sms.send).toHaveBeenCalledWith(OLD, expect.stringContaining('remplacé'));
+    expect(email.send).toHaveBeenCalledWith('awa@example.com', expect.any(String), expect.stringContaining('remplacé'));
+    expect(sms.send).not.toHaveBeenCalled();
   });
 
-  it('l\'échec du SMS vers l\'ancien numéro ne fait pas échouer le changement', async () => {
-    const { service } = build({ smsFails: true });
+  it('SMS_EXTRA_PURPOSES=PHONE_CHANGE_ALERT rouvre le SMS d\'alerte à l\'ANCIEN numéro', async () => {
+    process.env.SMS_EXTRA_PURPOSES = 'PHONE_CHANGE_ALERT';
+    const { service, sms } = build();
+    await service.confirm('u1', NEW, '123456');
+    expect(sms.send).toHaveBeenCalledWith(OLD, expect.stringContaining('remplacé'), 'PHONE_CHANGE_ALERT');
+  });
+
+  it('l\'échec de l\'alerte (e-mail ou SMS) ne fait pas échouer le changement', async () => {
+    process.env.SMS_EXTRA_PURPOSES = 'PHONE_CHANGE_ALERT';
+    const { service } = build({ user: customer({ email: 'awa@example.com' }), smsFails: true, emailFails: true });
     await expect(service.confirm('u1', NEW, '123456')).resolves.toBeDefined();
   });
 
@@ -262,5 +287,60 @@ describe('PhoneChangeService.confirm — étape 2', () => {
   it('compte suspendu : refusé', async () => {
     const { service } = build({ user: { id: 'u1', phone: OLD, accountType: AccountType.CUSTOMER, isSuspended: true } });
     await expect(service.confirm('u1', NEW, '123456')).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('PhoneChangeService — équipe (Support, SuperAdmin) : code par e-mail, jamais par SMS', () => {
+  it.each([AccountType.SUPPORT, AccountType.SUPERADMIN])('%s : le code part par e-mail, aucun SMS, destination masquée', async (accountType) => {
+    const { service, sms, email, prisma } = build({ user: staffUser(accountType) });
+    const result = await service.request('u1', NEW);
+    expect(result).toEqual({ expiresInSeconds: 300, channel: 'EMAIL', destination: 'a•••t@occaz.sarl' });
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(email.send).toHaveBeenCalledTimes(1);
+    expect(email.send.mock.calls[0][0]).toBe('agent@occaz.sarl');
+    const sentCode = /(\d{6})/.exec(email.send.mock.calls[0][2])?.[1] as string;
+    expect(prisma.phoneChangeRequest.create.mock.calls[0][0].data.codeHash).toBe(hashOtpCode(sentCode));
+  });
+
+  it('pas d\'adresse e-mail sur le compte : refusé avant toute demande, rien n\'est envoyé', async () => {
+    const { service, sms, email, prisma } = build({ user: staffUser(AccountType.SUPPORT, { email: null }) });
+    await expect(service.request('u1', NEW)).rejects.toThrow(/adresse e-mail/);
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(email.send).not.toHaveBeenCalled();
+    expect(prisma.phoneChangeRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('l\'équipe n\'est pas limitée aux indicatifs SMS autorisés (aucun SMS ne part)', async () => {
+    const { service } = build({ user: staffUser(AccountType.SUPERADMIN), settings: { 'otp.allowed_phone_prefixes': '+33' } });
+    await expect(service.request('u1', NEW)).resolves.toMatchObject({ channel: 'EMAIL' });
+  });
+
+  it('numéro déjà pris ou limite d\'envois atteinte : refus comme pour un client', async () => {
+    await expect(build({ user: staffUser(AccountType.SUPPORT), owner: { id: 'other' } }).service.request('u1', NEW)).rejects.toBeInstanceOf(ConflictException);
+    await expect(build({ user: staffUser(AccountType.SUPPORT), recentByUser: 5 }).service.request('u1', NEW)).rejects.toMatchObject({ status: HttpStatus.TOO_MANY_REQUESTS });
+  });
+
+  it('échec de l\'e-mail : 503 clair, demande marquée échouée', async () => {
+    const { service, prisma } = build({ user: staffUser(AccountType.SUPPORT), emailFails: true });
+    await expect(service.request('u1', NEW)).rejects.toThrow(/e-mail n'a pas pu être envoyé/);
+    expect(prisma.phoneChangeRequest.update).toHaveBeenCalledWith({ where: { id: 'r-new' }, data: { status: OtpStatus.FAILED } });
+  });
+
+  it('mode test : adresse listée dans AUTH_TEST_STAFF_EMAILS = code 000000, rien n\'est envoyé', async () => {
+    process.env.AUTH_TEST_MODE_ENABLED = 'true';
+    process.env.AUTH_TEST_STAFF_EMAILS = 'agent@occaz.sarl';
+    const { service, email, prisma } = build({ user: staffUser(AccountType.SUPPORT) });
+    await service.request('u1', NEW);
+    expect(email.send).not.toHaveBeenCalled();
+    expect(prisma.phoneChangeRequest.create.mock.calls[0][0].data.codeHash).toBe(hashOtpCode('000000'));
+  });
+
+  it('bon code : le compte d\'équipe prend le nouveau numéro, alerte par e-mail, jamais de SMS', async () => {
+    process.env.SMS_EXTRA_PURPOSES = 'PHONE_CHANGE_ALERT';
+    const { service, tx, sms, email } = build({ user: staffUser(AccountType.SUPPORT) });
+    await service.confirm('u1', NEW, '123456');
+    expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { phone: NEW, isPhoneVerified: true } });
+    expect(email.send).toHaveBeenCalledWith('agent@occaz.sarl', expect.any(String), expect.stringContaining('remplacé'));
+    expect(sms.send).not.toHaveBeenCalled();
   });
 });

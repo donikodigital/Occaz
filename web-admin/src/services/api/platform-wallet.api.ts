@@ -7,6 +7,8 @@ import type {
   PlatformWalletOverview,
   PlatformWithdrawal,
   PlatformWithdrawalStatus,
+  WithdrawalCodeRequest,
+  WithdrawalCodeResponse,
   WithdrawalInput,
 } from '@/types/platform-wallet.types';
 
@@ -20,6 +22,8 @@ export const platformWalletApi = {
 
   withdrawals: (params: { page?: number; limit?: number; status?: PlatformWithdrawalStatus; currencyId?: string }) =>
     api.get<Paginated<PlatformWithdrawal>>('/platform-wallet/withdrawals', { query: params }),
+  requestWithdrawalCode: (input: WithdrawalCodeRequest) =>
+    api.post<WithdrawalCodeResponse>('/platform-wallet/withdrawals/code', input),
   withdraw: (input: WithdrawalInput) => api.post<PlatformWithdrawal>('/platform-wallet/withdrawals', input),
   markPaid: (id: string, externalReference?: string) =>
     api.patch<PlatformWithdrawal>(`/platform-wallet/withdrawals/${id}/paid`, { externalReference: externalReference || undefined }),

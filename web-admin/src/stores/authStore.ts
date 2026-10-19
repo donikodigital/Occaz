@@ -1,4 +1,6 @@
 // web-admin/src/stores/authStore.ts
+// [19/10/2026] v+ — Plus de jeton côté navigateur (cookies HttpOnly gérés par le relais /api/bff) : au démarrage on demande simplement
+// « qui suis-je ? » (GET /users/me) ; une réponse 401 veut dire pas de session. Les anciens jetons du localStorage sont effacés.
 // [02/10/2026] v+ — Les permissions du compte (rôles attribués) sont chargées via GET /users/me : au
 // démarrage (hydrate) et juste après une connexion (setSession). Le menu et les actions du back-office
 // s'en servent pour n'afficher que ce que le compte a le droit de faire.
@@ -27,23 +29,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   isHydrating: true,
 
   hydrate: async () => {
-    const accessToken = tokenStorage.getAccessToken();
-    if (!accessToken) {
-      set({ isHydrating: false });
-      return;
-    }
+    tokenStorage.clearLegacyTokens();
     try {
       const me = await usersApi.getMe();
       // `?? []` : si le serveur (pas encore mis à jour) ne renvoie pas les permissions, on ne bloque pas sur « Chargement… ».
       set({ user: { ...me, permissions: me.permissions ?? [] }, isAuthenticated: true, isHydrating: false });
     } catch {
-      tokenStorage.clearTokens();
       set({ user: null, isAuthenticated: false, isHydrating: false });
     }
   },
 
   setSession: (result) => {
-    tokenStorage.setTokens(result.accessToken, result.refreshToken);
     set({ user: result.user, isAuthenticated: true, isHydrating: false });
 
     // Le résultat de connexion ne contient pas les permissions : on les récupère aussitôt. En cas
@@ -62,7 +58,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     await authApi.logout().catch(() => undefined);
-    tokenStorage.clearTokens();
     set({ user: null, isAuthenticated: false });
   },
 

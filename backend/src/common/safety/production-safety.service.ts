@@ -38,7 +38,11 @@ export class ProductionSafetyService implements OnApplicationBootstrap {
     );
     if (simulatedTypes.length > 0) {
       issues.push(
-        `Paiements simulés (${simulatedTypes.join(', ')}) : aucun argent réel n'est encaissé ni remboursé. Brancher les vrais prestataires dans PaymentProviderRegistry.`,
+        `Paiements simulés (${simulatedTypes.join(', ')}) : aucun argent réel n'est encaissé ni remboursé. ${
+          env.ALLOW_SIMULATED_PAYMENTS === 'true'
+            ? 'ALLOW_SIMULATED_PAYMENTS=true les autorise : à retirer avant le lancement public.'
+            : 'Ils sont refusés (503) tant que ALLOW_SIMULATED_PAYMENTS=true n\'est pas posé : brancher les vrais prestataires dans PaymentProviderRegistry.'
+        }`,
       );
     }
 

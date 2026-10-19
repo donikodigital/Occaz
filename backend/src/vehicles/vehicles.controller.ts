@@ -1,5 +1,8 @@
 // backend/src/vehicles/vehicles.controller.ts
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+// [19/10/2026] v2 — GET /vehicles/:id et GET /vehicles/:id/documents n'étaient protégés que par la connexion : tout compte connecté pouvait
+// lire la fiche et les papiers (carte grise, assurance…) d'un véhicule d'autrui. Désormais : le conducteur propriétaire, ou le personnel
+// qui a vehicle.read dans son périmètre pays.
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -37,8 +40,8 @@ export class VehiclesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.vehiclesService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.assertCanRead(id, user);
   }
 
   @Patch(':id')
@@ -78,7 +81,8 @@ export class VehiclesController {
   }
 
   @Get(':id/documents')
-  findDocuments(@Param('id') id: string) {
+  async findDocuments(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.assertCanRead(id, user);
     return this.vehiclesService.findDocuments(id);
   }
 
@@ -104,5 +108,19 @@ export class VehiclesController {
   async reject(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     await this.scope.assertVehicle(user, PERMISSIONS.VEHICLE_VERIFY, id);
     return this.vehiclesService.reject(id, user.id);
+  }
+
+  /** Véhicule renvoyé seulement à son propriétaire ou au personnel autorisé (dans son périmètre pays) ; 404 si absent, 403 sinon. */
+  private async assertCanRead(vehicleId: string, user: AuthenticatedUser) {
+    const vehicle = await this.vehiclesService.findOne(vehicleId);
+    if (user.permissions?.includes(PERMISSIONS.VEHICLE_READ)) {
+      await this.scope.assertVehicle(user, PERMISSIONS.VEHICLE_READ, vehicleId);
+      return vehicle;
+    }
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id).catch(() => null);
+    if (!driverId || driverId !== vehicle.driverId) {
+      throw new ForbiddenException("Ce véhicule n'appartient pas à ce conducteur.");
+    }
+    return vehicle;
   }
 }

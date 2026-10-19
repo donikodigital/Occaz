@@ -1,4 +1,6 @@
 // backend/src/auth/account-auth.service.ts
+// [19/10/2026] v2 — Politique SMS : chaque SMS précise son motif (inscription ou mot de passe oublié, les deux seuls motifs ouverts pour les
+// comptes Client et Conducteur) ; voir integrations/sms/sms-purpose.ts.
 // [11/10/2026] v1 — Inscription en étapes, connexion par numéro + mot de passe à 6 chiffres, mot de passe oublié (SMS ou e-mail).
 //
 //   Inscription : le téléphone est vérifié par un code SMS (le compte est alors connecté), puis l'e-mail — facultatif — par un code
@@ -33,6 +35,7 @@ import { DevicesService } from '../devices/devices.service';
 import { SessionsService } from './sessions.service';
 import { AuthResult, AuthService } from './auth.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
+import { SmsPurpose } from '../integrations/sms/sms-purpose';
 import { EMAIL_PROVIDER, EmailProvider } from '../integrations/email/email-provider.interface';
 import { OtpSettings, OtpSettingsService } from '../otp/otp-settings.service';
 import { generateOtpCode, hashOtpCode, maskPhone, verifyOtpCode } from '../common/utils/otp.util';
@@ -596,6 +599,7 @@ export class AccountAuthService {
         await this.smsProvider.send(
           user.phone,
           `Occa'Z : ${code} est ${wording}. Valable ${Math.round(settings.expirySeconds / 60)} min. Ne le communiquez à personne.`,
+          purpose === OtpPurpose.PASSWORD_RESET ? SmsPurpose.PASSWORD_RESET : SmsPurpose.SIGNUP,
         );
       } catch (error) {
         await this.prisma.otpCode.delete({ where: { id: otp.id } }).catch(() => undefined);

@@ -1,13 +1,12 @@
 //backend/src/platform-wallet/platform-wallet.service.spec.ts
 // Portefeuille plateforme : le solde vient du registre des commissions, un retrait ne dépasse jamais le disponible, ne part que vers
-// un bénéficiaire enregistré, après confirmation du mot de passe, et un résultat inconnu ne rembourse jamais tout seul.
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
+// un bénéficiaire enregistré, après confirmation par le code reçu par e-mail, et un résultat inconnu ne rembourse jamais tout seul.
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PlatformWithdrawalStatus } from '@prisma/client';
 import { PlatformWalletService } from './platform-wallet.service';
 import type { DisburseOutcome } from '../wallets/providers/payout-provider.interface';
 
-const PASSWORD = 'Secret#123';
+const CODE = '123456';
 const BENEFICIARY = { id: 'b1', label: 'Mon Orange Money', isActive: true, method: 'orange_money', phone: '+224620004417' };
 const XOF = { id: 'xof', isoCode: 'XOF' };
 
@@ -19,6 +18,7 @@ function build(options: {
   outcome?: DisburseOutcome | Error;
   beneficiary?: typeof BENEFICIARY | null;
   simulated?: boolean;
+  codeRejected?: boolean;
 } = {}) {
   const state: Record<string, unknown> = {};
   const withdrawalSum = (status: string) => (status === 'PAID' ? (options.paid ?? 0n) : (options.processing ?? 0n));
@@ -44,7 +44,6 @@ function build(options: {
     platformBeneficiary: {
       findUnique: jest.fn().mockResolvedValue(options.beneficiary === undefined ? BENEFICIARY : options.beneficiary),
     },
-    user: { findUnique: jest.fn().mockResolvedValue({ passwordHash: bcrypt.hashSync(PASSWORD, 4) }) },
     // Commissions par statut, avec le montant d'origine de la réservation / de l'envoi (pas la valeur convertie du registre).
     $queryRaw: jest.fn().mockResolvedValue([
       { status: 'COMPLETED', total: options.earned ?? 100_000n },
@@ -60,11 +59,15 @@ function build(options: {
     options.outcome instanceof Error ? Promise.reject(options.outcome) : Promise.resolve(options.outcome ?? { status: 'PAID', externalReference: 'REF-1' }),
   );
   const providers = { get: () => ({ isSimulated: options.simulated ?? false, disburse }) };
-  const service = new PlatformWalletService(prisma as never, audit as never, notifications as never, providers as never);
-  return { service, prisma, audit, notifications, disburse, state };
+  const codes = {
+    send: jest.fn().mockResolvedValue({ expiresInSeconds: 600, sentTo: 'a•••z@gmail.com' }),
+    consume: jest.fn().mockImplementation(() => (options.codeRejected ? Promise.reject(new UnauthorizedException('Code incorrect.')) : Promise.resolve())),
+  };
+  const service = new PlatformWalletService(prisma as never, audit as never, notifications as never, providers as never, codes as never);
+  return { service, prisma, audit, notifications, disburse, state, codes };
 }
 
-const dto = (over: Record<string, unknown> = {}) => ({ beneficiaryId: 'b1', currencyId: 'xof', amount: '5000', password: PASSWORD, ...over }) as never;
+const dto = (over: Record<string, unknown> = {}) => ({ beneficiaryId: 'b1', currencyId: 'xof', amount: '5000', code: CODE, ...over }) as never;
 
 describe('PlatformWalletService — solde', () => {
   it('disponible = commissions libérées − retraits payés − retraits en cours ; les commissions en attente ne comptent pas', async () => {
@@ -86,6 +89,28 @@ describe('PlatformWalletService — devise de la commission', () => {
   });
 });
 
+describe('PlatformWalletService.requestCode', () => {
+  const REQ = { beneficiaryId: 'b1', currencyId: 'xof', amount: '5000' } as never;
+
+  it('envoie le code par e-mail pour CE retrait', async () => {
+    const { service, codes } = build();
+    await service.requestCode(REQ, 'admin1');
+    expect(codes.send).toHaveBeenCalledWith('admin1', { beneficiaryId: 'b1', currencyId: 'xof', amount: 5000n }, { beneficiaryLabel: 'Mon Orange Money', isoCode: 'XOF' });
+  });
+
+  it('n\'envoie aucun code si le solde est insuffisant, le bénéficiaire désactivé ou le montant nul', async () => {
+    const poor = build({ earned: 4_000n });
+    await expect(poor.service.requestCode(REQ, 'admin1')).rejects.toBeInstanceOf(BadRequestException);
+    const off = build({ beneficiary: { ...BENEFICIARY, isActive: false } });
+    await expect(off.service.requestCode(REQ, 'admin1')).rejects.toBeInstanceOf(BadRequestException);
+    const zero = build();
+    await expect(zero.service.requestCode({ ...(REQ as object), amount: '0' } as never, 'admin1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(poor.codes.send).not.toHaveBeenCalled();
+    expect(off.codes.send).not.toHaveBeenCalled();
+    expect(zero.codes.send).not.toHaveBeenCalled();
+  });
+});
+
 describe('PlatformWalletService.withdraw', () => {
   const OLD_ENV = process.env.NODE_ENV;
   afterEach(() => {
@@ -100,11 +125,25 @@ describe('PlatformWalletService.withdraw', () => {
     expect(audit.log.mock.calls.map((c) => c[0].action)).toEqual(['REQUESTED', 'PAID']);
   });
 
-  it('refuse un mauvais mot de passe sans toucher à l\'argent', async () => {
-    const { service, prisma, disburse } = build();
-    await expect(service.withdraw(dto({ password: 'faux' }), 'admin1')).rejects.toBeInstanceOf(ForbiddenException);
+  it('refuse un code incorrect ou expiré sans toucher à l\'argent', async () => {
+    const { service, prisma, disburse } = build({ codeRejected: true });
+    await expect(service.withdraw(dto({ code: '999999' }), 'admin1')).rejects.toBeInstanceOf(UnauthorizedException);
     expect(prisma.platformWithdrawal.create).not.toHaveBeenCalled();
     expect(disburse).not.toHaveBeenCalled();
+  });
+
+  it('le code est lié au retrait : bénéficiaire, devise et montant exacts', async () => {
+    const { service, codes } = build();
+    await service.withdraw(dto(), 'admin1');
+    expect(codes.consume).toHaveBeenCalledWith('admin1', { beneficiaryId: 'b1', currencyId: 'xof', amount: 5000n }, CODE);
+  });
+
+  it('refuse un montant nul ou invalide en 400 (jamais 500) avant de consommer le code', async () => {
+    const { service, codes } = build();
+    await expect(service.withdraw(dto({ amount: '0' }), 'admin1')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.withdraw(dto({ amount: '-5' }), 'admin1')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.withdraw(dto({ amount: '12.5' }), 'admin1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(codes.consume).not.toHaveBeenCalled();
   });
 
   it('refuse un montant supérieur au disponible', async () => {

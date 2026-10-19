@@ -48,6 +48,6 @@ import { UserSafetyModule } from '../user-safety/user-safety.module';
   ],
   controllers: [TripsController, BookingsController],
   providers: [TripsService, BookingsService, TripOtpService, TripArrivalService, BookingExpiryService, TripExpiryService, TripReminderService],
-  exports: [TripsService, BookingsService, TripOtpService],
+  exports: [TripsService, BookingsService, TripOtpService, BookingExpiryService, TripExpiryService, TripReminderService],
 })
 export class TripsModule {}

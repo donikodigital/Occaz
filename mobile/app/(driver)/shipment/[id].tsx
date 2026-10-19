@@ -1,4 +1,5 @@
 // mobile/app/(driver)/shipment/[id].tsx
+// [19/10/2026] v+ — le code de récupération n'est plus envoyé par SMS à l'expéditeur (il le voit dans l'application) ; celui de livraison part toujours par SMS au destinataire.
 //
 // [09/10/2026] v4 — Page allégée : on ne montre que l'étape à faire (bouton ou code), le bandeau (statut, itinéraire, gain) et la
 // personne concernée par cette étape (l'expéditeur avant la récupération, le destinataire ensuite). Période et les deux fiches
@@ -446,11 +447,13 @@ export default function DriverShipmentDetailScreen() {
           onRequest={() =>
             requestPickupOtp.mutate(undefined, {
               onSuccess: (result) => {
-                if (!result.smsSent) {
+                if (result.smsDisabled || !result.smsSent) {
                   setFeedback({
                     tone: 'info',
                     title: 'Code généré',
-                    text: "Le SMS n'a pas pu être envoyé à l'expéditeur — demandez-lui de consulter son code directement dans l'application.",
+                    text: result.smsDisabled
+                      ? "L'expéditeur vient d'être prévenu dans son application : demandez-lui son code (bouton « Voir mon code » sur son envoi)."
+                      : "Le SMS n'a pas pu être envoyé à l'expéditeur — demandez-lui de consulter son code directement dans l'application.",
                   });
                 }
               },

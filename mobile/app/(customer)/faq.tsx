@@ -38,7 +38,7 @@ const QUESTIONS: { question: string; answer: string }[] = [
   {
     question: 'Comment le conducteur valide-t-il la prise en charge ou la livraison ?',
     answer:
-      'Un code à usage unique vous est envoyé par SMS à chaque étape (montée, descente, récupération, livraison) : vous le donnez au conducteur pour valider.',
+      'Un code à usage unique s\'affiche dans l\'application (bouton « Voir mon code ») à chaque étape : montée, descente, remise du colis. Vous le donnez au conducteur pour valider. Pour la livraison d\'un colis, le code est envoyé par SMS au destinataire, qui n\'a pas besoin de compte.',
   },
   {
     question: 'Quels moyens de paiement sont acceptés ?',

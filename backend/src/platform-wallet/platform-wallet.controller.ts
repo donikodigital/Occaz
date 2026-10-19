@@ -11,6 +11,7 @@ import {
   CreateWithdrawalDto,
   FailWithdrawalDto,
   ListWithdrawalsQueryDto,
+  RequestWithdrawalCodeDto,
   ResolveWithdrawalDto,
   UpdateBeneficiaryDto,
 } from './dto/platform-wallet.dto';
@@ -50,6 +51,13 @@ export class PlatformWalletController {
   @Get('withdrawals')
   withdrawals(@Query() query: ListWithdrawalsQueryDto) {
     return this.service.listWithdrawals(query);
+  }
+
+  /** Étape 1 d'un retrait : envoie par e-mail le code de confirmation (valable 10 minutes, lié au bénéficiaire, à la devise et au montant). */
+  @Permissions(PERMISSIONS.PLATFORM_WALLET_MANAGE)
+  @Post('withdrawals/code')
+  requestCode(@Body() dto: RequestWithdrawalCodeDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.service.requestCode(dto, user.id);
   }
 
   @Permissions(PERMISSIONS.PLATFORM_WALLET_MANAGE)

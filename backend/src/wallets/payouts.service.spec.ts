@@ -22,7 +22,7 @@ function build(options: { status?: PayoutStatus; claimCount?: number; finalizeFa
   };
   const providers = { get: () => ({ isSimulated: true, disburse: jest.fn() }) };
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
-  const service = new PayoutsService(prisma as never, { log: jest.fn() } as never, wallets as never, providers as never, notifications as never);
+  const service = new PayoutsService(prisma as never, { log: jest.fn() } as never, wallets as never, providers as never, notifications as never, { check: jest.fn().mockImplementation(({ rawAmount, rawDestination }: { rawAmount: string; rawDestination?: string }) => Promise.resolve({ amount: BigInt(rawAmount), destinationRef: rawDestination ?? null, manualReason: null })) } as never);
   return { service, prisma, wallets };
 }
 

@@ -79,11 +79,11 @@ export const shipmentsApi = {
   // canal best-effort.
 
   requestPickupOtp: (id: string) =>
-    api.post<{ expiresInSeconds: number; smsSent: boolean }>(`/shipments/${id}/otp/pickup/request`),
+    api.post<{ expiresInSeconds: number; smsSent: boolean; smsDisabled?: boolean }>(`/shipments/${id}/otp/pickup/request`),
 
   /** Pour l'expéditeur : revoir son propre code dans l'app (renvoie le code en clair, contrairement à requestPickupOtp destiné au conducteur). */
   revealPickupOtpForSender: (id: string) =>
-    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean }>(
+    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean; smsDisabled?: boolean }>(
       `/shipments/${id}/otp/pickup/reveal-for-sender`,
     ),
 
@@ -102,11 +102,11 @@ export const shipmentsApi = {
   // retransmettre autrement).
 
   requestDeliveryOtp: (id: string) =>
-    api.post<{ expiresInSeconds: number; smsSent: boolean }>(`/shipments/${id}/otp/delivery/request`),
+    api.post<{ expiresInSeconds: number; smsSent: boolean; smsDisabled?: boolean }>(`/shipments/${id}/otp/delivery/request`),
 
   /** Pour l'expéditeur : revoir le code de livraison dans l'app (renvoie le code en clair). Le SMS continue de partir sur le téléphone du destinataire. */
   revealDeliveryOtpForSender: (id: string) =>
-    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean }>(
+    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean; smsDisabled?: boolean }>(
       `/shipments/${id}/otp/delivery/reveal-for-sender`,
     ),
 

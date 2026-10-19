@@ -1,4 +1,6 @@
 // backend/src/user-safety/sos.service.ts
+// [19/10/2026] v2 — Politique SMS : les SMS aux proches portent le motif SOS, fermé par défaut pour limiter le coût (voir integrations/sms/sms-purpose.ts).
+// L'alerte reste enregistrée et le support est prévenu (cloche + e-mail). Pour que les proches reçoivent de nouveau un SMS : SMS_EXTRA_PURPOSES=SOS.
 // [11/10/2026] v1 — alerte SOS : enregistre l'alerte (position, trajet concerné), prévient par SMS les proches enregistrés et alerte le
 // support (cloche + email). Une alerte déjà active n'est pas dupliquée : un second appui met seulement la position à jour, pour ne pas
 // envoyer dix SMS aux proches. La personne peut annuler (« je suis en sécurité »), les proches en sont alors informés.
@@ -8,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
+import { SmsPurpose } from '../integrations/sms/sms-purpose';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
@@ -83,7 +86,7 @@ export class SosService {
     const smsText = `[Occa'Z] ALERTE SOS : ${name} a besoin d'aide${trip}. Appelez-le/la au ${user.phone}.${where}`;
 
     const [smsResults] = await Promise.all([
-      Promise.allSettled(contacts.map((contact) => this.sms.send(contact.phone, smsText))),
+      Promise.allSettled(contacts.map((contact) => this.sms.send(contact.phone, smsText, SmsPurpose.SOS))),
       this.notifications.notifyStaff({
         permission: PERMISSIONS.SOS_READ,
         type: NotificationType.SAFETY,
@@ -128,7 +131,7 @@ export class SosService {
     const contacts = alert.contactsNotified > 0 ? await this.prisma.emergencyContact.findMany({ where: { userId } }) : [];
     const text = `[Occa'Z] Fausse alerte : ${user ? fullName(user) : 'votre proche'} est en sécurité. Merci de votre réactivité.`;
     await Promise.allSettled([
-      ...contacts.map((contact) => this.sms.send(contact.phone, text)),
+      ...contacts.map((contact) => this.sms.send(contact.phone, text, SmsPurpose.SOS)),
       this.notifications.notifyStaff({
         permission: PERMISSIONS.SOS_READ,
         type: NotificationType.SAFETY,

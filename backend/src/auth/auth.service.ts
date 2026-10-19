@@ -1,4 +1,5 @@
 // backend/src/auth/auth.service.ts
+// [19/10/2026] Politique SMS : le SMS de connexion porte le motif LOGIN, fermé par défaut (connexion par SMS abandonnée pour Client et Conducteur).
 import {
   BadRequestException,
   Inject,
@@ -21,6 +22,7 @@ import { DevicesService } from '../devices/devices.service';
 import { SessionsService } from './sessions.service';
 import { TwoFactorService } from './two-factor.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
+import { SmsPurpose } from '../integrations/sms/sms-purpose';
 import { EMAIL_PROVIDER, EmailProvider } from '../integrations/email/email-provider.interface';
 import { generateOtpCode, hashOtpCode, maskPhone, verifyOtpCode } from '../common/utils/otp.util';
 import { maskEmail } from '../common/utils/mask.util';
@@ -248,6 +250,7 @@ export class AuthService {
         await this.smsProvider.send(
           dto.phone,
           `Votre code de connexion est ${code}. Il expire dans ${Math.round(expirySeconds / 60)} minutes.`,
+          SmsPurpose.LOGIN,
         );
       } catch (error) {
         // Le SMS n'est pas parti : ce code ne servirait à rien et ne doit pas compter dans les plafonds de la personne. On le

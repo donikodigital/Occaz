@@ -1,5 +1,9 @@
 // mobile/app/(driver)/payout-new.tsx
 //
+// [19/10/2026] v5 — Le retrait est confirmé par le CODE PIN de connexion (6 chiffres), à la place d'un SMS : six cases masquées sous les champs.
+// Un PIN faux est expliqué sur place (le serveur verrouille le compte 15 min après 5 erreurs, comme à la connexion). Un NOUVEAU numéro est
+// vérifié par l'équipe avant le premier envoi : l'écran de résultat le dit.
+//
 // [10/10/2026] v4 — Habillage Ocean, comme les autres pages : bandeau (héro) en tête, solde dans une carte ombrée, champs dans une section
 // à en-tête souligné, bouton Ocean, message d'erreur en bandeau dans la page. Logique et écran de résultat inchangés.
 //
@@ -17,6 +21,7 @@ import {
   IconCash,
   IconCircleCheck,
   IconClockHour4,
+  IconLock,
   IconSend,
   IconWallet,
 } from '@tabler/icons-react-native';
@@ -27,6 +32,7 @@ import { useRequestPayout } from '@/hooks/usePayouts';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
+import { PIN_LENGTH, PinCodeInput } from '@/components/auth/PinCodeInput';
 import { OceanButton, OceanCard, OceanSection } from '@/components/ocean/OceanKit';
 import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { OCEAN } from '@/theme/ocean';
@@ -63,7 +69,7 @@ function describeOutcome(payout: Payout, amountText: string, destination: string
         Icon: IconClockHour4,
         tint: OCEAN.base,
         title: 'En attente de validation',
-        text: `Votre retrait de ${amountText} a bien été demandé : il doit être validé par l'équipe avant l'envoi vers ${masked}. Le montant est mis de côté, et vous serez prévenu dès que ce sera traité.`,
+        text: `Votre retrait de ${amountText} a bien été demandé : il doit être validé par l'équipe avant l'envoi vers ${masked} (un nouveau numéro est toujours vérifié la première fois). Le montant est mis de côté, et vous serez prévenu dès que ce sera traité.`,
       };
   }
 }
@@ -73,6 +79,7 @@ export default function NewPayoutScreen() {
   const { data: profile } = useDriverProfile();
   const [amount, setAmount] = useState('');
   const [destinationRef, setDestinationRef] = useState(profile?.mobileMoneyNumber ?? '');
+  const [pin, setPin] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [result, setResult] = useState<{ payout: Payout; amountText: string; destination: string } | null>(null);
   const requestPayout = useRequestPayout();
@@ -93,11 +100,17 @@ export default function NewPayoutScreen() {
       return;
     }
 
+    if (pin.length !== PIN_LENGTH) {
+      setErrorMessage('Saisissez votre code PIN de connexion (6 chiffres) pour confirmer le retrait.');
+      return;
+    }
+
     requestPayout.mutate(
       {
         amount: String(Math.round(numericAmount)),
         method: 'mobile_money',
         destinationRef: destinationRef.trim(),
+        pin,
       },
       {
         onSuccess: (payout) =>
@@ -107,6 +120,8 @@ export default function NewPayoutScreen() {
             destination: destinationRef.trim(),
           }),
         onError: (error) => {
+          // Quel que soit l'échec, on efface le PIN : il faut le ressaisir (et rien ne reste affiché à l'écran).
+          setPin('');
           setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
         },
       },
@@ -171,6 +186,19 @@ export default function NewPayoutScreen() {
           onChangeText={setDestinationRef}
           keyboardType="phone-pad"
           placeholder="+224620000000"
+        />
+      </OceanSection>
+
+      <OceanSection icon={<IconLock size={17} color={OCEAN.base} />} title="Confirmez avec votre code PIN">
+        <PinCodeInput
+          label="Code PIN de connexion"
+          value={pin}
+          onChange={(next) => {
+            setPin(next);
+            if (errorMessage) setErrorMessage(undefined);
+          }}
+          autoFocus={false}
+          hasError={Boolean(errorMessage) && pin.length === 0}
         />
       </OceanSection>
 

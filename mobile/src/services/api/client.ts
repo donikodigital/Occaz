@@ -1,7 +1,9 @@
 // mobile/src/services/api/client.ts
+// [19/10/2026] v+ — alimente connectivityStore : échec réseau (hors délai dépassé) => hors connexion ; toute réponse du serveur => en ligne.
 import Constants from 'expo-constants';
 import { secureStorage } from '../storage/secureStorage';
 import { ApiError, SessionExpiredError } from './ApiError';
+import { useConnectivityStore } from '@/stores/connectivityStore';
 import type { ApiErrorEnvelope, ApiSuccessEnvelope } from './types';
 
 const API_URL =
@@ -70,6 +72,8 @@ async function rawFetch<T>(path: string, options: RequestOptions, accessToken?: 
         signal: controller.signal,
       });
     } catch {
+      // Un délai dépassé (abandon volontaire) ne prouve pas que le réseau est coupé ; un échec immédiat, si.
+      if (!controller.signal.aborted) useConnectivityStore.getState().markOffline();
       throw new ApiError(
         controller.signal.aborted
           ? 'Le serveur met trop de temps à répondre — réessayez dans un instant.'
@@ -78,6 +82,7 @@ async function rawFetch<T>(path: string, options: RequestOptions, accessToken?: 
       );
     }
 
+    useConnectivityStore.getState().markOnline();
     const json = (await response.json().catch(() => null)) as
       | ApiSuccessEnvelope<T>
       | ApiErrorEnvelope

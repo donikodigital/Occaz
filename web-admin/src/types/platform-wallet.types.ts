@@ -65,10 +65,21 @@ export interface BeneficiaryInput {
   phone: string;
 }
 
-export interface WithdrawalInput {
+/** Étape 1 d'un retrait : demande du code de confirmation envoyé par e-mail. */
+export interface WithdrawalCodeRequest {
   beneficiaryId: string;
   currencyId: string;
   amount: Money;
+}
+
+export interface WithdrawalCodeResponse {
+  expiresInSeconds: number;
+  /** Adresse e-mail d'envoi, masquée par le serveur (ex. t***@gmail.com). */
+  sentTo: string;
+}
+
+/** Étape 2 : le code reçu par e-mail remplace le mot de passe. */
+export interface WithdrawalInput extends WithdrawalCodeRequest {
   note?: string;
-  password: string;
+  code: string;
 }

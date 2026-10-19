@@ -6,10 +6,13 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/services/queryClient';
 import { useAuthStore } from '@/stores/authStore';
 import { CookieBanner } from '@/components/cookies/CookieBanner';
+import { initMonitoring } from '@/lib/monitoring';
 
 /**
- * Hydrate la session au premier chargement (vérifie qu'un jeton stocké
- * est toujours valide via GET /users/me) avant de rendre quoi que ce
+ * [19/10/2026] v+ — initMonitoring() : erreurs non rattrapées envoyées à Sentry (si NEXT_PUBLIC_SENTRY_DSN est renseigné).
+ *
+ * Hydrate la session au premier chargement (vérifie que la session — cookie HttpOnly — est
+ * toujours valide via GET /users/me) avant de rendre quoi que ce
  * soit — même principe que app/_layout.tsx côté mobile.
  */
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -19,6 +22,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
+    initMonitoring();
     hydrate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

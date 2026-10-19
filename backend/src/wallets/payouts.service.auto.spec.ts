@@ -13,6 +13,8 @@ function build(options: {
   outcome?: DisburseOutcome | Error;
   claimCount?: number;
   reserveFails?: boolean;
+  /** Raison renvoyée par les garde-fous (ex. NOUVELLE_DESTINATION) : impose la validation manuelle. */
+  manualReason?: string | null;
 } = {}) {
   // Le retrait vit dans `state` : chaque réclamation de statut le modifie, comme la base de données le ferait.
   const state: Record<string, unknown> = {
@@ -58,12 +60,23 @@ function build(options: {
   const audit = { log: jest.fn().mockResolvedValue(undefined) };
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
   const providers = { get: () => ({ isSimulated: true, disburse }) };
-  const service = new PayoutsService(prisma as never, audit as never, wallets as never, providers as never, notifications as never);
+  const service = new PayoutsService(prisma as never, audit as never, wallets as never, providers as never, notifications as never, { check: jest.fn().mockImplementation(({ rawAmount, rawDestination }: { rawAmount: string; rawDestination?: string }) => Promise.resolve({ amount: BigInt(rawAmount), destinationRef: rawDestination ?? null, manualReason: options.manualReason ?? null })) } as never);
   return { service, prisma, wallets, audit, notifications, disburse };
 }
 
 const request = (service: PayoutsService) => service.request('dr1', { amount: '15000', method: 'orange_money', destinationRef: '+224620004417' } as never);
 const statusUpdates = (prisma: ReturnType<typeof build>['prisma']) => prisma.payout.updateMany.mock.calls.map((c) => c[0].data.status);
+
+describe('PayoutsService.request — garde-fous (nouveau numéro)', () => {
+  it('NOUVEAU numéro : rien n\'est envoyé, le retrait attend l\'équipe, la raison est tracée, les fonds restent réservés', async () => {
+    const { service, disburse, audit, wallets } = build({ manualReason: 'NOUVELLE_DESTINATION' });
+    const result = await request(service);
+    expect(disburse).not.toHaveBeenCalled();
+    expect(result.status).toBe(PayoutStatus.REQUESTED);
+    expect(wallets.reserveForPayout).toHaveBeenCalledTimes(1);
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'AUTO_SKIPPED', diff: { reason: 'NOUVELLE_DESTINATION' } }));
+  });
+});
 
 describe('PayoutsService.request — retrait automatique (par défaut)', () => {
   it('envoie le virement tout de suite au prestataire avec le retrait comme clé d\'idempotence, sans validation de l\'équipe', async () => {

@@ -1,6 +1,8 @@
 // backend/src/payments/providers/simulated-payment.provider.ts
+// [19/10/2026] v2 — En production, la simulation est REFUSÉE (503) sauf ALLOW_SIMULATED_PAYMENTS=true : plus de réservation « payée » sans argent.
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { assertSimulationAllowed } from '../../common/safety/simulation-guard';
 import {
   InitiatePaymentParams,
   InitiatePaymentResult,
@@ -16,7 +18,7 @@ import {
  * soit testable de bout en bout sans dépendre d'un vrai prestataire.
  *
  * ⚠️ Ne jamais utiliser en production : aucune vérification de paiement
- * réel n'a lieu. Remplacer par un adaptateur réel dans
+ * réel n'a lieu. Le code le refuse en production tant que ALLOW_SIMULATED_PAYMENTS=true n'est pas posé. Remplacer par un adaptateur réel dans
  * PaymentProviderRegistry avant tout lancement commercial (section 14).
  */
 @Injectable()
@@ -24,6 +26,7 @@ export class SimulatedPaymentProvider implements PaymentProviderAdapter {
   private readonly logger = new Logger('SimulatedPaymentProvider');
 
   async initiate(params: InitiatePaymentParams): Promise<InitiatePaymentResult> {
+    assertSimulationAllowed('Le paiement en ligne');
     const externalReference = `SIM-${randomUUID()}`;
     this.logger.warn(
       `[SIMULATION] Paiement ${params.paymentId} de ${params.amount} ${params.currencyIsoCode} capturé instantanément (réf. ${externalReference}) — AUCUN VRAI PAIEMENT N'A EU LIEU.`,
@@ -52,6 +55,7 @@ export class SimulatedPaymentProvider implements PaymentProviderAdapter {
   }
 
   async refund(params: { externalReference: string; amount: bigint }) {
+    assertSimulationAllowed('Le remboursement automatique');
     this.logger.warn(
       `[SIMULATION] Remboursement de ${params.amount} pour ${params.externalReference} — AUCUN VRAI REMBOURSEMENT N'A EU LIEU.`,
     );

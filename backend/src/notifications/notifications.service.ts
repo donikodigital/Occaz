@@ -1,10 +1,14 @@
 // backend/src/notifications/notifications.service.ts
+// [19/10/2026] v3 — Politique SMS (voir integrations/sms/sms-purpose.ts) : les notifications ne partent plus par SMS (coût). Le canal SMS demandé
+// par un appelant est retiré sans bruit : la notification reste dans l'application (cloche) et part par push et e-mail. Réactivation sans
+// redéployer : SMS_EXTRA_PURPOSES=NOTIFICATION.
 // [21/09/2026] v2 — pushData et pushOptions transmis au fournisseur push.
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AccountType, NotificationChannel, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationTemplatesService } from './notification-templates.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
+import { isSmsPurposeAllowed, SmsPurpose } from '../integrations/sms/sms-purpose';
 import { PUSH_PROVIDER, PushOptions, PushProvider } from '../integrations/push/push-provider.interface';
 import { EMAIL_PROVIDER, EmailProvider } from '../integrations/email/email-provider.interface';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
@@ -47,7 +51,9 @@ export class NotificationsService {
   ) {}
 
   async notify(params: NotifyParams): Promise<void> {
-    const channels = params.channels ?? [NotificationChannel.PUSH];
+    const requested = params.channels ?? [NotificationChannel.PUSH];
+    const smsOpen = isSmsPurposeAllowed(SmsPurpose.NOTIFICATION);
+    const channels = requested.filter((channel) => channel !== NotificationChannel.SMS || smsOpen);
     await Promise.all(channels.map((channel) => this.dispatchOne(params, channel)));
   }
 
@@ -120,7 +126,7 @@ export class NotificationsService {
       }
       case NotificationChannel.SMS:
         await this.assertSmsBudget(userId);
-        await this.smsProvider.send(user.phone, body);
+        await this.smsProvider.send(user.phone, body, SmsPurpose.NOTIFICATION);
         return;
       case NotificationChannel.EMAIL:
         if (!user.email) throw new Error("L'utilisateur n'a pas d'adresse email.");

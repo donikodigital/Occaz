@@ -1,4 +1,5 @@
 // backend/src/trips/trip-otp.service.ts
+// [19/10/2026] v+ — Quand le conducteur demande le code, le passager est prévenu par une notification dans l'application (plus de SMS : politique SMS).
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { BookingStatus, NotificationChannel, NotificationType, OtpPurpose, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -79,10 +80,37 @@ export class TripOtpService {
           : "Signalez d'abord votre arrivée (markDriverArrived) avant de demander le code de prise en charge.",
       );
     }
-    return this.otpService.generateAndSend(
+    const result = await this.otpService.generateAndSend(
       { purpose: OtpPurpose.TRIP_PICKUP, phone: booking.customer.user.phone, bookingId },
       'Communiquez ce code à votre conducteur pour confirmer votre prise en charge :',
     );
+    await this.tellPassengerCodeIsReady(booking, 'PICKUP');
+    return result;
+  }
+
+  /**
+   * Le code n'est plus envoyé par SMS : le passager est prévenu par une notification dans l'application, qui l'envoie vers « Voir mon code ».
+   * Meilleur effort : une notification manquée ne fait jamais échouer la demande du conducteur.
+   */
+  private async tellPassengerCodeIsReady(
+    booking: { id: string; tripId: string; customer: { userId: string } },
+    kind: 'PICKUP' | 'DROPOFF',
+  ): Promise<void> {
+    try {
+      await this.notifications.notify({
+        userId: booking.customer.userId,
+        type: NotificationType.STATUS_CHANGE,
+        channels: [NotificationChannel.PUSH],
+        fallbackTitle: 'Votre code est prêt',
+        fallbackBody:
+          kind === 'PICKUP'
+            ? "Votre conducteur vous demande votre code de prise en charge. Ouvrez « Voir mon code » sur votre réservation, puis donnez-le lui."
+            : "Votre conducteur vous demande votre code de dépose. Ouvrez « Voir mon code » sur votre réservation, puis donnez-le lui.",
+        pushData: { type: 'STATUS_CHANGE', tripId: booking.tripId, bookingId: booking.id },
+      });
+    } catch (error) {
+      this.logger.warn(`Notification « code prêt » non envoyée pour la réservation ${booking.id} — ${(error as Error).message}.`);
+    }
   }
 
   /**
@@ -185,10 +213,12 @@ export class TripOtpService {
   async requestDropoffOtp(bookingId: string, driverId: string) {
     const booking = await this.getBookingWithContext(bookingId);
     this.assertDriverOwnsTrip(booking, driverId);
-    return this.otpService.generateAndSend(
+    const result = await this.otpService.generateAndSend(
       { purpose: OtpPurpose.TRIP_DROPOFF, phone: booking.customer.user.phone, bookingId },
       'Communiquez ce code à votre conducteur pour confirmer la fin de votre trajet :',
     );
+    await this.tellPassengerCodeIsReady(booking, 'DROPOFF');
+    return result;
   }
 
   /** Même principe que revealPickupOtpForCustomer, pour le code de dépose. */

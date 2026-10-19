@@ -1,8 +1,10 @@
 // backend/src/integrations/sms/routing-sms.provider.ts
+// [19/10/2026] v2 — transmet le motif du SMS au fournisseur choisi.
 // [18/10/2026] v1 — Choisit le fournisseur SMS selon l'indicatif du numéro : la Guinée (+224) passe par Orange (une fraction du prix d'un
 // agrégateur international), tous les autres pays par le fournisseur international (Infobip, TextBee…).
 import { Injectable } from '@nestjs/common';
 import { SmsProvider } from './sms-provider.interface';
+import type { SmsPurpose } from './sms-purpose';
 
 export interface SmsRoute {
   /** Indicatif avec « + », par exemple « +224 ». */
@@ -29,7 +31,7 @@ export class CountryRoutingSmsProvider implements SmsProvider {
     return this.routes.find((route) => number.startsWith(route.prefix))?.provider ?? this.fallback;
   }
 
-  send(toPhone: string, message: string): Promise<void> {
-    return this.providerFor(toPhone).send(toPhone, message);
+  send(toPhone: string, message: string, purpose?: SmsPurpose): Promise<void> {
+    return this.providerFor(toPhone).send(toPhone, message, purpose);
   }
 }

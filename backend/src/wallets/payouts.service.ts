@@ -1,5 +1,7 @@
 // backend/src/wallets/payouts.service.ts
 //
+// [19/10/2026] v2 — Demande de retrait durcie : le PIN de connexion est vérifié par le contrôleur (PinConfirmationService), puis les garde-fous
+// (montant > 0 et au-dessus du minimum, plafond sur 24 h, numéro valide, NOUVEAU numéro => validation manuelle) par PayoutGuardrailsService.
 // Retraits des conducteurs. Deux modes, au choix du réglage « payout.auto_enabled » (page « Retraits » du back-office) :
 //  - AUTOMATIQUE (par défaut) : la demande est envoyée tout de suite au prestataire de paiement (Orange Money), sans validation du
 //    support ; le conducteur est prévenu du résultat. Un plafond facultatif (payout.auto_max_amount) renvoie les gros montants
@@ -20,9 +22,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { WalletsService } from './wallets.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
-import { formatMoneyWithCurrency, toMoneyBigInt } from '../common/utils/money.util';
+import { formatMoneyWithCurrency } from '../common/utils/money.util';
 import { RequestPayoutDto } from './dto/request-payout.dto';
 import { PayoutProviderRegistry } from './providers/payout-provider.registry';
+import { PayoutGuardrailsService } from './payout-guardrails.service';
 
 export interface PayoutAutoSettings {
   /** Retrait automatique activé (par défaut oui). */
@@ -84,6 +87,7 @@ export class PayoutsService {
     private readonly wallets: WalletsService,
     private readonly providers: PayoutProviderRegistry,
     private readonly notifications: NotificationsService,
+    private readonly guardrails: PayoutGuardrailsService,
   ) {}
 
   async findOne(id: string) {
@@ -131,7 +135,15 @@ export class PayoutsService {
 
   async request(driverId: string, dto: RequestPayoutDto) {
     const wallet = await this.wallets.findByDriverId(driverId);
-    const amount = toMoneyBigInt(dto.amount);
+    // Montant (> 0, minimum, plafond 24 h) et numéro (format, connu ou nouveau) : refus clair en 400, jamais une erreur 500.
+    const checked = await this.guardrails.check({
+      walletId: wallet.id,
+      driverId,
+      currencyIsoCode: wallet.currency?.isoCode ?? '',
+      rawAmount: dto.amount,
+      rawDestination: dto.destinationRef,
+    });
+    const amount = checked.amount;
 
     const payout = await this.prisma.payout.create({
       data: {
@@ -140,7 +152,7 @@ export class PayoutsService {
         currencyId: wallet.currencyId,
         status: PayoutStatus.REQUESTED,
         method: dto.method,
-        destinationRef: dto.destinationRef,
+        destinationRef: checked.destinationRef,
       },
     });
 
@@ -160,7 +172,7 @@ export class PayoutsService {
 
     // Retrait automatique : envoyé tout de suite au prestataire (sauf mode manuel ou plafond dépassé). Le résultat — payé,
     // en cours, refusé, ou toujours en attente de l'équipe — est celui du retrait renvoyé au conducteur.
-    const result = await this.processAutomatically(payout.id);
+    const result = await this.processAutomatically(payout.id, checked.manualReason);
 
     // Resté « en attente de validation » (mode manuel, montant au-dessus du plafond, numéro manquant) : l'équipe doit le traiter.
     if (result.status === PayoutStatus.REQUESTED) {
@@ -242,12 +254,25 @@ export class PayoutsService {
    *  - erreur technique (résultat inconnu : l'argent est peut-être parti) → « en cours », JAMAIS remboursé automatiquement :
    *    l'équipe vérifie chez le prestataire avant de clôturer.
    */
-  async processAutomatically(id: string) {
+  async processAutomatically(id: string, forcedManualReason: string | null = null) {
     const payout = await this.findOne(id);
     const settings = await this.getAutoSettings();
 
     // Mode manuel choisi volontairement : validation par l'équipe, rien à tracer (ce n'est pas une anomalie).
     if (!settings.enabled) return payout;
+
+    // Garde-fou imposé par la demande (nouveau numéro de destination) : jamais d'envoi automatique, l'équipe regarde d'abord.
+    if (forcedManualReason) {
+      await this.audit.log({ actorId: null, entityType: 'Payout', entityId: id, action: 'AUTO_SKIPPED', diff: { reason: forcedManualReason } });
+      return payout;
+    }
+
+    // Aucun prestataire réel en production : un envoi « automatique » serait marqué payé sans qu'un franc ne parte. Le retrait attend
+    // l'équipe, qui fait le virement elle-même (« Passer en traitement » puis « Marquer payé »).
+    if (this.providers.get().isSimulated && process.env.NODE_ENV === 'production') {
+      await this.audit.log({ actorId: null, entityType: 'Payout', entityId: id, action: 'AUTO_SKIPPED', diff: { reason: 'PRESTATAIRE_NON_BRANCHE' } });
+      return payout;
+    }
 
     // Cas qui renvoient vers la validation manuelle : on le trace pour que l'équipe sache pourquoi ce retrait attend.
     const manualReason =

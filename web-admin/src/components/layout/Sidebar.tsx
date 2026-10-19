@@ -5,6 +5,7 @@
 // arrondie en pied de page. Structure et logique inchangées : toujours un
 // tiroir piloté par isOpen/onClose en dessous de lg, fixe au-delà.
 // [02/10/2026] v3 — Le menu ne montre plus que les entrées permises au compte connecté (voir nav-items.ts).
+// [19/10/2026] v5 — Lien « Mon profil » (changement de numéro par code e-mail) au-dessus du bouton de déconnexion.
 // v4 — Le vrai logo Occa'Z remplace l'icône générique (public/brand/logo.png), en-tête avec le nom en grand
 // et la pastille « Back-office », entrée active en dégradé, titres de section avec filet, défilement du menu
 // sans barre visible, pied de page aéré : e-mail et rôle en haut, bouton « Se déconnecter » à part en dessous.
@@ -14,7 +15,7 @@ import React, { useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { IconLogout, IconX } from '@tabler/icons-react';
+import { IconLogout, IconUserCircle, IconX } from '@tabler/icons-react';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ACCOUNT_TYPE_LABELS } from '@/utils/userLabels';
@@ -181,9 +182,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 ) : null}
               </div>
             </div>
+            <Link
+              href="/profile"
+              onClick={onClose}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm font-semibold text-text-primary shadow-sm ring-1 ring-border/60 transition hover:bg-surface-muted active:scale-[0.98]"
+            >
+              <IconUserCircle size={16} />
+              Mon profil
+            </Link>
             <button
               onClick={handleLogout}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm font-semibold text-danger shadow-sm ring-1 ring-danger/20 transition hover:bg-danger-light hover:text-danger-dark active:scale-[0.98]"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm font-semibold text-danger shadow-sm ring-1 ring-danger/20 transition hover:bg-danger-light hover:text-danger-dark active:scale-[0.98]"
             >
               <IconLogout size={16} />
               Se déconnecter

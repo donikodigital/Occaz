@@ -100,9 +100,10 @@ function PickupCodeCard({ shipmentId }: { shipmentId: string }) {
   return (
     <OtpCodeCard
       title="Code de récupération"
-      description="Communiquez-le au conducteur pour confirmer la remise du colis — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
+      description="Communiquez-le au conducteur pour confirmer la remise du colis — affiché ici (copie directe possible)."
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
+      smsDisabled={reveal.data?.smsDisabled}
       isPending={reveal.isPending}
       isError={reveal.isError}
       error={reveal.error}
@@ -121,6 +122,7 @@ function DeliveryCodeCard({ shipmentId }: { shipmentId: string }) {
       description="Envoyé par SMS au destinataire, qui le communique au conducteur pour confirmer la réception — récupérable ici aussi si besoin (copie directe possible)."
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
+      smsDisabled={reveal.data?.smsDisabled}
       isPending={reveal.isPending}
       isError={reveal.isError}
       error={reveal.error}

@@ -3,6 +3,8 @@ import { api } from './client';
 import type {
   AuthResult,
   LoginPasswordPayload,
+  PhoneChangeRequestResult,
+  SafeUser,
   RequestStaffCodePayload,
   RequestStaffCodeResult,
   SetupTwoFactorResult,
@@ -19,6 +21,12 @@ export const authApi = {
 
   verifyStaffCode: (payload: VerifyStaffCodePayload) =>
     api.post<AuthResult>('/auth/staff/code/verify', payload, { auth: false }),
+
+  /** Changement de numéro, étape 1 : un code est envoyé par e-mail à l'adresse du compte (jamais par SMS pour l'équipe). */
+  requestPhoneChange: (newPhone: string) => api.post<PhoneChangeRequestResult>('/auth/phone-change/request', { newPhone }),
+
+  /** Changement de numéro, étape 2 : le bon code remplace le numéro du compte. */
+  confirmPhoneChange: (newPhone: string, code: string) => api.post<SafeUser>('/auth/phone-change/confirm', { newPhone, code }),
 
   logout: () => api.post<void>('/auth/logout'),
 

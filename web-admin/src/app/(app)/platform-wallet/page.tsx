@@ -1,4 +1,5 @@
 // web-admin/src/app/(app)/platform-wallet/page.tsx
+// [19/10/2026] Retrait en 2 étapes : le code à 6 chiffres reçu par e-mail remplace le mot de passe (POST withdrawals/code puis withdrawals).
 //
 // Portefeuille de la plateforme : les commissions encaissées (XOF et GNF) et leur retrait vers des numéros Orange Money enregistrés
 // — le propriétaire, le support, le service client… Le solde vient du registre des commissions (il n'est pas saisi à la main).
@@ -29,7 +30,7 @@ import {
   IconUsers,
   IconX,
 } from '@tabler/icons-react';
-import { Button, IconActionButton, Modal, PasswordField, Select, TextArea, TextField } from '@/components/ui';
+import { Button, IconActionButton, Modal, Select, TextArea, TextField } from '@/components/ui';
 import {
   CardShell,
   Chip,
@@ -48,6 +49,7 @@ import {
   useCreateBeneficiary,
   useMarkWithdrawalFailed,
   useMarkWithdrawalPaid,
+  useRequestWithdrawalCode,
   usePlatformBeneficiaries,
   usePlatformWallet,
   usePlatformWithdrawals,
@@ -337,23 +339,40 @@ function WithdrawModal({
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
+  const requestCode = useRequestWithdrawalCode();
   const withdraw = useWithdrawCommissions();
   const active = useMemo(() => beneficiaries.filter((item) => item.isActive), [beneficiaries]);
   const [beneficiaryId, setBeneficiaryId] = useState(active.find((item) => item.kind === 'OWNER')?.id ?? active[0]?.id ?? '');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [password, setPassword] = useState('');
+  // Étape 2 : null tant que le code n'a pas été envoyé par e-mail.
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState('');
 
   const selected = active.find((item) => item.id === beneficiaryId);
   const available = BigInt(balance.available);
   const typed = amount ? BigInt(amount) : 0n;
   const tooMuch = typed > available;
-  const valid = !!selected && typed > 0n && !tooMuch && password.length > 0;
+  const formValid = !!selected && typed > 0n && !tooMuch;
+  const codeValid = /^\d{6}$/.test(code);
+
+  function sendCode() {
+    if (!selected) return;
+    requestCode.mutate(
+      { beneficiaryId: selected.id, currencyId: balance.currencyId, amount },
+      {
+        onSuccess: (result) => {
+          setSentTo(result.sentTo);
+          setCode('');
+        },
+      },
+    );
+  }
 
   function submit() {
     if (!selected) return;
     withdraw.mutate(
-      { beneficiaryId: selected.id, currencyId: balance.currencyId, amount, note: note.trim() || undefined, password },
+      { beneficiaryId: selected.id, currencyId: balance.currencyId, amount, note: note.trim() || undefined, code },
       {
         onSuccess: (result) => {
           const text = formatMoney(result.amount, balance.isoCode);
@@ -370,6 +389,13 @@ function WithdrawModal({
     );
   }
 
+  /** Revenir à l'étape 1 pour changer le montant ou le bénéficiaire : le code envoyé ne vaut que pour la demande d'origine. */
+  function backToForm() {
+    setSentTo(null);
+    setCode('');
+    withdraw.reset();
+  }
+
   return (
     <Modal
       open
@@ -378,17 +404,48 @@ function WithdrawModal({
       description={`Disponible : ${formatMoney(balance.available, balance.isoCode)}`}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            Annuler
+          <Button variant="ghost" onClick={sentTo ? backToForm : onClose}>
+            {sentTo ? 'Modifier' : 'Annuler'}
           </Button>
-          <Button loading={withdraw.isPending} disabled={!valid} onClick={submit}>
-            {manualTransfer ? 'Réserver le retrait' : 'Envoyer'}
-          </Button>
+          {sentTo ? (
+            <Button loading={withdraw.isPending} disabled={!codeValid} onClick={submit}>
+              {manualTransfer ? 'Réserver le retrait' : 'Envoyer'}
+            </Button>
+          ) : (
+            <Button loading={requestCode.isPending} disabled={!formValid} onClick={sendCode}>
+              Recevoir le code par e-mail
+            </Button>
+          )}
         </div>
       }
     >
       {active.length === 0 ? (
         <Notice>Ajoute d’abord un bénéficiaire (ton numéro Orange Money, par exemple) pour pouvoir retirer.</Notice>
+      ) : sentTo && selected ? (
+        <div className="space-y-4">
+          <Notice>
+            Un code à 6 chiffres vient d’être envoyé à {sentTo}. Il est valable 10 minutes et ne sert que pour ce retrait de{' '}
+            {formatMoney(amount, balance.isoCode)} vers {selected.label}.
+          </Notice>
+          <TextField
+            label="Code reçu par e-mail"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="000000"
+            value={code}
+            onChange={(event) => setCode(digitsOnly(event.target.value).slice(0, 6))}
+          />
+          <button
+            type="button"
+            disabled={requestCode.isPending}
+            onClick={sendCode}
+            className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+          >
+            {requestCode.isPending ? 'Envoi…' : 'Renvoyer le code'}
+          </button>
+          <FormError message={errorText(withdraw.error) ?? errorText(requestCode.error)} />
+        </div>
       ) : (
         <div className="space-y-4">
           {manualTransfer ? (
@@ -422,13 +479,7 @@ function WithdrawModal({
             </button>
           </div>
           <TextArea label="Motif (facultatif)" rows={2} placeholder="Commissions de septembre, prime équipe support…" value={note} onChange={(event) => setNote(event.target.value)} />
-          <PasswordField
-            label="Ton mot de passe"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <FormError message={errorText(withdraw.error)} />
+          <FormError message={errorText(requestCode.error)} />
         </div>
       )}
     </Modal>

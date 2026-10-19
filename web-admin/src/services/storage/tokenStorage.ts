@@ -1,29 +1,16 @@
 // web-admin/src/services/storage/tokenStorage.ts
-/**
- * localStorage plutôt qu'un cookie httpOnly — plus simple pour un outil
- * interne à usage restreint (Support/SuperAdmin), cohérent avec le repli
- * web de l'app mobile (voir mobile/src/services/storage/secureStorage.ts,
- * qui documente le même compromis). `window` est toujours défini ici :
- * ce module n'est importé que par du code client ('use client').
- */
-const KEYS = {
-  accessToken: 'auth.accessToken',
-  refreshToken: 'auth.refreshToken',
-} as const;
+// [19/10/2026] v2 — Les jetons de connexion ne sont PLUS stockés dans le navigateur : ils vivent dans des cookies HttpOnly posés par le relais
+// serveur /api/bff (voir app/api/bff/[...path]/route.ts). Ce fichier ne garde qu'un nettoyage : les sessions ouvertes avant cette
+// version ont laissé deux jetons dans le localStorage, que l'on efface au démarrage pour qu'ils ne traînent pas là.
+const LEGACY_KEYS = ['auth.accessToken', 'auth.refreshToken'] as const;
 
 export const tokenStorage = {
-  getAccessToken(): string | null {
-    return window.localStorage.getItem(KEYS.accessToken);
-  },
-  getRefreshToken(): string | null {
-    return window.localStorage.getItem(KEYS.refreshToken);
-  },
-  setTokens(accessToken: string, refreshToken: string): void {
-    window.localStorage.setItem(KEYS.accessToken, accessToken);
-    window.localStorage.setItem(KEYS.refreshToken, refreshToken);
-  },
-  clearTokens(): void {
-    window.localStorage.removeItem(KEYS.accessToken);
-    window.localStorage.removeItem(KEYS.refreshToken);
+  /** Efface les anciens jetons du localStorage (inoffensif s'il n'y en a pas). */
+  clearLegacyTokens(): void {
+    try {
+      for (const key of LEGACY_KEYS) window.localStorage.removeItem(key);
+    } catch {
+      // stockage indisponible (navigation privée stricte) : rien à nettoyer
+    }
   },
 };

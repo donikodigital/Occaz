@@ -9,11 +9,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { ExchangeRateModule } from '../pricing/exchange-rate.module';
 import { SimulatedPayoutProvider } from './providers/simulated-payout.provider';
 import { PayoutProviderRegistry } from './providers/payout-provider.registry';
+import { PinConfirmationService } from './pin-confirmation.service';
+import { PayoutGuardrailsService } from './payout-guardrails.service';
 
 @Module({
   imports: [DriverProfilesModule, NotificationsModule, ExchangeRateModule],
   controllers: [WalletsController, PayoutsController],
-  providers: [WalletsService, PayoutsService, SimulatedPayoutProvider, PayoutProviderRegistry],
+  providers: [WalletsService, PayoutsService, SimulatedPayoutProvider, PayoutProviderRegistry, PinConfirmationService, PayoutGuardrailsService],
   exports: [WalletsService, PayoutsService, PayoutProviderRegistry],
 })
 export class WalletsModule {}

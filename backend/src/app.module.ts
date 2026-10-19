@@ -1,4 +1,5 @@
 // backend/src/app.module.ts
+// [19/10/2026] v+ — JobsModule (déclencheur externe des traitements automatiques) et AppConfigModule (version minimale de l'application).
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
@@ -49,6 +50,8 @@ import { CountryScopeModule } from './common/scope/country-scope.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { UserSafetyModule } from './user-safety/user-safety.module';
+import { JobsModule } from './jobs/jobs.module';
+import { AppConfigModule } from './app-config/app-config.module';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -114,6 +117,8 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     TicketsModule,
     TrackingModule,
     UserSafetyModule,
+    JobsModule,
+    AppConfigModule,
 
     // Toutes les Parties du cahier des charges sont couvertes — voir
     // README.md pour la correspondance Lot / section.

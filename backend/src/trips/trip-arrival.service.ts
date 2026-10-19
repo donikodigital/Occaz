@@ -1,4 +1,5 @@
 // backend/src/trips/trip-arrival.service.ts
+// [19/10/2026] v+ — le code n'est plus envoyé par SMS (politique SMS) : la notification renvoie vers le bouton « Voir mon code » de l'application.
 //
 // [09/10/2026] v1 — Ce qui part automatiquement quand le conducteur signale son arrivée quelque part (départ, ville traversée,
 // destination). Avant, seuls les clients qui montent à une étape étaient prévenus (push + SMS, sans email), sans code ; ceux qui
@@ -193,7 +194,7 @@ export class TripArrivalService {
           : `Votre conducteur est arrivé à ${placeName}.`;
       return {
         title: 'Le conducteur est arrivé',
-        body: `${where} Donnez-lui votre code de prise en charge (reçu par SMS, ou bouton « Voir mon code » dans l'application).`,
+        body: `${where} Donnez-lui votre code de prise en charge (bouton « Voir mon code » dans l'application).`,
         sms:
           point.kind === 'ORIGIN'
             ? 'Votre conducteur est arrivé. Communiquez-lui ce code pour confirmer votre prise en charge :'
@@ -202,7 +203,7 @@ export class TripArrivalService {
     }
     return {
       title: `Vous êtes arrivé à ${placeName}`,
-      body: `Vous êtes arrivé à ${placeName}. Donnez votre code de dépose à votre conducteur pour confirmer la fin de votre trajet (reçu par SMS, ou bouton « Voir mon code » dans l'application).`,
+      body: `Vous êtes arrivé à ${placeName}. Donnez votre code de dépose à votre conducteur pour confirmer la fin de votre trajet (bouton « Voir mon code » dans l'application).`,
       sms: `Vous êtes arrivé à ${placeName}. Communiquez ce code à votre conducteur pour confirmer la fin de votre trajet :`,
     };
   }

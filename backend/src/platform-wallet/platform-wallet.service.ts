@@ -8,31 +8,32 @@
 //     disponible = commissions libérées (COMPLETED) − retraits payés − retraits en cours
 // Les commissions « en attente » (course pas encore terminée, donc remboursable) ne sont pas retirables.
 //
-// Sécurité : permission dédiée, mot de passe redemandé à chaque retrait, verrou par devise (deux retraits simultanés ne peuvent pas
+// Sécurité : permission dédiée, CODE À 6 CHIFFRES REÇU PAR E-MAIL à chaque retrait (lié au bénéficiaire, à la devise et au montant — voir withdrawal-code.service.ts), verrou par devise (deux retraits simultanés ne peuvent pas
 // dépasser le solde), numéro de destination limité aux bénéficiaires enregistrés, journal d'audit sur chaque action.
 //
 // Tant que l'adaptateur Orange Money réel n'existe pas, en PRODUCTION le retrait est enregistré « en cours » (le montant est réservé)
 // SANS appel au prestataire : le SuperAdmin fait le virement depuis le compte marchand Orange Money, puis clique « Marquer payé ».
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   NotificationType,
   PlatformWithdrawalStatus,
   Prisma,
   WalletTransactionStatus,
 } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
 import * as Sentry from '@sentry/nestjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WithdrawalCodeService } from './withdrawal-code.service';
 import { PayoutProviderRegistry } from '../wallets/providers/payout-provider.registry';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
-import { formatMoneyWithCurrency } from '../common/utils/money.util';
+import { formatMoneyWithCurrency, toPositiveMoneyBigInt } from '../common/utils/money.util';
 import {
   CreateBeneficiaryDto,
   CreateWithdrawalDto,
   ListWithdrawalsQueryDto,
+  RequestWithdrawalCodeDto,
   UpdateBeneficiaryDto,
 } from './dto/platform-wallet.dto';
 
@@ -74,6 +75,7 @@ export class PlatformWalletService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly providers: PayoutProviderRegistry,
+    private readonly codes: WithdrawalCodeService,
   ) {}
 
   // ─── Solde ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -240,19 +242,25 @@ export class PlatformWalletService {
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 
+  /**
+   * Étape 1 : envoie par e-mail au SuperAdmin le code qui confirmera CE retrait. Tout est vérifié avant l'envoi (bénéficiaire actif,
+   * devise, montant, solde) pour ne jamais envoyer un code qui ne servirait à rien.
+   */
+  async requestCode(dto: RequestWithdrawalCodeDto, actorId: string) {
+    const { amount, beneficiary, currency } = await this.loadWithdrawalTarget(dto.beneficiaryId, dto.currencyId, dto.amount);
+    const balance = await this.computeBalance(this.prisma, currency.id);
+    if (amount > balance.available) {
+      throw new BadRequestException(
+        `Solde insuffisant : tu peux retirer au maximum ${formatMoneyWithCurrency(balance.available, currency.isoCode)}.`,
+      );
+    }
+    return this.codes.send(actorId, { beneficiaryId: beneficiary.id, currencyId: currency.id, amount }, { beneficiaryLabel: beneficiary.label, isoCode: currency.isoCode });
+  }
+
+  /** Étape 2 : le code reçu par e-mail autorise le retrait (une seule fois, et seulement pour ce bénéficiaire, cette devise et ce montant). */
   async withdraw(dto: CreateWithdrawalDto, actorId: string) {
-    await this.assertPassword(actorId, dto.password);
-
-    const amount = BigInt(dto.amount);
-    if (amount <= 0n) throw new BadRequestException('Le montant doit être supérieur à zéro.');
-
-    const [beneficiary, currency] = await Promise.all([
-      this.prisma.platformBeneficiary.findUnique({ where: { id: dto.beneficiaryId } }),
-      this.prisma.currency.findUnique({ where: { id: dto.currencyId } }),
-    ]);
-    if (!beneficiary) throw new NotFoundException('Bénéficiaire introuvable.');
-    if (!beneficiary.isActive) throw new BadRequestException('Ce bénéficiaire est désactivé : réactive-le ou choisis-en un autre.');
-    if (!currency) throw new NotFoundException('Devise introuvable.');
+    const { amount, beneficiary, currency } = await this.loadWithdrawalTarget(dto.beneficiaryId, dto.currencyId, dto.amount);
+    await this.codes.consume(actorId, { beneficiaryId: beneficiary.id, currencyId: currency.id, amount }, dto.code);
 
     // Verrou par devise : le solde est relu et le retrait créé dans la même transaction, derrière un verrou, pour que deux
     // retraits lancés en même temps ne puissent pas dépasser ensemble le solde.
@@ -374,11 +382,16 @@ export class PlatformWalletService {
     return true;
   }
 
-  private async assertPassword(userId: string, password: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
-    if (!user?.passwordHash) throw new ForbiddenException('Ce compte n\'a pas de mot de passe : impossible de confirmer un retrait.');
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) throw new ForbiddenException('Mot de passe incorrect.');
+  private async loadWithdrawalTarget(beneficiaryId: string, currencyId: string, rawAmount: string) {
+    const amount = toPositiveMoneyBigInt(rawAmount);
+    const [beneficiary, currency] = await Promise.all([
+      this.prisma.platformBeneficiary.findUnique({ where: { id: beneficiaryId } }),
+      this.prisma.currency.findUnique({ where: { id: currencyId } }),
+    ]);
+    if (!beneficiary) throw new NotFoundException('Bénéficiaire introuvable.');
+    if (!beneficiary.isActive) throw new BadRequestException('Ce bénéficiaire est désactivé : réactive-le ou choisis-en un autre.');
+    if (!currency) throw new NotFoundException('Devise introuvable.');
+    return { amount, beneficiary, currency };
   }
 
   private alert(title: string, body: string): Promise<void> {

@@ -1,4 +1,5 @@
 // web-admin/src/types/auth.types.ts
+// [19/10/2026] v+ — AuthResult ne porte plus les jetons (cookies HttpOnly, relais /api/bff).
 // [02/10/2026] v+ — SafeUser.permissions : permissions effectives du compte connecté (renvoyées par GET /users/me uniquement).
 export type AccountType = 'CUSTOMER' | 'DRIVER' | 'SUPPORT' | 'SUPERADMIN';
 
@@ -56,11 +57,22 @@ export interface AuthTokens {
   expiresIn: number;
 }
 
-export interface AuthResult extends AuthTokens {
+/**
+ * Résultat d'une connexion telle que le NAVIGATEUR la reçoit : le relais /api/bff a déjà retiré accessToken/refreshToken du corps (ils sont
+ * dans des cookies HttpOnly) — il ne reste que l'utilisateur.
+ */
+export interface AuthResult {
   user: SafeUser;
 }
 
 export interface SetupTwoFactorResult {
   secret: string;
   otpAuthUri: string;
+}
+/** Changement de numéro (compte d'équipe) : le code part par e-mail à l'adresse du compte. */
+export interface PhoneChangeRequestResult {
+  expiresInSeconds: number;
+  channel: 'SMS' | 'EMAIL';
+  /** Adresse masquée (« a•••t@occaz.sarl ») pour l'e-mail, numéro masqué pour le SMS. */
+  destination: string;
 }

@@ -1,0 +1,59 @@
+// mobile/src/components/screens/UpdateRequiredScreen.tsx
+// [19/10/2026] v1 — Écran plein écran « Mise à jour requise » : affiché à la place de l'application quand sa version est plus ancienne que la
+// version minimale réglée dans le back-office (app.min_version). Sert à retirer d'un coup une version cassée ou dangereuse, sans attendre
+// que les gens se mettent à jour d'eux-mêmes. Le bouton ouvre la fiche de l'application (Google Play / App Store).
+import React from 'react';
+import { Linking, Platform, StyleSheet, View } from 'react-native';
+import { IconDownload } from '@tabler/icons-react-native';
+import { AppText, ScreenContainer } from '@/components/ui';
+import { OceanButton } from '@/components/ocean/OceanKit';
+import { OCEAN } from '@/theme/ocean';
+import { spacing } from '@/theme';
+
+export function UpdateRequiredScreen({ storeUrl }: { storeUrl: string | null }) {
+  return (
+    <ScreenContainer maxWidth="form">
+      <View style={styles.body}>
+        <View style={styles.icon}>
+          <IconDownload size={40} color={OCEAN.base} />
+        </View>
+        <AppText variant="xxl" weight="bold" align="center" color={OCEAN.deep}>
+          Mise à jour requise
+        </AppText>
+        <AppText variant="base" color="textSecondary" align="center">
+          Cette version d&apos;Occa&apos;Z n&apos;est plus prise en charge. Installez la dernière version pour continuer à réserver, voyager et suivre vos envois en toute sécurité.
+        </AppText>
+        {storeUrl ? null : (
+          <AppText variant="sm" color="textSecondary" align="center">
+            Ouvrez {Platform.OS === 'ios' ? "l'App Store" : 'le Play Store'} et recherchez « Occa&apos;Z » pour la mettre à jour.
+          </AppText>
+        )}
+      </View>
+      {storeUrl ? (
+        <OceanButton label="Mettre à jour" onPress={() => void Linking.openURL(storeUrl)} style={styles.button} />
+      ) : null}
+    </ScreenContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  body: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  icon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: OCEAN.mist,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  button: {
+    marginBottom: spacing.md,
+  },
+});

@@ -1,5 +1,6 @@
 // backend/src/notifications/notifications.service.sms-limit.spec.ts
 // Plafond de SMS de notification par utilisateur et par jour : le SMS est refusé, le push et la trace en base restent.
+// Politique SMS (19/10/2026) : le canal SMS des notifications est fermé par défaut ; ces tests le rouvrent avec SMS_EXTRA_PURPOSES=NOTIFICATION.
 import { NotificationChannel, NotificationType } from '@prisma/client';
 import { NotificationsService } from './notifications.service';
 
@@ -40,10 +41,17 @@ const params = {
 };
 
 describe('NotificationsService — plafond de SMS de notification', () => {
+  beforeEach(() => {
+    process.env.SMS_EXTRA_PURPOSES = 'NOTIFICATION';
+  });
+  afterEach(() => {
+    delete process.env.SMS_EXTRA_PURPOSES;
+  });
+
   it('sous le plafond : le SMS part et la notification est marquée envoyée', async () => {
     const { service, sms, prisma } = build({ sentToday: 9 });
     await service.notify(params);
-    expect(sms.send).toHaveBeenCalledWith('+224620000001', 'Corps');
+    expect(sms.send).toHaveBeenCalledWith('+224620000001', 'Corps', 'NOTIFICATION');
     expect(prisma.notification.update).toHaveBeenCalledWith(expect.objectContaining({ data: { sentAt: expect.any(Date) } }));
   });
 
@@ -77,6 +85,15 @@ describe('NotificationsService — plafond de SMS de notification', () => {
   it('le plafond ne concerne pas le push : un utilisateur à 10 SMS reçoit toujours ses notifications dans l\'application', async () => {
     const { service, push } = build({ sentToday: 50 });
     await service.notify({ ...params, channels: [NotificationChannel.PUSH] });
+    expect(push.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('politique par défaut : le canal SMS est retiré sans bruit, le push part, aucun comptage', async () => {
+    delete process.env.SMS_EXTRA_PURPOSES;
+    const { service, sms, push, prisma } = build();
+    await service.notify(params);
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(prisma.notification.count).not.toHaveBeenCalled();
     expect(push.send).toHaveBeenCalledTimes(1);
   });
 });

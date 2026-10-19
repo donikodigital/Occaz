@@ -1,5 +1,8 @@
 // mobile/app/_layout.tsx
+// [19/10/2026] v+ — bandeau « Pas de connexion » (OfflineBanner) et écran « Mise à jour requise » quand la version est sous app.min_version.
 import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { ErrorBoundary as ExpoRouterErrorBoundary, Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -18,6 +21,10 @@ import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/theme';
 import { usePushNotificationRegistration } from '@/hooks/usePushNotifications';
 import { AnimatedSplash } from '@/components/screens/AnimatedSplash';
+import { OfflineBanner } from '@/components/screens/OfflineBanner';
+import { UpdateRequiredScreen } from '@/components/screens/UpdateRequiredScreen';
+import { useAppConfig } from '@/hooks/useAppConfig';
+import { isUpdateRequired } from '@/utils/version';
 import { initMonitoring, withMonitoredErrorBoundary, withMonitoring } from '@/services/monitoring';
 import '@/tasks/tripLocationTask';
 
@@ -29,6 +36,17 @@ initMonitoring();
 // Écran d'erreur d'Expo Router (affiché quand un écran plante à l'affichage) : inchangé pour l'utilisateur, mais l'erreur est
 // maintenant remontée au suivi.
 export const ErrorBoundary = withMonitoredErrorBoundary(ExpoRouterErrorBoundary);
+
+/** Affiche l'application, ou l'écran « Mise à jour requise » si cette version est plus ancienne que le minimum réglé dans le back-office. */
+function AppGate() {
+  const { data: appConfig } = useAppConfig();
+  const currentVersion = Constants.expoConfig?.version;
+  if (appConfig && isUpdateRequired(currentVersion, appConfig.minVersion)) {
+    const storeUrl = Platform.OS === 'ios' ? appConfig.updateUrlIos : appConfig.updateUrlAndroid;
+    return <UpdateRequiredScreen storeUrl={storeUrl} />;
+  }
+  return <Slot />;
+}
 
 function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -68,7 +86,8 @@ function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <StatusBar style="dark" />
-          <Slot />
+          <AppGate />
+          <OfflineBanner />
           {showIntro ? <AnimatedSplash onFinish={() => setShowIntro(false)} /> : null}
         </QueryClientProvider>
       </SafeAreaProvider>

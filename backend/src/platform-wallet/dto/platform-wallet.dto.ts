@@ -88,7 +88,7 @@ export class CreateWithdrawalDto {
 
   @ApiProperty({ description: 'Montant, plus petite unité de la devise (entier)' })
   @IsString()
-  @Matches(/^\d+$/, { message: 'Le montant doit être un nombre entier.' })
+  @Matches(/^[1-9]\d{0,14}$/, { message: 'Le montant doit être un nombre entier supérieur à zéro.' })
   amount: string;
 
   @ApiPropertyOptional({ description: 'Motif (ex. « Commissions de septembre », « Prime équipe support »)' })
@@ -97,10 +97,28 @@ export class CreateWithdrawalDto {
   @MaxLength(200)
   note?: string;
 
-  @ApiProperty({ description: 'Mot de passe du compte connecté : un retrait d\'argent exige une confirmation.' })
+  @ApiProperty({ description: 'Code à 6 chiffres reçu par e-mail pour CE retrait (POST /platform-wallet/withdrawals/code).' })
+  @IsString()
+  @Matches(/^\d{6}$/, { message: 'Le code de confirmation comporte 6 chiffres.' })
+  code: string;
+}
+
+/** Demande d'envoi du code de confirmation : décrit le retrait que le code protégera. */
+export class RequestWithdrawalCodeDto {
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  password: string;
+  beneficiaryId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  currencyId: string;
+
+  @ApiProperty({ description: 'Montant, plus petite unité de la devise (entier strictement positif)' })
+  @IsString()
+  @Matches(/^[1-9]\d{0,14}$/, { message: 'Le montant doit être un nombre entier supérieur à zéro.' })
+  amount: string;
 }
 
 export class ResolveWithdrawalDto {

@@ -18,7 +18,9 @@ const SETTINGS: OtpSettings = {
   phoneChangeCooldownDays: 30,
   notificationSmsDailyLimitPerUser: 10,
 };
-const PARAMS = { purpose: OtpPurpose.TRIP_PICKUP, phone: '+224620000001', bookingId: 'b1' };
+// Politique SMS : seul le code de livraison d'un colis part par SMS (vers le destinataire). Les autres codes de remise restent dans l'application.
+const PARAMS = { purpose: OtpPurpose.SHIPMENT_DELIVERY, phone: '+224620000001', shipmentId: 's1' };
+const PICKUP = { purpose: OtpPurpose.TRIP_PICKUP, phone: '+224620000001', bookingId: 'b1' };
 const FUTURE = () => new Date(Date.now() + 5 * 60_000);
 
 type Row = { id: string; code: string; attempts: number; maxAttempts: number; expiresAt: Date; status: OtpStatus };
@@ -62,12 +64,41 @@ describe('OtpService.generateAndSend', () => {
   it('stocke seulement le hash, envoie le SMS et ne renvoie pas le code par défaut', async () => {
     const { service, prisma, sms } = build();
     const result = await service.generateAndSend(PARAMS, 'Votre code :');
-    expect(result).toEqual({ expiresInSeconds: 300, code: undefined, smsSent: true });
+    expect(result).toEqual({ expiresInSeconds: 300, code: undefined, smsSent: true, smsDisabled: false });
+    expect(sms.send.mock.calls[0][2]).toBe('PARCEL_RECIPIENT');
     const sentCode = /(\d{6})$/.exec(sms.send.mock.calls[0][1])?.[1] as string;
     expect(sms.send.mock.calls[0][0]).toBe(PARAMS.phone);
     const stored = prisma.otpCode.create.mock.calls[0][0].data;
     expect(stored.code).toBe(hashOtpCode(sentCode));
     expect(JSON.stringify(stored)).not.toContain(sentCode);
+  });
+
+  it('code de prise en charge ou de dépose : AUCUN SMS (politique), code créé et smsDisabled=true', async () => {
+    const { service, sms, prisma } = build();
+    const result = await service.generateAndSend(PICKUP, 'Votre code :', { revealCodeToCaller: true });
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ smsSent: false, smsDisabled: true });
+    expect(result.code).toMatch(/^\d{6}$/);
+    expect(prisma.otpCode.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('code de livraison lu par l\'expéditeur (revealCodeToCaller) : pas de SMS, il le lit à l\'écran', async () => {
+    const { service, sms } = build();
+    const result = await service.generateAndSend(PARAMS, 'Votre code :', { revealCodeToCaller: true });
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(result.smsDisabled).toBe(true);
+  });
+
+  it('SMS_EXTRA_PURPOSES=HANDOVER réactive les SMS de prise en charge sans redéployer', async () => {
+    process.env.SMS_EXTRA_PURPOSES = 'HANDOVER';
+    try {
+      const { service, sms } = build();
+      const result = await service.generateAndSend(PICKUP, 'Votre code :');
+      expect(sms.send).toHaveBeenCalledTimes(1);
+      expect(result.smsSent).toBe(true);
+    } finally {
+      delete process.env.SMS_EXTRA_PURPOSES;
+    }
   });
 
   it('revealCodeToCaller : le code en clair est renvoyé (bénéficiaire uniquement), toujours haché en base', async () => {
@@ -86,9 +117,8 @@ describe('OtpService.generateAndSend', () => {
 
   it('échec du SMS : le code existe quand même (visible dans l\'application), smsSent=false, aucune exception', async () => {
     const { service, prisma } = build({ smsFails: true });
-    const result = await service.generateAndSend(PARAMS, 'Votre code :', { revealCodeToCaller: true });
-    expect(result.smsSent).toBe(false);
-    expect(result.code).toMatch(/^\d{6}$/);
+    const result = await service.generateAndSend(PARAMS, 'Votre code :');
+    expect(result).toMatchObject({ smsSent: false, smsDisabled: false });
     expect(prisma.otpCode.create).toHaveBeenCalledTimes(1);
   });
 
@@ -98,12 +128,11 @@ describe('OtpService.generateAndSend', () => {
     expect(sms.send).toHaveBeenCalledTimes(1);
   });
 
-  it('plafond de SMS de remise atteint : AUCUN SMS, mais le code est créé et renvoyé au bénéficiaire', async () => {
+  it('plafond de SMS de remise atteint : AUCUN SMS, mais le code est créé', async () => {
     const { service, sms, prisma } = build({ sentToday: 5 });
-    const result = await service.generateAndSend(PARAMS, 'Votre code :', { revealCodeToCaller: true });
+    const result = await service.generateAndSend(PARAMS, 'Votre code :');
     expect(sms.send).not.toHaveBeenCalled();
     expect(result.smsSent).toBe(false);
-    expect(result.code).toMatch(/^\d{6}$/);
     expect(prisma.otpCode.create).toHaveBeenCalledTimes(1);
   });
 
@@ -111,7 +140,7 @@ describe('OtpService.generateAndSend', () => {
     const { service, prisma } = build();
     await service.generateAndSend(PARAMS, 'Votre code :');
     const where = prisma.otpCode.count.mock.calls[0][0].where;
-    expect(where).toMatchObject({ purpose: OtpPurpose.TRIP_PICKUP, bookingId: 'b1' });
+    expect(where).toMatchObject({ purpose: OtpPurpose.SHIPMENT_DELIVERY, shipmentId: 's1' });
     const age = Date.now() - where.createdAt.gte.getTime();
     expect(age).toBeGreaterThan(23.9 * 3_600_000);
     expect(age).toBeLessThan(24.1 * 3_600_000);

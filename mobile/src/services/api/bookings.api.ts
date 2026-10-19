@@ -20,24 +20,24 @@ export const bookingsApi = {
   // (voir reveal-for-customer), le SMS n'est qu'un canal best-effort.
 
   requestPickupOtp: (id: string) =>
-    api.post<{ expiresInSeconds: number; smsSent: boolean }>(`/bookings/${id}/otp/pickup/request`),
+    api.post<{ expiresInSeconds: number; smsSent: boolean; smsDisabled?: boolean }>(`/bookings/${id}/otp/pickup/request`),
 
   verifyPickupOtp: (id: string, code: string) => api.post<void>(`/bookings/${id}/otp/pickup/verify`, { code }),
 
   requestDropoffOtp: (id: string) =>
-    api.post<{ expiresInSeconds: number; smsSent: boolean }>(`/bookings/${id}/otp/dropoff/request`),
+    api.post<{ expiresInSeconds: number; smsSent: boolean; smsDisabled?: boolean }>(`/bookings/${id}/otp/dropoff/request`),
 
   verifyDropoffOtp: (id: string, code: string) => api.post<void>(`/bookings/${id}/otp/dropoff/verify`, { code }),
 
   // --- Côté client : revoir son propre code dans l'app (renvoie le code en clair, contrairement aux endpoints ci-dessus destinés au conducteur) ---
 
   revealPickupOtpForCustomer: (id: string) =>
-    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean }>(
+    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean; smsDisabled?: boolean }>(
       `/bookings/${id}/otp/pickup/reveal-for-customer`,
     ),
 
   revealDropoffOtpForCustomer: (id: string) =>
-    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean }>(
+    api.post<{ expiresInSeconds: number; code?: string; smsSent: boolean; smsDisabled?: boolean }>(
       `/bookings/${id}/otp/dropoff/reveal-for-customer`,
     ),
 };

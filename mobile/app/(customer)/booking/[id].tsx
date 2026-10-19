@@ -121,9 +121,10 @@ function PickupCodeCard({ bookingId }: { bookingId: string }) {
   return (
     <OtpCodeCard
       title="Code de prise en charge"
-      description="Communiquez-le à votre conducteur pour confirmer votre prise en charge — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
+      description="Communiquez-le à votre conducteur pour confirmer votre prise en charge — affiché ici (copie directe possible)."
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
+      smsDisabled={reveal.data?.smsDisabled}
       isPending={reveal.isPending}
       isError={reveal.isError}
       error={reveal.error}
@@ -137,9 +138,10 @@ function DropoffCodeCard({ bookingId }: { bookingId: string }) {
   return (
     <OtpCodeCard
       title="Code de dépose"
-      description="Communiquez-le à votre conducteur pour confirmer la fin de votre trajet — envoyé par SMS, et récupérable ici si besoin (copie directe possible)."
+      description="Communiquez-le à votre conducteur pour confirmer la fin de votre trajet — affiché ici (copie directe possible)."
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
+      smsDisabled={reveal.data?.smsDisabled}
       isPending={reveal.isPending}
       isError={reveal.isError}
       error={reveal.error}

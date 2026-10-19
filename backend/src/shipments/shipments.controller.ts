@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.controller.ts
+// [19/10/2026] v6 — GET/POST /:id/documents réservés à l'expéditeur, au conducteur de l'envoi et au personnel autorisé (ShipmentAccessService).
 // [16/10/2026] v5 — le personnel Support ne voit plus la commission (platformFee) : voir common/utils/platform-earnings.ts.
 // [09/10/2026] v4 — invitations : le client cherche des conducteurs (/:id/drivers) et les invite (/:id/invitations) ; le conducteur répond (/invitations/…).
 // [30/09/2026] v3 — route otp/delivery/reveal-for-sender : l'expéditeur peut revoir le code de livraison, sur le modèle de otp/pickup/reveal-for-sender.
@@ -14,6 +15,7 @@ import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { CountryScopeService } from '../common/scope/country-scope.service';
 import { canSeePlatformEarnings, withoutPlatformFee } from '../common/utils/platform-earnings';
 import { ShipmentsService } from './shipments.service';
+import { ShipmentAccessService } from './shipment-access.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { AssignShipmentDto } from './dto/assign-shipment.dto';
 import { CancelShipmentDto } from './dto/cancel-shipment.dto';
@@ -44,6 +46,7 @@ export class ShipmentsController {
     private readonly invitations: ShipmentInvitationsService,
     private readonly scope: CountryScopeService,
     private readonly userBlocks: UserBlocksService,
+    private readonly access: ShipmentAccessService,
   ) {}
 
   @Get('mine')
@@ -189,12 +192,14 @@ export class ShipmentsController {
   }
 
   @Post(':id/documents')
-  uploadEvidence(@Param('id') id: string, @Body() dto: CreateDocumentDto) {
+  async uploadEvidence(@Param('id') id: string, @Body() dto: CreateDocumentDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.access.assertCanAccessEvidence(user, id, 'write');
     return this.shipmentsService.uploadEvidence(id, dto);
   }
 
   @Get(':id/documents')
-  findEvidence(@Param('id') id: string) {
+  async findEvidence(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.access.assertCanAccessEvidence(user, id, 'read');
     return this.shipmentsService.findEvidence(id);
   }
 

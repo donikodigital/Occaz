@@ -1,4 +1,5 @@
 // mobile/src/components/screens/OtpCodeCard.tsx
+// [19/10/2026] v+ — `smsDisabled` : le SMS est coupé volontairement (coût) ; plus de faux message « SMS non envoyé » quand on affiche son propre code.
 //
 // Carte réutilisable pour un code de vérification (prise en charge,
 // dépose, récupération de colis...) : le code est toujours envoyé par
@@ -29,6 +30,8 @@ export interface OtpCodeCardProps {
   code: string | undefined;
   /** false si le SMS n'a pas pu être envoyé — le code reste valable, généré et affiché indépendamment du SMS (canal best-effort en parallèle). */
   smsSent?: boolean;
+  /** true quand le SMS est volontairement coupé (politique d'envoi) : le code se lit à l'écran, ce n'est pas une panne. */
+  smsDisabled?: boolean;
   isPending: boolean;
   isError: boolean;
   error: unknown;
@@ -40,6 +43,7 @@ export function OtpCodeCard({
   description,
   code,
   smsSent,
+  smsDisabled,
   isPending,
   isError,
   error,
@@ -94,7 +98,7 @@ export function OtpCodeCard({
         <AppText variant="xs" weight="semibold" color={colors.success} align="center">
           Copié dans le presse-papiers
         </AppText>
-      ) : code && smsSent === false ? (
+      ) : code && smsSent === false && !smsDisabled ? (
         <AppText variant="xs" color={colors.accentDark} align="center">
           Le SMS n'a pas pu être envoyé, mais ce code reste valable — copiez-le directement ci-dessus.
         </AppText>

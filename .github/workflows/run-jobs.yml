@@ -1,0 +1,38 @@
+# .github/workflows/run-jobs.yml
+# [19/10/2026] Déclenche les traitements automatiques de l'API toutes les 5 minutes (réservations impayées, trajets sans réservation,
+# rappels de départ, plages de dates des envois). Sur Render gratuit, le serveur se met en veille : ses minuteries internes ne tournent
+# plus. Cet appel HTTP le réveille ET lance les traitements. À configurer UNE fois dans GitHub → Settings → Secrets and variables → Actions :
+#   JOBS_API_URL  l'adresse de l'API, sans « / » final            (ex. https://api.occaz.sarl)
+#   JOBS_SECRET   la même valeur que la variable JOBS_SECRET de Render (24 caractères au minimum)
+name: Traitements automatiques
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: run-jobs
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Appeler POST /api/v1/jobs/run
+        env:
+          JOBS_API_URL: ${{ secrets.JOBS_API_URL }}
+          JOBS_SECRET: ${{ secrets.JOBS_SECRET }}
+        run: |
+          if [ -z "$JOBS_API_URL" ] || [ -z "$JOBS_SECRET" ]; then
+            echo "JOBS_API_URL et JOBS_SECRET ne sont pas configurés : rien à faire."
+            exit 0
+          fi
+          # Un serveur en veille peut mettre une minute à répondre : on patiente et on réessaie.
+          curl --fail-with-body --silent --show-error \
+            --max-time 120 --retry 3 --retry-delay 10 --retry-all-errors \
+            -X POST "${JOBS_API_URL%/}/api/v1/jobs/run" \
+            -H "x-jobs-secret: ${JOBS_SECRET}" \
+            -H "content-type: application/json"
+          echo

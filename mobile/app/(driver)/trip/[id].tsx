@@ -1,4 +1,5 @@
 // mobile/app/(driver)/trip/[id].tsx
+// [19/10/2026] v+ — plus de SMS pour les codes de trajet : le passager est prévenu dans l'application, le message le dit.
 // [10/10/2026] v+ — Plus aucun Alert.alert (sans effet sur le web) : erreurs en bannière dans la page, « Retirer une ville », « Annuler le trajet » et « Prise en charge non validée » en boîte de confirmation. Une action du trajet qui échoue (publier, démarrer…) affiche maintenant son erreur au lieu de ne rien faire.
 //
 // [09/10/2026] v10 — Trajet en brouillon ou publié sans réservation : même simplification que le guide. L'écran ne montre que le billet
@@ -392,11 +393,13 @@ function BookingOtpCard({
         // (canal best-effort) — le passager peut alors le consulter
         // directement dans son app plutôt que d'attendre un SMS qui
         // n'arrivera pas.
-        if (!result.smsSent) {
+        if (result.smsDisabled || !result.smsSent) {
           setFeedback({
             tone: 'info',
             title: 'Code généré',
-            text: "Le SMS n'a pas pu être envoyé au passager — demandez-lui de consulter son code directement dans l'application (bouton « Voir mon code » sur sa réservation).",
+            text: result.smsDisabled
+              ? "Le passager vient d'être prévenu dans son application : demandez-lui son code (bouton « Voir mon code » sur sa réservation)."
+              : "Le SMS n'a pas pu être envoyé au passager — demandez-lui de consulter son code directement dans l'application (bouton « Voir mon code » sur sa réservation).",
           });
         }
       },

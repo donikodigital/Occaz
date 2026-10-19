@@ -1,4 +1,5 @@
 // mobile/src/types/payouts.types.ts
+// [19/10/2026] RequestPayoutPayload.pin : le code PIN de connexion confirme le retrait (à la place d'un SMS).
 import type { Money } from '@/services/api/types';
 
 export type PayoutStatus = 'REQUESTED' | 'PROCESSING' | 'PAID' | 'FAILED' | 'CANCELLED';
@@ -23,4 +24,6 @@ export interface RequestPayoutPayload {
   amount: string;
   method?: string;
   destinationRef?: string;
+  /** Code PIN de connexion (6 chiffres) : obligatoire, confirme le retrait. */
+  pin: string;
 }

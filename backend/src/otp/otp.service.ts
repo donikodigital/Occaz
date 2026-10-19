@@ -1,8 +1,14 @@
 // backend/src/otp/otp.service.ts
+// [19/10/2026] v2 — Politique SMS (voir integrations/sms/sms-purpose.ts) : parmi les codes de remise, SEUL le code de livraison d'un colis part
+// par SMS, et seulement vers le DESTINATAIRE (qui n'a pas forcément de compte Occa'Z). Les codes de prise en charge (trajet, colis) et de
+// dépose restent affichés dans l'application de leur bénéficiaire (compte Occa'Z). Quand l'expéditeur consulte lui-même son code
+// (revealCodeToCaller), aucun SMS n'est envoyé : il le lit à l'écran. Le résultat indique `smsDisabled` quand le SMS est volontairement coupé,
+// pour que l'application n'affiche pas un faux « échec d'envoi ».
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { OtpPurpose, OtpStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
+import { isSmsPurposeAllowed, SmsPurpose } from '../integrations/sms/sms-purpose';
 import { generateOtpCode, hashOtpCode, verifyOtpCode } from '../common/utils/otp.util';
 import { addDuration } from '../common/utils/duration.util';
 import { OtpSettingsService } from './otp-settings.service';
@@ -74,9 +80,12 @@ export class OtpService {
     params: GenerateOtpParams,
     message: string,
     options?: { revealCodeToCaller?: boolean },
-  ): Promise<{ expiresInSeconds: number; code?: string; smsSent: boolean }> {
+  ): Promise<{ expiresInSeconds: number; code?: string; smsSent: boolean; smsDisabled: boolean }> {
     const { expirySeconds, maxAttempts, handoverSmsDailyLimit } = await this.otpSettings.get();
-    const smsAllowed = await this.isHandoverSmsAllowed(params, handoverSmsDailyLimit);
+    // Politique : seul le code de livraison part par SMS, vers le destinataire ; jamais quand l'appelant lit lui-même son code.
+    const smsPurpose = params.purpose === OtpPurpose.SHIPMENT_DELIVERY ? SmsPurpose.PARCEL_RECIPIENT : SmsPurpose.HANDOVER;
+    const smsDisabled = !isSmsPurposeAllowed(smsPurpose) || Boolean(options?.revealCodeToCaller);
+    const smsAllowed = !smsDisabled && (await this.isHandoverSmsAllowed(params, handoverSmsDailyLimit));
     const code = generateOtpCode();
 
     await this.prisma.otpCode.create({
@@ -94,7 +103,7 @@ export class OtpService {
 
     let smsSent = smsAllowed;
     try {
-      if (smsAllowed) await this.smsProvider.send(params.phone, `${message} ${code}`);
+      if (smsAllowed) await this.smsProvider.send(params.phone, `${message} ${code}`, smsPurpose);
     } catch (error) {
       smsSent = false;
       this.logger.warn(
@@ -102,7 +111,7 @@ export class OtpService {
       );
     }
 
-    return { expiresInSeconds: expirySeconds, code: options?.revealCodeToCaller ? code : undefined, smsSent };
+    return { expiresInSeconds: expirySeconds, code: options?.revealCodeToCaller ? code : undefined, smsSent, smsDisabled };
   }
 
   /**

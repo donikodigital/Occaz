@@ -1,4 +1,5 @@
 // mobile/src/components/screens/DriverJourneyGuide.tsx
+// [19/10/2026] v+ — plus de SMS pour les codes de trajet : les messages parlent de l'application (« Voir mon code »).
 //
 // [09/10/2026] v1 — Le guide du conducteur : l'écran ne montre QUE l'étape à faire, avec un seul bouton (ou un seul code à saisir).
 // Tout le reste (billet, villes traversées, liste des passagers, véhicule) se consulte à la demande, sous « Voir tous les détails »,
@@ -441,7 +442,13 @@ function CodeStep({
     request.mutate(undefined, {
       onSuccess: (result) => {
         setCodeSent(true);
-        if (!result.smsSent) {
+        if (result.smsDisabled) {
+          notify({
+            tone: 'info',
+            title: 'Code généré',
+            text: "Le passager vient d'être prévenu dans son application : demandez-lui son code (bouton « Voir mon code » sur sa réservation).",
+          });
+        } else if (!result.smsSent) {
           notify({
             tone: 'info',
             title: 'Code généré',
@@ -516,7 +523,7 @@ function CodeStep({
       {codeSent ? (
         <>
           <AppText variant="sm" color="textSecondary" align="center">
-            Le passager a reçu son code par SMS et peut aussi l&apos;afficher dans son application (« Voir mon code »).
+            Le passager voit son code dans son application (« Voir mon code ») : demandez-le lui, puis saisissez-le ci-dessous.
           </AppText>
           <View style={styles.codeRow}>
             <TextField
@@ -537,22 +544,22 @@ function CodeStep({
           />
           <Pressable
             accessibilityRole="button"
-            onPress={() => sendCode(() => notify({ tone: 'info', title: 'Code renvoyé', text: 'Un nouveau code vient d’être envoyé au passager.' }))}
+            onPress={() => sendCode(() => notify({ tone: 'info', title: 'Code renvoyé', text: 'Le passager est prévenu : il retrouve son nouveau code dans son application.' }))}
             disabled={request.isPending}
             style={({ pressed }) => [styles.resend, pressed && styles.pressed]}
           >
             <IconRefresh size={14} color={OCEAN.base} />
             <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-              Le passager n&apos;a pas reçu le code ? Renvoyer
+              Le passager ne trouve pas son code ? Le renvoyer
             </AppText>
           </Pressable>
         </>
       ) : (
         <>
           <AppText variant="sm" color="textSecondary" align="center">
-            Ce passager n&apos;a pas encore reçu de code de dépose : envoyez-le lui, puis saisissez celui qu&apos;il vous donne.
+            Ce passager n&apos;a pas encore de code de dépose : demandez-le, il le verra dans son application, puis saisissez celui qu&apos;il vous donne.
           </AppText>
-          <OceanButton label="Envoyer le code au passager" onPress={() => sendCode()} loading={request.isPending} style={styles.mainButton} />
+          <OceanButton label="Demander le code au passager" onPress={() => sendCode()} loading={request.isPending} style={styles.mainButton} />
         </>
       )}
       <ProblemSection items={problems} />

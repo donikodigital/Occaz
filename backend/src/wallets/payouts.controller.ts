@@ -1,4 +1,5 @@
 // backend/src/wallets/payouts.controller.ts
+// [19/10/2026] v2 — POST /payouts exige le code PIN de connexion du conducteur (aucun SMS).
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -8,6 +9,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { CountryScopeService } from '../common/scope/country-scope.service';
 import { PayoutsService } from './payouts.service';
+import { PinConfirmationService } from './pin-confirmation.service';
 import { RequestPayoutDto } from './dto/request-payout.dto';
 import { FailPayoutDto } from './dto/fail-payout.dto';
 import { ListPayoutsQueryDto } from './dto/list-payouts-query.dto';
@@ -22,6 +24,7 @@ export class PayoutsController {
     private readonly payoutsService: PayoutsService,
     private readonly driverProfilesService: DriverProfilesService,
     private readonly scope: CountryScopeService,
+    private readonly pinConfirmation: PinConfirmationService,
   ) {}
 
   @Get('mine')
@@ -33,6 +36,8 @@ export class PayoutsController {
   @Post()
   async request(@Body() dto: RequestPayoutDto, @CurrentUser() user: AuthenticatedUser) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    // Le PIN d'abord : sans lui, rien n'est créé ni réservé. Les erreurs de PIN comptent dans le verrouillage de la connexion.
+    await this.pinConfirmation.assertPin(user.id, dto.pin, 'PAYOUT_REQUEST');
     return this.payoutsService.request(driverId, dto);
   }
 

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/EmergencyContactsScreen.tsx
+// [19/10/2026] v+ — les textes suivent le réglage serveur (features.sosSms) : plus de promesse de SMS quand ils sont coupés.
 // [11/10/2026] v1 — « Mes proches » : les personnes (3 au plus) prévenues par SMS, avec votre position, quand vous envoyez une alerte SOS.
 // Partagé entre l'espace client et l'espace conducteur. Erreurs et confirmations dans la page (jamais Alert.alert).
 import React, { useState } from 'react';
@@ -11,6 +12,7 @@ import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { ApiError } from '@/services/api/ApiError';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAddEmergencyContact, useEmergencyContacts, useRemoveEmergencyContact } from '@/hooks/useSafety';
 import { isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
 import type { EmergencyContact } from '@/types/safety.types';
@@ -19,6 +21,9 @@ const MAX_CONTACTS = 3;
 
 export function EmergencyContactsScreen() {
   const { data, isLoading } = useEmergencyContacts();
+  // Les SMS d'alerte aux proches sont coupés par défaut (coût) : sans confirmation du serveur, on ne promet pas de SMS.
+  const { data: appConfig } = useAppConfig();
+  const sosSms = appConfig?.features.sosSms === true;
   const add = useAddEmergencyContact();
   const remove = useRemoveEmergencyContact();
   const [name, setName] = useState('');
@@ -47,7 +52,7 @@ export function EmergencyContactsScreen() {
         onSuccess: () => {
           setName('');
           setPhone('+224');
-          setFeedback({ tone: 'success', text: 'Proche ajouté. Il sera prévenu par SMS si vous envoyez une alerte.' });
+          setFeedback({ tone: 'success', text: sosSms ? 'Proche ajouté. Il sera prévenu par SMS si vous envoyez une alerte.' : 'Proche ajouté. Ses coordonnées sont enregistrées ; l’envoi de SMS d’alerte aux proches n’est pas actif pour le moment.' });
         },
         onError: (error) => setFeedback({ tone: 'error', text: error instanceof ApiError ? error.message : 'Impossible d’ajouter ce proche.' }),
       },
@@ -67,7 +72,7 @@ export function EmergencyContactsScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanHeroHeader title="Mes proches" subtitle="Prévenus par SMS si vous envoyez un SOS" icon={<IconUsersGroup />} onBack={() => router.back()} />
+      <OceanHeroHeader title="Mes proches" subtitle={sosSms ? 'Prévenus par SMS si vous envoyez un SOS' : 'Vos personnes de confiance'} icon={<IconUsersGroup />} onBack={() => router.back()} />
 
       {feedback ? (
         <View style={styles.banner}>
@@ -79,7 +84,7 @@ export function EmergencyContactsScreen() {
         <OceanEmpty
           icon={<IconUsersGroup size={26} color={OCEAN.base} />}
           title="Aucun proche enregistré"
-          text="Ajoutez jusqu’à 3 personnes de confiance. En cas d’alerte, elles reçoivent un SMS avec votre position."
+          text={sosSms ? 'Ajoutez jusqu’à 3 personnes de confiance. En cas d’alerte, elles reçoivent un SMS avec votre position.' : 'Ajoutez jusqu’à 3 personnes de confiance. L’envoi de SMS d’alerte à vos proches n’est pas actif pour le moment : en cas d’alerte, l’équipe Occa’Z est prévenue.'}
         />
       ) : (
         <View style={styles.list}>

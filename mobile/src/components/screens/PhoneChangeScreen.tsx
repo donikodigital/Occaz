@@ -1,10 +1,12 @@
 // mobile/src/components/screens/PhoneChangeScreen.tsx
+// [19/10/2026] v+ — Le code part TOUJOURS par SMS au nouveau numéro ; l'avertissement du changement part par e-mail (plus de SMS à l'ancien numéro).
+// [19/10/2026] v+ — Quand le serveur annonce le changement de numéro fermé (SMS coupé par défaut), l'écran l'explique au lieu de laisser échouer l'envoi.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // Changement de numéro de téléphone, commun aux espaces Client et Conducteur (les deux écrans de route le réutilisent).
 //
 //   1. Nouveau numéro  → un code est envoyé par SMS à ce NOUVEAU numéro (preuve que la personne le possède) ;
-//   2. Code à 6 chiffres → saisi, il remplace le numéro du compte ; l'ancien numéro reçoit un SMS d'alerte ;
+//   2. Code à 6 chiffres → saisi, il remplace le numéro du compte ; si le compte a une adresse e-mail, elle est prévenue du changement ;
 //   3. Confirmation.
 //
 // Le numéro est l'identifiant de connexion : après le changement, on se connecte avec le nouveau. Le numéro Mobile Money d'un
@@ -20,6 +22,7 @@ import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { LockedField } from '@/components/screens/LockedField';
 import { OTP_CODE_LENGTH, OtpCodeInput } from '@/components/screens/OtpCodeInput';
 import { useConfirmPhoneChange, useRequestPhoneChange } from '@/hooks/usePhoneChange';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/services/api/ApiError';
 import { guessCountryPrefix, isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
@@ -36,6 +39,7 @@ function errorText(error: unknown): string {
 
 export function PhoneChangeScreen() {
   const currentPhone = useAuthStore((state) => state.user?.phone ?? '');
+  const { data: appConfig } = useAppConfig();
 
   const [step, setStep] = useState<Step>('number');
   // Pré-rempli avec l'indicatif du pays du numéro actuel : on ne tape que la suite.
@@ -108,6 +112,21 @@ export function PhoneChangeScreen() {
 
   // ---------------------------------------------------------------------------
 
+  if (step === 'number' && appConfig?.features.phoneChange === false) {
+    return (
+      <ScreenContainer scroll maxWidth="form">
+        <OceanHeroHeader title="Changer mon numéro" icon={<IconDeviceMobile />} onBack={() => router.back()} />
+        <View style={styles.body}>
+          <AuthIllustration icon={<IconDeviceMobile size={26} color={OCEAN.onDark} />} size={104} style={styles.illustration} />
+          <AppText variant="base" color="textSecondary" align="center" style={styles.subtitle}>
+            Le changement de numéro en ligne n&apos;est pas disponible pour le moment. Contactez le support Occa&apos;Z : il le fera pour vous après vérification de votre identité.
+          </AppText>
+        </View>
+        <OceanButton label="Retour" variant="soft" onPress={() => router.back()} style={styles.submit} />
+      </ScreenContainer>
+    );
+  }
+
   if (step === 'done') {
     return (
       <ScreenContainer maxWidth="form">
@@ -120,7 +139,7 @@ export function PhoneChangeScreen() {
             Votre compte utilise maintenant le {newPhone.trim()}. Utilisez ce numéro pour vous connecter.
           </AppText>
           <AppText variant="xs" color="textMuted" align="center">
-            Un SMS a été envoyé à votre ancien numéro pour l'en informer.
+            Si votre compte a une adresse e-mail, nous l'avons prévenue du changement.
           </AppText>
         </View>
         <OceanButton label="Terminé" onPress={() => router.back()} style={styles.submit} />
@@ -216,7 +235,7 @@ export function PhoneChangeScreen() {
         </View>
 
         <AppText variant="xs" color="textMuted" style={styles.note}>
-          Ce numéro devient votre identifiant de connexion. Votre ancien numéro recevra un SMS pour vous prévenir du changement.
+          Ce numéro devient votre identifiant de connexion. Si votre compte a une adresse e-mail, elle sera prévenue du changement.
           Un nouveau changement ne sera possible qu'après un délai. Le numéro Mobile Money d'un conducteur n'est pas modifié ici.
         </AppText>
       </View>
