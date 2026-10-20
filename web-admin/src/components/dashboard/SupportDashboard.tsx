@@ -3,6 +3,8 @@
 // conducteurs et clients les plus concernés, et les raccourcis permis par ses rôles. Remplace l'erreur
 // « DASHBOARD_ADMIN_READ » que voyait un Support, le tableau de bord administrateur lui étant réservé.
 // Données : GET /dashboards/support (permission dispute.read). Que des cartes, jamais de tableau.
+// [20/10/2026] v+ — plus de débordement sur mobile : les grilles de cartes ont une colonne « minmax(0, 1fr) » (grid-cols-1) et la carte
+// peut rétrécir (min-w-0) ; sans cela une ligne longue (« Envoi · ouvert le … · +224… ») élargissait la carte au-delà de l'écran.
 'use client';
 
 import React from 'react';
@@ -48,7 +50,7 @@ function DisputeCard({ dispute }: { dispute: SupportDisputeSummary }) {
   return (
     <Link
       href={`/disputes/${dispute.id}`}
-      className="group flex items-center gap-3.5 rounded-2xl border border-border bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+      className="group flex min-w-0 items-center gap-3.5 rounded-2xl border border-border bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
     >
       <span
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
@@ -86,7 +88,7 @@ function EmptyCard({ text }: { text: string }) {
 function PartyCard({ name, count, kind }: { name: string; count: number; kind: 'driver' | 'customer' }) {
   const Icon = kind === 'driver' ? IconSteeringWheel : IconUser;
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 shadow-sm">
+    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 shadow-sm">
       <span
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
           kind === 'driver' ? 'bg-success-light text-success-dark' : 'bg-primary-light text-primary'
@@ -162,7 +164,7 @@ export function SupportDashboard() {
         {data.newDisputes.length === 0 ? (
           <EmptyCard text="Aucun nouveau litige : la file est vide." />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {data.newDisputes.map((dispute) => (
               <DisputeCard key={dispute.id} dispute={dispute} />
             ))}
@@ -175,7 +177,7 @@ export function SupportDashboard() {
         {data.urgentDisputes.length === 0 ? (
           <EmptyCard text="Aucun litige urgent en ce moment." />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {data.urgentDisputes.map((dispute) => (
               <DisputeCard key={dispute.id} dispute={dispute} />
             ))}
@@ -184,7 +186,7 @@ export function SupportDashboard() {
       </div>
 
       {data.flaggedDrivers.length > 0 || data.flaggedCustomers.length > 0 ? (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {data.flaggedDrivers.length > 0 ? (
             <div>
               <SectionTitle>Conducteurs les plus concernés</SectionTitle>

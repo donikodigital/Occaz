@@ -1,5 +1,7 @@
 // web-admin/src/app/(app)/disputes/page.tsx
 //
+// [20/10/2026] v2b — un litige clos s'affiche en carte grisée (fond gris, barre grise, couleurs atténuées) : on repère d'un coup d'œil
+// ce qui est terminé et ce qui reste à traiter.
 // v2 — Même structure que les autres pages d'administration : bandeau compact
 // (PageHero), filtres statut et priorité sur une seule ligne, cartes avec
 // barre de couleur selon la priorité (rouge = critique, orange = haute…),
@@ -114,11 +116,12 @@ export default function DisputesPage() {
             {disputes.map((dispute) => {
               const isShipment = dispute.subjectType === 'SHIPMENT';
               const isAssigned = dispute.assignedAgentId !== null;
+              const isClosed = dispute.status === 'CLOSED';
 
               return (
-                <ListCard key={dispute.id} href={`/disputes/${dispute.id}`} tone={PRIORITY_TONE[dispute.priority]}>
+                <ListCard key={dispute.id} href={`/disputes/${dispute.id}`} tone={PRIORITY_TONE[dispute.priority]} muted={isClosed}>
                   <div className="flex items-start gap-3">
-                    <IconTile tone={isShipment ? 'accent' : 'primary'}>
+                    <IconTile tone={isClosed ? 'neutral' : isShipment ? 'accent' : 'primary'}>
                       {isShipment ? <IconPackage size={20} /> : <IconRoute size={20} />}
                     </IconTile>
                     <div className="min-w-0 flex-1">

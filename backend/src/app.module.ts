@@ -1,4 +1,5 @@
 // backend/src/app.module.ts
+// [20/10/2026] v+ — + StaffAccountsModule (création des comptes d'équipe depuis le back-office).
 // [19/10/2026] v+ — JobsModule (déclencheur externe des traitements automatiques) et AppConfigModule (version minimale de l'application).
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -16,6 +17,7 @@ import { SeedModule } from './seed/seed.module';
 import { HealthModule } from './health/health.module';
 import { GeocodingModule } from './geocoding/geocoding.module';
 import { UsersModule } from './users/users.module';
+import { StaffAccountsModule } from './staff-accounts/staff-accounts.module';
 import { DevicesModule } from './devices/devices.module';
 import { AuthModule } from './auth/auth.module';
 import { CustomerProfilesModule } from './profiles/customer-profiles/customer-profiles.module';
@@ -83,6 +85,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     HealthModule,
     GeocodingModule,
     UsersModule,
+    StaffAccountsModule,
     DevicesModule,
     AuthModule,
 

@@ -1,4 +1,7 @@
 // backend/src/users/users.service.ts
+// [20/10/2026] v+ — Le prénom/nom d'un compte d'équipe créé depuis le back-office (StaffProfile) remonte aussi sur SafeUser.
+// [20/10/2026] v+ — suspend() enregistre le début de la suspension (User.suspendedAt) ; unsuspend() l'efface. Un compte suspendu 6 mois
+// sans être réactivé est supprimé par account-purge/suspended-account-purge.service.ts.
 // [22/09/2026] v+ — deleteSelf() : suppression de compte en libre-service, bloquée s'il reste une réservation, un envoi ou un trajet en cours.
 // [02/10/2026] v+ — Garde-fous sur les comptes d'équipe : un Support ne peut plus modifier, suspendre ni
 // désactiver un SuperAdmin (ni un collègue), personne ne peut suspendre/désactiver son propre compte, et
@@ -21,6 +24,7 @@ import { DeleteAccountDto } from './dto/delete-account.dto';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { isTestPhone } from '../common/utils/test-mode.util';
+import { suspensionStart } from '../common/utils/suspension';
 
 /** Vue "sûre" d'un utilisateur — ne contient jamais passwordHash / twoFactorSecret. */
 export type SafeUser = Omit<User, 'passwordHash' | 'twoFactorSecret' | 'failedLoginAttempts' | 'lockedUntil'> & {
@@ -40,11 +44,13 @@ export type SafeUser = Omit<User, 'passwordHash' | 'twoFactorSecret' | 'failedLo
 type UserWithProfileNames = User & {
   customerProfile?: { firstName: string; lastName: string } | null;
   driverProfile?: { firstName: string; lastName: string } | null;
+  staffProfile?: { firstName: string; lastName: string } | null;
 };
 
 const PROFILE_NAME_INCLUDE = {
   customerProfile: { select: { firstName: true, lastName: true } },
   driverProfile: { select: { firstName: true, lastName: true } },
+  staffProfile: { select: { firstName: true, lastName: true } },
 } as const;
 
 @Injectable()
@@ -55,8 +61,8 @@ export class UsersService {
   ) {}
 
   toSafeUser(user: UserWithProfileNames): SafeUser {
-    const { passwordHash, twoFactorSecret, failedLoginAttempts, lockedUntil, customerProfile, driverProfile, ...safe } = user;
-    const profile = customerProfile ?? driverProfile ?? null;
+    const { passwordHash, twoFactorSecret, failedLoginAttempts, lockedUntil, customerProfile, driverProfile, staffProfile, ...safe } = user;
+    const profile = customerProfile ?? driverProfile ?? staffProfile ?? null;
     const isCustomerOrDriver = user.accountType === AccountType.CUSTOMER || user.accountType === AccountType.DRIVER;
     return {
       ...safe,
@@ -232,9 +238,10 @@ export class UsersService {
 
   async suspend(id: string, reason: string, actorId: string): Promise<SafeUser> {
     await this.assertActorMayManage(actorId, id);
+    const current = await this.prisma.user.findUnique({ where: { id }, select: { isSuspended: true, suspendedAt: true } });
     const user = await this.prisma.user.update({
       where: { id },
-      data: { isSuspended: true, suspendedReason: reason },
+      data: { isSuspended: true, suspendedReason: reason, suspendedAt: suspensionStart(current) },
       include: PROFILE_NAME_INCLUDE,
     });
     await this.audit.log({
@@ -251,7 +258,7 @@ export class UsersService {
     await this.assertActorMayManage(actorId, id);
     const user = await this.prisma.user.update({
       where: { id },
-      data: { isSuspended: false, suspendedReason: null },
+      data: { isSuspended: false, suspendedReason: null, suspendedAt: null },
       include: PROFILE_NAME_INCLUDE,
     });
     await this.audit.log({

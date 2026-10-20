@@ -10,6 +10,7 @@
 // défilement visible, cartes de liste (CardShell, ListCard, IconTile, MetaItem).
 // Les blancs du bandeau sont des valeurs arbitraires (text-[#ffffff]) pour
 // ne dépendre d'aucune couleur « white » du thème Tailwind.
+// [20/10/2026] v+ — ListCard accepte `muted` : carte grisée pour un élément terminé (litige clos).
 
 'use client';
 
@@ -496,6 +497,10 @@ const TONE_TILE: Record<Tone, string> = {
 const CARD_SURFACE =
   'relative overflow-hidden rounded-2xl bg-surface shadow-[0_8px_24px_-12px_rgba(8,58,99,0.28)] ring-1 ring-border/70';
 
+/** Carte « terminée » (litige clos, par exemple) : fond gris clair, ombre plus discrète et couleurs atténuées, pour la distinguer d'un coup d'œil. */
+const CARD_SURFACE_MUTED =
+  'relative overflow-hidden rounded-2xl bg-slate-100 shadow-[0_6px_18px_-12px_rgba(51,65,85,0.25)] ring-1 ring-slate-200 saturate-[0.4]';
+
 /** Carte ombrée avec une barre de couleur à gauche (couleur = situation). Le remplissage est à la charge de l'appelant. */
 export function CardShell({
   tone = 'primary',
@@ -521,15 +526,18 @@ export function ListCard({
   href,
   onClick,
   tone = 'primary',
+  muted = false,
   children,
 }: {
   href?: string;
   onClick?: () => void;
   tone?: Tone;
+  /** Carte grisée (élément terminé) : voir CARD_SURFACE_MUTED. La barre de gauche devient grise quel que soit `tone`. */
+  muted?: boolean;
   children: React.ReactNode;
 }) {
-  const classes = `${CARD_SURFACE} group block h-full w-full p-3.5 pl-5 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-12px_rgba(8,58,99,0.38)] hover:ring-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary`;
-  const bar = <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${TONE_BAR[tone]}`} />;
+  const classes = `${muted ? CARD_SURFACE_MUTED : CARD_SURFACE} group block h-full w-full p-3.5 pl-5 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-12px_rgba(8,58,99,0.38)] hover:ring-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary`;
+  const bar = <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${TONE_BAR[muted ? 'neutral' : tone]}`} />;
 
   if (href) {
     return (

@@ -1,4 +1,5 @@
 // backend/src/jobs/jobs.service.ts
+// [20/10/2026] v3 — + suppression des comptes suspendus depuis 6 mois (rappels mensuels par e-mail avant).
 // [19/10/2026] v2 — + rappels d'intégration (dossier conducteur tous les 2 jours, adresse e-mail).
 // [19/10/2026] v1 — Lance, un par un, les traitements automatiques (réservations impayées, trajets sans réservation, rappels de départ, plages
 // de dates des envois). Chaque traitement garde son propre garde-fou (verrou « déjà en cours » + mises à jour conditionnelles en base) :
@@ -9,6 +10,7 @@ import { TripExpiryService } from '../trips/trip-expiry.service';
 import { TripReminderService } from '../trips/trip-reminder.service';
 import { ShipmentWindowService } from '../shipments/shipment-window.service';
 import { OnboardingReminderService } from '../onboarding-reminders/onboarding-reminder.service';
+import { SuspendedAccountPurgeService } from '../account-purge/suspended-account-purge.service';
 
 export interface JobResult {
   job: string;
@@ -27,6 +29,7 @@ export class JobsService {
     private readonly tripReminder: TripReminderService,
     private readonly shipmentWindow: ShipmentWindowService,
     private readonly onboardingReminders: OnboardingReminderService,
+    private readonly suspendedAccountPurge: SuspendedAccountPurgeService,
   ) {}
 
   /** Les traitements, dans l'ordre. Un échec n'empêche jamais les suivants. */
@@ -37,6 +40,7 @@ export class JobsService {
       ['trip-reminders', () => this.tripReminder.runOnce()],
       ['shipment-window', () => this.shipmentWindow.runOnce()],
       ['onboarding-reminders', () => this.onboardingReminders.runOnce()],
+      ['suspended-account-purge', () => this.suspendedAccountPurge.runOnce()],
     ];
   }
 

@@ -1,14 +1,16 @@
 // mobile/app/(driver)/complete-profile.tsx
+// [19/10/2026] v+ — bouton « Retour » en haut de l'écran (vers l'espace passager si le compte en a un, sinon vers l'écran précédent).
 // [19/10/2026] v+ — reprend nom, pays et ville du profil passager quand un passager devient conducteur ; l'étape des pièces rappelle le délai de régularisation.
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconMapPin } from '@tabler/icons-react-native';
-import { AppText, Button, Card, DocumentUploadField, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
+import { IconArrowLeft, IconMapPin } from '@tabler/icons-react-native';
+import { AppText, Button, Card, DocumentUploadField, IconButton, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { CountrySelectField } from '@/components/screens/CountrySelectField';
 import { colors, spacing } from '@/theme';
 import { useCreateDriverProfile } from '@/hooks/useDriverProfile';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
+import { useProfileStepBack } from '@/hooks/useProfileStepBack';
 import { useDriverDocumentUpload, useMyDriverDocuments } from '@/hooks/useDriverDocuments';
 import { useDriverPhotoUpload } from '@/hooks/useDriverPhotoUpload';
 import { useCitySelectionStore } from '@/stores/citySelectionStore';
@@ -92,6 +94,7 @@ export default function DriverCompleteProfileScreen() {
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [isProfileCreated, setProfileCreated] = useState(false);
   const createProfile = useCreateDriverProfile();
+  const goBack = useProfileStepBack('DRIVER');
 
   const citySelection = useCitySelectionStore((state) => state.selection);
   const consumeCitySelection = useCitySelectionStore((state) => state.consume);
@@ -157,6 +160,11 @@ export default function DriverCompleteProfileScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
+      {goBack ? (
+        <View style={styles.topBar}>
+          <IconButton icon={<IconArrowLeft size={18} color={colors.textPrimary} />} accessibilityLabel="Retour" onPress={goBack} />
+        </View>
+      ) : null}
       <AppText variant="xxl" weight="semibold" style={styles.title}>
         Complétez votre profil
       </AppText>
@@ -226,6 +234,11 @@ export default function DriverCompleteProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
   title: {
     marginTop: spacing.sm,
     marginBottom: spacing.xxs,

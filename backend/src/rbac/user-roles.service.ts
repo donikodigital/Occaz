@@ -1,13 +1,17 @@
 // backend/src/rbac/user-roles.service.ts
+// [20/10/2026] v+ — revoke() refuse de retirer le rôle « superadmin » : personne ne pourrait le redonner à un SuperAdmin qui se le serait retiré.
 // [02/10/2026] v+ — Portée géographique appliquée : getEffectivePermissions() calcule, par permission, les pays
 // auxquels elle est limitée (voir common/scope/country-scope.ts) ; assign() vérifie que le pays existe.
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { EffectivePermissions, resolveEffectivePermissions } from '../common/scope/country-scope';
 
 export type { EffectivePermissions };
+
+/** Clé du rôle complet créé par rbac.seed.ts : il ne se retire pas par l'API. */
+export const SUPERADMIN_ROLE_KEY = 'superadmin';
 
 @Injectable()
 export class UserRolesService {
@@ -60,8 +64,14 @@ export class UserRolesService {
   }
 
   async revoke(userRoleId: string, actorId: string) {
-    const userRole = await this.prisma.userRole.findUnique({ where: { id: userRoleId } });
+    const userRole = await this.prisma.userRole.findUnique({
+      where: { id: userRoleId },
+      include: { role: { select: { key: true } } },
+    });
     if (!userRole) throw new NotFoundException('Attribution de rôle introuvable.');
+    if (userRole.role.key === SUPERADMIN_ROLE_KEY) {
+      throw new ForbiddenException('Le rôle Super administrateur ne peut pas être retiré.');
+    }
 
     await this.prisma.userRole.delete({ where: { id: userRoleId } });
     await this.audit.log({

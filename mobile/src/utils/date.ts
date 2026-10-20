@@ -5,6 +5,11 @@ export function formatDateShort(iso: string): string {
   return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(iso));
 }
 
+/** « 17 oct. 2026 » — pour une date passée qu'on veut situer sans ambiguïté (envoi, réservation, historique). */
+export function formatDateWithYear(iso: string): string {
+  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
+}
+
 export function formatDateLong(iso: string): string {
   return new Intl.DateTimeFormat('fr-FR', {
     weekday: 'long',

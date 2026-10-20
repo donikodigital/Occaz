@@ -1,5 +1,6 @@
 // mobile/app/(customer)/complete-profile.tsx
 //
+// [19/10/2026] v2b — bouton « Retour » en haut de l'écran (vers l'espace conducteur si le compte en a un, sinon vers l'écran précédent).
 // v2 — Habillage bleu océan : un bandeau d'accueil sombre, le formulaire sur
 // une carte à en-tête soulignée, et le bouton plein. Logique inchangée.
 //
@@ -11,12 +12,13 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconUserCircle, IconUserPlus } from '@tabler/icons-react-native';
-import { AppText, ScreenContainer, TextField } from '@/components/ui';
+import { IconArrowLeft, IconUserCircle, IconUserPlus } from '@tabler/icons-react-native';
+import { AppText, IconButton, ScreenContainer, TextField } from '@/components/ui';
 import { OceanButton, OceanHeroCard, OceanSection } from '@/components/ocean/OceanKit';
-import { spacing } from '@/theme';
+import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCreateCustomerProfile } from '@/hooks/useCustomerProfile';
+import { useProfileStepBack } from '@/hooks/useProfileStepBack';
 import { ApiError } from '@/services/api/ApiError';
 
 export default function CompleteProfileScreen() {
@@ -25,6 +27,7 @@ export default function CompleteProfileScreen() {
   const [email, setEmail] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const createProfile = useCreateCustomerProfile();
+  const goBack = useProfileStepBack('CUSTOMER');
 
   function handleSubmit() {
     setErrorMessage(undefined);
@@ -51,6 +54,11 @@ export default function CompleteProfileScreen() {
   return (
     <ScreenContainer scroll maxWidth="form">
       <View style={styles.body}>
+        {goBack ? (
+          <View style={styles.topBar}>
+            <IconButton icon={<IconArrowLeft size={18} color={colors.textPrimary} />} accessibilityLabel="Retour" onPress={goBack} />
+          </View>
+        ) : null}
         <OceanHeroCard style={styles.hero}>
           <View style={styles.heroIcon}>
             <IconUserPlus size={26} color={OCEAN.onDark} />
@@ -95,6 +103,11 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     paddingTop: spacing.lg,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   hero: {
     gap: spacing.xs,

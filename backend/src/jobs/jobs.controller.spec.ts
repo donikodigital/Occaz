@@ -1,4 +1,5 @@
 // backend/src/jobs/jobs.controller.spec.ts
+// [20/10/2026] v+ — JobsService reçoit aussi la suppression des comptes suspendus (6e traitement).
 // [19/10/2026] v+ — JobsService reçoit aussi les rappels d'intégration (5e traitement).
 // Déclencheur externe des traitements : fermé sans secret, 401 avec un mauvais, lance tout avec le bon.
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
@@ -55,9 +56,16 @@ describe('JobsService.runAll', () => {
   it('un traitement en échec n\'empêche pas les suivants', async () => {
     const ok = { runOnce: jest.fn().mockResolvedValue(undefined) };
     const boom = { runOnce: jest.fn().mockRejectedValue(new Error('boom')) };
-    const service = new JobsService(ok as never, boom as never, ok as never, ok as never, ok as never);
+    const service = new JobsService(ok as never, boom as never, ok as never, ok as never, ok as never, ok as never);
     const results = await service.runAll();
-    expect(results.map((r) => [r.job, r.ok])).toEqual([['booking-expiry', true], ['trip-expiry', false], ['trip-reminders', true], ['shipment-window', true], ['onboarding-reminders', true]]);
-    expect(ok.runOnce).toHaveBeenCalledTimes(4);
+    expect(results.map((r) => [r.job, r.ok])).toEqual([
+      ['booking-expiry', true],
+      ['trip-expiry', false],
+      ['trip-reminders', true],
+      ['shipment-window', true],
+      ['onboarding-reminders', true],
+      ['suspended-account-purge', true],
+    ]);
+    expect(ok.runOnce).toHaveBeenCalledTimes(5);
   });
 });

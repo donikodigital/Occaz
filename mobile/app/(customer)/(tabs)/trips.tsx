@@ -1,4 +1,5 @@
 // mobile/app/(customer)/(tabs)/trips.tsx
+// [20/10/2026] v3b — la carte d'un envoi affiche sa date d'envoi (« Envoyé le 17 oct. 2026 »).
 // [07/10/2026] v3 — « Mon activité » et sa phrase passent dans un bandeau (hero) bleu océan ; le reste de l'écran est inchangé.
 // [21/09/2026] v+ — le montant d'un envoi s'affiche dans sa devise.
 // [03/10/2026] v+ — la carte d'un envoi montre « ville de départ → ville d'arrivée » : on comprend d'un coup d'œil pourquoi
@@ -22,7 +23,7 @@ import { OCEAN } from '@/theme/ocean';
 import { useMyBookings } from '@/hooks/useBookings';
 import { useMyShipments } from '@/hooks/useShipments';
 import { currencyOf, formatMoney } from '@/utils/money';
-import { formatDateShort, formatTime } from '@/utils/date';
+import { formatDateShort, formatDateWithYear, formatTime } from '@/utils/date';
 import { formatCityCountry, formatShipmentRoute } from '@/utils/shipmentDisplay';
 import { bookingBoardingAt, bookingRouteLabel } from '@/utils/tripSegment';
 import type { Booking, BookingStatus } from '@/types/bookings.types';
@@ -127,7 +128,10 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
           {formatShipmentRoute(shipment) ??
             formatCityCountry(shipment.recipientLocation) ??
             shipment.recipientLocation?.label ??
-            formatDateShort(shipment.createdAt)}
+            'Colis'}
+        </AppText>
+        <AppText variant="xs" color="textMuted" numberOfLines={1}>
+          Envoyé le {formatDateWithYear(shipment.createdAt)}
         </AppText>
       </View>
       <View style={styles.rowEnd}>

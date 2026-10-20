@@ -1,4 +1,5 @@
 // web-admin/src/components/layout/Sidebar.tsx
+// [20/10/2026] v+ — getVisibleSections() reçoit isSuperAdmin (entrée « Création comptes » réservée au SuperAdmin).
 // [22/09/2026] v2 — Refonte visuelle : marque en médaillon dégradé, icônes
 // de navigation dans une pastille (au lieu d'un simple trait actif à
 // gauche), item actif en fond plein avec ombre douce, carte utilisateur
@@ -50,8 +51,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const { can } = usePermissions();
-  const sections = getVisibleSections(can);
+  const { can, isSuperAdmin } = usePermissions();
+  const sections = getVisibleSections(can, isSuperAdmin);
 
   // Referme le tiroir à chaque changement de page.
   useEffect(() => {

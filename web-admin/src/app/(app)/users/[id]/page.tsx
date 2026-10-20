@@ -1,4 +1,6 @@
 // web-admin/src/app/(app)/users/[id]/page.tsx
+// [20/10/2026] v+ — Le rôle « Super administrateur » n'a plus de bouton « Retirer » (une pastille « Protégé » à la place) : un SuperAdmin qui se
+// le retirerait par erreur ne pourrait plus le récupérer. Le serveur refuse aussi ce retrait (voir backend/src/rbac/user-roles.service.ts).
 // [02/10/2026] v+ — La section « Rôles » exige role.manage et le bloc de suspension user.suspend ; seul un
 // SuperAdmin agit sur un compte de l'équipe, et personne ne suspend son propre compte.
 // [02/10/2026] v+ — Attribution d'un rôle « limité à un pays » : le rôle ne s'applique alors qu'aux dossiers de ce pays.
@@ -7,7 +9,7 @@
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { IconArrowLeft } from '@tabler/icons-react';
+import { IconArrowLeft, IconLock } from '@tabler/icons-react';
 import { Badge, Button, Card, Select, TextArea } from '@/components/ui';
 import { useSuspendUser, useUnsuspendUser, useUser } from '@/hooks/useUsers';
 import { useAssignRole, useRevokeRole, useRoles, useUserRoles } from '@/hooks/useRbac';
@@ -16,6 +18,9 @@ import { ACCOUNT_TYPE_LABELS } from '@/utils/userLabels';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PERMISSIONS } from '@/utils/permissions';
 import { ApiError } from '@/services/api/ApiError';
+
+/** Clé du rôle qui ne se retire jamais depuis l'interface (même valeur que backend/src/rbac/rbac.seed.ts). */
+const PROTECTED_ROLE_KEY = 'superadmin';
 
 function UserRolesSection({ userId }: { userId: string }) {
   const { data: assignments, isLoading } = useUserRoles(userId);
@@ -40,12 +45,22 @@ function UserRolesSection({ userId }: { userId: string }) {
                 <p className="text-sm font-medium text-text-primary">{assignment.role.name}</p>
                 {assignment.country ? <p className="text-xs text-text-secondary">Limité à {assignment.country.name}</p> : null}
               </div>
-              <button
-                onClick={() => revokeRole.mutate(assignment.id)}
-                className="text-xs text-danger hover:underline"
-              >
-                Retirer
-              </button>
+              {assignment.role.key === PROTECTED_ROLE_KEY ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-border/40 px-2 py-1 text-xs font-semibold text-text-secondary"
+                  title="Ce rôle ne peut pas être retiré."
+                >
+                  <IconLock size={12} />
+                  Protégé
+                </span>
+              ) : (
+                <button
+                  onClick={() => revokeRole.mutate(assignment.id)}
+                  className="text-xs text-danger hover:underline"
+                >
+                  Retirer
+                </button>
+              )}
             </div>
           ))}
         </div>

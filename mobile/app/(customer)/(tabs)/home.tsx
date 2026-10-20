@@ -1,4 +1,5 @@
 // mobile/app/(customer)/(tabs)/home.tsx
+// [19/10/2026] v+ — carte « Détails du trajet » : le statut (« Confirmée ») et le prix (« 253 000 GNF ») tiennent sur une seule ligne.
 // [19/10/2026] v+ — rappel d'ajouter une adresse e-mail (carte facultative, affichée tant qu'aucune adresse n'est vérifiée).
 // [10/10/2026] v+ — « Message indisponible » s'affiche dans la page (bannière) au lieu d'Alert.alert, sans effet sur le web.
 // [10/10/2026] v+ — action « Suivre un colis » dans le bouton + (saisie d'un numéro de suivi).
@@ -315,9 +316,10 @@ export default function CustomerHomeScreen() {
                 destination={routePoint(currentTrip.destinationLocation, currentTrip.destinationCity)}
                 columns={[
                   { label: 'Date', value: `${formatDateShort(currentTrip.departureAt)} · ${formatTime(currentTrip.departureAt)}` },
-                  { label: 'Places', value: String(current.seatsCount) },
-                  { label: 'Statut', value: currentStatusLabel },
-                  { label: 'Prix', value: formatMoney(current.totalAmount, currencyOf(current)) },
+                  { label: 'Places', value: String(current.seatsCount), flex: 0.6 },
+                  // « Confirmée » et « 253 000 GNF » restent chacun sur une seule ligne.
+                  { label: 'Statut', value: currentStatusLabel, flex: 1.15, singleLine: true },
+                  { label: 'Prix', value: formatMoney(current.totalAmount, currencyOf(current)), flex: 1.35, singleLine: true },
                 ]}
                 primary={{ label: currentPrimaryLabel, onPress: () => router.push(`/(customer)/booking/${current.id}`) }}
                 secondary={{

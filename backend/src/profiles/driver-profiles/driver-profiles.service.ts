@@ -1,4 +1,5 @@
 // backend/src/profiles/driver-profiles/driver-profiles.service.ts
+// [20/10/2026] v+ — suspend() enregistre le début de la suspension (User.suspendedAt), reactivate() l'efface (voir common/utils/suspension.ts).
 // [19/10/2026] v+ — createForUser accepte aussi un compte client (compte à deux profils).
 import {
   BadRequestException,
@@ -20,6 +21,7 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../../common/dto/pagination-response.dto';
 import { CreateDriverProfileDto } from './dto/create-driver-profile.dto';
 import { UpdateDriverProfileDto } from './dto/update-driver-profile.dto';
+import { suspensionStart } from '../../common/utils/suspension';
 
 @Injectable()
 export class DriverProfilesService {
@@ -304,9 +306,13 @@ export class DriverProfilesService {
         where: { id },
         data: { status: DriverAccountStatus.SUSPENDED },
       });
+      const currentUser = await tx.user.findUnique({
+        where: { id: existing.userId },
+        select: { isSuspended: true, suspendedAt: true },
+      });
       await tx.user.update({
         where: { id: existing.userId },
-        data: { isSuspended: true, suspendedReason: reason },
+        data: { isSuspended: true, suspendedReason: reason, suspendedAt: suspensionStart(currentUser) },
       });
       await tx.session.updateMany({
         where: { userId: existing.userId, isRevoked: false },
@@ -336,7 +342,7 @@ export class DriverProfilesService {
       });
       await tx.user.update({
         where: { id: existing.userId },
-        data: { isSuspended: false, suspendedReason: null },
+        data: { isSuspended: false, suspendedReason: null, suspendedAt: null },
       });
       return updated;
     });

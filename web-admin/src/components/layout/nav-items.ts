@@ -1,4 +1,6 @@
 // web-admin/src/components/layout/nav-items.ts
+// [20/10/2026] v+ — Entrée « Création comptes » (Système), réservée au SuperAdmin : `superAdminOnly` sur NavItem, et `isSuperAdmin` en
+// paramètre de canSeeNavItem() / getVisibleSections().
 // [22/09/2026] v+ — getQuickLinks() retiré : la barre du bas mobile a été supprimée, toute la navigation mobile passe par le tiroir de la Sidebar.
 // [02/10/2026] v+ — Chaque entrée déclare la permission (une parmi plusieurs) qui y donne accès : le menu et
 // les pages ne montrent plus que ce que le compte connecté a le droit d'utiliser (un Support ne voit plus
@@ -26,6 +28,7 @@ import {
   IconSteeringWheel,
   IconTicket,
   IconTruckDelivery,
+  IconUserPlus,
   IconUsers,
   IconWallet,
   IconBuildingBank,
@@ -39,6 +42,8 @@ export interface NavItem {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   /** Accès si le compte a AU MOINS UNE de ces permissions (le SuperAdmin passe toujours). */
   permissions?: PermissionKey[];
+  /** Réservé au compte SuperAdmin, quelles que soient les permissions des rôles. */
+  superAdminOnly?: boolean;
 }
 
 export interface NavSection {
@@ -98,6 +103,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Système',
     items: [
       { href: '/roles', label: 'Rôles', icon: IconShieldLock, permissions: [PERMISSIONS.ROLE_MANAGE] },
+      { href: '/staff-accounts', label: 'Création comptes', icon: IconUserPlus, superAdminOnly: true },
       { href: '/settings', label: 'Paramètres', icon: IconSettings, permissions: [PERMISSIONS.SETTINGS_UPDATE] },
       { href: '/audit-logs', label: "Journal d'audit", icon: IconHistory, permissions: [PERMISSIONS.AUDIT_READ] },
     ],
@@ -115,14 +121,19 @@ export function getActiveNavItem(pathname: string): NavItem | undefined {
 }
 
 /** Vrai si le compte peut ouvrir cette entrée du menu. `can` vient de usePermissions(). */
-export function canSeeNavItem(item: NavItem, can: (...required: PermissionKey[]) => boolean): boolean {
+export function canSeeNavItem(
+  item: NavItem,
+  can: (...required: PermissionKey[]) => boolean,
+  isSuperAdmin: boolean,
+): boolean {
+  if (item.superAdminOnly && !isSuperAdmin) return false;
   return !item.permissions || can(...item.permissions);
 }
 
 /** Sections du menu réduites à ce que le compte a le droit d'utiliser (une section vide disparaît). */
-export function getVisibleSections(can: (...required: PermissionKey[]) => boolean): NavSection[] {
+export function getVisibleSections(can: (...required: PermissionKey[]) => boolean, isSuperAdmin: boolean): NavSection[] {
   return NAV_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => canSeeNavItem(item, can)),
+    items: section.items.filter((item) => canSeeNavItem(item, can, isSuperAdmin)),
   })).filter((section) => section.items.length > 0);
 }

@@ -1,6 +1,7 @@
 // mobile/src/components/home/CurrentTripCard.tsx
-// mobile/src/components/home/CurrentTripCard.tsx
 //
+// [19/10/2026] v1.2 — une colonne peut être forcée sur une seule ligne (`singleLine`) : « Confirmée » et « 253 000 GNF » ne sont plus coupés
+// (espaces insécables + réduction légère de la police si la place manque).
 // [09/10/2026] v1.1 — une colonne peut porter une valeur sur plusieurs lignes (« Passagers » puis « Colis ») et une largeur relative (`flex`),
 // pour que « Passagers » ne soit plus coupé en plein mot.
 // [08/10/2026] v1 — Carte « Détails du trajet » de l'accueil, d'après la maquette : la carte de la route (ou, sans coordonnées ni jeton
@@ -23,6 +24,8 @@ export interface TripColumn {
   value: string;
   /** Largeur relative de la colonne (1 par défaut) : plus grande pour un mot long comme « Passagers ». */
   flex?: number;
+  /** Valeur toujours sur une seule ligne, jamais coupée (statut, montant et devise). */
+  singleLine?: boolean;
 }
 
 export interface TripCardAction {
@@ -114,9 +117,22 @@ export function CurrentTripCard({
                 <AppText variant="xs" color="textMuted">
                   {column.label}
                 </AppText>
-                <AppText variant="sm" weight="bold" color={OCEAN.deep} numberOfLines={2}>
-                  {column.value}
-                </AppText>
+                {column.singleLine ? (
+                  <AppText
+                    variant="sm"
+                    weight="bold"
+                    color={OCEAN.deep}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                  >
+                    {column.value.replace(/ /g, ' ')}
+                  </AppText>
+                ) : (
+                  <AppText variant="sm" weight="bold" color={OCEAN.deep} numberOfLines={2}>
+                    {column.value}
+                  </AppText>
+                )}
               </View>
             ))}
           </View>

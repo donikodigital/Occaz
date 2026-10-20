@@ -1,4 +1,5 @@
 // web-admin/src/app/(app)/layout.tsx
+// [20/10/2026] v+ — canSeeNavItem() reçoit isSuperAdmin (page « Création comptes » réservée au SuperAdmin).
 // [22/09/2026] v2 — Barre du bas mobile retirée (BottomNavBar supprimé) :
 // sur mobile, la navigation passe entièrement par le tiroir ouvert depuis
 // le vrai en-tête (MobileTopBar). Plus de pb-24 réservé pour elle.
@@ -21,7 +22,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const { can, isReady } = usePermissions();
+  const { can, isReady, isSuperAdmin } = usePermissions();
   const [isMobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return null;
 
   const activeItem = getActiveNavItem(pathname);
-  const isAllowed = !activeItem || canSeeNavItem(activeItem, can);
+  const isAllowed = !activeItem || canSeeNavItem(activeItem, can, isSuperAdmin);
 
   return (
     <div className="flex min-h-screen bg-background">
