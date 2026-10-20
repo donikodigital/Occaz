@@ -36,7 +36,7 @@ export class TrackingNotificationsService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  /** Adresse publique de la page de suivi (sans « / » final), ex. https://occaz.app — absente : les e-mails n'ont pas de lien. */
+  /** Adresse publique de la page de suivi (sans « / » final), ex. https://occaz.sarl — absente : les e-mails n'ont pas de lien. */
   private trackingUrl(trackingNumber: string): string | null {
     const base = process.env.TRACKING_BASE_URL?.trim().replace(/\/+$/, '');
     return base ? `${base}/suivi/${trackingNumber}` : null;

@@ -27,6 +27,7 @@ import {
   IconGift,
   IconUserPlus,
 } from '@tabler/icons-react';
+import { LegalFooterLinks } from '@/components/legal/LegalDocumentView';
 
 const PLAY_STORE_URL = process.env.NEXT_PUBLIC_PLAY_STORE_URL?.trim() ?? '';
 const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL?.trim() ?? '';
@@ -238,7 +239,10 @@ export default function JoinPage() {
           ) : null}
         </section>
 
-        <p className="pb-2 text-center text-xs text-text-muted">© 2026 Occa&apos;Z · occaz.sarl</p>
+        <div className="flex flex-col items-center gap-2 pb-2">
+          <LegalFooterLinks />
+          <p className="text-center text-xs text-text-muted">© 2026 Occa&apos;Z · occaz.sarl</p>
+        </div>
       </div>
     </main>
   );

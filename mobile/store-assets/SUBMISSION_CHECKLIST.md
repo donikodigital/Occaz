@@ -1,6 +1,8 @@
 <!-- mobile/store-assets/SUBMISSION_CHECKLIST.md -->
 # Checklist de soumission — App Store & Google Play
 
+> [20/10/2026] Pour Google Play, suivre en priorité `PLAY_CONSOLE_GUIDE.md` (réponses prêtes à saisir dans chaque formulaire) et `listing-fr.md` (textes de la fiche). Les politiques publiées sont sur https://occaz.sarl/confidentialite, /conditions et /suppression-compte.
+
 ## Comptes développeur (préalable, en dehors de ce dépôt)
 - [ ] Compte Apple Developer (99 $/an) — https://developer.apple.com
 - [ ] Compte Google Play Console (25 $, paiement unique) — https://play.google.com/console
@@ -10,7 +12,8 @@
 - [x] Icônes générées (`assets/images/icon.png`, `adaptive-icon.png`, `splash-icon.png`, `favicon.png`)
 - [x] `app.json` : identifiants de bundle, version, icônes référencées
 - [x] `eas.json` : profils development / preview / production
-- [ ] Remplacer `extra.eas.projectId` et `owner` dans `app.json` (générés automatiquement au premier `eas build`, ou récupérables via `eas project:info`)
+- [x] `extra.eas.projectId` et `owner` renseignés dans `app.json`
+- [x] `extra.apiUrl` pointe sur https://api.occaz.sarl/api/v1 (surchargé par `EXPO_PUBLIC_API_URL` dans `app.config.js`)
 
 ## Avant le premier build
 ```bash
@@ -46,7 +49,8 @@ de données à cocher (localisation précise, informations personnelles,
 informations financières, photos).
 
 ### Les deux stores
-- [ ] URL de la politique de confidentialité (publier `privacy-policy-fr.md` sur une page web accessible avant de soumettre — obligatoire, pas optionnel)
+- [x] Politique de confidentialité rédigée et publiée par le site : https://occaz.sarl/confidentialite (déployer le site avant de soumettre ; version Markdown : `privacy-policy-fr.md`)
+- [x] Page de suppression de compte (exigée par Google Play) : https://occaz.sarl/suppression-compte
 - [ ] Justification de la demande de permission de localisation (déjà rédigée en français dans `app.json`, mais Apple demande parfois une explication supplémentaire dans le formulaire de review — reprendre le texte du plugin `expo-location`)
 - [ ] Compte de test fourni aux équipes de revue (voir `listing-fr.md`, section "Notes pour la revue")
 

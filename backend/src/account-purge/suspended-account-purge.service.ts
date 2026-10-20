@@ -1,6 +1,9 @@
 // backend/src/account-purge/suspended-account-purge.service.ts
 // [20/10/2026] v1 — Suppression définitive des comptes CLIENT et CONDUCTEUR suspendus depuis 6 mois sans avoir été réactivés, lancée par le
 // déclencheur de tâches (POST /jobs/run, toutes les 5 minutes ; au plus une passe par heure et par instance).
+// [20/10/2026] v2 — Même traitement pour les comptes que leur titulaire a supprimés lui-même (« Supprimer votre compte » dans l'application) :
+// 30 jours après la demande (journal d'audit SELF_DELETE), les données personnelles sont effacées ou anonymisées. C'est l'engagement pris dans la
+// politique de confidentialité (section 8) ; le texte libre du motif de départ est lui aussi effacé.
 //
 // RAPPELS — chaque mois après le début de la suspension (1er, 2e… 5e mois), le titulaire reçoit un e-mail qui l'invite à se rapprocher de
 // l'administration pour se mettre en conformité, avec la date de suppression. Pas d'adresse e-mail sur le compte = aucun avertissement
@@ -34,6 +37,9 @@ const TRANSACTION_OPTIONS = { timeout: 30_000, maxWait: 10_000 };
 
 /** Durée de suspension (en mois) au bout de laquelle le compte est supprimé. */
 export const RETENTION_MONTHS = 6;
+/** Délai (en jours) entre la suppression demandée par le titulaire et l'effacement de ses données. */
+export const SELF_DELETE_GRACE_DAYS = 30;
+export const SELF_DELETE_ACTION = 'SELF_DELETE';
 export const KIND_SUSPENSION_NOTICE = 'SUSPENSION_NOTICE';
 export const PURGE_ENABLED_KEY = 'jobs.suspended_purge_enabled';
 export const ANONYMOUS_FIRST_NAME = 'Compte';
@@ -118,6 +124,8 @@ export function storageKeyFromPublicUrl(url: string | null | undefined, publicBa
 // ---------------------------------------------------------------------------
 
 export type PurgeOutcome = 'deleted' | 'anonymized' | 'skipped';
+/** Pourquoi un compte est purgé : suspendu depuis 6 mois, ou supprimé par son titulaire depuis 30 jours. */
+export type PurgeReason = 'SUSPENDED' | 'SELF_DELETE';
 
 interface PurgeTarget {
   id: string;
@@ -160,6 +168,7 @@ export class SuspendedAccountPurgeService {
       if (!(await this.enabled())) return { ...EMPTY_RESULT };
       const result: PurgeRunResult = { ...EMPTY_RESULT };
       await this.purgeDueAccounts(now, result);
+      await this.purgeSelfDeletedAccounts(now, result);
       result.reminders = await this.sendMonthlyReminders(now);
       this.lastRunAt = Date.now();
       return result;
@@ -277,8 +286,53 @@ export class SuspendedAccountPurgeService {
     }
   }
 
-  /** Supprime un compte dont les 6 mois sont écoulés. Revérifie tout juste avant d'agir : la situation a pu changer depuis la sélection. */
-  async purgeOne(userId: string, now: Date = new Date()): Promise<PurgeOutcome> {
+  /** Comptes supprimés par leur titulaire il y a plus de 30 jours : on efface leurs données (suppression complète ou anonymisation). */
+  private async purgeSelfDeletedAccounts(now: Date, result: PurgeRunResult): Promise<void> {
+    let lastId: string | undefined;
+
+    for (;;) {
+      // Comptes désactivés et pas encore effacés : un petit ensemble. On cherche ensuite, parmi eux, ceux dont la demande de suppression est assez ancienne.
+      const users = await this.prisma.user.findMany({
+        where: {
+          isActive: false,
+          deletedAt: null,
+          accountType: { in: PURGEABLE_TYPES },
+          ...(lastId ? { id: { gt: lastId } } : {}),
+        },
+        orderBy: { id: 'asc' },
+        take: BATCH_SIZE,
+        select: { id: true },
+      });
+      if (users.length === 0) break;
+      lastId = users[users.length - 1].id;
+
+      const threshold = new Date(now.getTime() - SELF_DELETE_GRACE_DAYS * DAY_MS);
+      const requests = await this.prisma.auditLog.findMany({
+        where: {
+          entityType: 'User',
+          action: SELF_DELETE_ACTION,
+          entityId: { in: users.map((user) => user.id) },
+          createdAt: { lte: threshold },
+        },
+        select: { entityId: true },
+      });
+
+      for (const id of new Set(requests.map((request) => request.entityId))) {
+        try {
+          const outcome = await this.purgeOne(id, now, 'SELF_DELETE');
+          if (outcome === 'deleted') result.deleted += 1;
+          else if (outcome === 'anonymized') result.anonymized += 1;
+          else result.skipped += 1;
+        } catch (error) {
+          result.failed += 1;
+          this.logger.error(`Effacement du compte supprimé par son titulaire ${id} en échec : ${(error as Error).message}`);
+        }
+      }
+    }
+  }
+
+  /** Supprime un compte dont le délai est écoulé (6 mois de suspension, ou 30 jours après la suppression demandée par le titulaire). Revérifie tout juste avant d'agir : la situation a pu changer depuis la sélection. */
+  async purgeOne(userId: string, now: Date = new Date(), reason: PurgeReason = 'SUSPENDED'): Promise<PurgeOutcome> {
     const target = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -293,11 +347,17 @@ export class SuspendedAccountPurgeService {
     });
     if (!target || target.deletedAt) return 'skipped';
     if (!PURGEABLE_TYPES.includes(target.accountType)) return 'skipped';
-    if (!target.isSuspended || !target.suspendedAt || purgeDueAt(target.suspendedAt).getTime() > now.getTime()) return 'skipped';
+    if (reason === 'SUSPENDED') {
+      if (!target.isSuspended || !target.suspendedAt || purgeDueAt(target.suspendedAt).getTime() > now.getTime()) return 'skipped';
+    } else if (!(await this.selfDeleteGraceElapsed(userId, now))) {
+      return 'skipped';
+    }
 
     const blocker = await this.blockingReason(target);
     if (blocker) {
-      this.logger.warn(`Compte suspendu ${userId} conservé malgré les 6 mois : ${blocker}.`);
+      this.logger.warn(
+        `Compte ${userId} conservé malgré l'échéance (${reason === 'SUSPENDED' ? '6 mois de suspension' : '30 jours après sa suppression'}) : ${blocker}.`,
+      );
       return 'skipped';
     }
 
@@ -329,12 +389,27 @@ export class SuspendedAccountPurgeService {
         entityType: 'User',
         entityId: userId,
         action: outcome === 'deleted' ? 'PURGE_DELETED' : 'PURGE_ANONYMIZED',
-        diff: { accountType: target.accountType, reason: `SUSPENDED_${RETENTION_MONTHS}_MONTHS`, suspendedAt: target.suspendedAt.toISOString() },
+        diff:
+          reason === 'SUSPENDED'
+            ? { accountType: target.accountType, reason: `SUSPENDED_${RETENTION_MONTHS}_MONTHS`, suspendedAt: target.suspendedAt?.toISOString() }
+            : { accountType: target.accountType, reason: `SELF_DELETE_${SELF_DELETE_GRACE_DAYS}_DAYS` },
       });
     } catch (error) {
       this.logger.warn(`Journal d'audit non écrit pour ${userId} : ${(error as Error).message}`);
     }
     return outcome;
+  }
+
+  /** Vrai si la dernière demande de suppression du titulaire date de plus de 30 jours et si le compte est toujours désactivé. */
+  private async selfDeleteGraceElapsed(userId: string, now: Date): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { isActive: true } });
+    if (!user || user.isActive) return false;
+    const request = await this.prisma.auditLog.findFirst({
+      where: { entityType: 'User', entityId: userId, action: SELF_DELETE_ACTION },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    return Boolean(request) && request!.createdAt.getTime() + SELF_DELETE_GRACE_DAYS * DAY_MS <= now.getTime();
   }
 
   /** Pourquoi ce compte ne doit pas être supprimé maintenant, ou null. */
@@ -488,6 +563,11 @@ export class SuspendedAccountPurgeService {
     await tx.review.updateMany({ where: { rating: { fromUserId: userId } }, data: { comment: null } });
     await tx.sosAlert.updateMany({ where: { userId }, data: { latitude: null, longitude: null, message: null } });
     await tx.userReport.updateMany({ where: { reporterId: userId }, data: { details: null } });
+    // Le motif de départ saisi en texte libre lors de la suppression du compte.
+    await tx.auditLog.updateMany({
+      where: { entityType: 'User', entityId: userId, action: SELF_DELETE_ACTION },
+      data: { diff: Prisma.DbNull },
+    });
 
     if (target.customerProfile) {
       await tx.customerProfile.update({

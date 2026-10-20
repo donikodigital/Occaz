@@ -91,7 +91,7 @@
       "expo-image"
     ],
     "extra": {
-      "apiUrl": "https://api.transport-partage.example.com/api/v1",
+      "apiUrl": "https://api.occaz.sarl/api/v1",
       "router": {},
       "eas": {
         "projectId": "690adc2d-4963-404a-84e6-3f7543cf3e6d"

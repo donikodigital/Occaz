@@ -6,10 +6,12 @@
 // chaque page, et envoyé à /cookie-consent (route publique) pour garder
 // une trace de ce qui a été accepté et quand — voir CookieConsentService,
 // backend.
+// [20/10/2026] Lien vers la politique de confidentialité (/confidentialite) ; version de la politique passée à 2026-10-20 (texte définitif).
 
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { IconCookie } from '@tabler/icons-react';
 import { Button } from '@/components/ui';
 import { ToggleRow } from '@/components/admin/AdminUi';
@@ -20,7 +22,7 @@ import { cookieConsentApi } from '@/services/api/promotions.api';
  * chaque enregistrement de consentement garde la version affichée à ce
  * moment-là (voir CookieConsent.policyVersion, schema.prisma).
  */
-const POLICY_VERSION = '2026-09-23';
+const POLICY_VERSION = '2026-10-20';
 const STORAGE_KEY = 'occaz_cookie_consent';
 
 interface StoredConsent {
@@ -75,7 +77,10 @@ export function CookieBanner() {
             <p className="text-sm font-semibold text-text-primary">Cookies</p>
             <p className="mt-1 text-xs text-text-secondary">
               Nous utilisons des cookies techniques nécessaires au fonctionnement du site, et, avec votre accord, des
-              cookies de mesure d'audience.
+              cookies de mesure d'audience.{' '}
+              <Link href="/confidentialite" className="font-semibold text-primary underline-offset-2 hover:underline">
+                En savoir plus
+              </Link>
             </p>
           </div>
         </div>

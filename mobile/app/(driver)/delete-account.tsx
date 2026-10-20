@@ -1,4 +1,5 @@
 // mobile/app/(driver)/delete-account.tsx
+// [20/10/2026] Le texte annonce l'effacement des données sous 30 jours (politique de confidentialité, section 8).
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v1 — Suppression de compte : avertissement clair, motif facultatif,
@@ -49,9 +50,7 @@ export default function DeleteAccountScreen() {
             Cette action est définitive
           </AppText>
           <AppText variant="xs" color={colors.dangerDark} style={styles.warningText}>
-            Votre compte sera désactivé et vous ne pourrez plus vous connecter. Si un trajet, une réservation ou un
-            envoi est
-            encore en cours, terminez-le ou annulez-le d'abord.
+            Votre compte sera désactivé immédiatement et vous ne pourrez plus vous connecter. Vos données personnelles seront ensuite effacées ou anonymisées sous 30 jours, sauf celles que la loi nous oblige à conserver (pièces comptables). Si un trajet, une réservation ou un envoi est encore en cours, terminez-le ou annulez-le d'abord.
           </AppText>
         </View>
       </View>

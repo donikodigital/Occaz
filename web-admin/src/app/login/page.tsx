@@ -23,6 +23,7 @@ import { authApi } from '@/services/api/auth.api';
 import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { AuthResult } from '@/types/auth.types';
+import { LegalFooterLinks } from '@/components/legal/LegalDocumentView';
 
 type Mode = 'password' | 'code-request' | 'code-verify' | 'reset-request' | 'reset-confirm';
 
@@ -406,7 +407,10 @@ export default function LoginPage() {
           ) : null}
         </div>
 
-        <p className="mt-6 text-center text-xs text-text-muted">© 2026 Occa&apos;Z · occaz.sarl</p>
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <LegalFooterLinks />
+          <p className="text-center text-xs text-text-muted">© 2026 Occa&apos;Z · occaz.sarl</p>
+        </div>
       </main>
     </div>
   );

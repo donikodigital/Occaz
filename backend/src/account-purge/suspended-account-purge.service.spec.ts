@@ -1,6 +1,7 @@
 // backend/src/account-purge/suspended-account-purge.service.spec.ts
 // Comptes suspendus depuis 6 mois : rappels mensuels par e-mail (seulement avec une adresse), puis suppression définitive — complète s'il
 // n'y a aucun historique, anonymisation sinon — avec les garde-fous (équipe, service en cours, solde, litige).
+// [20/10/2026] Comptes supprimés par leur titulaire : mêmes effacements 30 jours après la demande (SELF_DELETE).
 import { AccountType, Prisma } from '@prisma/client';
 import {
   ANONYMOUS_FIRST_NAME,
@@ -98,7 +99,7 @@ const COUNT_MODELS = [
 const TX_MODELS = [
   'onboardingReminderLog', 'tripReminderLog', 'notification', 'savedLocation', 'emergencyContact', 'userBlock', 'cookieConsent',
   'phoneChangeRequest', 'otpCode', 'session', 'device', 'userRole', 'verification', 'document', 'savedCard', 'wallet', 'message', 'review',
-  'sosAlert', 'userReport',
+  'sosAlert', 'userReport', 'auditLog',
 ] as const;
 
 interface Options {
@@ -113,6 +114,12 @@ interface Options {
   wallet?: { balance: bigint; pendingBalance: bigint } | null;
   settings?: Record<string, unknown>;
   claimed?: Set<string>;
+  /** Comptes désactivés renvoyés à la requête des comptes supprimés par leur titulaire. */
+  selfDeletedUsers?: Array<{ id: string }>;
+  /** Demandes de suppression (journal d'audit SELF_DELETE) renvoyées pour ces comptes. */
+  selfDeleteRequests?: Array<{ entityId: string }>;
+  /** Date de la dernière demande de suppression relue par purgeOne ; null = aucune. */
+  selfDeleteRequestedAt?: Date | null;
   /** Erreur levée par la première suppression complète. */
   hardDeleteError?: Error;
 }
@@ -121,6 +128,7 @@ function build(options: Options = {}) {
   const claimed = options.claimed ?? new Set<string>();
   let reminderPageServed = false;
   let purgePageServed = false;
+  let selfDeletePageServed = false;
 
   const tx: Record<string, Record<string, jest.Mock>> = {};
   for (const name of TX_MODELS) tx[name] = { deleteMany: jest.fn().mockResolvedValue({ count: 0 }), updateMany: jest.fn().mockResolvedValue({ count: 0 }) };
@@ -144,6 +152,11 @@ function build(options: Options = {}) {
           reminderPageServed = true;
           return options.reminderUsers ?? [];
         }
+        if ((where as { isActive?: boolean }).isActive === false) {
+          if (selfDeletePageServed) return [];
+          selfDeletePageServed = true;
+          return options.selfDeletedUsers ?? [];
+        }
         if (purgePageServed) return [];
         purgePageServed = true;
         return options.purgeUsers ?? [];
@@ -164,6 +177,11 @@ function build(options: Options = {}) {
     $transaction: jest.fn(async (fn: (client: unknown) => Promise<unknown>) => fn(tx)),
   };
   for (const name of COUNT_MODELS) prisma[name] = { count: jest.fn().mockResolvedValue(options.counts?.[name] ?? 0) };
+  prisma.auditLog = {
+    count: jest.fn().mockResolvedValue(options.counts?.auditLog ?? 0),
+    findMany: jest.fn().mockResolvedValue(options.selfDeleteRequests ?? []),
+    findFirst: jest.fn().mockResolvedValue(options.selfDeleteRequestedAt ? { createdAt: options.selfDeleteRequestedAt } : null),
+  };
 
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
   const storage = { deleteObject: jest.fn().mockResolvedValue(undefined) };
@@ -356,5 +374,79 @@ describe('SuspendedAccountPurgeService — suppression', () => {
     expect(where.accountType).toEqual({ in: ['CUSTOMER', 'DRIVER'] });
     expect(where.suspendedAt.not).toBeNull();
     expect(where.suspendedAt.lte.toISOString()).toBe('2026-04-20T10:00:00.000Z');
+  });
+});
+
+describe('SuspendedAccountPurgeService — comptes supprimés par leur titulaire', () => {
+  const selfDeleted = (over: Record<string, unknown> = {}) => target({ isSuspended: false, suspendedAt: null, ...over });
+
+  it('30 jours après la demande : données effacées, motif de départ effacé du journal, audit sans donnée personnelle', async () => {
+    const { service, tx, audit } = build({
+      selfDeletedUsers: [{ id: 'u1' }],
+      selfDeleteRequests: [{ entityId: 'u1' }],
+      selfDeleteRequestedAt: at('2026-09-20T10:00:00Z'),
+      target: selfDeleted(),
+      // Le journal compte déjà la demande faite par le titulaire lui-même : le compte est donc anonymisé, pas supprimé.
+      counts: { auditLog: 1 },
+    });
+    const result = await service.runOnce(NOW, true);
+    expect(result).toMatchObject({ deleted: 0, anonymized: 1, skipped: 0, failed: 0 });
+    expect(tx.user.update.mock.calls[0][0].data).toMatchObject({ phone: 'deleted-u1', email: null, isActive: false });
+    expect(tx.auditLog.updateMany).toHaveBeenCalledWith({
+      where: { entityType: 'User', entityId: 'u1', action: 'SELF_DELETE' },
+      data: { diff: Prisma.DbNull },
+    });
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityId: 'u1', action: 'PURGE_ANONYMIZED', diff: { accountType: 'DRIVER', reason: 'SELF_DELETE_30_DAYS' } }),
+    );
+  });
+
+  it('une demande de moins de 30 jours n\'est jamais traitée', async () => {
+    const { service, prisma } = build({
+      selfDeletedUsers: [{ id: 'u1' }],
+      selfDeleteRequests: [{ entityId: 'u1' }],
+      selfDeleteRequestedAt: at('2026-09-21T10:00:00Z'),
+      target: selfDeleted(),
+    });
+    const result = await service.runOnce(NOW, true);
+    expect(result).toMatchObject({ deleted: 0, anonymized: 0, skipped: 1 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('compte réactivé entre-temps, déjà effacé, ou sans demande de suppression : rien n\'est fait', async () => {
+    const reactivated = build({ target: selfDeleted(), selfDeleteRequestedAt: at('2026-01-01T00:00:00Z') });
+    (reactivated.prisma.user as { findUnique: jest.Mock }).findUnique.mockResolvedValueOnce({ isActive: true });
+    expect(await reactivated.service.purgeOne('u1', NOW, 'SELF_DELETE')).toBe('skipped');
+
+    const noRequest = build({ target: selfDeleted(), selfDeleteRequestedAt: null });
+    (noRequest.prisma.user as { findUnique: jest.Mock }).findUnique
+      .mockResolvedValueOnce(selfDeleted())
+      .mockResolvedValueOnce({ isActive: false });
+    expect(await noRequest.service.purgeOne('u1', NOW, 'SELF_DELETE')).toBe('skipped');
+
+    const already = build({ target: selfDeleted({ deletedAt: at('2026-10-01T00:00:00Z') }) });
+    expect(await already.service.purgeOne('u1', NOW, 'SELF_DELETE')).toBe('skipped');
+    for (const run of [reactivated, noRequest, already]) expect(run.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('même garde-fou que pour une suspension : solde de portefeuille non nul = compte laissé tel quel', async () => {
+    const { service, prisma } = build({
+      selfDeletedUsers: [{ id: 'u1' }],
+      selfDeleteRequests: [{ entityId: 'u1' }],
+      selfDeleteRequestedAt: at('2026-09-01T10:00:00Z'),
+      target: selfDeleted(),
+      wallet: { balance: BigInt(2000), pendingBalance: BigInt(0) },
+    });
+    const result = await service.runOnce(NOW, true);
+    expect(result).toMatchObject({ anonymized: 0, deleted: 0, skipped: 1 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('la requête ne cible que les clients et conducteurs désactivés et pas encore effacés', async () => {
+    const { service, prisma } = build({});
+    await service.runOnce(NOW, true);
+    const where = (prisma.user as { findMany: jest.Mock }).findMany.mock.calls.find(([arg]) => arg.where.isActive === false)?.[0].where;
+    expect(where.deletedAt).toBeNull();
+    expect(where.accountType).toEqual({ in: ['CUSTOMER', 'DRIVER'] });
   });
 });

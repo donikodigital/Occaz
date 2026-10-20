@@ -25,9 +25,10 @@ import { OceanSection } from '@/components/ocean/OceanKit';
 import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { COMPANY } from '@/content/legal';
 
-/** Adresse support fournie par Doniko. */
-const SUPPORT_EMAIL = 'Doniko.digital@gmail.com';
+/** Adresse support : celle de la société (src/content/legal.ts). */
+const SUPPORT_EMAIL: string = COMPANY.supportEmail;
 
 interface RowProps {
   icon: React.ReactNode;
