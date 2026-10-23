@@ -1,4 +1,7 @@
 // web-admin/src/app/login/page.tsx
+// [24/10/2026] v4 — Écran compact, sans défilement sur téléphone : le sous-titre « Accédez à votre espace… » est retiré (les autres étapes gardent
+// leur explication), logo, marges et champs resserrés, hauteur en `dvh` (la barre d'adresse du navigateur n'ajoute plus de défilement), et le lien
+// « Supprimer mon compte » n'apparaît plus ici (il ne concerne pas l'équipe).
 // [18/10/2026] v3 — La connexion de l'équipe sans mot de passe se fait par un code reçu par e-mail (plus de SMS, plus de numéro de
 // téléphone à saisir). Le reste de la page est inchangé.
 // [02/10/2026] v2 — Refonte visuelle : même habillage Ocean que l'app Client /
@@ -28,10 +31,10 @@ import { LegalFooterLinks } from '@/components/legal/LegalDocumentView';
 type Mode = 'password' | 'code-request' | 'code-verify' | 'reset-request' | 'reset-confirm';
 
 /** Champs de la carte : fond bleu très clair et bord océan, comme les champs de l'app. */
-const FIELD_CLASS = 'rounded-xl! border-primary-accent! bg-primary-light/40! py-3!';
+const FIELD_CLASS = 'rounded-xl! border-primary-accent! bg-primary-light/40! py-2.5!';
 
 /** Bouton principal : même dégradé que l'app, coins plus arrondis. */
-const SUBMIT_CLASS = 'w-full rounded-xl! py-3.5! text-base! shadow-lg! shadow-primary-dark/25!';
+const SUBMIT_CLASS = 'w-full rounded-xl! py-3! text-base! shadow-lg! shadow-primary-dark/25!';
 
 /** Lien secondaire sous le bouton principal. */
 const LINK_CLASS =
@@ -168,9 +171,10 @@ export default function LoginPage() {
             ? 'Mot de passe oublié'
             : 'Nouveau mot de passe';
 
+  // Aucun sous-titre sur l'écran de connexion principal : le titre et la puce « Espace Support & Administration » suffisent.
   const subtitle =
     mode === 'password'
-      ? 'Accédez à votre espace Support ou Administration.'
+      ? ''
       : mode === 'code-request'
         ? "Un code de connexion vous sera envoyé par e-mail, à l'adresse de votre compte."
         : mode === 'code-verify'
@@ -181,17 +185,17 @@ export default function LoginPage() {
 
   return (
     <div
-      className="relative min-h-screen bg-cover bg-center"
+      className="relative min-h-dvh bg-cover bg-center"
       style={{ backgroundImage: "url('/brand/onboarding-sky.jpg')" }}
     >
       {/* Voile clair entre la photo de ciel et le contenu : le ciel reste visible, le texte reste lisible. */}
       <div className="pointer-events-none absolute inset-0 bg-white/75" />
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-5 py-10">
+      <main className="relative z-10 mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center px-5 py-5">
         {/* Marque : logo pin sur badge, nom de l'application et puce de rôle. */}
-        <header className="animate-in mb-6 flex flex-col items-center text-center">
-          <AuthIllustration size={132} />
-          <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-primary-dark">Occa&apos;Z</h2>
+        <header className="animate-in mb-4 flex flex-col items-center text-center">
+          <AuthIllustration size={92} className="max-[700px]:-my-[11px] max-[700px]:scale-75" />
+          <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-primary-dark">Occa&apos;Z</h2>
           <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-primary-accent bg-white/80 px-3 py-1 text-xs font-semibold text-primary shadow-sm">
             <IconShieldCheck size={14} />
             Espace Support &amp; Administration
@@ -199,14 +203,14 @@ export default function LoginPage() {
         </header>
 
         {/* Carte ombrée — jamais le formulaire posé nu sur le fond. */}
-        <div className="animate-in w-full rounded-3xl border border-primary-accent/70 bg-surface/95 p-7 shadow-2xl shadow-primary-dark/15 backdrop-blur sm:p-8">
-          <div className="mb-6">
+        <div className="animate-in w-full rounded-3xl border border-primary-accent/70 bg-surface/95 p-5 shadow-2xl shadow-primary-dark/15 backdrop-blur sm:p-8">
+          <div className="mb-4">
             <h1 className="text-2xl font-bold text-primary-dark">{title}</h1>
-            <p className="mt-1.5 text-sm leading-relaxed text-text-secondary">{subtitle}</p>
+            {subtitle ? <p className="mt-1.5 text-sm leading-relaxed text-text-secondary">{subtitle}</p> : null}
           </div>
 
           {mode === 'password' ? (
-            <form onSubmit={handlePasswordSubmit} className="space-y-5">
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <TextField
                 label="Email"
                 type="email"
@@ -270,7 +274,7 @@ export default function LoginPage() {
           ) : null}
 
           {mode === 'code-request' ? (
-            <form onSubmit={handleRequestCode} className="space-y-5">
+            <form onSubmit={handleRequestCode} className="space-y-4">
               <TextField
                 label="Email"
                 type="email"
@@ -303,7 +307,7 @@ export default function LoginPage() {
           ) : null}
 
           {mode === 'code-verify' ? (
-            <form onSubmit={handleVerifyCode} className="space-y-5">
+            <form onSubmit={handleVerifyCode} className="space-y-4">
               <TextField
                 label="Code reçu par email"
                 value={otpCode}
@@ -335,7 +339,7 @@ export default function LoginPage() {
           ) : null}
 
           {mode === 'reset-request' ? (
-            <form onSubmit={handleRequestReset} className="space-y-5">
+            <form onSubmit={handleRequestReset} className="space-y-4">
               <TextField
                 label="Email"
                 type="email"
@@ -368,7 +372,7 @@ export default function LoginPage() {
           ) : null}
 
           {mode === 'reset-confirm' ? (
-            <form onSubmit={handleConfirmReset} className="space-y-5">
+            <form onSubmit={handleConfirmReset} className="space-y-4">
               <TextField
                 label="Code reçu par email"
                 value={resetCode}
@@ -407,8 +411,8 @@ export default function LoginPage() {
           ) : null}
         </div>
 
-        <div className="mt-6 flex flex-col items-center gap-2">
-          <LegalFooterLinks />
+        <div className="mt-4 flex flex-col items-center gap-1.5">
+          <LegalFooterLinks showAccountDeletion={false} />
           <p className="text-center text-xs text-text-muted">© 2026 Occa&apos;Z · occaz.sarl</p>
         </div>
       </main>

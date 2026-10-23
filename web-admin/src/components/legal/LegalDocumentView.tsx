@@ -1,5 +1,7 @@
 // web-admin/src/components/legal/LegalDocumentView.tsx
 //
+// [24/10/2026] v1b — LegalFooterLinks : prop `showAccountDeletion` (vrai par défaut) ; la page de connexion de l'équipe masque « Supprimer mon compte »,
+// qui ne concerne que les clients et conducteurs.
 // [20/10/2026] v1 — Mise en page des pages juridiques publiques (/confidentialite, /conditions) : un texte de src/content/legal.ts,
 // sommaire cliquable, cartes à ombre (pas de tableau). Même ciel que les autres pages publiques (login, rejoindre).
 import React from 'react';
@@ -9,7 +11,7 @@ import { IconInfoCircle } from '@tabler/icons-react';
 import { COMPANY, LEGAL_UPDATED_AT, LEGAL_VERSION, type LegalBlock, type LegalDocument } from '@/content/legal';
 
 /** Les pages publiques du site : liens de pied de page communs. */
-export function LegalFooterLinks({ className = '' }: { className?: string }) {
+export function LegalFooterLinks({ className = '', showAccountDeletion = true }: { className?: string; showAccountDeletion?: boolean }) {
   return (
     <nav aria-label="Informations légales" className={`flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs ${className}`}>
       <Link href="/confidentialite" className="font-medium text-text-secondary underline-offset-2 hover:text-primary hover:underline">
@@ -18,9 +20,11 @@ export function LegalFooterLinks({ className = '' }: { className?: string }) {
       <Link href="/conditions" className="font-medium text-text-secondary underline-offset-2 hover:text-primary hover:underline">
         Conditions générales
       </Link>
-      <Link href="/suppression-compte" className="font-medium text-text-secondary underline-offset-2 hover:text-primary hover:underline">
-        Supprimer mon compte
-      </Link>
+      {showAccountDeletion ? (
+        <Link href="/suppression-compte" className="font-medium text-text-secondary underline-offset-2 hover:text-primary hover:underline">
+          Supprimer mon compte
+        </Link>
+      ) : null}
     </nav>
   );
 }
