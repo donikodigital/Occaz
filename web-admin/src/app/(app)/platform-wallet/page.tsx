@@ -1,4 +1,6 @@
 // web-admin/src/app/(app)/platform-wallet/page.tsx
+// [23/10/2026] v3 — fenêtre de retrait : le numéro n'était plus visible dans la liste « Envoyer à » (texte coupé) ; la liste ne montre plus
+// que le numéro puis le nom, et une carte sous la liste affiche le bénéficiaire choisi en entier (nom, type, numéro complet).
 // [19/10/2026] Retrait en 2 étapes : le code à 6 chiffres reçu par e-mail remplace le mot de passe (POST withdrawals/code puis withdrawals).
 //
 // Portefeuille de la plateforme : les commissions encaissées (XOF et GNF) et leur retrait vers des numéros Orange Money enregistrés
@@ -457,10 +459,19 @@ function WithdrawModal({
           <Select label="Envoyer à" value={beneficiaryId} onChange={(event) => setBeneficiaryId(event.target.value)}>
             {active.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.label} · {KIND_LABELS[item.kind]} · {item.phone}
+                {item.phone} · {item.label}
               </option>
             ))}
           </Select>
+          {selected ? (
+            <div className="-mt-2 rounded-xl bg-surface-muted px-3.5 py-2.5 text-sm shadow-sm">
+              <p className="break-words font-semibold text-text-primary">{selected.label}</p>
+              <p className="mt-0.5 break-words text-xs text-text-secondary">
+                {selected.holderName} · {KIND_LABELS[selected.kind]}
+              </p>
+              <p className="mt-1 break-all text-sm font-semibold tabular-nums text-text-primary">{selected.phone}</p>
+            </div>
+          ) : null}
           <div>
             <TextField
               label={`Montant (${balance.isoCode})`}

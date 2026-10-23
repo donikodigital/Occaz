@@ -1,15 +1,14 @@
 // backend/src/user-safety/user-safety.controllers.ts
+// [23/10/2026] v3 — listes /reports et /sos : filtres via ListUserReportsQueryDto / ListSosQueryDto (le filtre de statut faisait échouer la requête en 400).
 // [16/10/2026] v2 — POST /reports/:id/remind : message de rappel du service client.
 // [11/10/2026] v1 — routes de la sécurité : /blocks, /reports, /emergency-contacts, /sos. Les routes d'administration (support) demandent une
 // permission (user_report.* / sos.*) et respectent la portée par pays ; les autres ne concernent que l'utilisateur connecté.
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { SosStatus, UserReportStatus } from '@prisma/client';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { CountryScopeService } from '../common/scope/country-scope.service';
 import { UserBlocksService } from './user-blocks.service';
@@ -22,6 +21,8 @@ import {
   CreateSosDto,
   CreateUserReportDto,
   HandleSosDto,
+  ListSosQueryDto,
+  ListUserReportsQueryDto,
   RemindUserReportDto,
   UpdateSosLocationDto,
   UpdateUserReportDto,
@@ -73,12 +74,10 @@ export class UserReportsController {
   @Permissions(PERMISSIONS.USER_REPORT_READ)
   @Get()
   findAll(
-    @Query() query: PaginationQueryDto,
+    @Query() query: ListUserReportsQueryDto,
     @CurrentUser() user: AuthenticatedUser,
-    @Query('status') status?: UserReportStatus,
-    @Query('reportedUserId') reportedUserId?: string,
   ) {
-    return this.reports.findAll(query, { status, reportedUserId }, this.scope.userWhere(user, PERMISSIONS.USER_REPORT_READ));
+    return this.reports.findAll(query, { status: query.status, reportedUserId: query.reportedUserId }, this.scope.userWhere(user, PERMISSIONS.USER_REPORT_READ));
   }
 
   /** Rappel envoyé par le service client à la personne signalée (ou à celle qui a signalé). */
@@ -148,8 +147,8 @@ export class SosController {
 
   @Permissions(PERMISSIONS.SOS_READ)
   @Get()
-  findAll(@Query() query: PaginationQueryDto, @CurrentUser() user: AuthenticatedUser, @Query('status') status?: SosStatus) {
-    return this.sos.findAll(query, { status }, this.scope.userWhere(user, PERMISSIONS.SOS_READ));
+  findAll(@Query() query: ListSosQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.sos.findAll(query, { status: query.status }, this.scope.userWhere(user, PERMISSIONS.SOS_READ));
   }
 
   @Post(':id/location')

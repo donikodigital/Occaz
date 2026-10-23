@@ -1,4 +1,5 @@
 // backend/src/user-safety/dto/user-safety.dto.ts
+// [23/10/2026] v2 — ListUserReportsQueryDto et ListSosQueryDto : les filtres des listes (statut…) faisaient rejeter la requête en 400.
 // [11/10/2026] v1 — corps des requêtes de la sécurité : signalement, contact d'urgence, SOS, traitement par le support.
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SosStatus, UserReportReason, UserReportStatus } from '@prisma/client';
@@ -17,6 +18,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 /**
  * Désigne la personne visée : l'application ne connaît que l'identifiant du profil conducteur (sur un trajet) ou client (sur une
@@ -174,4 +176,27 @@ export class HandleSosDto {
   @IsString()
   @MaxLength(1000)
   resolutionNote?: string;
+}
+
+/**
+ * Filtres des listes d'administration. Les lier via des @Query('…') séparés, à côté de @Query() query: PaginationQueryDto, fait rejeter
+ * toute la requête en 400 ("property status should not exist") avec le ValidationPipe global (forbidNonWhitelisted) : on les déclare ici.
+ */
+export class ListUserReportsQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ enum: UserReportStatus, description: 'Filtre par statut.' })
+  @IsOptional()
+  @IsEnum(UserReportStatus)
+  status?: UserReportStatus;
+
+  @ApiPropertyOptional({ description: 'Filtre par personne signalée (identifiant du compte).' })
+  @IsOptional()
+  @IsString()
+  reportedUserId?: string;
+}
+
+export class ListSosQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ enum: SosStatus, description: 'Filtre par statut.' })
+  @IsOptional()
+  @IsEnum(SosStatus)
+  status?: SosStatus;
 }
