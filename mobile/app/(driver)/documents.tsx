@@ -2,6 +2,7 @@
 // [19/10/2026] v1 — « Mon dossier » : l'endroit où un conducteur déjà inscrit envoie (ou renvoie) ses pièces : photo, permis, carte grise du
 // véhicule, et ajoute un véhicule s'il n'en a pas. Un bandeau rappelle les jours restants avant le blocage de la création de trajets.
 // Les envois échoués s'affichent sous le champ concerné (pas d'Alert.alert).
+// [23/10/2026] v2 — chaque pièce non vérifiée (permis, pièce d'identité, carte grise) peut être supprimée, avec confirmation.
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
@@ -12,16 +13,17 @@ import { DriverComplianceBanner } from '@/components/screens/DriverComplianceBan
 import { spacing } from '@/theme';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useDriverCompliance } from '@/hooks/useDriverCompliance';
-import { useDriverDocumentUpload, useMyDriverDocuments } from '@/hooks/useDriverDocuments';
+import { useDeleteDriverDocument, useDriverDocumentUpload, useMyDriverDocuments } from '@/hooks/useDriverDocuments';
 import { useDriverPhotoUpload } from '@/hooks/useDriverPhotoUpload';
 import { useMyVehicles } from '@/hooks/useVehicles';
-import { useVehicleDocumentUpload, useVehicleDocuments } from '@/hooks/useVehicleDocuments';
+import { useDeleteVehicleDocument, useVehicleDocumentUpload, useVehicleDocuments } from '@/hooks/useVehicleDocuments';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Vehicle } from '@/types/vehicles.types';
 
 function VehicleRegistrationField({ vehicle }: { vehicle: Vehicle }) {
   const { data: documents } = useVehicleDocuments(vehicle.id);
   const upload = useVehicleDocumentUpload(vehicle.id);
+  const remove = useDeleteVehicleDocument(vehicle.id);
   const registrationDoc = documents?.find((d) => d.type === 'vehicle_registration');
   return (
     <DocumentUploadField
@@ -31,6 +33,9 @@ function VehicleRegistrationField({ vehicle }: { vehicle: Vehicle }) {
       onPickLibrary={() => upload.pickFromLibrary('vehicle_registration')}
       onPickCamera={() => upload.pickFromCamera('vehicle_registration')}
       errorMessage={upload.errorFor('vehicle_registration')}
+      onDelete={registrationDoc ? () => remove.mutate(registrationDoc.id) : undefined}
+      isDeleting={remove.isPending}
+      deleteError={remove.isError ? remove.error.message : null}
     />
   );
 }
@@ -42,6 +47,7 @@ export default function DriverDocumentsScreen() {
   const { data: documents } = useMyDriverDocuments();
   const { data: vehicles } = useMyVehicles();
   const upload = useDriverDocumentUpload();
+  const remove = useDeleteDriverDocument();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const photoUpload = useDriverPhotoUpload((updated) => {
     setPhotoUrl(updated.photoUrl);
@@ -52,6 +58,12 @@ export default function DriverDocumentsScreen() {
   const nationalIdDoc = documents?.find((d) => d.type === 'national_id');
   const initials = profile ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}` : '?';
   const hasVehicle = Boolean(vehicles && vehicles.length > 0);
+  /** Props de suppression d'une pièce : le chargement et l'erreur ne concernent que la pièce visée. */
+  const deletion = (doc: { id: string } | undefined) => ({
+    onDelete: doc ? () => remove.mutate(doc.id) : undefined,
+    isDeleting: remove.isPending && remove.variables === doc?.id,
+    deleteError: remove.isError && remove.variables === doc?.id ? remove.error.message : null,
+  });
 
   return (
     <ScreenContainer scroll maxWidth="form">
@@ -84,6 +96,7 @@ export default function DriverDocumentsScreen() {
           onPickLibrary={() => upload.pickFromLibrary('driver_license')}
           onPickCamera={() => upload.pickFromCamera('driver_license')}
           errorMessage={upload.errorFor('driver_license')}
+          {...deletion(licenseDoc)}
         />
         <DocumentUploadField
           label="Carte nationale d'identité"
@@ -92,6 +105,7 @@ export default function DriverDocumentsScreen() {
           onPickLibrary={() => upload.pickFromLibrary('national_id')}
           onPickCamera={() => upload.pickFromCamera('national_id')}
           errorMessage={upload.errorFor('national_id')}
+          {...deletion(nationalIdDoc)}
         />
       </OceanSection>
 

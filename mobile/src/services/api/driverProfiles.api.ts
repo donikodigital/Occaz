@@ -20,6 +20,8 @@ export const driverProfilesApi = {
 
   listMyDocuments: () => api.get<AppDocument[]>('/driver-profiles/me/documents'),
 
+  deleteDocument: (documentId: string) => api.delete<{ deleted: number }>(`/driver-profiles/me/documents/${documentId}`),
+
   requestPhotoUploadUrl: (payload: RequestUploadUrlPayload) =>
     api.post<UploadUrlResult>('/driver-profiles/me/photo/upload-url', payload),
 

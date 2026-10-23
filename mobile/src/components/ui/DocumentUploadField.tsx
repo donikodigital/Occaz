@@ -1,11 +1,14 @@
 // mobile/src/components/ui/DocumentUploadField.tsx
+// [23/10/2026] v+ — onDelete : bouton « Supprimer ce document » (avec confirmation) tant que la pièce n'est pas vérifiée. Une pièce vérifiée
+// ne se supprime pas : un petit texte invite à en renvoyer une nouvelle.
 // [10/10/2026] v+ — errorMessage : l'échec d'un envoi s'affiche sous le champ (Alert.alert ne fait rien sur le web).
 // [21/09/2026] v+ — strokeWidth au lieu de stroke.
-import React from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import { IconAlertCircle, IconCamera, IconFileText, IconPhoto } from '@tabler/icons-react-native';
+import { IconAlertCircle, IconCamera, IconFileText, IconPhoto, IconTrash } from '@tabler/icons-react-native';
 import { AppText } from './AppText';
 import { Badge } from './Badge';
+import { ConfirmDialog } from './ConfirmDialog';
 import { FeedbackBanner } from './FeedbackBanner';
 import type { BadgeTone } from './Badge';
 import { colors, radius, spacing } from '@/theme';
@@ -19,6 +22,11 @@ export interface DocumentUploadFieldProps {
   onPickCamera: () => void;
   /** Échec du dernier envoi de cette pièce, affiché sous le champ. */
   errorMessage?: string | null;
+  /** Supprime la pièce envoyée. Sans cette fonction, aucun bouton de suppression n'est affiché. */
+  onDelete?: () => void;
+  isDeleting?: boolean;
+  /** Échec de la dernière suppression, affiché sous le champ. */
+  deleteError?: string | null;
 }
 
 /** Statut affiché : celui du document, ou MISSING tant que rien n'a été envoyé. */
@@ -71,8 +79,20 @@ function ActionButton({
 }
 
 /** Un champ par type de pièce (CNI, permis, carte grise...) — la même pièce peut être renvoyée si rejetée, un nouvel envoi remplace simplement l'ancien statut à l'écran suivant. */
-export function DocumentUploadField({ label, document, isUploading, onPickLibrary, onPickCamera, errorMessage }: DocumentUploadFieldProps) {
+export function DocumentUploadField({
+  label,
+  document,
+  isUploading,
+  onPickLibrary,
+  onPickCamera,
+  errorMessage,
+  onDelete,
+  isDeleting = false,
+  deleteError,
+}: DocumentUploadFieldProps) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const state: DisplayState = document?.status ?? 'MISSING';
+  const canDelete = Boolean(onDelete && document && state !== 'VERIFIED');
   const tile = STATE_TILE[state];
 
   return (
@@ -120,7 +140,43 @@ export function DocumentUploadField({ label, document, isUploading, onPickLibrar
         </View>
       )}
 
+      {canDelete && !isUploading ? (
+        <Pressable
+          onPress={() => setConfirmingDelete(true)}
+          disabled={isDeleting}
+          accessibilityRole="button"
+          accessibilityLabel={`Supprimer le document : ${label}`}
+          style={({ pressed }) => [styles.deleteButton, (pressed || isDeleting) && styles.actionPressed]}
+        >
+          {isDeleting ? <ActivityIndicator size="small" color={colors.dangerDark} /> : <IconTrash size={16} color={colors.dangerDark} />}
+          <AppText variant="sm" weight="semibold" color="dangerDark">
+            {isDeleting ? 'Suppression…' : 'Supprimer ce document'}
+          </AppText>
+        </Pressable>
+      ) : null}
+
+      {onDelete && document && state === 'VERIFIED' ? (
+        <AppText variant="xs" color="textMuted">
+          Document vérifié : pour le changer, envoyez-en un nouveau.
+        </AppText>
+      ) : null}
+
       {errorMessage ? <FeedbackBanner tone="error" text={errorMessage} /> : null}
+      {deleteError ? <FeedbackBanner tone="error" text={deleteError} /> : null}
+
+      <ConfirmDialog
+        visible={confirmingDelete}
+        title="Supprimer ce document ?"
+        message="Le fichier envoyé sera effacé. Vous pourrez en envoyer un autre à tout moment."
+        confirmLabel="Supprimer"
+        destructive
+        loading={isDeleting}
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          onDelete?.();
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </View>
   );
 }
@@ -176,6 +232,15 @@ const styles = StyleSheet.create({
   },
   actionPressed: {
     opacity: 0.7,
+  },
+  deleteButton: {
+    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.dangerLight,
   },
   uploading: {
     height: 42,

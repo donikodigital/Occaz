@@ -1,4 +1,7 @@
 // mobile/src/components/screens/NotificationsInboxScreen.tsx
+// [23/10/2026] v4 — Suppression en masse plus visible : une barre d'actions sous l'en-tête (au lieu d'icônes dans l'en-tête, qui faisaient
+// passer le titre « Notifications » sur deux lignes) avec « Sélectionner » et « Tout lire ». En mode sélection : « Tout sélectionner /
+// Tout désélectionner » et « Supprimer (n) » en rouge, avec le même passage par une confirmation qu'avant.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [26/09/2026] v3 — Chaque notification s'ouvre en modale (texte complet,
 // jamais tronqué) au lieu de se contenter d'un aperçu sur 2 lignes.
@@ -262,6 +265,12 @@ export function NotificationsInboxScreen() {
     });
   }
 
+  const allSelected = items.length > 0 && items.every((n) => selectedIds.has(n.id));
+
+  function toggleSelectAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(items.map((n) => n.id)));
+  }
+
   function handleOpenDetail(notification: AppNotification) {
     if (!notification.readAt) markRead.mutate(notification.id);
     setDetailNotification(notification);
@@ -313,54 +322,73 @@ export function NotificationsInboxScreen() {
           title="Notifications"
           subtitle={subtitle}
           onBack={selectionMode ? exitSelectionMode : () => router.back()}
-          right={
-            selectionMode ? (
-              <View style={styles.headerActions}>
-                <Pressable
-                  onPress={() => setConfirmingDelete(true)}
-                  disabled={selectedIds.size === 0 || deleteNotifications.isPending}
-                  accessibilityRole="button"
-                  accessibilityLabel="Supprimer la sélection"
-                  style={({ pressed }) => [
-                    styles.iconButton,
-                    (selectedIds.size === 0 || deleteNotifications.isPending) && styles.iconButtonDisabled,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <IconTrash size={18} color={colors.danger} />
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.headerActions}>
-                {items.length > 0 ? (
-                  <Pressable
-                    onPress={() => setSelectionMode(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Sélectionner des notifications"
-                    style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-                  >
-                    <IconChecklist size={18} color={OCEAN.base} />
-                  </Pressable>
-                ) : null}
-                {unreadCount > 0 ? (
-                  <Pressable
-                    onPress={() => markAllRead.mutate()}
-                    disabled={markAllRead.isPending}
-                    accessibilityRole="button"
-                    accessibilityLabel="Tout marquer comme lu"
-                    style={({ pressed }) => [styles.markAll, pressed && styles.pressed, markAllRead.isPending && styles.markAllDisabled]}
-                  >
-                    <IconChecks size={15} color={OCEAN.base} />
-                    <AppText variant="xs" weight="bold" color={OCEAN.base}>
-                      Tout lire
-                    </AppText>
-                  </Pressable>
-                ) : null}
-              </View>
-            )
-          }
         />
       </View>
+
+      {items.length > 0 ? (
+        <View style={styles.toolbar}>
+          {selectionMode ? (
+            <>
+              <Pressable
+                onPress={toggleSelectAll}
+                accessibilityRole="button"
+                accessibilityLabel={allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+                style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
+              >
+                {allSelected ? <IconSquareCheck size={16} color={OCEAN.base} /> : <IconSquare size={16} color={OCEAN.base} />}
+                <AppText variant="xs" weight="bold" color={OCEAN.base}>
+                  {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </AppText>
+              </Pressable>
+              <Pressable
+                onPress={() => setConfirmingDelete(true)}
+                disabled={selectedIds.size === 0 || deleteNotifications.isPending}
+                accessibilityRole="button"
+                accessibilityLabel="Supprimer la sélection"
+                style={({ pressed }) => [
+                  styles.pill,
+                  styles.pillDanger,
+                  (selectedIds.size === 0 || deleteNotifications.isPending) && styles.pillDisabled,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <IconTrash size={16} color={colors.danger} />
+                <AppText variant="xs" weight="bold" color={colors.danger}>
+                  {selectedIds.size > 0 ? `Supprimer (${selectedIds.size})` : 'Supprimer'}
+                </AppText>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Pressable
+                onPress={() => setSelectionMode(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Sélectionner des notifications"
+                style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
+              >
+                <IconChecklist size={16} color={OCEAN.base} />
+                <AppText variant="xs" weight="bold" color={OCEAN.base}>
+                  Sélectionner
+                </AppText>
+              </Pressable>
+              {unreadCount > 0 ? (
+                <Pressable
+                  onPress={() => markAllRead.mutate()}
+                  disabled={markAllRead.isPending}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tout marquer comme lu"
+                  style={({ pressed }) => [styles.pill, pressed && styles.pressed, markAllRead.isPending && styles.pillDisabled]}
+                >
+                  <IconChecks size={16} color={OCEAN.base} />
+                  <AppText variant="xs" weight="bold" color={OCEAN.base}>
+                    Tout lire
+                  </AppText>
+                </Pressable>
+              ) : null}
+            </>
+          )}
+        </View>
+      ) : null}
 
       <ResponsiveList
         data={rows}
@@ -421,33 +449,29 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: spacing.lg,
   },
-  headerActions: {
+  toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.xs + 2,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
   },
-  iconButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: OCEAN.mist,
-  },
-  iconButtonDisabled: {
-    opacity: 0.4,
-  },
-  markAll: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     height: 40,
-    paddingHorizontal: spacing.sm + 2,
+    paddingHorizontal: spacing.sm + 4,
     borderRadius: radius.pill,
     backgroundColor: OCEAN.mist,
   },
-  markAllDisabled: {
-    opacity: 0.5,
+  pillDanger: {
+    backgroundColor: '#FDE8E8',
+  },
+  pillDisabled: {
+    opacity: 0.4,
   },
   list: {
     flexGrow: 1,

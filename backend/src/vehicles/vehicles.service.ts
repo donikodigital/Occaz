@@ -187,4 +187,10 @@ export class VehiclesService {
   findDocuments(vehicleId: string) {
     return this.documentsService.findAllForOwner(DocumentOwnerType.VEHICLE, vehicleId);
   }
+
+  /** Le conducteur propriétaire du véhicule supprime l'une de ses pièces (carte grise…). */
+  async deleteDocument(vehicleId: string, driverId: string, documentId: string, actorId: string) {
+    await this.assertOwnership(vehicleId, driverId);
+    return this.documentsService.removeOwned(DocumentOwnerType.VEHICLE, vehicleId, documentId, actorId);
+  }
 }

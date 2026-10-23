@@ -17,4 +17,7 @@ export const vehiclesApi = {
     api.post<AppDocument>(`/vehicles/${vehicleId}/documents`, payload),
 
   listDocuments: (vehicleId: string) => api.get<AppDocument[]>(`/vehicles/${vehicleId}/documents`),
+
+  deleteDocument: (vehicleId: string, documentId: string) =>
+    api.delete<{ deleted: number }>(`/vehicles/${vehicleId}/documents/${documentId}`),
 };

@@ -1,7 +1,8 @@
 // backend/src/profiles/driver-profiles/driver-profiles.controller.ts
+// [23/10/2026] v+ — DELETE /driver-profiles/me/documents/:documentId : le conducteur supprime l'une de ses pièces (permis, pièce d'identité).
 // [19/10/2026] v+ — GET /driver-profiles/me/compliance : pièces manquantes, jours restants avant le blocage des trajets.
 // [16/10/2026] v+ — fiche conducteur : le portefeuille (solde) n'est montré qu'aux comptes ayant une permission financière, pas au service client.
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -64,6 +65,11 @@ export class DriverProfilesController {
   @Get('me/documents')
   findMyDocuments(@CurrentUser() user: AuthenticatedUser) {
     return this.driverProfilesService.findDocumentsForUser(user.id);
+  }
+
+  @Delete('me/documents/:documentId')
+  deleteMyDocument(@Param('documentId') documentId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.driverProfilesService.deleteDocumentForUser(user.id, documentId);
   }
 
   @Post('me/photo/upload-url')

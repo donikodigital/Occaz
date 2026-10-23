@@ -1,4 +1,9 @@
 // backend/src/locations/locations.controller.ts
+//
+// [23/10/2026] v2 — Confidentialité : une adresse est partagée entre utilisateurs (une même adresse est réutilisée pour tous)
+// et peut être celle d'un destinataire de colis. GET /locations/nearby et GET /locations/:id permettaient à n'importe quel
+// compte connecté de parcourir toutes les adresses. Ils sont désormais réservés au personnel autorisé (geography.manage) ;
+// l'application utilise /saved (adresses de l'utilisateur), /resolve-city et POST /locations.
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -29,6 +34,8 @@ export class LocationsController {
     return this.locationsService.create(dto, userId);
   }
 
+  /** Parcours de TOUTES les adresses autour d'un point : réservé au personnel (aucune app ne l'appelle). */
+  @Permissions(PERMISSIONS.GEOGRAPHY_MANAGE)
   @Get('nearby')
   findNearby(@Query() query: FindNearbyDto) {
     return this.locationsService.findNearby(query);
@@ -52,6 +59,8 @@ export class LocationsController {
     return this.locationsService.markUsed(id, userId);
   }
 
+  /** Lecture d'une adresse par identifiant : réservée au personnel (une adresse peut être celle d'un destinataire). */
+  @Permissions(PERMISSIONS.GEOGRAPHY_MANAGE)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.locationsService.findOne(id);

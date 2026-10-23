@@ -2,6 +2,7 @@
 // [19/10/2026] v2 — GET /vehicles/:id et GET /vehicles/:id/documents n'étaient protégés que par la connexion : tout compte connecté pouvait
 // lire la fiche et les papiers (carte grise, assurance…) d'un véhicule d'autrui. Désormais : le conducteur propriétaire, ou le personnel
 // qui a vehicle.read dans son périmètre pays.
+// [23/10/2026] v3 — DELETE /vehicles/:id/documents/:documentId : le conducteur propriétaire supprime une pièce du véhicule (carte grise…).
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -78,6 +79,16 @@ export class VehiclesController {
   ) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
     return this.vehiclesService.uploadDocument(id, driverId, dto);
+  }
+
+  @Delete(':id/documents/:documentId')
+  async deleteDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    return this.vehiclesService.deleteDocument(id, driverId, documentId, user.id);
   }
 
   @Get(':id/documents')

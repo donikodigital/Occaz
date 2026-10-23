@@ -456,4 +456,10 @@ export class DriverProfilesService {
     const driverId = await this.getProfileIdForUser(userId);
     return this.documentsService.findAllForOwner(DocumentOwnerType.DRIVER, driverId);
   }
+
+  /** Le conducteur supprime l'une de ses pièces (jamais celle d'un autre : le propriétaire est fixé par son profil). */
+  async deleteDocumentForUser(userId: string, documentId: string) {
+    const driverId = await this.getProfileIdForUser(userId);
+    return this.documentsService.removeOwned(DocumentOwnerType.DRIVER, driverId, documentId, userId);
+  }
 }
