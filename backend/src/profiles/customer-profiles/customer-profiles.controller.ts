@@ -1,17 +1,18 @@
 // backend/src/profiles/customer-profiles/customer-profiles.controller.ts
+// [23/10/2026] v+ — liste : le filtre pays passe par ListCustomerProfilesQueryDto (il faisait échouer la requête en 400).
 // [21/09/2026] v+ — routes de photo de profil (upload-url puis confirmation), comme côté conducteur.
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../../common/types/request-with-user.interface';
 import { CountryScopeService } from '../../common/scope/country-scope.service';
 import { RequestUploadUrlDto } from '../../storage/dto/request-upload-url.dto';
 import { CustomerProfilesService } from './customer-profiles.service';
 import { CreateCustomerProfileDto } from './dto/create-customer-profile.dto';
 import { UpdateCustomerProfileDto } from './dto/update-customer-profile.dto';
+import { ListCustomerProfilesQueryDto } from './dto/list-customer-profiles-query.dto';
 import { ConfirmPhotoDto } from './dto/confirm-photo.dto';
 
 @ApiTags('Profils — Clients')
@@ -51,13 +52,12 @@ export class CustomerProfilesController {
   @Permissions(PERMISSIONS.CUSTOMER_READ)
   @Get()
   findAll(
-    @Query() query: PaginationQueryDto,
+    @Query() query: ListCustomerProfilesQueryDto,
     @CurrentUser() user: AuthenticatedUser,
-    @Query('countryId') countryId?: string,
   ) {
     return this.customerProfilesService.findAll(
       query,
-      countryId,
+      query.countryId,
       this.scope.customerWhere(user, PERMISSIONS.CUSTOMER_READ),
     );
   }

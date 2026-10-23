@@ -1,15 +1,15 @@
 // backend/src/verifications/verifications.controller.ts
+// [23/10/2026] v+ — liste : les filtres statut/type passent par ListVerificationsQueryDto (ils faisaient échouer la requête en 400).
 // [19/10/2026] v+ — le profil conducteur se déduit de l'existence du profil, plus du type de compte.
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { VerificationStatus, VerificationType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { CountryScopeService } from '../common/scope/country-scope.service';
 import { VerificationsService } from './verifications.service';
+import { ListVerificationsQueryDto } from './dto/list-verifications-query.dto';
 import { CreateVerificationDto } from './dto/create-verification.dto';
 import { RejectVerificationDto } from './dto/reject-verification.dto';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
@@ -39,14 +39,12 @@ export class VerificationsController {
   @Permissions(PERMISSIONS.DRIVER_VERIFY)
   @Get()
   findAll(
-    @Query() query: PaginationQueryDto,
+    @Query() query: ListVerificationsQueryDto,
     @CurrentUser() user: AuthenticatedUser,
-    @Query('status') status?: VerificationStatus,
-    @Query('type') type?: VerificationType,
   ) {
     return this.verificationsService.findAll(
       query,
-      { status, type },
+      { status: query.status, type: query.type },
       this.scope.verificationWhere(user, PERMISSIONS.DRIVER_VERIFY),
     );
   }

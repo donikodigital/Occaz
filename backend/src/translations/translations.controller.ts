@@ -1,13 +1,14 @@
 // backend/src/translations/translations.controller.ts
+// [23/10/2026] v+ — liste : les filtres type/langue passent par ListTranslationsQueryDto (ils faisaient échouer la requête en 400).
 import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { TranslationsService } from './translations.service';
+import { ListTranslationsQueryDto } from './dto/list-translations-query.dto';
 import { UpsertTranslationDto } from './dto/upsert-translation.dto';
 
 @ApiTags('Administration — Traductions')
@@ -29,11 +30,9 @@ export class TranslationsController {
   @Permissions(PERMISSIONS.SETTINGS_UPDATE)
   @Get()
   findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('entityType') entityType?: string,
-    @Query('locale') locale?: string,
+    @Query() query: ListTranslationsQueryDto,
   ) {
-    return this.translationsService.findAll(query, { entityType, locale });
+    return this.translationsService.findAll(query, { entityType: query.entityType, locale: query.locale });
   }
 
   @Permissions(PERMISSIONS.SETTINGS_UPDATE)

@@ -1,4 +1,5 @@
 // backend/src/disputes/disputes.controller.ts
+// [23/10/2026] v+ — liste : les filtres statut/priorité/agent passent par ListDisputesQueryDto (ils faisaient échouer la requête en 400).
 // [16/10/2026] v+ — libérer d'office l'argent d'un conducteur (DRIVER_PAYOUT) exige aussi `payout.manage` : le service client valide un code ou
 // suspend un compte, il ne déplace pas de fonds. Le SuperAdmin et la finance passent toujours.
 // [02/10/2026] v+ — résolution : un remboursement exige aussi `refund.create` et une suspension `user.suspend`
@@ -6,11 +7,10 @@
 // [02/10/2026] v+ — Portée par pays : liste, fiche et actions limitées aux litiges du périmètre de l'agent.
 import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AccountType, DisputePriority, DisputeResolutionType, DisputeStatus } from '@prisma/client';
+import { AccountType, DisputeResolutionType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { CountryScopeService } from '../common/scope/country-scope.service';
 import { canSeePlatformEarnings, withoutDisputeFinance } from '../common/utils/platform-earnings';
@@ -19,6 +19,7 @@ import { CreateDisputeDto } from './dto/create-dispute.dto';
 import { AddDisputeMessageDto } from './dto/add-dispute-message.dto';
 import { AddDisputeEvidenceDto } from './dto/add-dispute-evidence.dto';
 import { AssignDisputeDto } from './dto/assign-dispute.dto';
+import { ListDisputesQueryDto } from './dto/list-disputes-query.dto';
 import { UpdateDisputeStatusDto } from './dto/update-dispute-status.dto';
 import { ResolveDisputeDto } from './dto/resolve-dispute.dto';
 
@@ -142,15 +143,12 @@ export class DisputesController {
   @Permissions(PERMISSIONS.DISPUTE_READ)
   @Get()
   findAll(
-    @Query() query: PaginationQueryDto,
+    @Query() query: ListDisputesQueryDto,
     @CurrentUser() user: AuthenticatedUser,
-    @Query('status') status?: DisputeStatus,
-    @Query('priority') priority?: DisputePriority,
-    @Query('assignedAgentId') assignedAgentId?: string,
   ) {
     return this.disputesService.findAll(
       query,
-      { status, priority, assignedAgentId },
+      { status: query.status, priority: query.priority, assignedAgentId: query.assignedAgentId },
       this.scope.disputeWhere(user, PERMISSIONS.DISPUTE_READ),
     );
   }

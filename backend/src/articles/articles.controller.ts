@@ -1,9 +1,11 @@
 // backend/src/articles/articles.controller.ts
+// [23/10/2026] v+ — actualités publiées : le filtre pays passe par ListPublishedArticlesQueryDto (il faisait échouer la requête en 400).
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { ListPublishedArticlesQueryDto } from './dto/list-published-articles-query.dto';
 import { ArticlesService } from './articles.service';
 import { UpsertArticleDto } from './dto/upsert-article.dto';
 
@@ -14,8 +16,8 @@ export class ArticlesController {
   constructor(private readonly articlesService: ArticlesService) {}
 
   @Get('published')
-  findPublished(@Query() query: PaginationQueryDto, @Query('countryId') countryId?: string) {
-    return this.articlesService.findPublished(query, countryId);
+  findPublished(@Query() query: ListPublishedArticlesQueryDto) {
+    return this.articlesService.findPublished(query, query.countryId);
   }
 
   @Permissions(PERMISSIONS.PROMOTION_MANAGE)
