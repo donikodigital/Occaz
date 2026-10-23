@@ -9,3 +9,5 @@ web-build/
 .DS_Store
 ios/
 android/
+fcm-key.json
+*-firebase-adminsdk-*.json

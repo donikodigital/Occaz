@@ -1,5 +1,9 @@
 // web-admin/src/app/(app)/geography/page.tsx
 //
+// [23/10/2026] v7 — Carte d'un pays : les pastilles « Désactivé » et « Par défaut à l’inscription » passent sous le nom du pays
+// (elles se replient si besoin) ; la pastille de la devise reste seule à droite, avec la flèche. Avant, la pastille « Par défaut à
+// l’inscription » écrasait le nom du pays et chevauchait le code de la devise.
+//
 // [11/10/2026] v6 — Villes : la liste est repliée par défaut (41 cartes d'un coup, c'est long à parcourir) ; une carte « Voir les villes »
 // la déroule. Elle s'ouvre toute seule dès qu'on cherche ou qu'on filtre « Sans GPS », et se replie quand on change de pays.
 //
@@ -294,10 +298,22 @@ function CountryCard({ country, currencies, onClick }: { country: Country; curre
         <p className="text-xs text-text-secondary">
           {country.isoCode} · {country.phoneCode}
         </p>
+        {!country.isActive || country.isSignupDefault ? (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {!country.isActive ? (
+              <span className="whitespace-nowrap">
+                <Badge label="Désactivé" tone="neutral" />
+              </span>
+            ) : null}
+            {country.isSignupDefault ? (
+              <span className="whitespace-nowrap">
+                <Badge label="Par défaut à l’inscription" tone="success" />
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {!country.isActive ? <Badge label="Désactivé" tone="neutral" /> : null}
-        {country.isSignupDefault ? <Badge label="Par défaut à l’inscription" tone="success" /> : null}
+      <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
         {missingCurrency ? <Badge label="Devise manquante" tone="danger" /> : <Badge label={currency?.isoCode ?? '—'} tone="primary" />}
         <IconChevronRight size={18} className="text-text-muted transition-transform group-hover:translate-x-0.5" />
       </div>

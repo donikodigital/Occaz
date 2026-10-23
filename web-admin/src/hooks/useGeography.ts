@@ -70,7 +70,12 @@ export function useDeleteCurrency() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => geographyApi.deleteCurrency(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['currencies'] }),
+    // Les pays désactivés qui utilisaient la devise en sont détachés : on recharge aussi les pays.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['currencies'] }),
+        queryClient.invalidateQueries({ queryKey: ['countries'] }),
+      ]),
   });
 }
 

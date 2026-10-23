@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "329046855045",
+    "project_id": "occaz-8bb3a",
+    "storage_bucket": "occaz-8bb3a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:329046855045:android:08ba1ffef9acd67bb808ec",
+        "android_client_info": {
+          "package_name": "sarl.occaz.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBMJ7D-o7kPnb7xwQIhzAabMEbe7ShweHk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
