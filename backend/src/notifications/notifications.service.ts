@@ -1,4 +1,5 @@
 // backend/src/notifications/notifications.service.ts
+// [25/10/2026] v4 — Push : les tokens sont dédoublonnés avant l'envoi (un téléphone ne reçoit plus la même notification plusieurs fois).
 // [19/10/2026] v3 — Politique SMS (voir integrations/sms/sms-purpose.ts) : les notifications ne partent plus par SMS (coût). Le canal SMS demandé
 // par un appelant est retiré sans bruit : la notification reste dans l'application (cloche) et part par push et e-mail. Réactivation sans
 // redéployer : SMS_EXTRA_PURPOSES=NOTIFICATION.
@@ -120,7 +121,8 @@ export class NotificationsService {
         const devices = await this.prisma.device.findMany({
           where: { userId, pushToken: { not: null } },
         });
-        const tokens = devices.map((d) => d.pushToken).filter((t): t is string => Boolean(t));
+        // Un token n'est utilisé qu'une fois : même si la base garde deux lignes pour le même téléphone, il ne reçoit qu'une notification.
+        const tokens = [...new Set(devices.map((d) => d.pushToken).filter((t): t is string => Boolean(t)))];
         await this.pushProvider.send(tokens, title, body, pushData, pushOptions);
         return;
       }

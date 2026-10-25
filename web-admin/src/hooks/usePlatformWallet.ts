@@ -1,7 +1,13 @@
 // web-admin/src/hooks/usePlatformWallet.ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformWalletApi } from '@/services/api/platform-wallet.api';
-import type { BeneficiaryInput, PlatformWithdrawalStatus, WithdrawalCodeRequest, WithdrawalInput } from '@/types/platform-wallet.types';
+import type {
+  BeneficiaryInput,
+  ExpenseCategory,
+  PlatformWithdrawalStatus,
+  WithdrawalCodeRequest,
+  WithdrawalInput,
+} from '@/types/platform-wallet.types';
 
 export function usePlatformWallet() {
   return useQuery({
@@ -15,11 +21,28 @@ export function usePlatformBeneficiaries() {
   return useQuery({ queryKey: ['platform-beneficiaries'], queryFn: () => platformWalletApi.beneficiaries() });
 }
 
-export function usePlatformWithdrawals(params: { page?: number; status?: PlatformWithdrawalStatus }) {
+export function usePlatformWithdrawals(params: {
+  page?: number;
+  status?: PlatformWithdrawalStatus;
+  category?: ExpenseCategory;
+  year?: number;
+  month?: number;
+}) {
   return useQuery({
     queryKey: ['platform-withdrawals', params],
     queryFn: () => platformWalletApi.withdrawals({ ...params, limit: 20 }),
     refetchInterval: 30_000,
+  });
+}
+
+/** Bulletin d'une personne pour un mois (le net à payer remplit le montant du retrait « Salaire »). */
+export function usePayslipPreview(staffUserId: string, period: string) {
+  return useQuery({
+    queryKey: ['payslip-preview', staffUserId, period],
+    queryFn: () => platformWalletApi.payslipPreview(staffUserId, period),
+    enabled: !!staffUserId && /^\d{4}-\d{2}$/.test(period),
+    retry: false,
+    staleTime: 0,
   });
 }
 

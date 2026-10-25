@@ -225,6 +225,13 @@ describe('Décisions de l\'équipe — le conducteur est toujours prévenu', () 
     expect(fallbackBody.replace(/\s/g, ' ')).toContain('15 000 XOF');
   });
 
+  it('« Passer en traitement » deux fois de suite : le conducteur n\'est prévenu qu\'une fois', async () => {
+    const { service, notifications } = build();
+    await service.markProcessing('p1', 'admin1');
+    await expect(service.markProcessing('p1', 'admin1')).rejects.toThrow('ne peut pas être marqué en traitement');
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
+  });
+
   it('« Marquer payé » : retrait effectué', async () => {
     const { service, notifications, wallets } = build({ status: PayoutStatus.PROCESSING });
     await service.markPaid('p1', 'admin1');

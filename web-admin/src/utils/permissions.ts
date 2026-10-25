@@ -48,6 +48,8 @@ export const PERMISSIONS = {
   USER_REPORT_MANAGE: 'user_report.manage',
   SOS_READ: 'sos.read',
   SOS_MANAGE: 'sos.manage',
+  COMPANY_DOCUMENT_READ: 'company_document.read',
+  COMPANY_DOCUMENT_MANAGE: 'company_document.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

@@ -1,7 +1,9 @@
 // backend/src/storage/storage.service.ts
+// [25/10/2026] v+ — headObject() (taille réelle d'un fichier envoyé) et option `contentDisposition` du lien de lecture (nom du fichier au téléchargement,
+// ouverture dans le navigateur ou enregistrement) : utilisés par les documents de l'entreprise.
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 /**
@@ -87,15 +89,32 @@ export class StorageService {
    * (donc temporaire — voir STORAGE_PUBLIC_BASE_URL dans .env.example
    * pour l'activer durablement).
    */
-  async createDownloadUrl(key: string, options: { public?: boolean } = {}): Promise<string> {
+  async createDownloadUrl(key: string, options: { public?: boolean; contentDisposition?: string } = {}): Promise<string> {
     if (options.public) {
       const publicBaseUrl = process.env.STORAGE_PUBLIC_BASE_URL;
       if (publicBaseUrl) {
         return `${publicBaseUrl.replace(/\/$/, '')}/${key}`;
       }
     }
-    const command = new GetObjectCommand({ Bucket: this.getBucket(), Key: key });
+    // `contentDisposition` fixe le nom proposé au téléchargement (sinon le navigateur afficherait la clé générée) et le mode : « inline » ouvre
+    // le fichier dans le navigateur, « attachment » l'enregistre. Il fait partie de la signature : le lien ne peut pas être détourné.
+    const command = new GetObjectCommand({ Bucket: this.getBucket(), Key: key, ResponseContentDisposition: options.contentDisposition });
     return getSignedUrl(this.getClient(), command, { expiresIn: this.urlTtlSeconds });
+  }
+
+  /**
+   * Ce que le stockage sait d'un objet : sa taille réelle et son type. Sert à vérifier, après l'envoi direct du client, que le fichier est bien
+   * arrivé et qu'il respecte la taille permise (le serveur ne voit jamais passer le fichier). Renvoie null si l'objet n'existe pas.
+   */
+  async headObject(key: string): Promise<{ size: number; contentType: string | null } | null> {
+    try {
+      const result = await this.getClient().send(new HeadObjectCommand({ Bucket: this.getBucket(), Key: key }));
+      return { size: Number(result.ContentLength ?? 0), contentType: result.ContentType ?? null };
+    } catch (error) {
+      const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+      if (status === 404 || (error as Error).name === 'NotFound' || (error as Error).name === 'NoSuchKey') return null;
+      throw error;
+    }
   }
 
   async deleteObject(key: string): Promise<void> {

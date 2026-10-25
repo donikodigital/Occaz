@@ -1,4 +1,5 @@
 // backend/src/integrations/push/expo-push.provider.ts
+// [25/10/2026] v3 — tokens dédoublonnés avant l'envoi.
 // [21/09/2026] v2 — options par push : canal Android et priorité (alerte qui sonne).
 import { Injectable, Logger } from '@nestjs/common';
 import { PushOptions, PushProvider } from './push-provider.interface';
@@ -32,7 +33,8 @@ export class ExpoPushProvider implements PushProvider {
     // Un token invalide (mauvais format) ferait échouer tout le lot côté
     // Expo — filtré ici plutôt que de risquer de perdre les envois valides
     // à cause d'un seul mauvais token.
-    const validTokens = pushTokens.filter((token) => /^Expo(nent)?PushToken\[.+\]$/.test(token));
+    // Dédoublonné : un même token ne reçoit jamais deux fois le même message.
+    const validTokens = [...new Set(pushTokens)].filter((token) => /^Expo(nent)?PushToken\[.+\]$/.test(token));
     if (validTokens.length === 0) {
       if (pushTokens.length > 0) {
         this.logger.warn(`${pushTokens.length} token(s) fourni(s), aucun au format Expo valide — rien envoyé.`);

@@ -1,4 +1,6 @@
 // web-admin/src/components/layout/nav-items.ts
+// [25/10/2026] v+ — Entrée « Documents » (Système) : procès-verbaux, statuts, contrats… de l'entreprise (COMPANY_DOCUMENT_READ).
+// [25/10/2026] v+ — Entrée « Comptabilité » (Finance) : synthèse mensuelle / semestrielle / annuelle, pièces comptables, fiches de paie, exports.
 // [20/10/2026] v+ — Entrée « Création comptes » (Système), réservée au SuperAdmin : `superAdminOnly` sur NavItem, et `isSuperAdmin` en
 // paramètre de canSeeNavItem() / getVisibleSections().
 // [22/09/2026] v+ — getQuickLinks() retiré : la barre du bas mobile a été supprimée, toute la navigation mobile passe par le tiroir de la Sidebar.
@@ -11,8 +13,10 @@ import {
   IconAlertTriangle,
   IconArrowsExchange,
   IconBooks,
+  IconCalculator,
   IconCash,
   IconCreditCard,
+  IconFolders,
   IconDiscount2,
   IconFlag3,
   IconGift,
@@ -76,6 +80,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/payment-providers', label: 'Moyens de paiement', icon: IconCreditCard, permissions: [PERMISSIONS.PAYMENT_PROVIDER_MANAGE] },
       { href: '/payouts', label: 'Retraits', icon: IconWallet, permissions: [PERMISSIONS.PAYOUT_MANAGE] },
       { href: '/platform-wallet', label: 'Portefeuille plateforme', icon: IconBuildingBank, permissions: [PERMISSIONS.PLATFORM_WALLET_READ] },
+      { href: '/accounting', label: 'Comptabilité', icon: IconCalculator, permissions: [PERMISSIONS.PLATFORM_WALLET_READ] },
       { href: '/pricing', label: 'Tarification', icon: IconCash, permissions: [PERMISSIONS.COMMISSION_MANAGE, PERMISSIONS.CANCELLATION_POLICY_MANAGE] },
       { href: '/trip-pricing', label: 'Configuration frais trajets', icon: IconAdjustmentsDollar, permissions: [PERMISSIONS.SETTINGS_UPDATE] },
       { href: '/exchange-rates', label: 'Taux de change', icon: IconArrowsExchange, permissions: [PERMISSIONS.SETTINGS_UPDATE] },
@@ -102,6 +107,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Système',
     items: [
+      { href: '/documents', label: 'Documents', icon: IconFolders, permissions: [PERMISSIONS.COMPANY_DOCUMENT_READ] },
       { href: '/roles', label: 'Rôles', icon: IconShieldLock, permissions: [PERMISSIONS.ROLE_MANAGE] },
       { href: '/staff-accounts', label: 'Création comptes', icon: IconUserPlus, superAdminOnly: true },
       { href: '/settings', label: 'Paramètres', icon: IconSettings, permissions: [PERMISSIONS.SETTINGS_UPDATE] },

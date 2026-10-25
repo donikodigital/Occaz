@@ -1,5 +1,6 @@
 // backend/src/storage/storage-key.util.ts
 //
+// [25/10/2026] v2 — extensions acceptées paramétrables (documents de l'entreprise : Word, Excel…), PDF et photos par défaut comme avant.
 // [25/10/2026] v1 — Règles pures sur les clés de stockage (sans base de données ni réseau).
 // Une clé est fabriquée par le serveur (StorageService.buildKey) : « <dossier>/<identifiant du propriétaire>/<uuid>.<extension> ». Quand le client
 // « confirme » un envoi, il renvoie cette clé : sans contrôle, il pourrait y glisser celle d'un autre (photo publique d'un autre utilisateur, par
@@ -15,18 +16,24 @@ export interface StorageKeyOwner {
 }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const EXTENSIONS = '(jpg|png|webp|pdf)';
+/** Extensions des fichiers « pièces » (photos et PDF) : celles de tous les usages historiques. */
+export const DEFAULT_KEY_EXTENSIONS: readonly string[] = ['jpg', 'png', 'webp', 'pdf'];
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** Vrai si `key` a été fabriquée pour l'un de ces propriétaires. */
-export function isStorageKeyOwnedBy(key: unknown, owners: readonly StorageKeyOwner[]): boolean {
-  if (typeof key !== 'string' || key.length === 0 || key.length > 300) return false;
+export function isStorageKeyOwnedBy(
+  key: unknown,
+  owners: readonly StorageKeyOwner[],
+  extensions: readonly string[] = DEFAULT_KEY_EXTENSIONS,
+): boolean {
+  if (typeof key !== 'string' || key.length === 0 || key.length > 300 || extensions.length === 0) return false;
+  const allowed = `(${extensions.map(escapeRegExp).join('|')})`;
   return owners.some(({ folder, ownerId }) => {
     if (!folder || !ownerId) return false;
-    return new RegExp(`^${escapeRegExp(folder)}/${escapeRegExp(ownerId)}/${UUID}\\.${EXTENSIONS}$`).test(key);
+    return new RegExp(`^${escapeRegExp(folder)}/${escapeRegExp(ownerId)}/${UUID}\\.${allowed}$`).test(key);
   });
 }
 
@@ -35,8 +42,9 @@ export function assertStorageKeyOwnedBy(
   key: unknown,
   owners: readonly StorageKeyOwner[],
   message = "Fichier invalide : envoyez-le de nouveau depuis l'application.",
+  extensions: readonly string[] = DEFAULT_KEY_EXTENSIONS,
 ): string {
-  if (!isStorageKeyOwnedBy(key, owners)) throw new BadRequestException(message);
+  if (!isStorageKeyOwnedBy(key, owners, extensions)) throw new BadRequestException(message);
   return key as string;
 }
 

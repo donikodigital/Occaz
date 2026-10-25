@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PermissionsService } from './permissions.service';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 
+// [25/10/2026] v+ — Les rôles service client reçoivent aussi les droits « Documents de l'entreprise » (lecture et dépôt).
 // [16/10/2026] v+ — Rôles « service client » recadrés : ils servent à aider les clients et les conducteurs (consulter trajets et colis,
 // recevoir et traiter les litiges, valider un code en cas de litige, suspendre un compte, envoyer un rappel après un signalement, suivre les
 // alertes SOS) et RIEN d'autre : aucun paramétrage, aucune finance (soldes, commissions, retraits, portefeuille de la plateforme), pas
@@ -40,6 +41,10 @@ const SUPPORT_AGENT_PERMISSIONS: string[] = [
   PERMISSIONS.DRIVER_SUSPEND,
   // Rembourser un client (depuis un litige ou à la main)
   PERMISSIONS.REFUND_CREATE,
+  // Documents de l'entreprise (PV de réunion, etc.) : les consulter et y déposer les siens. Un document sensible se marque « Réservé » :
+  // seuls le SuperAdmin et la personne qui l'a déposé le voient. Pour retirer l'accès à un rôle, décocher ces deux droits dans « Rôles ».
+  PERMISSIONS.COMPANY_DOCUMENT_READ,
+  PERMISSIONS.COMPANY_DOCUMENT_MANAGE,
 ];
 
 const DEFAULT_ROLES: { key: string; name: string; permissionKeys: string[]; enforce?: boolean }[] = [

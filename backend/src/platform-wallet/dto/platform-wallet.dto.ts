@@ -1,8 +1,24 @@
 // backend/src/platform-wallet/dto/platform-wallet.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PlatformBeneficiaryKind, PlatformWithdrawalStatus } from '@prisma/client';
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { ExpenseCategory, PlatformBeneficiaryKind, PlatformWithdrawalStatus } from '@prisma/client';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 /** Numéros acceptés avec espaces, tirets ou points ; enregistrés en « +224620004417 ». */
@@ -75,7 +91,144 @@ export class UpdateBeneficiaryDto {
   isActive?: boolean;
 }
 
-export class CreateWithdrawalDto {
+/** Fournisseur d'un achat (fournitures, équipements). */
+export class ExpenseSupplierDto {
+  @ApiProperty({ example: 'Papeterie Moderne' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  address?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  phone?: string;
+
+  @ApiPropertyOptional({ description: 'Numéro de la facture remise par le fournisseur' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  invoiceRef?: string;
+}
+
+/** Une ligne de facture ou de note de frais. Le total de la ligne est toujours recalculé par le serveur. */
+export class ExpenseLineDto {
+  @ApiProperty({ example: 'Ramettes de papier A4' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  description: string;
+
+  @ApiProperty({ minimum: 1, maximum: 100000 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100000)
+  quantity: number;
+
+  @ApiProperty({ description: 'Prix unitaire, entier supérieur à zéro (plus petite unité de la devise)' })
+  @IsString()
+  @Matches(/^[1-9]\d{0,14}$/, { message: 'Le prix unitaire doit être un nombre entier supérieur à zéro.' })
+  unitPrice: string;
+}
+
+export class ExpenseTravelDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  traveler: string;
+
+  @ApiProperty({ example: 'Conakry' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  from: string;
+
+  @ApiProperty({ example: 'Labé' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  to: string;
+
+  @ApiPropertyOptional({ example: '2026-10-20' })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'La date de départ doit être au format AAAA-MM-JJ.' })
+  departureDate?: string;
+
+  @ApiPropertyOptional({ example: '2026-10-23' })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'La date de retour doit être au format AAAA-MM-JJ.' })
+  returnDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  purpose?: string;
+}
+
+/**
+ * Le MOTIF d'un retrait et ce qu'il exige (voir expense-categories.ts) :
+ *   SALARY → staffUserId + periodMonth (le montant est le net calculé) · BONUS → staffUserId + reason · OPERATING → reason
+ *   TRAVEL → travel (+ lines facultatives) · SUPPLIES / OFFICE_EQUIPMENT → supplier + lines · OTHER → categoryLabel + reason
+ */
+export class ExpenseMotifDto {
+  @ApiProperty({ enum: ExpenseCategory })
+  @IsEnum(ExpenseCategory)
+  category: ExpenseCategory;
+
+  @ApiPropertyOptional({ description: 'Motif saisi quand la catégorie est OTHER' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  categoryLabel?: string;
+
+  @ApiPropertyOptional({ description: "Objet de la dépense / raison de la prime" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  reason?: string;
+
+  @ApiPropertyOptional({ description: 'Membre du personnel concerné (SALARY, BONUS)' })
+  @IsOptional()
+  @IsString()
+  staffUserId?: string;
+
+  @ApiPropertyOptional({ example: '2026-10', description: 'Mois du salaire (AAAA-MM)' })
+  @IsOptional()
+  @IsString()
+  periodMonth?: string;
+
+  @ApiPropertyOptional({ type: ExpenseSupplierDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ExpenseSupplierDto)
+  supplier?: ExpenseSupplierDto;
+
+  @ApiPropertyOptional({ type: [ExpenseLineDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ExpenseLineDto)
+  lines?: ExpenseLineDto[];
+
+  @ApiPropertyOptional({ type: ExpenseTravelDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ExpenseTravelDto)
+  travel?: ExpenseTravelDto;
+}
+
+export class CreateWithdrawalDto extends ExpenseMotifDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -91,7 +244,7 @@ export class CreateWithdrawalDto {
   @Matches(/^[1-9]\d{0,14}$/, { message: 'Le montant doit être un nombre entier supérieur à zéro.' })
   amount: string;
 
-  @ApiPropertyOptional({ description: 'Motif (ex. « Commissions de septembre », « Prime équipe support »)' })
+  @ApiPropertyOptional({ description: 'Note libre (facultative)' })
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -104,7 +257,7 @@ export class CreateWithdrawalDto {
 }
 
 /** Demande d'envoi du code de confirmation : décrit le retrait que le code protégera. */
-export class RequestWithdrawalCodeDto {
+export class RequestWithdrawalCodeDto extends ExpenseMotifDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -147,4 +300,38 @@ export class ListWithdrawalsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   currencyId?: string;
+
+  @ApiPropertyOptional({ enum: ExpenseCategory })
+  @IsOptional()
+  @IsEnum(ExpenseCategory)
+  category?: ExpenseCategory;
+
+  @ApiPropertyOptional({ example: 2026, description: 'Retraits demandés cette année-là' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2020)
+  @Max(2100)
+  year?: number;
+
+  @ApiPropertyOptional({ example: 10, description: "Retraits demandés ce mois-là (avec `year`)" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  month?: number;
+}
+
+/** Aperçu du bulletin d'une personne pour un mois (le montant net remplit le retrait). */
+export class PayslipPreviewQueryDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  staffUserId: string;
+
+  @ApiProperty({ example: '2026-10' })
+  @IsString()
+  @Matches(/^\d{4}-\d{2}$/, { message: 'Le mois doit être au format AAAA-MM.' })
+  period: string;
 }

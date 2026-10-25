@@ -361,6 +361,9 @@ model User {
   driverProfile   DriverProfile?
   // Identité d'un compte d'équipe (Support, Superviseur, Finance…) créé depuis le back-office ; absent pour les comptes du seed.
   staffProfile    StaffProfile?
+  staffPayProfile StaffPayProfile?
+  // Documents de l'entreprise déposés par ce compte (le document survit à la suppression du compte : uploadedById passe à NULL).
+  companyDocuments CompanyDocument[]
 
   userRoles UserRole[]
   devices   Device[]
@@ -434,6 +437,70 @@ model StaffProfile {
   @@map("staff_profiles")
 }
 
+// Données de paie d'un membre de l'équipe (Admin, Support, Superviseur…) : de quoi produire son bulletin de salaire. L'identité
+// (nom, adresse) vient de StaffProfile et du compte ; ici, seulement ce que la paie ajoute. Un compte SuperAdmin n'a pas de
+// StaffProfile : ses données de paie se saisissent quand même ici.
+model StaffPayProfile {
+  id                   String    @id @default(uuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Nom affiché sur le bulletin quand le compte n'a pas de StaffProfile (SuperAdmin).
+  fullName             String?
+  employeeNumber       String? // matricule
+  jobTitle             String?
+  hireDate             DateTime?
+  socialSecurityNumber String?
+  baseSalary           BigInt    @default(0)
+  currencyId           String
+  currency             Currency  @relation(fields: [currencyId], references: [id])
+  // [{ label, amount }] — primes et indemnités fixes ajoutées chaque mois.
+  allowances Json?
+  // [{ label, kind: 'PERCENT' | 'FIXED', value }] — retenues (cotisations sociales, impôt…). PERCENT : en centièmes de pour cent
+  // (500 = 5 %) sur le brut ; FIXED : montant. Les taux sont à fixer avec le comptable : l'application n'en impose aucun.
+  deductions Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("staff_pay_profiles")
+}
+
+// Documents de l'entreprise (procès-verbaux de réunion, statuts, contrats…), stockés dans le stockage d'objets (R2/S3) : la base ne garde que
+// la fiche (titre, catégorie, date) et la clé du fichier. `restricted` : visible du seul SuperAdmin et de la personne qui l'a déposé.
+enum CompanyDocumentCategory {
+  MEETING_MINUTES // procès-verbal de réunion
+  LEGAL // statuts, immatriculation, documents juridiques
+  CONTRACT // contrats et partenariats
+  FINANCE // finance et fiscalité
+  HR // ressources humaines
+  INSURANCE // assurances et autorisations
+  OTHER
+}
+
+model CompanyDocument {
+  id           String                  @id @default(uuid())
+  title        String
+  category     CompanyDocumentCategory
+  description  String?
+  // Date du document (jour de la réunion, date de signature…) ; absente si non précisée.
+  documentDate DateTime?               @db.Date
+  // Nom d'origine du fichier (affichage et nom du téléchargement) ; le stockage utilise une clé générée.
+  fileName     String
+  contentType  String
+  sizeBytes    Int
+  storageKey   String                  @unique
+  restricted   Boolean                 @default(false)
+  uploadedById String?
+  uploadedBy   User?                   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, documentDate])
+  @@index([createdAt])
+  @@map("company_documents")
+}
+
 model Role {
   id          String  @id @default(uuid())
   key         String  @unique // ex: superadmin, support_agent, support_supervisor, finance_manager
@@ -490,7 +557,8 @@ model Device {
   userId     String
   user       User      @relation(fields: [userId], references: [id])
   platform   String // ios | android | web
-  pushToken  String?
+  // Un token push = un téléphone = une seule ligne (sinon la même notification partait autant de fois que de lignes).
+  pushToken  String?   @unique
   isTrusted  Boolean   @default(false)
   lastSeenAt DateTime?
   createdAt  DateTime  @default(now())
@@ -697,6 +765,7 @@ model Currency {
   wallets             Wallet[]
   walletTransactions  WalletTransaction[]
   platformWithdrawals PlatformWithdrawal[]
+  staffPayProfiles    StaffPayProfile[]
   payouts             Payout[]
   commissionRules     CommissionRule[]
   cancellationFees    CancellationPolicy[]
@@ -1336,6 +1405,18 @@ enum PlatformWithdrawalStatus {
   FAILED
 }
 
+// Motif d'un retrait de la plateforme : à quoi sert l'argent. Chaque motif produit sa pièce comptable en PDF
+// (bulletin de paie, reçu de prime, facture d'achat, note de frais…) — voir platform-wallet/expense-document.pdf.ts.
+enum ExpenseCategory {
+  SALARY // salaire d'un membre de l'équipe → bulletin de paie
+  BONUS // prime → reçu de prime
+  OPERATING // fonctionnement (loyer, internet, électricité…) → justificatif de dépense
+  TRAVEL // frais de voyage → note de frais
+  SUPPLIES // fournitures (de bureau…) → facture d'achat
+  OFFICE_EQUIPMENT // équipements de bureau → facture d'achat
+  OTHER // autre motif saisi à la main → justificatif de dépense
+}
+
 model PlatformBeneficiary {
   id         String                  @id @default(uuid())
   label      String // « Mon Orange Money », « Awa — Service client »
@@ -1370,11 +1451,21 @@ model PlatformWithdrawal {
   failureReason     String?
   requestedById     String?
 
+  // Motif de la dépense et pièce comptable. `details` garde ce qui sert à produire le PDF (lignes, fournisseur, bulletin figé…) :
+  // la pièce reste identique même si, plus tard, le salaire ou l'adresse de la personne change.
+  category       ExpenseCategory @default(OTHER)
+  categoryLabel  String? // libellé saisi quand le motif est « Autres »
+  staffUserId    String? // membre de l'équipe concerné (salaire, prime)
+  periodMonth    String? // « 2026-10 » (salaire)
+  details        Json?
+  documentNumber String?         @unique // « BUL-2026-000012 »
+
   requestedAt DateTime  @default(now())
   processedAt DateTime?
 
   @@index([currencyId, status])
   @@index([requestedAt])
+  @@index([category, requestedAt])
   @@map("platform_withdrawals")
 }
 

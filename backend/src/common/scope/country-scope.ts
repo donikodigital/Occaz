@@ -39,6 +39,9 @@ export const GLOBAL_ONLY_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   // L'argent de la plateforme n'est pas rattaché à un pays : jamais de portée par pays.
   PERMISSIONS.PLATFORM_WALLET_READ,
   PERMISSIONS.PLATFORM_WALLET_MANAGE,
+  // Les documents de l'entreprise (PV, statuts, contrats) appartiennent à l'entreprise entière, pas à un pays.
+  PERMISSIONS.COMPANY_DOCUMENT_READ,
+  PERMISSIONS.COMPANY_DOCUMENT_MANAGE,
 ]);
 
 export interface RoleGrant {

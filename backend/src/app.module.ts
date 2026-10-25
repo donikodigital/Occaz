@@ -1,4 +1,6 @@
 // backend/src/app.module.ts
+// [25/10/2026] v+ — + CompanyDocumentsModule (documents de l'entreprise).
+// [25/10/2026] v+ — + AccountingModule (comptabilité, fiches de paie, exports).
 // [20/10/2026] v+ — + StaffAccountsModule (création des comptes d'équipe depuis le back-office).
 // [19/10/2026] v+ — JobsModule (déclencheur externe des traitements automatiques) et AppConfigModule (version minimale de l'application).
 import { Module } from '@nestjs/common';
@@ -33,6 +35,8 @@ import { PaymentProvidersModule } from './payment-providers/payment-providers.mo
 import { WalletsModule } from './wallets/wallets.module';
 import { AccountRolesModule } from './account-roles/account-roles.module';
 import { PlatformWalletModule } from './platform-wallet/platform-wallet.module';
+import { AccountingModule } from './accounting/accounting.module';
+import { CompanyDocumentsModule } from './company-documents/company-documents.module';
 import { PaymentsModule } from './payments/payments.module';
 import { VerificationsModule } from './verifications/verifications.module';
 import { RatingsModule } from './ratings/ratings.module';
@@ -102,6 +106,8 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     WalletsModule,
     AccountRolesModule,
     PlatformWalletModule,
+    AccountingModule,
+    CompanyDocumentsModule,
     PaymentsModule,
     VerificationsModule,
     RatingsModule,

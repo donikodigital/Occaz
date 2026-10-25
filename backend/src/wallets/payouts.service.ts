@@ -1,5 +1,8 @@
 // backend/src/wallets/payouts.service.ts
 //
+// [25/10/2026] v3 — « Passer en traitement » réclame le retrait en base avant de prévenir le conducteur : un double clic ne lui envoie plus
+// « Retrait validé » en double.
+//
 // [19/10/2026] v2 — Demande de retrait durcie : le PIN de connexion est vérifié par le contrôleur (PinConfirmationService), puis les garde-fous
 // (montant > 0 et au-dessus du minimum, plafond sur 24 h, numéro valide, NOUVEAU numéro => validation manuelle) par PayoutGuardrailsService.
 // Retraits des conducteurs. Deux modes, au choix du réglage « payout.auto_enabled » (page « Retraits » du back-office) :
@@ -560,10 +563,14 @@ export class PayoutsService {
     if (payout.status !== PayoutStatus.REQUESTED) {
       throw new NotFoundException('Ce retrait ne peut pas être marqué en traitement.');
     }
-    const updated = await this.prisma.payout.update({
-      where: { id },
+    // Le retrait est « réclamé » avant tout : un double clic (ou deux membres de l'équipe en même temps) ne prévient le conducteur qu'une fois.
+    const claimed = await this.prisma.payout.updateMany({
+      where: { id, status: PayoutStatus.REQUESTED },
       data: { status: PayoutStatus.PROCESSING },
     });
+    if (claimed.count === 0) {
+      throw new NotFoundException('Ce retrait ne peut pas être marqué en traitement.');
+    }
     await this.audit.log({
       actorId,
       entityType: 'Payout',
@@ -571,7 +578,7 @@ export class PayoutsService {
       action: 'PROCESSING',
     });
     await this.notifyDriverOfDecision(id, 'VALIDATED');
-    return updated;
+    return this.findOne(id);
   }
 
   /**

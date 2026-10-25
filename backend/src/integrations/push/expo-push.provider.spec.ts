@@ -1,4 +1,6 @@
+// backend/src/integrations/push/expo-push.provider.spec.ts
 // Le son d'un push : « default » pour toutes les alertes, sauf quand l'appelant en demande un (messages d'échange).
+// Un même token n'est jamais servi deux fois (sinon le téléphone reçoit la notification en plusieurs exemplaires).
 import { ExpoPushProvider } from './expo-push.provider';
 
 describe('ExpoPushProvider — son et canal', () => {
@@ -20,6 +22,11 @@ describe('ExpoPushProvider — son et canal', () => {
   it('garde le son « default » quand aucun son n\'est demandé', async () => {
     await new ExpoPushProvider().send([TOKEN], 'Titre', 'Corps', { type: 'PAYMENT' });
     expect(sent[0]).toMatchObject({ sound: 'default' });
+  });
+
+  it('n\'envoie qu\'un seul message quand le même token est fourni plusieurs fois', async () => {
+    await new ExpoPushProvider().send([TOKEN, TOKEN, TOKEN], 'Retrait effectué', 'Corps');
+    expect(sent).toHaveLength(1);
   });
 
   it('transmet le son et le canal des messages d\'échange', async () => {

@@ -69,6 +69,10 @@ export const PERMISSIONS = {
   USER_REPORT_MANAGE: 'user_report.manage',
   SOS_READ: 'sos.read',
   SOS_MANAGE: 'sos.manage',
+
+  // Documents de l'entreprise (procès-verbaux, statuts, contrats…) : consulter / ajouter, modifier et supprimer les siens
+  COMPANY_DOCUMENT_READ: 'company_document.read',
+  COMPANY_DOCUMENT_MANAGE: 'company_document.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

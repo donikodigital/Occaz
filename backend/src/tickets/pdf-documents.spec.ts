@@ -1,6 +1,7 @@
 // backend/src/tickets/pdf-documents.spec.ts
-// Génération réelle des PDF (pdfkit + codes-barres) : format A5, une page par colis, pas de plantage sur des textes difficiles.
-import { renderBookingTicket, type BookingTicketData } from './booking-ticket.pdf';
+// [25/10/2026] v+ — le billet de voyage est une feuille A4 à quatre volets ; les étiquettes de colis restent en A5.
+// Génération réelle des PDF (pdfkit + codes-barres) : billet A4, étiquettes A5 (une page par colis), pas de plantage sur des textes difficiles.
+import { durationText, renderBookingTicket, type BookingTicketData } from './booking-ticket.pdf';
 import { renderParcelLabels, type ParcelLabelData } from './parcel-label.pdf';
 import { pdfSafe } from './pdf-text';
 
@@ -56,12 +57,26 @@ function inspect(pdf: Buffer) {
 }
 
 describe('renderBookingTicket', () => {
-  it('produit un PDF A5 d\'une page', async () => {
+  it('produit un PDF A4 d\'une page (quatre volets A6)', async () => {
     const info = inspect(await renderBookingTicket(ticket));
     expect(info.isPdf).toBe(true);
     expect(info.pages).toBe(1);
-    expect(info.width).toBeCloseTo(419.53, 1);
-    expect(info.height).toBeCloseTo(595.28, 1);
+    expect(info.width).toBeCloseTo(595.28, 1);
+    expect(info.height).toBeCloseTo(841.89, 1);
+  });
+
+  it('supporte un billet sans heures, sans lieux et sans véhicule', async () => {
+    const pdf = await renderBookingTicket({
+      ...ticket,
+      boardingTimeKnown: false,
+      arrivalAt: null,
+      originPlace: null,
+      destinationPlace: null,
+      vehicle: null,
+      passengers: ['Aïssatou BAH'],
+      seatsCount: 1,
+    });
+    expect(inspect(pdf).pages).toBe(1);
   });
 
   it('supporte les textes très longs et les caractères hors de la police sans planter', async () => {
@@ -74,6 +89,19 @@ describe('renderBookingTicket', () => {
       amountPaid: '1 235 000 GNF',
     });
     expect(inspect(pdf).pages).toBe(1);
+  });
+});
+
+describe('durationText', () => {
+  const from = new Date('2026-10-12T08:30:00Z');
+  it('formate la durée en heures et minutes', () => {
+    expect(durationText(from, new Date('2026-10-12T11:50:00Z'))).toBe('3h20');
+    expect(durationText(from, new Date('2026-10-12T09:15:00Z'))).toBe('45 min');
+    expect(durationText(from, new Date('2026-10-12T10:30:00Z'))).toBe('2h00');
+  });
+  it('renvoie null sans arrivée ou si elle précède le départ', () => {
+    expect(durationText(from, null)).toBeNull();
+    expect(durationText(from, new Date('2026-10-12T08:00:00Z'))).toBeNull();
   });
 });
 

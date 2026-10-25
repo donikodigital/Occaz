@@ -1,4 +1,7 @@
 // web-admin/src/app/(app)/platform-wallet/page.tsx
+// [25/10/2026] v4 — Motifs de dépense sur les retraits (Salaire, Primes, Fonctionnement, Frais de voyage, Fournitures, Équipements de bureau,
+// Autres) : la fenêtre de retrait demande ce que le motif exige et produit une pièce PDF (bulletin de paie, reçu de prime, facture d'achat,
+// note de frais, justificatif), téléchargeable depuis chaque retrait de l'historique ; filtre par motif. Voir aussi la page Comptabilité.
 // [23/10/2026] v3 — fenêtre de retrait : le numéro n'était plus visible dans la liste « Envoyer à » (texte coupé) ; la liste ne montre plus
 // que le numéro puis le nom, et une carte sous la liste affiche le bénéficiaire choisi en entier (nom, type, numéro complet).
 // [19/10/2026] Retrait en 2 étapes : le code à 6 chiffres reçu par e-mail remplace le mot de passe (POST withdrawals/code puis withdrawals).
@@ -20,7 +23,6 @@ import {
   IconArrowUpRight,
   IconBriefcase,
   IconCheck,
-  IconClockHour4,
   IconCopy,
   IconCrown,
   IconHeadset,
@@ -33,6 +35,8 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { Button, IconActionButton, Modal, Select, TextArea, TextField } from '@/components/ui';
+import { DocumentButton, ExpenseIcon, StatusPill } from '@/components/platformWallet/ExpenseParts';
+import { ExpenseMotifForm } from '@/components/platformWallet/ExpenseMotifForm';
 import {
   CardShell,
   Chip,
@@ -47,10 +51,12 @@ import {
   Tabs,
   type Tone,
 } from '@/components/admin/AdminUi';
+import { useAccountingStaff } from '@/hooks/useAccounting';
 import {
   useCreateBeneficiary,
   useMarkWithdrawalFailed,
   useMarkWithdrawalPaid,
+  usePayslipPreview,
   useRequestWithdrawalCode,
   usePlatformBeneficiaries,
   usePlatformWallet,
@@ -62,9 +68,12 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { ApiError } from '@/services/api/ApiError';
 import { PERMISSIONS } from '@/utils/permissions';
 import { formatMoney } from '@/utils/money';
+import { EXPENSE_CATEGORY_INFO, EXPENSE_CATEGORY_ORDER, expenseLabel, periodLabel } from '@/utils/expenseCategories';
+import { amountMode, draftIssue, draftToInput, emptyMotifDraft, fixedAmount, type MotifDraft } from '@/utils/motifDraft';
 import type {
   BeneficiaryKind,
   CurrencyBalance,
+  ExpenseCategory,
   PlatformBeneficiary,
   PlatformWithdrawal,
   PlatformWithdrawalStatus,
@@ -343,25 +352,36 @@ function WithdrawModal({
 }) {
   const requestCode = useRequestWithdrawalCode();
   const withdraw = useWithdrawCommissions();
+  const staff = useAccountingStaff();
   const active = useMemo(() => beneficiaries.filter((item) => item.isActive), [beneficiaries]);
   const [beneficiaryId, setBeneficiaryId] = useState(active.find((item) => item.kind === 'OWNER')?.id ?? active[0]?.id ?? '');
+  const [draft, setDraft] = useState<MotifDraft>(emptyMotifDraft);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   // Étape 2 : null tant que le code n'a pas été envoyé par e-mail.
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [code, setCode] = useState('');
 
+  // Bulletin de la personne pour le mois choisi (motif « Salaire ») : son net à payer devient le montant.
+  const preview = usePayslipPreview(draft.category === 'SALARY' ? draft.staffUserId : '', draft.periodMonth);
+
   const selected = active.find((item) => item.id === beneficiaryId);
   const available = BigInt(balance.available);
-  const typed = amount ? BigInt(amount) : 0n;
+  const mode = amountMode(draft);
+  const fixed = fixedAmount(draft, preview.data);
+  const typed = mode === 'manual' ? (amount ? BigInt(amount) : 0n) : (fixed ?? 0n);
+  const finalAmount = typed.toString();
   const tooMuch = typed > available;
-  const formValid = !!selected && typed > 0n && !tooMuch;
+  const wrongCurrency = draft.category === 'SALARY' && !!preview.data && preview.data.currencyId !== balance.currencyId;
+  const issue = draftIssue(draft, preview.data);
+  const formValid = !!selected && typed > 0n && !tooMuch && !issue && !wrongCurrency;
   const codeValid = /^\d{6}$/.test(code);
+  const motifText = expenseLabel(draft.category, draft.categoryLabel);
 
   function sendCode() {
     if (!selected) return;
     requestCode.mutate(
-      { beneficiaryId: selected.id, currencyId: balance.currencyId, amount },
+      { beneficiaryId: selected.id, currencyId: balance.currencyId, amount: finalAmount, ...draftToInput(draft) },
       {
         onSuccess: (result) => {
           setSentTo(result.sentTo);
@@ -374,16 +394,17 @@ function WithdrawModal({
   function submit() {
     if (!selected) return;
     withdraw.mutate(
-      { beneficiaryId: selected.id, currencyId: balance.currencyId, amount, note: note.trim() || undefined, code },
+      { beneficiaryId: selected.id, currencyId: balance.currencyId, amount: finalAmount, note: note.trim() || undefined, code, ...draftToInput(draft) },
       {
         onSuccess: (result) => {
           const text = formatMoney(result.amount, balance.isoCode);
+          const piece = result.documentNumber ? ` La pièce ${result.documentNumber} est téléchargeable en PDF dans l’historique.` : '';
           onDone(
-            result.status === 'PAID'
+            (result.status === 'PAID'
               ? `${text} envoyés à ${selected.label}.`
               : manualTransfer
                 ? `${text} réservés pour ${selected.label}. Fais maintenant le virement depuis ton compte marchand Orange Money, puis clique sur « Marquer payé ».`
-                : `${text} en cours d’envoi vers ${selected.label}.`,
+                : `${text} en cours d’envoi vers ${selected.label}.`) + piece,
           );
           onClose();
         },
@@ -401,6 +422,7 @@ function WithdrawModal({
   return (
     <Modal
       open
+      size="lg"
       onClose={onClose}
       title={`Retirer des commissions en ${balance.isoCode}`}
       description={`Disponible : ${formatMoney(balance.available, balance.isoCode)}`}
@@ -427,7 +449,7 @@ function WithdrawModal({
         <div className="space-y-4">
           <Notice>
             Un code à 6 chiffres vient d’être envoyé à {sentTo}. Il est valable 10 minutes et ne sert que pour ce retrait de{' '}
-            {formatMoney(amount, balance.isoCode)} vers {selected.label}.
+            {formatMoney(finalAmount, balance.isoCode)} vers {selected.label} ({motifText}).
           </Notice>
           <TextField
             label="Code reçu par e-mail"
@@ -456,6 +478,47 @@ function WithdrawModal({
               cliques sur « Marquer payé ».
             </Notice>
           ) : null}
+
+          <ExpenseMotifForm
+            draft={draft}
+            onChange={setDraft}
+            currencyId={balance.currencyId}
+            isoCode={balance.isoCode}
+            staff={staff.data}
+            staffLoading={staff.isLoading}
+            preview={{ data: preview.data, isLoading: preview.isLoading, error: preview.error }}
+          />
+
+          {/* Montant : saisi à la main, ou imposé par le motif (net du bulletin, total des lignes). */}
+          {mode === 'manual' ? (
+            <div>
+              <TextField
+                label={`Montant (${balance.isoCode})`}
+                inputMode="numeric"
+                placeholder="0"
+                value={amount ? new Intl.NumberFormat('fr-FR').format(Number(amount)) : ''}
+                onChange={(event) => setAmount(digitsOnly(event.target.value).replace(/^0+/, ''))}
+                error={tooMuch ? `Maximum : ${formatMoney(balance.available, balance.isoCode)}` : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setAmount(balance.available === '0' ? '' : balance.available)}
+                className="mt-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                Tout retirer ({formatMoney(balance.available, balance.isoCode)})
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-surface-muted px-3.5 py-3 shadow-sm">
+              <p className="text-xs font-medium text-text-secondary">
+                Montant du retrait · {mode === 'salary' ? 'net à payer du bulletin' : 'total des lignes'}
+              </p>
+              <p className="mt-0.5 text-xl font-bold tabular-nums text-text-primary">{typed > 0n ? formatMoney(finalAmount, balance.isoCode) : '—'}</p>
+              {tooMuch ? <p className="mt-1 text-xs text-danger">Maximum disponible : {formatMoney(balance.available, balance.isoCode)}</p> : null}
+              {wrongCurrency && preview.data ? <p className="mt-1 text-xs text-danger">Ce salaire est en {preview.data.isoCode} : ouvre le retrait de cette devise.</p> : null}
+            </div>
+          )}
+
           <Select label="Envoyer à" value={beneficiaryId} onChange={(event) => setBeneficiaryId(event.target.value)}>
             {active.map((item) => (
               <option key={item.id} value={item.id}>
@@ -472,24 +535,8 @@ function WithdrawModal({
               <p className="mt-1 break-all text-sm font-semibold tabular-nums text-text-primary">{selected.phone}</p>
             </div>
           ) : null}
-          <div>
-            <TextField
-              label={`Montant (${balance.isoCode})`}
-              inputMode="numeric"
-              placeholder="0"
-              value={amount ? new Intl.NumberFormat('fr-FR').format(Number(amount)) : ''}
-              onChange={(event) => setAmount(digitsOnly(event.target.value).replace(/^0+/, ''))}
-              error={tooMuch ? `Maximum : ${formatMoney(balance.available, balance.isoCode)}` : undefined}
-            />
-            <button
-              type="button"
-              onClick={() => setAmount(balance.available === '0' ? '' : balance.available)}
-              className="mt-1.5 text-xs font-semibold text-primary hover:underline"
-            >
-              Tout retirer ({formatMoney(balance.available, balance.isoCode)})
-            </button>
-          </div>
-          <TextArea label="Motif (facultatif)" rows={2} placeholder="Commissions de septembre, prime équipe support…" value={note} onChange={(event) => setNote(event.target.value)} />
+          <TextArea label="Note (facultative)" rows={2} placeholder="Une précision pour le journal…" value={note} onChange={(event) => setNote(event.target.value)} />
+          {issue && !(draft.category === 'SALARY' && preview.isLoading) ? <p className="text-xs text-text-muted">À compléter : {issue}</p> : null}
           <FormError message={errorText(requestCode.error)} />
         </div>
       )}
@@ -500,21 +547,6 @@ function WithdrawModal({
 // ---------------------------------------------------------------------------
 // Historique
 // ---------------------------------------------------------------------------
-
-/** Pastille de statut : toujours sur une seule ligne (« En cours » ne passe plus sur deux lignes). */
-function StatusPill({ status }: { status: PlatformWithdrawalStatus }) {
-  const classes: Record<PlatformWithdrawalStatus, string> = {
-    PROCESSING: 'bg-primary-light text-primary',
-    PAID: 'bg-success-light text-success-dark',
-    FAILED: 'bg-danger-light text-danger-dark',
-  };
-  return (
-    <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${classes[status]}`}>
-      {status === 'PROCESSING' ? <IconClockHour4 size={13} /> : status === 'PAID' ? <IconCheck size={13} /> : <IconX size={13} />}
-      {STATUS_LABELS[status]}
-    </span>
-  );
-}
 
 function WithdrawalCard({ withdrawal, canManage }: { withdrawal: PlatformWithdrawal; canManage: boolean }) {
   const markPaid = useMarkWithdrawalPaid();
@@ -537,14 +569,23 @@ function WithdrawalCard({ withdrawal, canManage }: { withdrawal: PlatformWithdra
   return (
     <CardShell tone={STATUS_TONES[withdrawal.status]} className="py-3 pl-5 pr-3.5">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-base font-bold leading-tight tabular-nums text-text-primary">{formatMoney(withdrawal.amount, withdrawal.currency.isoCode)}</p>
-          <p className="mt-0.5 truncate text-sm text-text-secondary">
-            vers <span className="font-medium text-text-primary">{withdrawal.beneficiary.label}</span>
-          </p>
+        <div className="flex min-w-0 items-start gap-3">
+          <ExpenseIcon category={withdrawal.category} />
+          <div className="min-w-0">
+            <p className="text-base font-bold leading-tight tabular-nums text-text-primary">{formatMoney(withdrawal.amount, withdrawal.currency.isoCode)}</p>
+            <p className="mt-0.5 truncate text-sm font-semibold text-text-primary">
+              {expenseLabel(withdrawal.category, withdrawal.categoryLabel)}
+              {withdrawal.periodMonth ? ` · ${periodLabel(withdrawal.periodMonth)}` : ''}
+            </p>
+            {withdrawal.subject ? <p className="truncate text-xs text-text-secondary">{withdrawal.subject}</p> : null}
+          </div>
         </div>
         <StatusPill status={withdrawal.status} />
       </div>
+      <p className="mt-1.5 truncate text-sm text-text-secondary">
+        vers <span className="font-medium text-text-primary">{withdrawal.beneficiary.label}</span>
+        {withdrawal.documentNumber ? <span className="text-text-muted"> · pièce {withdrawal.documentNumber}</span> : null}
+      </p>
 
       <p className="mt-1.5 break-words text-xs leading-relaxed text-text-muted">
         {formatDate(withdrawal.requestedAt)} · {withdrawal.destinationRef}
@@ -554,6 +595,12 @@ function WithdrawalCard({ withdrawal, canManage }: { withdrawal: PlatformWithdra
       {withdrawal.note ? <p className="mt-1.5 text-sm text-text-secondary">{withdrawal.note}</p> : null}
       {withdrawal.status === 'FAILED' && withdrawal.failureReason ? (
         <p className="mt-1.5 text-sm text-danger-dark">Motif : {withdrawal.failureReason}</p>
+      ) : null}
+
+      {withdrawal.hasDocument ? (
+        <div className="mt-2.5 flex justify-end">
+          <DocumentButton withdrawal={withdrawal} canManage={canManage} />
+        </div>
       ) : null}
 
       {open && canManage ? (
@@ -628,8 +675,9 @@ export default function PlatformWalletPage() {
   const beneficiaries = usePlatformBeneficiaries();
   const [tab, setTab] = useState<PageTab>('history');
   const [status, setStatus] = useState<PlatformWithdrawalStatus | ''>('');
+  const [category, setCategory] = useState<ExpenseCategory | ''>('');
   const [page, setPage] = useState(1);
-  const withdrawals = usePlatformWithdrawals({ page, status: status || undefined });
+  const withdrawals = usePlatformWithdrawals({ page, status: status || undefined, category: category || undefined });
 
   const [withdrawing, setWithdrawing] = useState<CurrencyBalance | null>(null);
   const [editing, setEditing] = useState<PlatformBeneficiary | null>(null);
@@ -713,6 +761,15 @@ export default function PlatformWalletPage() {
             }}
             allLabel="Tous"
             options={(Object.keys(STATUS_LABELS) as PlatformWithdrawalStatus[]).map((value) => ({ value, label: STATUS_LABELS[value] }))}
+          />
+          <FilterChips
+            value={category}
+            onChange={(value) => {
+              setCategory(value);
+              setPage(1);
+            }}
+            allLabel="Tous les motifs"
+            options={EXPENSE_CATEGORY_ORDER.map((value) => ({ value, label: EXPENSE_CATEGORY_INFO[value].label }))}
           />
           {withdrawals.isLoading ? (
             <ListSkeleton count={3} heightClass="h-24" gridClass="lg:grid-cols-2" />

@@ -9,6 +9,15 @@ const OTHER = 'a1b2c3d4-0000-4000-8000-000000000002';
 describe('isStorageKeyOwnedBy', () => {
   const owners = [{ folder: 'driver', ownerId: DRIVER }];
 
+  it('accepte les extensions données en paramètre (et seulement celles-là)', () => {
+    const docs = [{ folder: 'company-document', ownerId: DRIVER }];
+    expect(isStorageKeyOwnedBy(`company-document/${DRIVER}/${UUID}.docx`, docs, ['pdf', 'docx'])).toBe(true);
+    expect(isStorageKeyOwnedBy(`company-document/${DRIVER}/${UUID}.xlsx`, docs, ['pdf', 'docx'])).toBe(false);
+    // Par défaut : photos et PDF seulement, comme avant.
+    expect(isStorageKeyOwnedBy(`company-document/${DRIVER}/${UUID}.docx`, docs)).toBe(false);
+    expect(isStorageKeyOwnedBy(`company-document/${DRIVER}/${UUID}.pdf`, docs, [])).toBe(false);
+  });
+
   it('accepte une clé fabriquée pour ce propriétaire', () => {
     expect(isStorageKeyOwnedBy(`driver/${DRIVER}/${UUID}.jpg`, owners)).toBe(true);
     expect(isStorageKeyOwnedBy(`driver/${DRIVER}/${UUID}.pdf`, owners)).toBe(true);

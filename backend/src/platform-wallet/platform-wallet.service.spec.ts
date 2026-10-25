@@ -19,6 +19,7 @@ function build(options: {
   beneficiary?: typeof BENEFICIARY | null;
   simulated?: boolean;
   codeRejected?: boolean;
+  salaryAlreadyPaid?: boolean;
 } = {}) {
   const state: Record<string, unknown> = {};
   const withdrawalSum = (status: string) => (status === 'PAID' ? (options.paid ?? 0n) : (options.processing ?? 0n));
@@ -27,6 +28,7 @@ function build(options: {
     platformWithdrawal: {
       aggregate: jest.fn().mockImplementation(({ where }: { where: { status: string } }) => Promise.resolve({ _sum: { amount: withdrawalSum(where.status) } })),
       count: jest.fn().mockResolvedValue(0),
+      findFirst: jest.fn().mockResolvedValue(options.salaryAlreadyPaid ? { documentNumber: 'BUL-2026-000003' } : null),
       create: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
         Object.assign(state, { id: 'w1', ...data });
         return Promise.resolve({ ...state });
@@ -44,11 +46,18 @@ function build(options: {
     platformBeneficiary: {
       findUnique: jest.fn().mockResolvedValue(options.beneficiary === undefined ? BENEFICIARY : options.beneficiary),
     },
-    // Commissions par statut, avec le montant d'origine de la réservation / de l'envoi (pas la valeur convertie du registre).
-    $queryRaw: jest.fn().mockResolvedValue([
-      { status: 'COMPLETED', total: options.earned ?? 100_000n },
-      { status: 'PENDING', total: options.pending ?? 0n },
-    ]),
+    // Commissions par statut, avec le montant d'origine de la réservation / de l'envoi (pas la valeur convertie du registre) ;
+    // et la séquence des numéros de pièce.
+    $queryRaw: jest.fn().mockImplementation((strings: string[]) =>
+      Promise.resolve(
+        strings.join('?').includes('platform_document_number_seq')
+          ? [{ nextval: 12n }]
+          : [
+              { status: 'COMPLETED', total: options.earned ?? 100_000n },
+              { status: 'PENDING', total: options.pending ?? 0n },
+            ],
+      ),
+    ),
     $executeRaw: jest.fn().mockResolvedValue(1),
     $transaction: jest.fn(),
   };
@@ -63,11 +72,25 @@ function build(options: {
     send: jest.fn().mockResolvedValue({ expiresInSeconds: 600, sentTo: 'a•••z@gmail.com' }),
     consume: jest.fn().mockImplementation(() => (options.codeRejected ? Promise.reject(new UnauthorizedException('Code incorrect.')) : Promise.resolve())),
   };
-  const service = new PlatformWalletService(prisma as never, audit as never, notifications as never, providers as never, codes as never);
-  return { service, prisma, audit, notifications, disburse, state, codes };
+  const payslip = {
+    period: '2026-09',
+    baseSalary: '300000',
+    allowances: [],
+    gross: '300000',
+    deductions: [],
+    totalDeductions: '0',
+    net: '285000',
+  };
+  const staffPay = {
+    payslipFor: jest.fn().mockResolvedValue({ staff: { userId: 'staff1', fullName: 'Aïssatou Diallo' }, payslip, currencyId: 'xof', isoCode: 'XOF' }),
+    snapshotOf: jest.fn().mockResolvedValue({ userId: 'staff1', fullName: 'Aïssatou Diallo' }),
+  };
+  const service = new PlatformWalletService(prisma as never, audit as never, notifications as never, providers as never, codes as never, staffPay as never);
+  return { service, prisma, audit, notifications, disburse, state, codes, staffPay };
 }
 
-const dto = (over: Record<string, unknown> = {}) => ({ beneficiaryId: 'b1', currencyId: 'xof', amount: '5000', code: CODE, ...over }) as never;
+const MOTIF = { category: 'OPERATING', reason: 'Abonnement internet du bureau' };
+const dto = (over: Record<string, unknown> = {}) => ({ beneficiaryId: 'b1', currencyId: 'xof', amount: '5000', code: CODE, ...MOTIF, ...over }) as never;
 
 describe('PlatformWalletService — solde', () => {
   it('disponible = commissions libérées − retraits payés − retraits en cours ; les commissions en attente ne comptent pas', async () => {
@@ -90,7 +113,7 @@ describe('PlatformWalletService — devise de la commission', () => {
 });
 
 describe('PlatformWalletService.requestCode', () => {
-  const REQ = { beneficiaryId: 'b1', currencyId: 'xof', amount: '5000' } as never;
+  const REQ = { beneficiaryId: 'b1', currencyId: 'xof', amount: '5000', ...MOTIF } as never;
 
   it('envoie le code par e-mail pour CE retrait', async () => {
     const { service, codes } = build();
@@ -204,5 +227,78 @@ describe('PlatformWalletService — retrait en cours', () => {
     await service.markFailed('w1', 'Virement non passé', 'admin1');
     expect(state.status).toBe(PlatformWithdrawalStatus.FAILED);
     await expect(service.markFailed('w1', 'encore', 'admin1')).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('PlatformWalletService — motifs et pièces', () => {
+  const LINES = [{ description: 'Ramettes de papier A4', quantity: 5, unitPrice: '1000' }];
+  const SUPPLIES = { category: 'SUPPLIES', supplier: { name: 'Papeterie Moderne' }, lines: LINES, reason: undefined };
+
+  it('enregistre le motif, le numéro de pièce (séquence) et le détail figé', async () => {
+    const { service, state } = build();
+    await service.withdraw(dto({ ...SUPPLIES, amount: '5000' }), 'admin1');
+    expect(state.category).toBe('SUPPLIES');
+    expect(state.documentNumber).toMatch(/^FAC-\d{4}-000012$/);
+    expect((state.details as { lines: Array<{ total: string }> }).lines[0].total).toBe('5000');
+  });
+
+  it('refuse un montant qui ne correspond pas au total des lignes, sans consommer le code', async () => {
+    const { service, codes } = build();
+    await expect(service.withdraw(dto({ ...SUPPLIES, amount: '4000' }), 'admin1')).rejects.toThrow(/total des lignes/);
+    expect(codes.consume).not.toHaveBeenCalled();
+  });
+
+  it('refuse un motif incomplet (pas de fournisseur) avant le code', async () => {
+    const { service, codes } = build();
+    await expect(service.withdraw(dto({ category: 'SUPPLIES', lines: LINES, amount: '5000' }), 'admin1')).rejects.toThrow(/fournisseur/);
+    expect(codes.consume).not.toHaveBeenCalled();
+  });
+
+  it('le code n\'est pas envoyé non plus pour un motif incomplet', async () => {
+    const { service, codes } = build();
+    await expect(service.requestCode({ beneficiaryId: 'b1', currencyId: 'xof', amount: '5000', category: 'OTHER' } as never, 'admin1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(codes.send).not.toHaveBeenCalled();
+  });
+
+  it('Salaire : le montant est le net du bulletin, figé avec l\'identité', async () => {
+    const { service, state } = build({ earned: 1_000_000n });
+    await service.withdraw(dto({ category: 'SALARY', staffUserId: 'staff1', periodMonth: '2026-09', reason: undefined, amount: '285000' }), 'admin1');
+    expect(state.amount).toBe(285_000n);
+    expect(state.staffUserId).toBe('staff1');
+    expect(state.periodMonth).toBe('2026-09');
+    expect(state.documentNumber).toMatch(/^BUL-/);
+    expect((state.details as { payslip: { net: string } }).payslip.net).toBe('285000');
+  });
+
+  it('Salaire : refuse un autre montant que le net, une devise différente, ou un salaire déjà versé', async () => {
+    const wrongAmount = build();
+    await expect(wrongAmount.service.withdraw(dto({ category: 'SALARY', staffUserId: 'staff1', periodMonth: '2026-09', amount: '290000' }), 'admin1')).rejects.toThrow(/net à payer/);
+
+    const wrongCurrency = build();
+    wrongCurrency.staffPay.payslipFor.mockResolvedValue({ staff: { fullName: 'Aïssatou Diallo' }, payslip: { net: '285000' }, currencyId: 'gnf', isoCode: 'GNF' });
+    await expect(wrongCurrency.service.withdraw(dto({ category: 'SALARY', staffUserId: 'staff1', periodMonth: '2026-09', amount: '285000' }), 'admin1')).rejects.toThrow(/GNF/);
+
+    const twice = build({ salaryAlreadyPaid: true });
+    await expect(twice.service.withdraw(dto({ category: 'SALARY', staffUserId: 'staff1', periodMonth: '2026-09', amount: '285000' }), 'admin1')).rejects.toThrow(/déjà été versé/);
+    expect(twice.codes.consume).not.toHaveBeenCalled();
+    expect(twice.prisma.platformWithdrawal.create).not.toHaveBeenCalled();
+  });
+
+  it('Prime : reprend l\'identité de la personne', async () => {
+    const { service, state, staffPay } = build();
+    await service.withdraw(dto({ category: 'BONUS', staffUserId: 'staff1', reason: 'Objectifs atteints' }), 'admin1');
+    expect(staffPay.snapshotOf).toHaveBeenCalledWith('staff1');
+    expect((state.details as { staff: { fullName: string } }).staff.fullName).toBe('Aïssatou Diallo');
+  });
+
+  it('la liste ne renvoie jamais le détail (identité, bulletin) mais indique la pièce et la personne', async () => {
+    const { service, prisma } = build();
+    (prisma.platformWithdrawal as unknown as { findMany: jest.Mock }).findMany = jest.fn().mockResolvedValue([
+      { id: 'w1', requestedById: null, documentNumber: 'BUL-2026-000012', details: { staff: { fullName: 'Aïssatou Diallo', socialSecurityNumber: '123' } } },
+    ]);
+    const result = (await service.listWithdrawals({ page: 1, limit: 20, skip: 0, take: 20 } as never)) as { data: Array<Record<string, unknown>> };
+    expect(result.data[0].details).toBeUndefined();
+    expect(result.data[0]).toMatchObject({ hasDocument: true, subject: 'Aïssatou Diallo' });
+    expect(JSON.stringify(result.data[0])).not.toContain('123');
   });
 });

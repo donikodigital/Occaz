@@ -38,6 +38,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   geography: 'Géographie',
   audit: 'Journal d’audit',
   settings: 'Paramètres',
+  company_document: 'Documents de l’entreprise',
 };
 
 const ACTION_LABELS: Record<string, string> = {

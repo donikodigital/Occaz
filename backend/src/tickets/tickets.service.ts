@@ -307,7 +307,7 @@ export class TicketsService {
       [
         `Bonjour ${firstName},`,
         '',
-        `Votre réservation est confirmée. Votre billet (PDF, format A5) est en pièce jointe : gardez-le sur votre téléphone ou imprimez-le.`,
+        `Votre réservation est confirmée. Votre billet (PDF) est en pièce jointe : gardez-le sur votre téléphone, ou imprimez-le en A4 et pliez-le en quatre.`,
         '',
         `Trajet : ${data.originCity} → ${data.destinationCity}`,
         `Départ : ${day}${time}`,
