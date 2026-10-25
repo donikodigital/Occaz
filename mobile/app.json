@@ -94,10 +94,14 @@
     ],
     "extra": {
       "apiUrl": "https://api.occaz.sarl/api/v1",
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "25f0cbb8-bdf1-4f1e-b652-575141e7ab75"
+      }
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "owner": "doniko-digital"
   }
 }
