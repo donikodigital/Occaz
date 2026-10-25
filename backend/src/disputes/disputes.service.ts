@@ -439,13 +439,14 @@ export class DisputesService {
       case DisputeResolutionType.DRIVER_PAYOUT: {
         const driverId = await this.resolveDriverId(serviceType, targetId);
         if (driverId) {
-          await this.wallets
-            .releaseHeldFunds(
-              serviceType === ServiceType.TRIP
-                ? { driverId, bookingId: targetId }
-                : { driverId, shipmentId: targetId },
-            )
-            .catch(() => undefined); // déjà libéré (prestation menée à son terme normalement) : rien à faire
+          // releaseHeldFunds ne fait rien si les fonds sont déjà libérés ; une vraie erreur (portefeuille introuvable, libération
+          // concurrente) remonte maintenant à l'arbitre au lieu d'être avalée — sinon le litige serait « résolu » sans que le
+          // conducteur ait été payé.
+          await this.wallets.releaseHeldFunds(
+            serviceType === ServiceType.TRIP
+              ? { driverId, bookingId: targetId }
+              : { driverId, shipmentId: targetId },
+          );
         }
         return {};
       }
@@ -453,32 +454,32 @@ export class DisputesService {
       case DisputeResolutionType.CANCELLATION: {
         if (serviceType === ServiceType.TRIP) {
           const booking = await this.prisma.booking.findUnique({ where: { id: targetId } });
-          if (booking && booking.status !== BookingStatus.CANCELLED && booking.status !== BookingStatus.REFUNDED) {
+          if (booking) {
             await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-              await tx.booking.update({
-                where: { id: targetId },
+              // Annulation réclamée : si la réservation vient d'être annulée par ailleurs, on ne refait rien.
+              const claimed = await tx.booking.updateMany({
+                where: { id: targetId, status: { notIn: [BookingStatus.CANCELLED, BookingStatus.REFUNDED] } },
                 data: { status: BookingStatus.CANCELLED, cancelledAt: new Date(), cancellationReason: dto.notes },
               });
+              if (claimed.count === 0) return;
               // Places libérées sur les tronçons qu'occupait la réservation (voir trip-seats.ts).
               await syncTripSeats(tx, booking.tripId);
             });
           }
         } else {
           const shipment = await this.prisma.shipment.findUnique({ where: { id: targetId } });
-          if (
-            shipment &&
-            shipment.status !== ShipmentStatus.CANCELLED &&
-            shipment.status !== ShipmentStatus.REFUNDED
-          ) {
+          if (shipment) {
             await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-              await tx.shipment.update({
-                where: { id: targetId },
+              const claimed = await tx.shipment.updateMany({
+                where: { id: targetId, status: { notIn: [ShipmentStatus.CANCELLED, ShipmentStatus.REFUNDED] } },
                 data: {
                   status: ShipmentStatus.CANCELLED,
                   cancelledAt: new Date(),
                   cancellationReason: dto.notes,
                 },
               });
+              // Capacité rendue une seule fois, et seulement si c'est bien cet appel qui a annulé l'envoi.
+              if (claimed.count === 0) return;
               if (shipment.tripId) {
                 const trip = await tx.trip.findUnique({ where: { id: shipment.tripId } });
                 if (trip && trip.availableShipmentWeightKg !== null) {
@@ -552,44 +553,52 @@ export class DisputesService {
     targetId: string,
     percentage: number,
   ): Promise<{ refundAmount?: bigint; currencyId?: string }> {
-    const payment = await this.prisma.payment.findUnique({
-      where: serviceType === ServiceType.TRIP ? { bookingId: targetId } : { shipmentId: targetId },
-    });
-    if (!payment || payment.status !== PaymentStatus.CAPTURED) return {};
+    const payment = await this.findRefundablePayment(serviceType, targetId);
+    if (!payment) return {};
 
-    if (serviceType === ServiceType.TRIP) {
-      await this.paymentsService.refundBooking(targetId, percentage);
-    } else {
-      await this.paymentsService.refundShipment(targetId, percentage);
-    }
-
-    const refundAmount = BigInt(Math.round(Number(payment.amount) * (percentage / 100)));
+    const refundAmount =
+      serviceType === ServiceType.TRIP
+        ? await this.paymentsService.refundBooking(targetId, percentage)
+        : await this.paymentsService.refundShipment(targetId, percentage);
+    if (refundAmount <= 0n) return {};
     return { refundAmount, currencyId: payment.currencyId };
   }
 
+  /**
+   * Remboursement d'un montant précis décidé par l'arbitre : le montant exact est transmis au prestataire (plus d'arrondi au
+   * pourcent près — 7 500 sur 20 000 ne devient plus 7 600). Une erreur remonte à l'arbitre au lieu d'être avalée : le litige n'est
+   * pas marqué « résolu » si l'argent n'a pas bougé.
+   */
   private async executeRefundByAmount(
     serviceType: ServiceType,
     targetId: string,
     amount: bigint,
   ): Promise<{ refundAmount?: bigint; currencyId?: string }> {
-    const payment = await this.prisma.payment.findUnique({
-      where: serviceType === ServiceType.TRIP ? { bookingId: targetId } : { shipmentId: targetId },
-    });
-    if (!payment || payment.status !== PaymentStatus.CAPTURED) {
-      throw new BadRequestException('Aucun paiement capturé pour cette prestation — rien à rembourser.');
+    const payment = await this.findRefundablePayment(serviceType, targetId);
+    if (!payment) {
+      throw new BadRequestException('Aucun paiement remboursable pour cette prestation — rien à rembourser.');
     }
     if (amount > payment.amount) {
       throw new BadRequestException('Le montant à rembourser dépasse le montant payé.');
     }
-    const percentage = Math.round((Number(amount) / Number(payment.amount)) * 100);
 
-    if (serviceType === ServiceType.TRIP) {
-      await this.paymentsService.refundBooking(targetId, percentage);
-    } else {
-      await this.paymentsService.refundShipment(targetId, percentage);
+    const refundAmount =
+      serviceType === ServiceType.TRIP
+        ? await this.paymentsService.refundBooking(targetId, 0, { amount })
+        : await this.paymentsService.refundShipment(targetId, 0, { amount });
+    if (refundAmount <= 0n) {
+      throw new BadRequestException('Rien à rembourser : ce paiement est déjà entièrement remboursé.');
     }
+    return { refundAmount, currencyId: payment.currencyId };
+  }
 
-    return { refundAmount: amount, currencyId: payment.currencyId };
+  private async findRefundablePayment(serviceType: ServiceType, targetId: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: serviceType === ServiceType.TRIP ? { bookingId: targetId } : { shipmentId: targetId },
+    });
+    if (!payment) return null;
+    if (payment.status !== PaymentStatus.CAPTURED && payment.status !== PaymentStatus.PARTIALLY_REFUNDED) return null;
+    return payment;
   }
 
   private async resolveDriverId(serviceType: ServiceType, targetId: string): Promise<string | undefined> {

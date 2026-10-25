@@ -1,4 +1,5 @@
 // backend/src/trips/trips.module.ts
+// [25/10/2026] v8 — TripCompletionService (client absent, clôture automatique des trajets restés à l'arrivée).
 // [19/10/2026] v7 — AccountRolesModule (SelfDealingService : pas de réservation de son propre trajet).
 // [11/10/2026] v6 — TripReminderService (rappels de départ), UserSafetyModule (blocages).
 // [09/10/2026] v5 — TripArrivalService (notifications et codes envoyés à chaque arrivée du conducteur).
@@ -15,6 +16,7 @@ import { TripExpiryService } from './trip-expiry.service';
 import { TripOtpService } from './trip-otp.service';
 import { TripArrivalService } from './trip-arrival.service';
 import { TripReminderService } from './trip-reminder.service';
+import { TripCompletionService } from './trip-completion.service';
 import { VehiclesModule } from '../vehicles/vehicles.module';
 import { LocationsModule } from '../locations/locations.module';
 import { DriverProfilesModule } from '../profiles/driver-profiles/driver-profiles.module';
@@ -50,7 +52,7 @@ import { AccountRolesModule } from '../account-roles/account-roles.module';
     AccountRolesModule,
   ],
   controllers: [TripsController, BookingsController],
-  providers: [TripsService, BookingsService, TripOtpService, TripArrivalService, BookingExpiryService, TripExpiryService, TripReminderService],
-  exports: [TripsService, BookingsService, TripOtpService, BookingExpiryService, TripExpiryService, TripReminderService],
+  providers: [TripsService, BookingsService, TripOtpService, TripArrivalService, BookingExpiryService, TripExpiryService, TripReminderService, TripCompletionService],
+  exports: [TripsService, BookingsService, TripOtpService, BookingExpiryService, TripExpiryService, TripReminderService, TripCompletionService],
 })
 export class TripsModule {}

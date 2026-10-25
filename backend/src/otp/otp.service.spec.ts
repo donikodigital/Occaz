@@ -41,11 +41,13 @@ function build(options: {
   candidates?: Row[];
   /** Réponses successives (nombre de lignes modifiées) de updateMany : 1re = essai consommé, 2e = code consommé. */
   updateManyCounts?: number[];
+  recentAttempts?: number;
 } = {}) {
   const updateManyCounts = [...(options.updateManyCounts ?? [])];
   const prisma = {
     otpCode: {
       count: jest.fn().mockResolvedValue(options.sentToday ?? 0),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { attempts: options.recentAttempts ?? 0 } }),
       create: jest.fn().mockResolvedValue({ id: 'new' }),
       findMany: jest.fn().mockResolvedValue(options.candidates ?? []),
       update: jest.fn().mockResolvedValue({}),
@@ -207,5 +209,24 @@ describe('OtpService.verify', () => {
     await expect(build({ candidates: [] }).service.verify({ ...verifyParams, code: '123456' })).rejects.toBeInstanceOf(UnauthorizedException);
     const expired = build({ candidates: [row('c1', '123456', { expiresAt: new Date(Date.now() - 1000) })] });
     await expect(expired.service.verify({ ...verifyParams, code: '123456' })).rejects.toThrow(/expiré/);
+  });
+
+  it('10 essais ratés sur la dernière heure (même en redemandant des codes) : saisie bloquée, même avec le bon code', async () => {
+    const { service, prisma } = build({ candidates: [row('c1', '123456')], recentAttempts: 10 });
+    await expect(service.verify({ ...verifyParams, code: '123456' })).rejects.toMatchObject({ status: 429 });
+    expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('sous le seuil : la saisie reste possible', async () => {
+    const { service } = build({ candidates: [row('c1', '123456')], recentAttempts: 9 });
+    await expect(service.verify({ ...verifyParams, code: '123456' })).resolves.toBeUndefined();
+  });
+
+  it('le compte des essais ne regarde que cette étape de cette réservation, hors codes déjà validés, sur 1 heure', async () => {
+    const { service, prisma } = build({ candidates: [row('c1', '123456')] });
+    await service.verify({ ...verifyParams, code: '123456' });
+    const where = prisma.otpCode.aggregate.mock.calls[0][0].where;
+    expect(where).toMatchObject({ purpose: OtpPurpose.TRIP_PICKUP, bookingId: 'b1', status: { not: OtpStatus.VERIFIED } });
+    expect(Date.now() - where.createdAt.gte.getTime()).toBeGreaterThan(59 * 60_000);
   });
 });

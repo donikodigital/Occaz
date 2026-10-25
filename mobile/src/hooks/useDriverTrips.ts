@@ -1,6 +1,7 @@
 // mobile/src/hooks/useDriverTrips.ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tripsApi } from '@/services/api/trips.api';
+import { PAGE_SIZE, usePagedList } from '@/hooks/usePagedList';
 import type { CancelTripPayload, CreateTripPayload, TripStopInput, UpdateTripStopPayload } from '@/types/trips.types';
 
 export function useMyTrips(page = 1) {
@@ -8,6 +9,11 @@ export function useMyTrips(page = 1) {
     queryKey: ['trips', 'mine', page],
     queryFn: () => tripsApi.listMine({ page, limit: 20 }),
   });
+}
+
+/** Tous les trajets du conducteur, chargés par pages au fil du défilement (écran « Mon activité »). */
+export function useMyTripsList() {
+  return usePagedList(['trips', 'mine', 'list'], (page) => tripsApi.listMine({ page, limit: PAGE_SIZE }));
 }
 
 export function useTripBookings(tripId: string | undefined) {

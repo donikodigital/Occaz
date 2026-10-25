@@ -424,6 +424,58 @@ export class WalletsService {
     });
   }
 
+  /**
+   * Remboursement PARTIEL d'un client : la part remboursée est retirée des fonds encore en attente du conducteur, au prorata
+   * (rembourser 25 % du prix = retirer 25 % de sa part nette). Une ligne REFUND en attente est ajoutée : à la libération comme à
+   * l'annulation, le total des lignes en attente reste juste. Renvoie false si les fonds ne sont plus en attente (déjà libérés) :
+   * c'est alors au support de régulariser le solde (adjustBalance).
+   */
+  async deductHeldFunds(params: {
+    driverId: string;
+    bookingId?: string;
+    shipmentId?: string;
+    refundedAmount: bigint;
+    paidAmount: bigint;
+    reason: string;
+  }): Promise<boolean> {
+    if (!params.bookingId && !params.shipmentId) return false;
+    if (params.refundedAmount <= 0n || params.paidAmount <= 0n) return false;
+    const wallet = await this.findByDriverId(params.driverId);
+
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const pending = await tx.walletTransaction.findMany({
+        where: {
+          walletId: wallet.id,
+          status: WalletTransactionStatus.PENDING,
+          bookingId: params.bookingId,
+          shipmentId: params.shipmentId,
+        },
+      });
+      if (pending.length === 0) return false;
+
+      const net: bigint = pending.reduce((sum: bigint, t: { amount: bigint }) => sum + t.amount, 0n);
+      const ratio = params.refundedAmount > params.paidAmount ? params.paidAmount : params.refundedAmount;
+      let deduction = (net * ratio) / params.paidAmount;
+      if (deduction > net) deduction = net;
+      if (deduction <= 0n) return true;
+
+      await this.applyDelta(
+        wallet.id,
+        'pendingBalance',
+        -deduction,
+        {
+          type: WalletTransactionType.REFUND,
+          status: WalletTransactionStatus.PENDING,
+          bookingId: params.bookingId,
+          shipmentId: params.shipmentId,
+          metadata: { reason: params.reason },
+        },
+        tx,
+      );
+      return true;
+    });
+  }
+
   async adjustBalance(driverId: string, amountStr: string, reason: string, actorId: string) {
     const wallet = await this.findByDriverId(driverId);
     const amount = toMoneyBigInt(amountStr.replace('-', '')) * (amountStr.startsWith('-') ? -1n : 1n);

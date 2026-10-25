@@ -154,3 +154,37 @@ describe('WalletsService.reverseHeldFunds', () => {
     expect(tx.walletTransaction.create).not.toHaveBeenCalled();
   });
 });
+
+describe('WalletsService.deductHeldFunds — remboursement partiel', () => {
+  const params = { driverId: 'dr1', bookingId: 'b1', refundedAmount: 5_000n, paidAmount: 20_000n, reason: 'Remboursement partiel du client' };
+
+  it('retire au conducteur sa part, au prorata : 25 % remboursés = 25 % de sa part nette en moins', async () => {
+    // part nette en attente : 100 000 (revenu) − 15 000 (commission) = 85 000
+    const { service, tx } = build({ pending: [{ id: 'a', amount: 100_000n }, { id: 'b', amount: -15_000n }] });
+    await expect(service.deductHeldFunds(params)).resolves.toBe(true);
+    const created = tx.walletTransaction.create.mock.calls[0][0].data;
+    expect(created.amount).toBe(-21_250n);
+    expect(created.type).toBe(WalletTransactionType.REFUND);
+    expect(created.status).toBe(WalletTransactionStatus.PENDING);
+    expect(tx.wallet.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ pendingBalance: { increment: -21_250n } }) }));
+  });
+
+  it('fonds déjà libérés (plus rien en attente) : renvoie false, rien n’est écrit', async () => {
+    const { service, tx } = build({ pending: [] });
+    await expect(service.deductHeldFunds(params)).resolves.toBe(false);
+    expect(tx.walletTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it('ne retire jamais plus que ce qui est en attente', async () => {
+    const { service, tx } = build({ pending: [{ id: 'a', amount: 1_000n }] });
+    await service.deductHeldFunds({ ...params, refundedAmount: 50_000n });
+    expect(tx.walletTransaction.create.mock.calls[0][0].data.amount).toBe(-1_000n);
+  });
+
+  it('sans référence ou sans montant : ne fait rien', async () => {
+    const { service, tx } = build({ pending: [{ id: 'a', amount: 1_000n }] });
+    await expect(service.deductHeldFunds({ ...params, bookingId: undefined })).resolves.toBe(false);
+    await expect(service.deductHeldFunds({ ...params, refundedAmount: 0n })).resolves.toBe(false);
+    expect(tx.walletTransaction.create).not.toHaveBeenCalled();
+  });
+});

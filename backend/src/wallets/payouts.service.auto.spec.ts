@@ -9,23 +9,25 @@ const WALLET = { id: 'w1', driverId: 'dr1', currencyId: 'xof', currency: { isoCo
 function build(options: {
   amount?: bigint;
   destination?: string | null;
-  settings?: { enabled?: boolean; max?: number | null };
+  settings?: { enabled?: boolean; max?: number | null; delayMinutes?: number };
   outcome?: DisburseOutcome | Error;
   claimCount?: number;
   reserveFails?: boolean;
   /** Raison renvoyée par les garde-fous (ex. NOUVELLE_DESTINATION) : impose la validation manuelle. */
   manualReason?: string | null;
+  simulated?: boolean;
 } = {}) {
   // Le retrait vit dans `state` : chaque réclamation de statut le modifie, comme la base de données le ferait.
   const state: Record<string, unknown> = {
     id: 'p1', walletId: 'w1', amount: options.amount ?? 15_000n, currencyId: 'xof',
     status: PayoutStatus.REQUESTED, method: 'orange_money',
     destinationRef: options.destination === undefined ? '+224620004417' : options.destination,
-    externalReference: null, failureReason: null, autoProcessed: false,
+    externalReference: null, failureReason: null, autoProcessed: false, autoReleaseAt: null,
   };
   const settingRows = [
     ...(options.settings?.enabled === undefined ? [] : [{ key: 'payout.auto_enabled', value: options.settings.enabled }]),
     ...(options.settings?.max == null ? [] : [{ key: 'payout.auto_max_amount', value: options.settings.max }]),
+    ...(options.settings?.delayMinutes === undefined ? [] : [{ key: 'payout.new_destination_delay_minutes', value: options.settings.delayMinutes }]),
   ];
   const disburse = jest.fn().mockImplementation(() =>
     options.outcome instanceof Error ? Promise.reject(options.outcome) : Promise.resolve(options.outcome ?? { status: 'PAID', externalReference: 'REF-1' }),
@@ -35,6 +37,11 @@ function build(options: {
       create: jest.fn().mockImplementation(() => Promise.resolve({ ...state })),
       findUnique: jest.fn().mockImplementation(() => Promise.resolve({ ...state })),
       findUniqueOrThrow: jest.fn().mockImplementation(() => Promise.resolve({ ...state })),
+      findMany: jest.fn().mockImplementation(() =>
+        Promise.resolve(
+          state.status === PayoutStatus.REQUESTED && state.autoReleaseAt && (state.autoReleaseAt as Date).getTime() <= Date.now() ? [{ ...state }] : [],
+        ),
+      ),
       updateMany: jest.fn().mockImplementation(({ where, data }: { where: { status: unknown }; data: Record<string, unknown> }) => {
         if (options.claimCount === 0) return Promise.resolve({ count: 0 });
         const allowed = (where.status as { in?: unknown[] }).in ?? [where.status];
@@ -48,7 +55,7 @@ function build(options: {
       }),
     },
     platformSetting: { findMany: jest.fn().mockResolvedValue(settingRows) },
-    wallet: { findUniqueOrThrow: jest.fn().mockResolvedValue(WALLET) },
+    wallet: { findUniqueOrThrow: jest.fn().mockResolvedValue(WALLET), findUnique: jest.fn().mockResolvedValue(WALLET) },
     driverProfile: { findUnique: jest.fn().mockResolvedValue({ userId: 'u-driver' }) },
   };
   const wallets = {
@@ -59,7 +66,7 @@ function build(options: {
   };
   const audit = { log: jest.fn().mockResolvedValue(undefined) };
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
-  const providers = { get: () => ({ isSimulated: true, disburse }) };
+  const providers = { get: () => ({ isSimulated: options.simulated ?? true, disburse }) };
   const service = new PayoutsService(prisma as never, audit as never, wallets as never, providers as never, notifications as never, { check: jest.fn().mockImplementation(({ rawAmount, rawDestination }: { rawAmount: string; rawDestination?: string }) => Promise.resolve({ amount: BigInt(rawAmount), destinationRef: rawDestination ?? null, manualReason: options.manualReason ?? null })) } as never);
   return { service, prisma, wallets, audit, notifications, disburse };
 }
@@ -67,14 +74,117 @@ function build(options: {
 const request = (service: PayoutsService) => service.request('dr1', { amount: '15000', method: 'orange_money', destinationRef: '+224620004417' } as never);
 const statusUpdates = (prisma: ReturnType<typeof build>['prisma']) => prisma.payout.updateMany.mock.calls.map((c) => c[0].data.status);
 
-describe('PayoutsService.request — garde-fous (nouveau numéro)', () => {
-  it('NOUVEAU numéro : rien n\'est envoyé, le retrait attend l\'équipe, la raison est tracée, les fonds restent réservés', async () => {
-    const { service, disburse, audit, wallets } = build({ manualReason: 'NOUVELLE_DESTINATION' });
+describe('PayoutsService.request — nouveau numéro (le mode automatique n\'attend pas l\'équipe)', () => {
+  it('NOUVEAU numéro : programmé avec un délai de sécurité (60 min par défaut), conducteur prévenu, équipe NON sollicitée, fonds réservés', async () => {
+    const { service, disburse, audit, wallets, notifications } = build({ manualReason: 'NOUVELLE_DESTINATION' });
+    const before = Date.now();
     const result = await request(service);
     expect(disburse).not.toHaveBeenCalled();
     expect(result.status).toBe(PayoutStatus.REQUESTED);
+    const releaseAt = (result as unknown as { autoReleaseAt: Date }).autoReleaseAt.getTime();
+    expect(releaseAt - before).toBeGreaterThan(59 * 60_000);
+    expect(releaseAt - before).toBeLessThan(61 * 60_000);
     expect(wallets.reserveForPayout).toHaveBeenCalledTimes(1);
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'AUTO_SKIPPED', diff: { reason: 'NOUVELLE_DESTINATION' } }));
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'AUTO_DELAYED' }));
+    // seul le conducteur est prévenu : l'équipe n'a rien à faire (pas de cloche « Retrait à valider »)
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
+    expect((notifications as unknown as { notifyStaff?: jest.Mock }).notifyStaff).toBeUndefined();
+  });
+
+  it('délai réglé à 0 : le nouveau numéro est payé tout de suite', async () => {
+    const { service, disburse } = build({ manualReason: 'NOUVELLE_DESTINATION', settings: { delayMinutes: 0 } });
+    const result = await request(service);
+    expect(disburse).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe(PayoutStatus.PAID);
+  });
+
+  it('mode MANUEL : le nouveau numéro n\'est pas programmé, il attend l\'équipe', async () => {
+    const { service, disburse } = build({ manualReason: 'NOUVELLE_DESTINATION', settings: { enabled: false } });
+    const result = await request(service);
+    expect(disburse).not.toHaveBeenCalled();
+    expect((result as unknown as { autoReleaseAt: unknown }).autoReleaseAt).toBeNull();
+  });
+
+  it('autre garde-fou imposé : toujours la validation de l\'équipe', async () => {
+    const { service, disburse, audit } = build({ manualReason: 'AUTRE_RAISON' });
+    await request(service);
+    expect(disburse).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'AUTO_SKIPPED', diff: { reason: 'AUTRE_RAISON' } }));
+  });
+});
+
+describe('PayoutsService.releaseDue — envoi à l\'échéance du délai de sécurité', () => {
+  const dueNow = (state: Record<string, unknown>) => { state.autoReleaseAt = new Date(Date.now() - 1_000); };
+
+  it('envoie tout seul, sans équipe, quand le délai est écoulé', async () => {
+    const { service, disburse, prisma } = build({ manualReason: 'NOUVELLE_DESTINATION' });
+    const created = await request(service);
+    expect(disburse).not.toHaveBeenCalled();
+    // le délai est écoulé
+    const row = await prisma.payout.findUnique();
+    expect(row.status).toBe(PayoutStatus.REQUESTED);
+    await prisma.payout.update({ data: { autoReleaseAt: new Date(Date.now() - 1_000) } });
+    expect(created.status).toBe(PayoutStatus.REQUESTED);
+    await expect(service.releaseDue()).resolves.toBe(1);
+    expect(disburse).toHaveBeenCalledTimes(1);
+    const after = await prisma.payout.findUnique();
+    expect(after.status).toBe(PayoutStatus.PAID);
+  });
+
+  it('délai pas encore écoulé : rien ne part', async () => {
+    const { service, disburse } = build({ manualReason: 'NOUVELLE_DESTINATION' });
+    await request(service);
+    await expect(service.releaseDue()).resolves.toBe(0);
+    expect(disburse).not.toHaveBeenCalled();
+  });
+
+  it('mode passé en manuel entre-temps : le compte à rebours s\'arrête et l\'équipe est alertée', async () => {
+    const { service, disburse, prisma } = build({ manualReason: 'NOUVELLE_DESTINATION' });
+    await request(service);
+    await prisma.payout.update({ data: { autoReleaseAt: new Date(Date.now() - 1_000) } });
+    prisma.platformSetting.findMany.mockResolvedValue([{ key: 'payout.auto_enabled', value: false }]);
+    const notifyStaff = jest.fn().mockResolvedValue(undefined);
+    (service as unknown as { notifications: { notifyStaff: jest.Mock } }).notifications.notifyStaff = notifyStaff;
+    await expect(service.releaseDue()).resolves.toBe(0);
+    expect(disburse).not.toHaveBeenCalled();
+    expect(notifyStaff).toHaveBeenCalledTimes(1);
+    expect((await prisma.payout.findUnique()).autoReleaseAt).toBeNull();
+  });
+});
+
+describe('PayoutsService.cancelByDriver', () => {
+  it('annule un retrait programmé et rend les fonds au conducteur', async () => {
+    const { service, wallets, disburse, prisma } = build({ manualReason: 'NOUVELLE_DESTINATION' });
+    await request(service);
+    const result = await service.cancelByDriver('p1', 'dr1');
+    expect(result.status).toBe(PayoutStatus.CANCELLED);
+    expect(wallets.reversePayout).toHaveBeenCalledWith('dr1', 15_000n, 'p1');
+    // un retrait annulé n'est plus jamais envoyé
+    await prisma.payout.update({ data: { autoReleaseAt: new Date(Date.now() - 1_000) } });
+    await expect(service.releaseDue()).resolves.toBe(0);
+    expect(disburse).not.toHaveBeenCalled();
+  });
+
+  it('impossible une fois l\'envoi lancé : les fonds ne sont pas rendus', async () => {
+    const { service, wallets } = build({ outcome: { status: 'PROCESSING', externalReference: 'R' } as never });
+    await request(service);
+    await expect(service.cancelByDriver('p1', 'dr1')).rejects.toThrow(/ne peut plus être annulé/);
+    expect(wallets.reversePayout).not.toHaveBeenCalled();
+  });
+
+  it('refuse le retrait d\'un autre conducteur', async () => {
+    const { service, wallets } = build({ manualReason: 'NOUVELLE_DESTINATION' });
+    await request(service);
+    wallets.findByDriverId.mockResolvedValueOnce({ ...WALLET, id: 'w-autre' });
+    await expect(service.cancelByDriver('p1', 'autre')).rejects.toThrow(/introuvable/);
+  });
+
+  it('les fonds n\'ont pas pu être rendus : le retrait est rouvert pour réessayer', async () => {
+    const { service, wallets, prisma } = build({ manualReason: 'NOUVELLE_DESTINATION' });
+    await request(service);
+    wallets.reversePayout.mockRejectedValueOnce(new Error('conflit'));
+    await expect(service.cancelByDriver('p1', 'dr1')).rejects.toThrow('conflit');
+    expect((await prisma.payout.findUnique()).status).toBe(PayoutStatus.REQUESTED);
   });
 });
 

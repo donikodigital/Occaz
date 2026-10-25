@@ -25,13 +25,15 @@ import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { formatMoneyWithCurrency } from '../common/utils/money.util';
 import { RequestPayoutDto } from './dto/request-payout.dto';
 import { PayoutProviderRegistry } from './providers/payout-provider.registry';
-import { PayoutGuardrailsService } from './payout-guardrails.service';
+import { MANUAL_REASON_NEW_DESTINATION, PayoutGuardrailsService } from './payout-guardrails.service';
 
 export interface PayoutAutoSettings {
   /** Retrait automatique activé (par défaut oui). */
   enabled: boolean;
   /** Au-dessus de ce montant (devise du portefeuille), validation manuelle ; 0 = aucune limite. */
   maxAmount: bigint;
+  /** Délai de sécurité (minutes) avant l'envoi automatique vers un numéro jamais utilisé ; 0 = envoi immédiat. */
+  newDestinationDelayMinutes: number;
 }
 
 /** Ce que la page « Retraits » du back-office affiche en tête : le mode, le plafond, l'état du prestataire et la file d'attente. */
@@ -48,6 +50,9 @@ export interface PayoutConfig {
 
 const AUTO_ENABLED_KEY = 'payout.auto_enabled';
 const AUTO_MAX_AMOUNT_KEY = 'payout.auto_max_amount';
+const NEW_DESTINATION_DELAY_KEY = 'payout.new_destination_delay_minutes';
+const DEFAULT_NEW_DESTINATION_DELAY_MINUTES = 60;
+const RELEASE_BATCH_SIZE = 50;
 
 /** Numéro masqué pour les messages : « ••••4417 ». */
 function maskDestination(destination: string | null | undefined): string {
@@ -175,7 +180,8 @@ export class PayoutsService {
     const result = await this.processAutomatically(payout.id, checked.manualReason);
 
     // Resté « en attente de validation » (mode manuel, montant au-dessus du plafond, numéro manquant) : l'équipe doit le traiter.
-    if (result.status === PayoutStatus.REQUESTED) {
+    // Un retrait simplement programmé (délai de sécurité d'un nouveau numéro) part tout seul : aucune action de l'équipe.
+    if (result.status === PayoutStatus.REQUESTED && !result.autoReleaseAt) {
       await this.alertStaffOfPendingPayout(payout.id, result.amount, wallet.currency?.isoCode ?? '');
     }
     return result;
@@ -188,11 +194,16 @@ export class PayoutsService {
   /** Réglages lus à chaque demande : le SuperAdmin peut changer de mode à tout moment, sans redéploiement. */
   async getAutoSettings(): Promise<PayoutAutoSettings> {
     const rows = await this.prisma.platformSetting.findMany({
-      where: { key: { in: [AUTO_ENABLED_KEY, AUTO_MAX_AMOUNT_KEY] } },
+      where: { key: { in: [AUTO_ENABLED_KEY, AUTO_MAX_AMOUNT_KEY, NEW_DESTINATION_DELAY_KEY] } },
     });
     const value = (key: string) => rows.find((row) => row.key === key)?.value;
     const maxRaw = value(AUTO_MAX_AMOUNT_KEY);
+    const delayRaw = value(NEW_DESTINATION_DELAY_KEY);
     return {
+      newDestinationDelayMinutes:
+        typeof delayRaw === 'number' && Number.isFinite(delayRaw) && delayRaw >= 0
+          ? Math.floor(delayRaw)
+          : DEFAULT_NEW_DESTINATION_DELAY_MINUTES,
       // Absent = activé : c'est le comportement voulu par défaut (la migration crée le réglage à « oui »).
       enabled: value(AUTO_ENABLED_KEY) !== false,
       maxAmount: typeof maxRaw === 'number' && maxRaw > 0 ? BigInt(Math.floor(maxRaw)) : 0n,
@@ -202,7 +213,8 @@ export class PayoutsService {
   /** Mode courant + file d'attente, pour l'en-tête de la page « Retraits ». */
   async getConfig(scopeWhere?: Prisma.PayoutWhereInput): Promise<PayoutConfig> {
     const settings = await this.getAutoSettings();
-    const pendingBase = { status: PayoutStatus.REQUESTED };
+    // Les retraits programmés (délai de sécurité) partent seuls : ils ne comptent pas parmi ceux que l'équipe doit valider.
+    const pendingBase = { status: PayoutStatus.REQUESTED, autoReleaseAt: null };
     const pendingCount = await this.prisma.payout.count({ where: scopeWhere ? { AND: [pendingBase, scopeWhere] } : pendingBase });
     return {
       autoEnabled: settings.enabled,
@@ -261,12 +273,6 @@ export class PayoutsService {
     // Mode manuel choisi volontairement : validation par l'équipe, rien à tracer (ce n'est pas une anomalie).
     if (!settings.enabled) return payout;
 
-    // Garde-fou imposé par la demande (nouveau numéro de destination) : jamais d'envoi automatique, l'équipe regarde d'abord.
-    if (forcedManualReason) {
-      await this.audit.log({ actorId: null, entityType: 'Payout', entityId: id, action: 'AUTO_SKIPPED', diff: { reason: forcedManualReason } });
-      return payout;
-    }
-
     // Aucun prestataire réel en production : un envoi « automatique » serait marqué payé sans qu'un franc ne parte. Le retrait attend
     // l'équipe, qui fait le virement elle-même (« Passer en traitement » puis « Marquer payé »).
     if (this.providers.get().isSimulated && process.env.NODE_ENV === 'production') {
@@ -286,7 +292,127 @@ export class PayoutsService {
       return payout;
     }
 
+    // Nouveau numéro de destination : le mode automatique ne passe PAS par l'équipe. Un délai de sécurité s'applique (réglage
+    // « payout.new_destination_delay_minutes », 60 min par défaut) : le conducteur est prévenu, peut annuler pendant ce délai
+    // (numéro saisi par erreur, PIN volé), et l'argent part ensuite tout seul. À 0, l'envoi est immédiat.
+    if (forcedManualReason === MANUAL_REASON_NEW_DESTINATION) {
+      if (settings.newDestinationDelayMinutes > 0) return this.scheduleRelease(payout, settings.newDestinationDelayMinutes);
+    } else if (forcedManualReason) {
+      // Tout autre garde-fou imposé par la demande : jamais d'envoi automatique, l'équipe regarde d'abord.
+      await this.audit.log({ actorId: null, entityType: 'Payout', entityId: id, action: 'AUTO_SKIPPED', diff: { reason: forcedManualReason } });
+      return payout;
+    }
+
     return this.sendToProvider(payout, null);
+  }
+
+  /** Programme l'envoi automatique à l'échéance du délai de sécurité et prévient le conducteur (il peut annuler d'ici là). */
+  private async scheduleRelease(
+    payout: { id: string; walletId: string; amount: bigint; destinationRef: string | null },
+    delayMinutes: number,
+  ) {
+    const releaseAt = new Date(Date.now() + delayMinutes * 60_000);
+    const scheduled = await this.prisma.payout.updateMany({
+      where: { id: payout.id, status: PayoutStatus.REQUESTED },
+      data: { autoReleaseAt: releaseAt },
+    });
+    if (scheduled.count > 0) {
+      await this.audit.log({
+        actorId: null,
+        entityType: 'Payout',
+        entityId: payout.id,
+        action: 'AUTO_DELAYED',
+        diff: { reason: MANUAL_REASON_NEW_DESTINATION, releaseAt: releaseAt.toISOString() },
+      });
+      try {
+        const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { id: payout.walletId }, include: { currency: true } });
+        await this.notifyDriver(
+          wallet.driverId,
+          'Retrait programmé',
+          `Par sécurité, votre retrait de ${formatMoneyWithCurrency(payout.amount, wallet.currency.isoCode)} vers ${maskDestination(payout.destinationRef)} (nouveau numéro) sera envoyé automatiquement dans ${delayMinutes} minute${delayMinutes > 1 ? 's' : ''}. Ce n'est pas vous ? Annulez-le tout de suite depuis votre historique de retraits.`,
+        );
+      } catch (error) {
+        this.logger.warn(`Notification du retrait programmé ${payout.id} non envoyée : ${(error as Error).message}`);
+      }
+    }
+    return this.findOne(payout.id);
+  }
+
+  /**
+   * Envoie les retraits dont le délai de sécurité est écoulé — appelée toutes les minutes et par le déclencheur externe. Un
+   * retrait annulé entre-temps n'est plus « en attente » et n'est pas envoyé. Si le mode a été passé en manuel, ou si le plafond
+   * ne le permet plus, le retrait est rendu à l'équipe (et elle est alertée) au lieu de rester sans suite.
+   */
+  async releaseDue(): Promise<number> {
+    const due = await this.prisma.payout.findMany({
+      where: { status: PayoutStatus.REQUESTED, autoReleaseAt: { not: null, lte: new Date() } },
+      orderBy: { autoReleaseAt: 'asc' },
+      take: RELEASE_BATCH_SIZE,
+    });
+    if (due.length === 0) return 0;
+    const settings = await this.getAutoSettings();
+
+    let sent = 0;
+    for (const payout of due) {
+      try {
+        const overCap = settings.maxAmount > 0n && payout.amount > settings.maxAmount;
+        const providerMissing = this.providers.get().isSimulated && process.env.NODE_ENV === 'production';
+        const missingDestination = !payout.destinationRef?.trim();
+        if (!settings.enabled || overCap || providerMissing || missingDestination) {
+          // Plus d'envoi automatique possible : on arrête le compte à rebours et l'équipe prend le relais.
+          const handedOver = await this.prisma.payout.updateMany({
+            where: { id: payout.id, status: PayoutStatus.REQUESTED, autoReleaseAt: { not: null } },
+            data: { autoReleaseAt: null },
+          });
+          if (handedOver.count > 0) {
+            const reason = !settings.enabled
+              ? 'MODE_MANUEL'
+              : overCap
+                ? 'MONTANT_AU_DESSUS_DU_PLAFOND'
+                : providerMissing
+                  ? 'PRESTATAIRE_NON_BRANCHE'
+                  : 'DESTINATION_MANQUANTE';
+            await this.audit.log({ actorId: null, entityType: 'Payout', entityId: payout.id, action: 'AUTO_SKIPPED', diff: { reason } });
+            const wallet = await this.prisma.wallet.findUnique({ where: { id: payout.walletId }, include: { currency: true } });
+            await this.alertStaffOfPendingPayout(payout.id, payout.amount, wallet?.currency?.isoCode ?? '');
+          }
+          continue;
+        }
+        const result = await this.sendToProvider(payout, null);
+        if (result.status !== PayoutStatus.REQUESTED) sent += 1;
+      } catch (error) {
+        this.logger.error(`Envoi automatique du retrait ${payout.id} impossible`, (error as Error).stack);
+      }
+    }
+    return sent;
+  }
+
+  /**
+   * Le conducteur annule lui-même un retrait qui n'est pas encore parti (en attente de validation ou programmé) : ses fonds lui sont
+   * rendus. Impossible dès que l'envoi est lancé — l'argent est alors peut-être déjà chez le prestataire.
+   */
+  async cancelByDriver(id: string, driverId: string) {
+    const payout = await this.findOne(id);
+    const wallet = await this.wallets.findByDriverId(driverId);
+    if (payout.walletId !== wallet.id) {
+      throw new NotFoundException('Retrait introuvable.');
+    }
+    const claimed = await this.prisma.payout.updateMany({
+      where: { id, status: PayoutStatus.REQUESTED },
+      data: { status: PayoutStatus.CANCELLED, autoReleaseAt: null, failureReason: 'Annulé par le conducteur' },
+    });
+    if (claimed.count === 0) {
+      throw new BadRequestException("Ce retrait est déjà en cours d'envoi ou clôturé : il ne peut plus être annulé.");
+    }
+    try {
+      await this.wallets.reversePayout(driverId, payout.amount, id);
+    } catch (error) {
+      // Les fonds n'ont pas été rendus : on rouvre le retrait pour que l'annulation puisse être refaite.
+      await this.prisma.payout.updateMany({ where: { id, status: PayoutStatus.CANCELLED }, data: { status: PayoutStatus.REQUESTED, failureReason: null } });
+      throw error;
+    }
+    await this.audit.log({ actorId: null, entityType: 'Payout', entityId: id, action: 'CANCELLED_BY_DRIVER' });
+    return this.findOne(id);
   }
 
   /**

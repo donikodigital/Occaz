@@ -291,9 +291,15 @@ export class BookingsService {
       originCity: trip.originCity,
     });
 
+    // L'annulation est « réclamée » d'un seul coup : seul le premier appel (double appui, deux onglets, conducteur et client en même
+    // temps) passe, les autres s'arrêtent ici. Sans cela, l'événement d'annulation partait deux fois — double remboursement possible.
     const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const result = await tx.booking.update({
-        where: { id },
+      const claimed = await tx.booking.updateMany({
+        where: {
+          id,
+          customerId,
+          status: { in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED] },
+        },
         data: {
           status: BookingStatus.CANCELLED,
           cancelledAt: new Date(),
@@ -301,11 +307,18 @@ export class BookingsService {
           cancellationReason: reason,
         },
       });
+      if (claimed.count === 0) {
+        throw new BadRequestException('Cette réservation ne peut plus être annulée.');
+      }
 
       // Les places de ce client sont libérées sur les tronçons qu'il occupait — recalcul plutôt qu'incrément.
       await syncTripSeats(tx, booking.tripId);
+      // Annulation sans rien perdre (rien n'avait été payé, ou remboursement intégral) : le code promo est rendu.
+      if (booking.status === BookingStatus.PENDING_PAYMENT || (refundEligiblePercentage ?? 0) >= 100) {
+        await this.promoCodes.release({ bookingId: id }, tx);
+      }
 
-      return result;
+      return tx.booking.findUniqueOrThrow({ where: { id } });
     });
 
     this.eventEmitter.emit(
@@ -368,22 +381,31 @@ export class BookingsService {
     });
     if (affectedBookings.length === 0) return;
 
-    await this.prisma.booking.updateMany({
-      where: { id: { in: affectedBookings.map((b) => b.id) } },
-      data: {
-        status: BookingStatus.CANCELLED,
-        cancelledAt: new Date(),
-        cancelledBy: initiatedBy,
-        cancellationReason: reason,
-      },
-    });
-
+    // Chaque réservation est réclamée individuellement : une annulation faite entre-temps par le client ne déclenche pas un
+    // second remboursement ni un second événement.
+    const cancelledNow: typeof affectedBookings = [];
     for (const booking of affectedBookings) {
+      const claimed = await this.prisma.booking.updateMany({
+        where: {
+          id: booking.id,
+          status: { in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED] },
+        },
+        data: {
+          status: BookingStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancelledBy: initiatedBy,
+          cancellationReason: reason,
+        },
+      });
+      if (claimed.count === 0) continue;
+      cancelledNow.push(booking);
+      await this.promoCodes.release({ bookingId: booking.id });
       this.eventEmitter.emit(
         DOMAIN_EVENTS.BOOKING_CANCELLED,
         new BookingCancelledEvent(booking.id, reason, 100),
       );
     }
+    if (cancelledNow.length === 0) return;
 
     // Le passager le plus concerné de toute la plateforme : son trajet
     // n'aura pas lieu. Averti même s'il n'avait pas encore payé
@@ -398,7 +420,7 @@ export class BookingsService {
     if (!trip) return;
 
     await Promise.all(
-      affectedBookings.map((booking) =>
+      cancelledNow.map((booking) =>
         this.notifications.notify({
           userId: booking.customer.userId,
           type: NotificationType.STATUS_CHANGE,
@@ -465,6 +487,8 @@ export class BookingsService {
       if (claimed.count === 0) return false;
 
       await syncTripSeats(tx, booking.tripId);
+      // Réservation jamais payée : le code promo qu'elle avait consommé est rendu au client.
+      await this.promoCodes.release({ bookingId: id }, tx);
 
       return true;
     });

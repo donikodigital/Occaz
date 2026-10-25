@@ -151,7 +151,11 @@ describe('BookingsService.cancel — libère les places du tronçon', () => {
     };
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([{ status: 'PUBLISHED', totalSeats: TOTAL_SEATS }]),
-      booking: { update: jest.fn().mockResolvedValue({ id: 'b1' }), findMany: jest.fn().mockResolvedValue(remaining) },
+      booking: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'b1' }),
+        findMany: jest.fn().mockResolvedValue(remaining),
+      },
       trip: { update: jest.fn(), findUnique: jest.fn().mockResolvedValue(trip) },
     };
     const prisma = {
@@ -165,7 +169,7 @@ describe('BookingsService.cancel — libère les places du tronçon', () => {
       $transaction: jest.fn().mockImplementation((callback: (client: unknown) => unknown) => callback(tx)),
     };
     const pricing = { getCancellationPolicy: jest.fn().mockResolvedValue(null) };
-    const service = new BookingsService(prisma as never, pricing as never, { emit: jest.fn() } as never, {} as never, { notify: jest.fn() } as never);
+    const service = new BookingsService(prisma as never, pricing as never, { emit: jest.fn() } as never, { release: jest.fn() } as never, { notify: jest.fn() } as never);
     return { service, tx };
   }
 
@@ -183,5 +187,12 @@ describe('BookingsService.cancel — libère les places du tronçon', () => {
     await second.service.cancel('b1', 'c1', 'Imprévu');
     expect(first.tx.trip.update.mock.calls[0][0].data).toEqual(second.tx.trip.update.mock.calls[0][0].data);
     expect(first.tx.trip.update.mock.calls[0][0].data).toEqual({ availableSeats: TOTAL_SEATS });
+  });
+
+  it('deuxième annulation simultanée : refusée, sans libérer les places ni émettre un second remboursement', async () => {
+    const { service, tx } = cancelBuild([]);
+    tx.booking.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(service.cancel('b1', 'c1', 'Imprévu')).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.trip.update).not.toHaveBeenCalled();
   });
 });

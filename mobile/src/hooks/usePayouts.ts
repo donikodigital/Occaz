@@ -20,3 +20,14 @@ export function useRequestPayout() {
     },
   });
 }
+
+export function useCancelPayout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => payoutsApi.cancel(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payouts', 'mine'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+    },
+  });
+}

@@ -30,7 +30,7 @@ function createService(options: { claimCount?: number; booking?: Record<string, 
     $transaction: jest.fn().mockImplementation((callback: (client: unknown) => unknown) => callback(tx)),
   };
   const eventEmitter = { emit: jest.fn() };
-  const service = new BookingsService(prisma as never, {} as never, eventEmitter as never, {} as never, { notify: jest.fn().mockResolvedValue(undefined) } as never);
+  const service = new BookingsService(prisma as never, {} as never, eventEmitter as never, { release: jest.fn().mockResolvedValue(false) } as never, { notify: jest.fn().mockResolvedValue(undefined) } as never);
   return { service, prisma, tx, eventEmitter };
 }
 

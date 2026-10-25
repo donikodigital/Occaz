@@ -9,7 +9,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { BookingStatus, NotificationChannel, NotificationType, PaymentProviderType, PaymentStatus, ShipmentStatus } from '@prisma/client';
+import { BookingStatus, NotificationChannel, NotificationType, PaymentProviderType, PaymentStatus, Prisma, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentProvidersService } from '../payment-providers/payment-providers.service';
 import { PaymentProviderRegistry } from './providers/payment-provider-registry.service';
@@ -393,12 +393,21 @@ export class PaymentsService {
       });
       if (!booking) return;
 
-      await this.refundBooking(event.bookingId, event.refundEligiblePercentage ?? 0);
-      await this.wallets.reverseHeldFunds({
-        driverId: booking.trip.driverId,
-        bookingId: event.bookingId,
-        reason: event.reason,
-      });
+      const percentage = event.refundEligiblePercentage ?? 0;
+      await this.refundBooking(event.bookingId, percentage);
+      if (percentage >= 100) {
+        // Remboursement intégral : le conducteur ne touche rien (idempotent, refundBooking l'a déjà fait dans la plupart des cas).
+        await this.wallets.reverseHeldFunds({
+          driverId: booking.trip.driverId,
+          bookingId: event.bookingId,
+          reason: event.reason,
+        });
+      } else {
+        // Annulation tardive du client (remboursement partiel ou nul) : comme sur BlaBlaCar, le conducteur qui avait réservé sa
+        // place garde la part non remboursée. La part rendue au client a déjà été retirée de ses fonds (refundBooking) ; le reste
+        // est libéré dans son solde disponible. Sans paiement capturé, il n'y a rien en attente et rien n'est versé.
+        await this.wallets.releaseHeldFunds({ driverId: booking.trip.driverId, bookingId: event.bookingId });
+      }
     } catch (error) {
       // Une réservation annulée ne doit jamais rester bloquée parce que
       // le remboursement a échoué : l'erreur est journalisée pour reprise
@@ -428,18 +437,29 @@ export class PaymentsService {
     }
   }
 
-  async refundBooking(bookingId: string, refundPercentage: number): Promise<void> {
-    // 0 % : rien n'est remboursé, donc ni statut « remboursé » ni notification trompeuse.
-    if (Math.round(refundPercentage) <= 0) return;
+  /**
+   * Rembourse tout ou partie d'une réservation payée. `refundPercentage` est un pourcentage du montant payé ; `options.amount` (plus petite
+   * unité de la devise) l'emporte quand on connaît le montant exact (litige). Renvoie le montant réellement rendu (0 si rien n'a été remboursé) :
+   * un remboursement déjà fait, un paiement non capturé ou un montant nul ne déclenchent ni notification ni changement de statut.
+   * Sûr face aux appels simultanés (double appui, annulation du client et du conducteur en même temps) : voir executeRefund.
+   */
+  async refundBooking(bookingId: string, refundPercentage: number, options: { amount?: bigint } = {}): Promise<bigint> {
+    if (options.amount === undefined && Math.round(refundPercentage) <= 0) return 0n;
     const payment = await this.prisma.payment.findUnique({ where: { bookingId } });
-    if (!payment || payment.status !== PaymentStatus.CAPTURED) return;
-    await this.executeRefund(payment, refundPercentage);
-    const booking = await this.prisma.booking.update({
+    if (!payment) return 0n;
+    const outcome = await this.executeRefund(payment, { percentage: refundPercentage, amount: options.amount });
+    if (!outcome) return 0n;
+
+    const booking = await this.prisma.booking.findUniqueOrThrow({
       where: { id: bookingId },
-      data: { status: BookingStatus.REFUNDED },
       include: { customer: true, trip: { select: { driverId: true } } },
     });
-    if (refundPercentage >= 100) {
+    if (outcome.isFull) {
+      // Une réservation annulée reste « annulée » (sa place est rendue) ; seule une réservation encore en cours passe à « remboursée ».
+      await this.prisma.booking.updateMany({
+        where: { id: bookingId, status: { notIn: [BookingStatus.CANCELLED, BookingStatus.REFUNDED] } },
+        data: { status: BookingStatus.REFUNDED },
+      });
       // Client remboursé en totalité : le conducteur ne doit plus toucher cette course (si ses fonds sont encore en
       // attente). S'ils sont déjà libérés, c'est au support de les ajuster (wallet.adjust) — on le signale.
       await this.wallets.reverseHeldFunds({
@@ -448,21 +468,30 @@ export class PaymentsService {
         reason: 'Remboursement intégral du client',
       });
       await this.warnIfFundsAlreadyReleased({ bookingId }, 'réservation');
+    } else {
+      // Remboursement partiel : le conducteur supporte sa part (au prorata) sur les fonds encore en attente.
+      const deducted = await this.wallets.deductHeldFunds({
+        driverId: booking.trip.driverId,
+        bookingId,
+        refundedAmount: outcome.refundAmount,
+        paidAmount: payment.amount,
+        reason: 'Remboursement partiel du client',
+      });
+      if (!deducted) {
+        this.logger.warn(`Remboursement partiel de la réservation ${bookingId} alors que les gains du conducteur sont déjà libérés — ajustement manuel à prévoir (wallet.adjust).`);
+      }
     }
-    await this.notifications.notify({
-      userId: booking.customer.userId,
-      type: NotificationType.REFUND,
-      channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],
-      fallbackTitle: 'Remboursement effectué',
-      fallbackBody: `Votre remboursement (${refundPercentage}%) a été traité.`,
-    });
+    await this.notifyRefund(booking.customer.userId, outcome.refundAmount, payment.amount);
+    return outcome.refundAmount;
   }
 
-  async refundShipment(shipmentId: string, refundPercentage: number): Promise<void> {
-    if (Math.round(refundPercentage) <= 0) return;
+  async refundShipment(shipmentId: string, refundPercentage: number, options: { amount?: bigint } = {}): Promise<bigint> {
+    if (options.amount === undefined && Math.round(refundPercentage) <= 0) return 0n;
     const payment = await this.prisma.payment.findUnique({ where: { shipmentId } });
-    if (!payment || payment.status !== PaymentStatus.CAPTURED) return;
-    await this.executeRefund(payment, refundPercentage);
+    if (!payment) return 0n;
+    const outcome = await this.executeRefund(payment, { percentage: refundPercentage, amount: options.amount });
+    if (!outcome) return 0n;
+
     // Le statut REFUNDED du Shipment est déjà posé par
     // ShipmentsService.cancel (CANCELLED) — un envoi remboursé après
     // annulation reste CANCELLED, section 20 ne prévoit pas de double
@@ -471,20 +500,38 @@ export class PaymentsService {
       where: { id: shipmentId },
       include: { customer: true },
     });
-    if (refundPercentage >= 100 && shipment.driverId) {
+    if (outcome.isFull && shipment.driverId) {
       await this.wallets.reverseHeldFunds({
         driverId: shipment.driverId,
         shipmentId,
         reason: 'Remboursement intégral du client',
       });
       await this.warnIfFundsAlreadyReleased({ shipmentId }, 'envoi');
+    } else if (shipment.driverId) {
+      const deducted = await this.wallets.deductHeldFunds({
+        driverId: shipment.driverId,
+        shipmentId,
+        refundedAmount: outcome.refundAmount,
+        paidAmount: payment.amount,
+        reason: 'Remboursement partiel du client',
+      });
+      if (!deducted) {
+        this.logger.warn(`Remboursement partiel de l'envoi ${shipmentId} alors que les gains du conducteur sont déjà libérés — ajustement manuel à prévoir (wallet.adjust).`);
+      }
     }
+    await this.notifyRefund(shipment.customer.userId, outcome.refundAmount, payment.amount);
+    return outcome.refundAmount;
+  }
+
+  private async notifyRefund(userId: string, refundAmount: bigint, paidAmount: bigint): Promise<void> {
+    const percentage = paidAmount > 0n ? Math.round((Number(refundAmount) * 100) / Number(paidAmount)) : 0;
     await this.notifications.notify({
-      userId: shipment.customer.userId,
+      userId,
       type: NotificationType.REFUND,
       channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],
       fallbackTitle: 'Remboursement effectué',
-      fallbackBody: `Votre remboursement (${refundPercentage}%) a été traité.`,
+      fallbackBody: `Votre remboursement (${percentage}%) a été traité.`,
+      pushData: { type: 'REFUND' },
     });
   }
 
@@ -507,44 +554,79 @@ export class PaymentsService {
     }
   }
 
+  /**
+   * Rembourse chez le prestataire, UNE seule fois pour un même montant, même si l'appel arrive plusieurs fois en même temps.
+   *
+   *  1. On « réclame » le remboursement par une mise à jour conditionnelle du paiement (même statut ET même date de dernière
+   *     modification que ce qu'on a lu) et on inscrit la ligne de remboursement dans la MÊME transaction : un second appel simultané
+   *     ne trouve plus ce qu'il a lu et sort sans rien envoyer au prestataire.
+   *  2. Le montant est plafonné à ce qui reste à rembourser (les remboursements s'additionnent : 50 % puis 50 % = 100 %, jamais plus).
+   *  3. Si le prestataire échoue, la réclamation est annulée (ligne supprimée, statut remis) et l'erreur remonte.
+   * Renvoie null quand il n'y avait rien à faire.
+   */
   private async executeRefund(
-    payment: { id: string; amount: bigint; currencyId: string },
-    refundPercentage: number,
-  ): Promise<void> {
-    const clampedPercentage = Math.max(0, Math.min(100, refundPercentage));
-    if (clampedPercentage === 0) return;
+    payment: { id: string; amount: bigint; currencyId: string; status: PaymentStatus; updatedAt: Date },
+    request: { percentage?: number; amount?: bigint },
+  ): Promise<{ refundAmount: bigint; isFull: boolean } | null> {
+    if (payment.status !== PaymentStatus.CAPTURED && payment.status !== PaymentStatus.PARTIALLY_REFUNDED) return null;
 
-    const refundAmount = BigInt(Math.round(Number(payment.amount) * (clampedPercentage / 100)));
+    const refunded = await this.prisma.paymentTransaction.aggregate({
+      where: { paymentId: payment.id, status: PaymentStatus.REFUNDED },
+      _sum: { amount: true },
+    });
+    const already = refunded._sum?.amount ?? 0n;
+    const remaining = payment.amount - already;
+    if (remaining <= 0n) return null;
+
+    const percentage = Math.max(0, Math.min(100, request.percentage ?? 0));
+    const wanted = request.amount ?? BigInt(Math.round(Number(payment.amount) * (percentage / 100)));
+    if (wanted <= 0n) return null;
+    const refundAmount = wanted > remaining ? remaining : wanted;
+    const isFull = already + refundAmount >= payment.amount;
+
     const capturedTransaction = await this.prisma.paymentTransaction.findFirst({
       where: { paymentId: payment.id, status: PaymentStatus.CAPTURED },
       orderBy: { createdAt: 'desc' },
       include: { provider: true },
     });
-    if (!capturedTransaction) return;
+    if (!capturedTransaction) return null;
 
-    const adapter = this.registry.resolve(capturedTransaction.provider.type);
-    const refundResult = await adapter.refund({
-      externalReference: capturedTransaction.externalReference!,
-      amount: refundAmount,
+    const refundRow = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const claimed = await tx.payment.updateMany({
+        where: { id: payment.id, status: payment.status, updatedAt: payment.updatedAt },
+        data: { status: isFull ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED },
+      });
+      if (claimed.count === 0) return null;
+      return tx.paymentTransaction.create({
+        data: {
+          paymentId: payment.id,
+          providerId: capturedTransaction.providerId,
+          amount: refundAmount,
+          currencyId: payment.currencyId,
+          status: PaymentStatus.REFUNDED,
+        },
+      });
     });
+    if (!refundRow) return null;
 
-    await this.prisma.paymentTransaction.create({
-      data: {
-        paymentId: payment.id,
-        providerId: capturedTransaction.providerId,
-        externalReference: refundResult.externalReference,
+    try {
+      const adapter = this.registry.resolve(capturedTransaction.provider.type);
+      const refundResult = await adapter.refund({
+        externalReference: capturedTransaction.externalReference!,
         amount: refundAmount,
-        currencyId: payment.currencyId,
-        status: PaymentStatus.REFUNDED,
-      },
-    });
-
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: clampedPercentage >= 100 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED,
-      },
-    });
+      });
+      await this.prisma.paymentTransaction.update({
+        where: { id: refundRow.id },
+        data: { externalReference: refundResult.externalReference },
+      });
+    } catch (error) {
+      await this.prisma.$transaction([
+        this.prisma.paymentTransaction.delete({ where: { id: refundRow.id } }),
+        this.prisma.payment.updateMany({ where: { id: payment.id }, data: { status: payment.status } }),
+      ]).catch((rollbackError) => this.logger.error(`Remboursement du paiement ${payment.id} : annulation de la réclamation impossible`, rollbackError as Error));
+      throw error;
+    }
+    return { refundAmount, isFull };
   }
 
   // ---------------------------------------------------------------------

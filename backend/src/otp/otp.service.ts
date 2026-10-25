@@ -1,10 +1,11 @@
 // backend/src/otp/otp.service.ts
+// [25/10/2026] v3 — Verrou cumulé des essais ratés (10 par heure et par étape) : redemander un code ne remet plus le compteur à zéro.
 // [19/10/2026] v2 — Politique SMS (voir integrations/sms/sms-purpose.ts) : parmi les codes de remise, SEUL le code de livraison d'un colis part
 // par SMS, et seulement vers le DESTINATAIRE (qui n'a pas forcément de compte Occa'Z). Les codes de prise en charge (trajet, colis) et de
 // dépose restent affichés dans l'application de leur bénéficiaire (compte Occa'Z). Quand l'expéditeur consulte lui-même son code
 // (revealCodeToCaller), aucun SMS n'est envoyé : il le lit à l'écran. Le résultat indique `smsDisabled` quand le SMS est volontairement coupé,
 // pour que l'application n'affiche pas un faux « échec d'envoi ».
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { OtpPurpose, OtpStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
@@ -14,6 +15,15 @@ import { addDuration } from '../common/utils/duration.util';
 import { OtpSettingsService } from './otp-settings.service';
 
 const DAY_MS = 24 * 3_600_000;
+
+/**
+ * Verrou cumulé des codes de remise : chaque code n'autorise que quelques essais, mais « renvoyer le code » en crée un nouveau —
+ * sans plafond global, essayer des codes à la chaîne finissait par tomber juste (1 chance sur 1 000 000 par essai). Au-delà de
+ * ce nombre d'essais ratés sur la dernière heure, pour cette étape de cette réservation/de cet envoi, plus aucune saisie n'est
+ * acceptée jusqu'à la fin de l'heure ; le recours est le support (validation manuelle depuis un litige).
+ */
+export const HANDOVER_LOCK_MAX_FAILED_ATTEMPTS = 10;
+export const HANDOVER_LOCK_WINDOW_MS = 3_600_000;
 
 export interface GenerateOtpParams {
   purpose: OtpPurpose;
@@ -151,6 +161,7 @@ export class OtpService {
    * validation implicite côté appelant.
    */
   async verify(params: VerifyOtpParams): Promise<void> {
+    await this.assertNotLocked(params);
     const candidates = await this.prisma.otpCode.findMany({
       where: {
         purpose: params.purpose,
@@ -205,5 +216,26 @@ export class OtpService {
       },
       data: { status: OtpStatus.EXPIRED },
     });
+  }
+
+  /** Refuse toute saisie quand trop d'essais ratés se sont accumulés sur la dernière heure (voir HANDOVER_LOCK_MAX_FAILED_ATTEMPTS). */
+  private async assertNotLocked(params: VerifyOtpParams): Promise<void> {
+    if (!params.bookingId && !params.shipmentId) return;
+    const recent = await this.prisma.otpCode.aggregate({
+      where: {
+        purpose: params.purpose,
+        bookingId: params.bookingId,
+        shipmentId: params.shipmentId,
+        status: { not: OtpStatus.VERIFIED },
+        createdAt: { gte: new Date(Date.now() - HANDOVER_LOCK_WINDOW_MS) },
+      },
+      _sum: { attempts: true },
+    });
+    if ((recent._sum?.attempts ?? 0) >= HANDOVER_LOCK_MAX_FAILED_ATTEMPTS) {
+      throw new HttpException(
+        'Trop d’essais incorrects pour cette étape. Par sécurité, la saisie est bloquée pendant une heure. Si le client est bien présent, contactez le support.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 }

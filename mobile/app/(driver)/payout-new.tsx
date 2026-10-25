@@ -1,5 +1,8 @@
 // mobile/app/(driver)/payout-new.tsx
 //
+// [25/10/2026] v6 — Nouveau numéro : le retrait n'attend plus l'équipe. Il est programmé (délai de sécurité d'une heure par défaut), l'écran dit à
+// quelle heure il partira, et le conducteur peut l'annuler d'ici là (« Annuler ce retrait ») : les fonds sont remis dans son solde.
+//
 // [19/10/2026] v5 — Le retrait est confirmé par le CODE PIN de connexion (6 chiffres), à la place d'un SMS : six cases masquées sous les champs.
 // Un PIN faux est expliqué sur place (le serveur verrouille le compte 15 min après 5 erreurs, comme à la connexion). Un NOUVEAU numéro est
 // vérifié par l'équipe avant le premier envoi : l'écran de résultat le dit.
@@ -28,9 +31,10 @@ import {
 import { AppText, FeedbackBanner, ScreenContainer, TextField } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useMyWallet } from '@/hooks/useWallet';
-import { useRequestPayout } from '@/hooks/usePayouts';
+import { useCancelPayout, useRequestPayout } from '@/hooks/usePayouts';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { formatMoney } from '@/utils/money';
+import { formatTime } from '@/utils/date';
 import { ApiError } from '@/services/api/ApiError';
 import { PIN_LENGTH, PinCodeInput } from '@/components/auth/PinCodeInput';
 import { OceanButton, OceanCard, OceanSection } from '@/components/ocean/OceanKit';
@@ -49,8 +53,14 @@ function describeOutcome(payout: Payout, amountText: string, destination: string
         title: 'Retrait effectué',
         text: `${amountText} ont été envoyés sur votre compte Mobile Money (${masked}).`,
       };
-    case 'FAILED':
     case 'CANCELLED':
+      return {
+        Icon: IconCircleCheck,
+        tint: OCEAN.base,
+        title: 'Retrait annulé',
+        text: `Rien n'a été envoyé : ${amountText} ont été remis dans votre solde disponible.`,
+      };
+    case 'FAILED':
       return {
         Icon: IconAlertTriangle,
         tint: colors.danger,
@@ -65,6 +75,14 @@ function describeOutcome(payout: Payout, amountText: string, destination: string
         text: `${amountText} sont en cours d'envoi vers ${masked}. Vous serez prévenu dès que ce sera arrivé.`,
       };
     default:
+      if (payout.autoReleaseAt) {
+        return {
+          Icon: IconClockHour4,
+          tint: OCEAN.base,
+          title: 'Retrait programmé',
+          text: `Par sécurité, ${amountText} partiront automatiquement vers ${masked} à ${formatTime(payout.autoReleaseAt)} (nouveau numéro). Le montant est mis de côté. Ce n'est pas vous ? Annulez-le avant cette heure.`,
+        };
+      }
       return {
         Icon: IconClockHour4,
         tint: OCEAN.base,
@@ -83,6 +101,7 @@ export default function NewPayoutScreen() {
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [result, setResult] = useState<{ payout: Payout; amountText: string; destination: string } | null>(null);
   const requestPayout = useRequestPayout();
+  const cancelPayout = useCancelPayout();
 
   function handleSubmit() {
     setErrorMessage(undefined);
@@ -144,6 +163,22 @@ export default function NewPayoutScreen() {
             {outcome.text}
           </AppText>
         </View>
+        {errorMessage ? <FeedbackBanner tone="error" title="Annulation impossible" text={errorMessage} onDismiss={() => setErrorMessage(undefined)} /> : null}
+        {result.payout.status === 'REQUESTED' ? (
+          <OceanButton
+            label="Annuler ce retrait"
+            variant="danger"
+            loading={cancelPayout.isPending}
+            onPress={() => {
+              setErrorMessage(undefined);
+              cancelPayout.mutate(result.payout.id, {
+                onSuccess: (payout) => setResult({ ...result, payout }),
+                onError: (error) => setErrorMessage(error instanceof ApiError ? error.message : 'Réessayez dans un instant.'),
+              });
+            }}
+            style={styles.submit}
+          />
+        ) : null}
         <OceanButton label="Terminé" onPress={() => router.back()} style={styles.submit} />
       </ScreenContainer>
     );

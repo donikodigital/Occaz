@@ -276,7 +276,7 @@ describe('Mode des retraits — lecture et bascule', () => {
     const { service, prisma } = build();
     const scope = { wallet: { driver: { countryId: { in: ['gn'] } } } };
     await service.getConfig(scope as never);
-    expect(prisma.payout.count).toHaveBeenCalledWith({ where: { AND: [{ status: PayoutStatus.REQUESTED }, scope] } });
+    expect(prisma.payout.count).toHaveBeenCalledWith({ where: { AND: [{ status: PayoutStatus.REQUESTED, autoReleaseAt: null }, scope] } });
   });
 
   it('setMode écrit le réglage « payout.auto_enabled » et trace qui l\'a changé', async () => {

@@ -72,8 +72,8 @@ function build(options: {
     notifications as never,
     referrals as never,
   );
-  const refundBooking = jest.spyOn(service, 'refundBooking').mockResolvedValue(undefined);
-  const refundShipment = jest.spyOn(service, 'refundShipment').mockResolvedValue(undefined);
+  const refundBooking = jest.spyOn(service, 'refundBooking').mockResolvedValue(0n);
+  const refundShipment = jest.spyOn(service, 'refundShipment').mockResolvedValue(0n);
   return { service, prisma, wallets, bookingsService, shipmentsService, refundBooking, refundShipment };
 }
 

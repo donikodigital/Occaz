@@ -30,6 +30,7 @@ function createService(options: { shipment?: Record<string, unknown>; claimCount
     shipment: {
       updateMany: jest.fn().mockResolvedValue({ count: options.claimCount ?? 1 }),
       update: jest.fn().mockResolvedValue({ id: 's1' }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 's1' }),
       findUnique: jest.fn().mockResolvedValue(options.shipment ?? shipment()),
     },
     trip: {
@@ -54,7 +55,7 @@ function createService(options: { shipment?: Record<string, unknown>; claimCount
     {} as never,
     eventEmitter as never,
     notifications as never,
-    {} as never,
+    { release: jest.fn().mockResolvedValue(false) } as never,
   );
   return { service, tx, eventEmitter, notifications };
 }
@@ -115,6 +116,19 @@ describe('ShipmentsService.cancel', () => {
   it('laisse le support annuler un envoi en transit', async () => {
     const { service } = createService({ shipment: shipment({ status: ShipmentStatus.IN_TRANSIT, driverId: 'd1' }) });
     await expect(service.cancel('s1', 'Décision support', CancellationInitiator.SUPPORT)).resolves.toBeDefined();
+  });
+
+  it('annulation simultanée perdue : refusée, capacité du trajet non rendue une seconde fois, aucun second remboursement', async () => {
+    const { service, tx, eventEmitter } = createService({
+      shipment: shipment({ status: ShipmentStatus.DRIVER_ASSIGNED, driverId: 'd1', tripId: 't1' }),
+      claimCount: 0,
+      trip: { id: 't1', availableShipmentWeightKg: 10 },
+    });
+    await expect(
+      service.cancel('s1', 'Changement de plan', CancellationInitiator.CUSTOMER, { customerId: 'c1' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.trip.update).not.toHaveBeenCalled();
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 
   it('refuse à un autre client d\'annuler cet envoi', async () => {

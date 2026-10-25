@@ -1,4 +1,5 @@
 // mobile/src/hooks/usePushNotifications.ts
+// [25/10/2026] v6 — notification d'état reçue app ouverte (STATUS_CHANGE, REFUND, DRIVER_PAYMENT…) : les listes concernées se rechargent aussitôt.
 // [19/10/2026] v5 — notifications DRIVER_COMPLIANCE (ouvre « Mon dossier ») et ADD_EMAIL (ouvre l'ajout d'adresse e-mail) ; l'espace des conversations suit l'espace actif.
 // [10/10/2026] v4 — SHIPMENT_TRACKING : le toucher ouvre le suivi en direct du colis ; reçue app ouverte, elle rafraîchit le suivi.
 // [21/09/2026] v2 — canal Android « shipment-requests » (importance max) et ouverture de l'écran concerné au toucher d'une notification.
@@ -22,6 +23,19 @@ import { getActiveConversation, playMessageSound } from '@/utils/messageSound';
  * plateformes — configuré une seule fois au chargement du module.
  */
 type PushData = { type?: string; shipmentId?: string; conversationId?: string } | undefined;
+
+/** Pour chaque type de notification d'état, les données qu'il rend périmées (préfixes de clés React Query). */
+const QUERY_KEYS_BY_PUSH_TYPE: Record<string, string[][]> = {
+  STATUS_CHANGE: [['bookings'], ['trips'], ['shipments'], ['payments']],
+  BOOKING: [['bookings'], ['trips']],
+  ARRIVAL: [['bookings'], ['trips']],
+  DEPARTURE_IMMINENT: [['bookings'], ['trips']],
+  REFUND: [['bookings'], ['payments'], ['shipments']],
+  DRIVER_PAYMENT: [['wallet'], ['payouts'], ['bookings'], ['trips']],
+  DRIVER_ACCEPTED: [['shipments']],
+  SHIPMENT_EXTENSION: [['shipments']],
+  DISPUTE: [['disputes'], ['bookings'], ['shipments']],
+};
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
@@ -131,6 +145,13 @@ export function usePushNotificationRegistration(isAuthenticated: boolean) {
     // (sans attendre l'actualisation automatique).
     const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
       const data = notification.request.content.data as PushData;
+      // Changement d'état d'une réservation, d'un trajet, d'un envoi ou d'un paiement : les listes et les écrans concernés se
+      // rechargent tout de suite, sans attendre que l'utilisateur tire l'écran.
+      const staleKeys = data?.type ? QUERY_KEYS_BY_PUSH_TYPE[data.type] : undefined;
+      if (staleKeys) {
+        for (const queryKey of staleKeys) void queryClient.invalidateQueries({ queryKey });
+        return;
+      }
       // Invitation de colis reçue (conducteur) ou refusée (client) : la bannière / la liste se met à jour tout de suite.
       if (data?.type === 'SHIPMENT_INVITATION') {
         void queryClient.invalidateQueries({ queryKey: ['shipments', 'invitations', 'mine'] });

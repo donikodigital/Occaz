@@ -16,6 +16,7 @@ import { ListBookingsQueryDto } from './dto/list-bookings-query.dto';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 import { DriverProfilesService } from '../profiles/driver-profiles/driver-profiles.service';
 import { TripOtpService } from './trip-otp.service';
+import { TripCompletionService } from './trip-completion.service';
 import { hideContactsOnceCompleted } from './booking-contacts';
 import { UserBlocksService } from '../user-safety/user-blocks.service';
 import { SelfDealingService } from '../account-roles/self-dealing.service';
@@ -32,6 +33,7 @@ export class BookingsController {
     private readonly scope: CountryScopeService,
     private readonly userBlocks: UserBlocksService,
     private readonly selfDealing: SelfDealingService,
+    private readonly tripCompletion: TripCompletionService,
   ) {}
 
   @Get('mine')
@@ -90,6 +92,13 @@ export class BookingsController {
   ) {
     const customer = await this.customerProfilesService.findByUserId(user.id);
     return this.bookingsService.cancel(id, customer.id, dto.reason);
+  }
+
+  /** Le conducteur déclare un client absent au point de rendez-vous (après l'attente minimale) : il est payé, le client n'est pas remboursé. */
+  @Post(':id/no-show')
+  async declareNoShow(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    return this.tripCompletion.declareNoShow(id, driverId);
   }
 
   @Post(':id/otp/pickup/request')

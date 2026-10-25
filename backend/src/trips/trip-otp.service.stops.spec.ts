@@ -113,7 +113,7 @@ describe('TripOtpService — message de bienvenue après la dépose', () => {
       alightingStop: options.alightingCity === null ? null : { city: { name: options.alightingCity ?? 'Kissidougou' } },
     };
     const prisma = {
-      booking: { findUnique: jest.fn().mockResolvedValue(row), update: jest.fn().mockResolvedValue({}) },
+      booking: { findUnique: jest.fn().mockResolvedValue(row), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       tripPassenger: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
     const otp = { verify: jest.fn().mockResolvedValue(undefined) };
@@ -147,9 +147,29 @@ describe('TripOtpService — message de bienvenue après la dépose', () => {
   it('le message part après le paiement du conducteur, et son échec ne défait rien', async () => {
     const { service, prisma, wallets, notifications } = buildForDropoff({ notifyFails: true });
     await expect(service.verifyDropoffOtp('b1', 'd1', '123456')).resolves.toBeUndefined();
-    expect(prisma.booking.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: BookingStatus.COMPLETED } }));
+    expect(prisma.booking.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: BookingStatus.COMPLETED } }));
     expect(wallets.releaseHeldFunds).toHaveBeenCalledTimes(1);
     expect(notifications.notify).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('TripOtpService — dépose validée une seule fois', () => {
+  it('une dépose déjà clôturée (code saisi deux fois, clôture automatique en même temps) ne paie ni ne félicite deux fois', async () => {
+    const row = {
+      id: 'b1', tripId: 'trip1', status: BookingStatus.COMPLETED, boardingStopId: null,
+      trip: { id: 'trip1', driverId: 'd1', status: TripStatus.ARRIVED, destinationCity: { name: 'Conakry' } },
+      customer: { userId: 'u-client', user: {} }, alightingStop: null,
+    };
+    const prisma = {
+      booking: { findUnique: jest.fn().mockResolvedValue(row), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      tripPassenger: { updateMany: jest.fn() },
+    };
+    const wallets = { releaseHeldFunds: jest.fn() };
+    const notifications = { notify: jest.fn() };
+    const service = new TripOtpService(prisma as never, {} as never, wallets as never, notifications as never);
+    await service.closeDropoffBySystem('b1');
+    expect(wallets.releaseHeldFunds).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 });
 

@@ -16,6 +16,8 @@ export interface Payout {
   processedAt: string | null;
   /** Retrait envoyé tout de suite au prestataire, sans validation de l'équipe. */
   autoProcessed?: boolean;
+  /** Retrait vers un nouveau numéro : date d'envoi automatique (délai de sécurité). Tant qu'elle n'est pas passée, le conducteur peut annuler. */
+  autoReleaseAt?: string | null;
   /** Raison d'un refus (numéro refusé…), le cas échéant. */
   failureReason?: string | null;
 }

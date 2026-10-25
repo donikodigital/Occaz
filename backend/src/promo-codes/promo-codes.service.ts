@@ -172,7 +172,7 @@ export class PromoCodesService {
    */
   async redeem(
     tx: Prisma.TransactionClient,
-    promoCode: { id: string; usageLimit: number | null; usedCount: number },
+    promoCode: { id: string; usageLimit: number | null; usedCount: number; usageLimitPerUser?: number },
     params: { customerId: string; bookingId?: string; shipmentId?: string; discountAmount: bigint },
   ): Promise<void> {
     // Attribution conditionnelle : si usageLimit est atteint entre la validation
@@ -197,6 +197,40 @@ export class PromoCodesService {
         discountAmount: params.discountAmount,
       },
     });
+
+    // Limite par client re-vérifiée ICI : la vérification faite à la validation date d'avant la transaction, et deux
+    // réservations simultanées du même client la passaient toutes les deux. La mise à jour de usedCount ci-dessus verrouille la
+    // ligne du code jusqu'à la fin de la transaction : la seconde transaction attend la première puis voit sa consommation.
+    if (promoCode.usageLimitPerUser !== undefined) {
+      const used = await tx.promoCodeRedemption.count({ where: { promoCodeId: promoCode.id, customerId: params.customerId } });
+      if (used > promoCode.usageLimitPerUser) {
+        throw new ConflictException('Vous avez déjà utilisé ce code le nombre maximum de fois autorisé.');
+      }
+    }
+  }
+
+  /**
+   * Rend son utilisation au code quand la réservation/l'envoi qui l'avait consommé n'aboutit pas (expirée sans paiement, annulée
+   * avec remboursement intégral) : sans cela, le client perdait son code pour rien et le quota global se vidait de fausses
+   * utilisations. Idempotent — la ligne d'utilisation est supprimée une seule fois, et seul ce premier appel décrémente le compteur.
+   */
+  async release(params: { bookingId?: string; shipmentId?: string }, client?: Prisma.TransactionClient): Promise<boolean> {
+    if (!params.bookingId && !params.shipmentId) return false;
+    const run = async (tx: Prisma.TransactionClient) => {
+      const redemption = await tx.promoCodeRedemption.findFirst({
+        where: params.bookingId ? { bookingId: params.bookingId } : { shipmentId: params.shipmentId },
+        select: { id: true, promoCodeId: true },
+      });
+      if (!redemption) return false;
+      const deleted = await tx.promoCodeRedemption.deleteMany({ where: { id: redemption.id } });
+      if (deleted.count === 0) return false;
+      await tx.promoCode.updateMany({
+        where: { id: redemption.promoCodeId, usedCount: { gt: 0 } },
+        data: { usedCount: { decrement: 1 } },
+      });
+      return true;
+    };
+    return client ? run(client) : this.prisma.$transaction(run);
   }
 
   private async findEligible(code: string, serviceType: ServiceType | undefined, countryId?: string) {

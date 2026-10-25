@@ -567,7 +567,7 @@ export class TripsService {
     }
     const updated = await this.prisma.trip.update({
       where: { id },
-      data: { status: TripStatus.DRIVER_ARRIVED },
+      data: { status: TripStatus.DRIVER_ARRIVED, driverArrivedAt: new Date() },
     });
 
     // Les clients qui montent au départ reçoivent leur notification ET leur code de prise en charge ; ceux qui montent à une
@@ -621,7 +621,7 @@ export class TripsService {
         `Signalez d'abord votre arrivée à ${nextStop.city?.name ?? 'la prochaine étape'} : des clients y montent ou y descendent.`,
       );
     }
-    const updated = await this.prisma.trip.update({ where: { id }, data: { status: TripStatus.ARRIVED } });
+    const updated = await this.prisma.trip.update({ where: { id }, data: { status: TripStatus.ARRIVED, arrivedAt: new Date() } });
     await this.arrivals.announceArrival(trip, { kind: 'DESTINATION' }, trip.destinationCity.name);
     return updated;
   }

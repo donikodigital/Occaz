@@ -3,6 +3,7 @@
 // [21/09/2026] v2 — useShipmentQuote et useExtendShipment.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { shipmentsApi } from '@/services/api/shipments.api';
+import { PAGE_SIZE, usePagedList } from '@/hooks/usePagedList';
 import type {
   CancelShipmentPayload,
   CreateShipmentPayload,
@@ -15,6 +16,11 @@ export function useMyShipments(page = 1) {
     queryKey: ['shipments', 'mine', page],
     queryFn: () => shipmentsApi.listMine({ page, limit: 20 }),
   });
+}
+
+/** Tous les envois du client, chargés par pages au fil du défilement (écran « Mon activité »). */
+export function useMyShipmentsList() {
+  return usePagedList(['shipments', 'mine', 'list'], (page) => shipmentsApi.listMine({ page, limit: PAGE_SIZE }));
 }
 
 /** Tant que l'envoi n'est pas terminé, l'écran de suivi se met à jour tout seul : « conducteur trouvé », colis récupéré, livré… */

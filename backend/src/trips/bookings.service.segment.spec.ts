@@ -143,7 +143,11 @@ describe('BookingsService.cancel — délai compté depuis la montée du client'
     };
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([{ status: 'PUBLISHED', totalSeats: 4 }]),
-      booking: { update: jest.fn().mockResolvedValue({ id: 'b1' }), findMany: jest.fn().mockResolvedValue([]) },
+      booking: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'b1' }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       trip: { update: jest.fn(), findUnique: jest.fn().mockResolvedValue({ ...trip, totalSeats: 4 }) },
     };
     const prisma = {
@@ -161,7 +165,7 @@ describe('BookingsService.cancel — délai compté depuis la montée du client'
       getCancellationPolicy: jest.fn().mockResolvedValue({ hoursBeforeDeparture: 24, refundPercentage: 100 }),
     };
     const emit = jest.fn();
-    const service = new BookingsService(prisma as never, pricing as never, { emit } as never, {} as never, { notify: jest.fn() } as never);
+    const service = new BookingsService(prisma as never, pricing as never, { emit } as never, { release: jest.fn() } as never, { notify: jest.fn() } as never);
     return { service, emit, tx };
   }
 
@@ -183,7 +187,7 @@ describe('BookingsService.cancel — délai compté depuis la montée du client'
     const now = Date.now();
     const { service, emit, tx } = cancelService(new Date(now + 10 * 3_600_000), null, [{ pickedUpAt: new Date(now - 60_000) }]);
     await expect(service.cancel('b1', 'c1', 'Imprévu')).rejects.toThrow(/déjà été pris en charge/);
-    expect(tx.booking.update).not.toHaveBeenCalled();
+    expect(tx.booking.updateMany).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,5 @@
 // mobile/app/(customer)/(tabs)/trips.tsx
+// [25/10/2026] v4 — chargement de la suite en bas de liste, compteurs réels (total du serveur), tirer pour actualiser, état d'échec avec « Réessayer ».
 // [20/10/2026] v3b — la carte d'un envoi affiche sa date d'envoi (« Envoyé le 17 oct. 2026 »).
 // [07/10/2026] v3 — « Mon activité » et sa phrase passent dans un bandeau (hero) bleu océan ; le reste de l'écran est inchangé.
 // [21/09/2026] v+ — le montant d'un envoi s'affiche dans sa devise.
@@ -20,8 +21,9 @@ import { AppText, ResponsiveList, ScreenContainer } from '@/components/ui';
 import { OceanButton, OceanCard, OceanEmpty, OceanHeroCard, OceanPill, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
-import { useMyBookings } from '@/hooks/useBookings';
-import { useMyShipments } from '@/hooks/useShipments';
+import { useMyBookingsList } from '@/hooks/useBookings';
+import { useMyShipmentsList } from '@/hooks/useShipments';
+import { ListFailed, ListLoading, ListMoreFooter, listRefreshControl } from '@/components/ocean/ListFeedback';
 import { currencyOf, formatMoney } from '@/utils/money';
 import { formatDateShort, formatDateWithYear, formatTime } from '@/utils/date';
 import { formatCityCountry, formatShipmentRoute } from '@/utils/shipmentDisplay';
@@ -184,12 +186,13 @@ function Segmented({
 
 export default function ActivityScreen() {
   const [segment, setSegment] = useState<Segment>('trips');
-  const bookingsQuery = useMyBookings();
-  const shipmentsQuery = useMyShipments();
+  const bookingsQuery = useMyBookingsList();
+  const shipmentsQuery = useMyShipmentsList();
 
-  const bookings = bookingsQuery.data?.data ?? [];
-  const shipments = shipmentsQuery.data?.data ?? [];
-  const isLoading = segment === 'trips' ? bookingsQuery.isLoading : shipmentsQuery.isLoading;
+  const bookings = bookingsQuery.items;
+  const shipments = shipmentsQuery.items;
+  const current = segment === 'trips' ? bookingsQuery : shipmentsQuery;
+  const isLoading = current.isLoading;
 
   // Ce qui attend un paiement dans le segment affiché : le bandeau ouvre directement l'élément concerné.
   const pendingBookings = bookings.filter((booking) => booking.status === 'PENDING_PAYMENT');
@@ -221,8 +224,8 @@ export default function ActivityScreen() {
         value={segment}
         onChange={setSegment}
         items={[
-          { id: 'trips', label: 'Trajets', count: bookingsQuery.data ? bookings.length : undefined },
-          { id: 'shipments', label: 'Envois', count: shipmentsQuery.data ? shipments.length : undefined },
+          { id: 'trips', label: 'Trajets', count: bookingsQuery.total },
+          { id: 'shipments', label: 'Envois', count: shipmentsQuery.total },
         ]}
       />
 
@@ -274,7 +277,11 @@ export default function ActivityScreen() {
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           ListHeaderComponent={header}
-          ListEmptyComponent={!isLoading ? emptyTrips : undefined}
+          ListEmptyComponent={isLoading ? <ListLoading /> : bookingsQuery.hasFailed ? <ListFailed onRetry={bookingsQuery.refresh} /> : emptyTrips}
+          ListFooterComponent={<ListMoreFooter loading={bookingsQuery.isLoadingMore} />}
+          refreshControl={listRefreshControl(bookingsQuery.isRefreshing, bookingsQuery.refresh)}
+          onEndReached={bookingsQuery.loadMore}
+          onEndReachedThreshold={0.4}
           renderItem={({ item }) => <BookingRow booking={item} />}
         />
       ) : (
@@ -284,7 +291,11 @@ export default function ActivityScreen() {
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           ListHeaderComponent={header}
-          ListEmptyComponent={!isLoading ? emptyShipments : undefined}
+          ListEmptyComponent={isLoading ? <ListLoading /> : shipmentsQuery.hasFailed ? <ListFailed onRetry={shipmentsQuery.refresh} /> : emptyShipments}
+          ListFooterComponent={<ListMoreFooter loading={shipmentsQuery.isLoadingMore} />}
+          refreshControl={listRefreshControl(shipmentsQuery.isRefreshing, shipmentsQuery.refresh)}
+          onEndReached={shipmentsQuery.loadMore}
+          onEndReachedThreshold={0.4}
           renderItem={({ item }) => <ShipmentRow shipment={item} />}
         />
       )}

@@ -1,4 +1,6 @@
 // mobile/src/services/api/client.ts
+// [25/10/2026] v++ — réseau faible : un rafraîchissement qui échoue faute de réseau (ou à cause d'une erreur serveur passagère) ne déconnecte plus
+// et ne supprime plus les jetons ; seul un refus définitif du serveur (jeton refusé, expiré ou révoqué) met fin à la session.
 // [19/10/2026] v+ — alimente connectivityStore : échec réseau (hors délai dépassé) => hors connexion ; toute réponse du serveur => en ligne.
 import Constants from 'expo-constants';
 import { secureStorage } from '../storage/secureStorage';
@@ -103,6 +105,9 @@ function formatMessage(message: string | string[]): string {
   return Array.isArray(message) ? message.join(' ') : message;
 }
 
+/** Statuts par lesquels le serveur refuse définitivement le jeton de rafraîchissement : la session est réellement terminée. */
+const DEFINITIVE_REFRESH_REFUSAL = new Set([400, 401, 403]);
+
 async function refreshAccessToken(): Promise<string> {
   const refreshToken = await secureStorage.getRefreshToken();
   if (!refreshToken) throw new SessionExpiredError();
@@ -114,17 +119,23 @@ async function refreshAccessToken(): Promise<string> {
     );
     await secureStorage.setTokens(result.accessToken, result.refreshToken);
     return result.accessToken;
-  } catch {
-    await secureStorage.clearTokens();
-    throw new SessionExpiredError();
+  } catch (error) {
+    // Refus définitif du serveur : seulement dans ce cas on efface les jetons et on déconnecte.
+    if (error instanceof ApiError && DEFINITIVE_REFRESH_REFUSAL.has(error.statusCode)) {
+      await secureStorage.clearTokens();
+      throw new SessionExpiredError();
+    }
+    // Tout le reste (réseau coupé, délai dépassé, 5xx, 429) est passager : les jetons sont conservés, la requête échoue
+    // proprement et l'utilisateur réessaie — il ne perd pas sa session parce qu'il passe dans un tunnel.
+    throw error instanceof ApiError ? error : new ApiError('Connexion impossible — vérifiez votre réseau.', 0);
   }
 }
 
 /**
  * Point d'entrée unique pour tout appel réseau de l'application. Ajoute
  * le jeton d'accès, retente une fois après un rafraîchissement réussi
- * en cas de 401, et propage une SessionExpiredError sinon (jamais un
- * état d'erreur silencieux).
+ * en cas de 401, et propage une SessionExpiredError seulement quand la
+ * session est réellement perdue (jamais un état d'erreur silencieux).
  */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const useAuth = options.auth !== false;
@@ -135,15 +146,26 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   } catch (error) {
     if (!(error instanceof ApiError) || !error.isAuthError || !useAuth) throw error;
 
+    let newAccessToken: string;
     try {
       refreshPromise ??= refreshAccessToken().finally(() => {
         refreshPromise = null;
       });
-      const newAccessToken = await refreshPromise;
-      return await rawFetch<T>(path, options, newAccessToken);
+      newAccessToken = await refreshPromise;
     } catch (refreshError) {
-      onSessionExpired?.();
-      throw refreshError instanceof ApiError ? refreshError : new SessionExpiredError();
+      if (refreshError instanceof SessionExpiredError) onSessionExpired?.();
+      throw refreshError instanceof ApiError ? refreshError : new ApiError('Connexion impossible — vérifiez votre réseau.', 0);
+    }
+
+    try {
+      return await rawFetch<T>(path, options, newAccessToken);
+    } catch (retryError) {
+      // Jeton fraîchement obtenu et toujours refusé : la session n'est plus valable.
+      if (retryError instanceof ApiError && retryError.isAuthError) {
+        onSessionExpired?.();
+        throw new SessionExpiredError();
+      }
+      throw retryError;
     }
   }
 }

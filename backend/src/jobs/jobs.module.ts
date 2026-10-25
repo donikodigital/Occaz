@@ -6,11 +6,12 @@ import { ShipmentsModule } from '../shipments/shipments.module';
 import { TripsModule } from '../trips/trips.module';
 import { OnboardingRemindersModule } from '../onboarding-reminders/onboarding-reminders.module';
 import { AccountPurgeModule } from '../account-purge/account-purge.module';
+import { WalletsModule } from '../wallets/wallets.module';
 import { JobsController } from './jobs.controller';
 import { JobsService } from './jobs.service';
 
 @Module({
-  imports: [TripsModule, ShipmentsModule, OnboardingRemindersModule, AccountPurgeModule],
+  imports: [TripsModule, ShipmentsModule, OnboardingRemindersModule, AccountPurgeModule, WalletsModule],
   controllers: [JobsController],
   providers: [JobsService],
 })

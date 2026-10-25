@@ -1,6 +1,7 @@
 // mobile/src/hooks/useBookings.ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi } from '@/services/api/bookings.api';
+import { PAGE_SIZE, usePagedList } from '@/hooks/usePagedList';
 import type { CancelBookingPayload, CreateBookingPayload } from '@/types/bookings.types';
 
 export function useMyBookings(page = 1) {
@@ -8,6 +9,11 @@ export function useMyBookings(page = 1) {
     queryKey: ['bookings', 'mine', page],
     queryFn: () => bookingsApi.listMine({ page, limit: 20 }),
   });
+}
+
+/** Toutes les réservations du client, chargées par pages au fil du défilement (écran « Mon activité »). */
+export function useMyBookingsList() {
+  return usePagedList(['bookings', 'mine', 'list'], (page) => bookingsApi.listMine({ page, limit: PAGE_SIZE }));
 }
 
 /**
@@ -56,6 +62,20 @@ export function useCancelBooking(id: string) {
 }
 
 // --- Côté conducteur : validation OTP de prise en charge / dépose ---
+
+/** Client absent au rendez-vous : la réservation est clôturée, le conducteur payé (solde et trajet se mettent à jour). */
+export function useDeclareNoShow(bookingId: string, tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => bookingsApi.declareNoShow(bookingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trips', tripId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['trips', tripId] });
+      queryClient.invalidateQueries({ queryKey: ['trips', 'mine'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+    },
+  });
+}
 
 export function useRequestPickupOtp(bookingId: string, tripId: string) {
   const queryClient = useQueryClient();

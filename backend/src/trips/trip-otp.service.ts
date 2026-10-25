@@ -268,16 +268,28 @@ export class TripOtpService {
     await this.markDroppedOff(booking);
   }
 
+  /**
+   * Dépose validée par le système (trajet « arrivé » depuis longtemps sans que le client ait saisi son code) : le client a bien
+   * voyagé, le conducteur doit être payé. Voir TripCompletionService.autoCloseStuckTrips.
+   */
+  async closeDropoffBySystem(bookingId: string): Promise<void> {
+    const booking = await this.getBookingWithContext(bookingId);
+    await this.markDroppedOff(booking);
+  }
+
   private async markDroppedOff(
     booking: Awaited<ReturnType<TripOtpService['getBookingWithContext']>>,
   ): Promise<void> {
+    // Clôture « réclamée » : un code saisi deux fois, ou en même temps que la clôture automatique, ne paie ni ne félicite deux fois.
+    const claimed = await this.prisma.booking.updateMany({
+      where: { id: booking.id, status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] } },
+      data: { status: BookingStatus.COMPLETED },
+    });
+    if (claimed.count === 0) return;
+
     await this.prisma.tripPassenger.updateMany({
       where: { bookingId: booking.id },
       data: { droppedOffAt: new Date() },
-    });
-    await this.prisma.booking.update({
-      where: { id: booking.id },
-      data: { status: BookingStatus.COMPLETED },
     });
 
     await this.wallets.releaseHeldFunds({ driverId: booking.trip.driverId, bookingId: booking.id });

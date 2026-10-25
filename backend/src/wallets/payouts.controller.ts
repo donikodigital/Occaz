@@ -41,6 +41,13 @@ export class PayoutsController {
     return this.payoutsService.request(driverId, dto);
   }
 
+  /** Le conducteur annule un retrait pas encore parti (programmé ou en attente de validation) : ses fonds lui sont rendus. */
+  @Post(':id/cancel')
+  async cancelMine(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
+    return this.payoutsService.cancelByDriver(id, driverId);
+  }
+
   /** Mode des retraits (Automatique / Manuel), plafond, état du prestataire et nombre de retraits à valider. */
   @Permissions(PERMISSIONS.PAYOUT_MANAGE)
   @Get('config')

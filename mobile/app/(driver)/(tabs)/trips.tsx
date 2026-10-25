@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/trips.tsx
+// [25/10/2026] v5 — chargement de la suite en bas de liste, compteurs réels (total du serveur), tirer pour actualiser, état d'échec avec « Réessayer ».
 // [07/10/2026] v4 — « Mon activité » et sa phrase passent dans un bandeau (hero) bleu océan ; le reste de l'écran est inchangé.
 //
 //
@@ -18,8 +19,9 @@ import { AppText, ResponsiveList, ScreenContainer } from '@/components/ui';
 import { OceanButton, OceanCard, OceanEmpty, OceanHeroCard, OceanPill, type OceanPillTone } from '@/components/ocean/OceanKit';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
-import { useMyTrips } from '@/hooks/useDriverTrips';
-import { useAssignedShipments } from '@/hooks/useDriverShipments';
+import { useMyTripsList } from '@/hooks/useDriverTrips';
+import { useAssignedShipmentsList } from '@/hooks/useDriverShipments';
+import { ListFailed, ListLoading, ListMoreFooter, listRefreshControl } from '@/components/ocean/ListFeedback';
 import { formatDateShort, formatTime } from '@/utils/date';
 import { driverNetAmount, formatShipmentRoute, formatWindow } from '@/utils/shipmentDisplay';
 import { formatMoney } from '@/utils/money';
@@ -120,11 +122,11 @@ function Segmented({
 
 export default function DriverActivityScreen() {
   const [segment, setSegment] = useState<Segment>('trips');
-  const tripsQuery = useMyTrips();
-  const shipmentsQuery = useAssignedShipments();
+  const tripsQuery = useMyTripsList();
+  const shipmentsQuery = useAssignedShipmentsList();
 
-  const trips = tripsQuery.data?.data ?? [];
-  const shipments = shipmentsQuery.data?.data ?? [];
+  const trips = tripsQuery.items;
+  const shipments = shipmentsQuery.items;
   const isLoading = segment === 'trips' ? tripsQuery.isLoading : shipmentsQuery.isLoading;
 
   const header = (
@@ -147,8 +149,8 @@ export default function DriverActivityScreen() {
         value={segment}
         onChange={setSegment}
         items={[
-          { id: 'trips', label: 'Trajets', count: tripsQuery.data ? trips.length : undefined },
-          { id: 'shipments', label: 'Envois', count: shipmentsQuery.data ? shipments.length : undefined },
+          { id: 'trips', label: 'Trajets', count: tripsQuery.total },
+          { id: 'shipments', label: 'Envois', count: shipmentsQuery.total },
         ]}
       />
     </View>
@@ -187,7 +189,11 @@ export default function DriverActivityScreen() {
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           ListHeaderComponent={header}
-          ListEmptyComponent={!isLoading ? emptyTrips : undefined}
+          ListEmptyComponent={isLoading ? <ListLoading /> : tripsQuery.hasFailed ? <ListFailed onRetry={tripsQuery.refresh} /> : emptyTrips}
+          ListFooterComponent={<ListMoreFooter loading={tripsQuery.isLoadingMore} />}
+          refreshControl={listRefreshControl(tripsQuery.isRefreshing, tripsQuery.refresh)}
+          onEndReached={tripsQuery.loadMore}
+          onEndReachedThreshold={0.4}
           renderItem={({ item }) => <TripRow trip={item} />}
         />
       ) : (
@@ -197,7 +203,11 @@ export default function DriverActivityScreen() {
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           ListHeaderComponent={header}
-          ListEmptyComponent={!isLoading ? emptyShipments : undefined}
+          ListEmptyComponent={isLoading ? <ListLoading /> : shipmentsQuery.hasFailed ? <ListFailed onRetry={shipmentsQuery.refresh} /> : emptyShipments}
+          ListFooterComponent={<ListMoreFooter loading={shipmentsQuery.isLoadingMore} />}
+          refreshControl={listRefreshControl(shipmentsQuery.isRefreshing, shipmentsQuery.refresh)}
+          onEndReached={shipmentsQuery.loadMore}
+          onEndReachedThreshold={0.4}
           renderItem={({ item }) => <ShipmentRow shipment={item} />}
         />
       )}

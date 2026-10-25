@@ -27,6 +27,9 @@ export const bookingsApi = {
   requestDropoffOtp: (id: string) =>
     api.post<{ expiresInSeconds: number; smsSent: boolean; smsDisabled?: boolean }>(`/bookings/${id}/otp/dropoff/request`),
 
+  /** Le conducteur déclare un client absent (après l'attente minimale) : il est payé, le client n'est pas remboursé. */
+  declareNoShow: (id: string) => api.post<{ bookingId: string; status: string; noShow: boolean }>(`/bookings/${id}/no-show`),
+
   verifyDropoffOtp: (id: string, code: string) => api.post<void>(`/bookings/${id}/otp/dropoff/verify`, { code }),
 
   // --- Côté client : revoir son propre code dans l'app (renvoie le code en clair, contrairement aux endpoints ci-dessus destinés au conducteur) ---

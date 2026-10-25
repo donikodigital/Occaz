@@ -1,4 +1,5 @@
 // mobile/app/(driver)/trip/[id].tsx
+// [25/10/2026] v+ — bouton « Le client n'est pas venu ? Le déclarer absent » (après l'attente minimale) : le conducteur est payé, le client non remboursé.
 // [19/10/2026] v+ — plus de SMS pour les codes de trajet : le passager est prévenu dans l'application, le message le dit.
 // [10/10/2026] v+ — Plus aucun Alert.alert (sans effet sur le web) : erreurs en bannière dans la page, « Retirer une ville », « Annuler le trajet » et « Prise en charge non validée » en boîte de confirmation. Une action du trajet qui échoue (publier, démarrer…) affiche maintenant son erreur au lieu de ne rien faire.
 //
@@ -52,6 +53,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, View } from 'r
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   IconAlertTriangle,
+  IconUserX,
   IconArrowLeft,
   IconCar,
   IconChevronDown,
@@ -97,6 +99,7 @@ import {
   useUpdateTripStop,
 } from '@/hooks/useDriverTrips';
 import {
+  useDeclareNoShow,
   useRequestDropoffOtp,
   useRequestPickupOtp,
   useVerifyDropoffOtp,
@@ -369,6 +372,8 @@ function BookingOtpCard({
   const verifyPickup = useVerifyPickupOtp(booking.id, tripId);
   const requestDropoff = useRequestDropoffOtp(booking.id, tripId);
   const verifyDropoff = useVerifyDropoffOtp(booking.id, tripId);
+  const declareNoShow = useDeclareNoShow(booking.id, tripId);
+  const [noShowOpen, setNoShowOpen] = useState(false);
   const getOrCreateConversation = useGetOrCreateConversationForBooking();
 
   const names = booking.passengers?.map((p) => p.fullName) ?? [];
@@ -418,6 +423,17 @@ function BookingOtpCard({
       },
       onError: (error) => {
         setFeedback({ tone: 'error', title: 'Code invalide', text: error instanceof ApiError ? error.message : 'Réessayez.' });
+      },
+    });
+  }
+
+  function handleNoShow() {
+    declareNoShow.mutate(undefined, {
+      onSuccess: () => setNoShowOpen(false),
+      onError: (error) => {
+        // Attente minimale pas encore écoulée, trajet pas au bon stade… : le message du serveur dit exactement quoi faire.
+        setNoShowOpen(false);
+        setFeedback({ tone: 'error', title: 'Impossible pour le moment', text: error instanceof ApiError ? error.message : 'Réessayez dans un instant.' });
       },
     });
   }
@@ -541,8 +557,31 @@ function BookingOtpCard({
               </Pressable>
             </>
           )}
+          {phase === 'pickup' ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setNoShowOpen(true)}
+              style={({ pressed }) => [styles.supportLink, pressed && styles.pressed]}
+            >
+              <IconUserX size={14} color={colors.danger} />
+              <AppText variant="xs" color="danger" weight="semibold">
+                Le client n'est pas venu ? Le déclarer absent
+              </AppText>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
+      <ConfirmDialog
+        visible={noShowOpen}
+        title="Déclarer ce client absent ?"
+        message="Vous avez attendu votre client au rendez-vous. Sa réservation sera clôturée, vous serez payé et il ne sera pas remboursé. Possible après 15 minutes d'attente à l'endroit où il devait monter."
+        confirmLabel="Oui, il est absent"
+        cancelLabel="Non, je l'attends"
+        destructive
+        loading={declareNoShow.isPending}
+        onConfirm={handleNoShow}
+        onCancel={() => setNoShowOpen(false)}
+      />
 
       <Pressable
         accessibilityRole="button"

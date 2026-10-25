@@ -774,6 +774,7 @@ export class ShipmentsService {
       await tx.shipmentTracking.create({
         data: { shipmentId: id, status: ShipmentStatus.CANCELLED, note: reason },
       });
+      await this.promoCodes.release({ shipmentId: id }, tx);
       return true;
     });
 
@@ -820,6 +821,7 @@ export class ShipmentsService {
       await tx.shipmentTracking.create({
         data: { shipmentId: id, status: ShipmentStatus.CANCELLED, note: reason },
       });
+      await this.promoCodes.release({ shipmentId: id }, tx);
       return true;
     });
 
@@ -867,7 +869,28 @@ export class ShipmentsService {
       );
     }
 
+    // Annulation « réclamée » : seul le premier appel passe. Avant, deux annulations simultanées (client + conducteur, double appui)
+    // rendaient deux fois la capacité du trajet et émettaient deux fois l'événement de remboursement.
     const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const claimed = await tx.shipment.updateMany({
+        where: {
+          id,
+          status:
+            cancelledBy === CancellationInitiator.CUSTOMER || cancelledBy === CancellationInitiator.DRIVER
+              ? { in: CANCELLABLE_BY_PARTIES }
+              : { notIn: [ShipmentStatus.CANCELLED, ShipmentStatus.COMPLETED, ShipmentStatus.DELIVERED] },
+        },
+        data: {
+          status: ShipmentStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancelledBy,
+          cancellationReason: reason,
+        },
+      });
+      if (claimed.count === 0) {
+        throw new BadRequestException('Cet envoi ne peut plus être annulé.');
+      }
+
       if (shipment.tripId) {
         const trip = await tx.trip.findUnique({ where: { id: shipment.tripId } });
         if (trip && trip.availableShipmentWeightKg !== null) {
@@ -878,21 +901,13 @@ export class ShipmentsService {
         }
       }
 
-      const result = await tx.shipment.update({
-        where: { id },
-        data: {
-          status: ShipmentStatus.CANCELLED,
-          cancelledAt: new Date(),
-          cancelledBy,
-          cancellationReason: reason,
-        },
-      });
-
       await tx.shipmentTracking.create({
         data: { shipmentId: id, status: ShipmentStatus.CANCELLED, note: reason },
       });
+      // Remboursement intégral : le code promo consommé est rendu au client.
+      await this.promoCodes.release({ shipmentId: id }, tx);
 
-      return result;
+      return tx.shipment.findUniqueOrThrow({ where: { id } });
     });
 
     // Toute annulation restitue 100 % du montant payé par le client (règle

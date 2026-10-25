@@ -861,6 +861,11 @@ model Trip {
   currentLongitude         Float?
   currentPositionUpdatedAt DateTime?
 
+  // Horodatage des deux étapes de la journée : « conducteur arrivé au départ » (point de départ des 15 minutes d'attente avant de
+  // pouvoir déclarer un passager absent) et « arrivé à destination » (point de départ de la clôture automatique du trajet).
+  driverArrivedAt DateTime?
+  arrivedAt       DateTime?
+
   stops      TripStop[]
   bookings   Booking[]
   shipments  Shipment[]
@@ -1295,11 +1300,15 @@ model Payout {
   failureReason     String?
   autoProcessed     Boolean @default(false)
 
+  // Retrait vers un numéro jamais utilisé : il part tout seul à cette date (délai de réflexion, annulable par le conducteur).
+  autoReleaseAt DateTime?
+
   transactions WalletTransaction[]
 
   requestedAt DateTime  @default(now())
   processedAt DateTime?
 
+  @@index([status, autoReleaseAt])
   @@map("payouts")
 }
 
