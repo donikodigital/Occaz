@@ -94,14 +94,10 @@
     ],
     "extra": {
       "apiUrl": "https://api.occaz.sarl/api/v1",
-      "router": {},
-      "eas": {
-        "projectId": "690adc2d-4963-404a-84e6-3f7543cf3e6d"
-      }
+      "router": {}
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "owner": "jallow2026"
+    }
   }
 }
