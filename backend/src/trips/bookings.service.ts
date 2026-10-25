@@ -1,6 +1,7 @@
 // backend/src/trips/bookings.service.ts
 // [25/10/2026] v+ — le conducteur d'une réservation n'est plus renvoyé en entier (PUBLIC_DRIVER_SELECT) et le client, vu par le conducteur, se limite
 // à PUBLIC_CUSTOMER_SELECT (plus d'adresse ni de date de naissance).
+// [25/10/2026] sans politique d'annulation configurée, la règle par défaut s'applique (100 % jusqu'à 24 h avant) au lieu de 0 %.
 import { BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -10,7 +11,7 @@ import { BadRequestException,
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BookingStatus, CancellationInitiator, NotificationChannel, NotificationType, Prisma, ServiceType, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { PricingService } from '../pricing/pricing.service';
+import { DEFAULT_TRIP_CANCELLATION_POLICY, PricingService } from '../pricing/pricing.service';
 import { PromoCodesService } from '../promo-codes/promo-codes.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
@@ -305,6 +306,7 @@ export class BookingsService {
           cancelledAt: new Date(),
           cancelledBy: CancellationInitiator.CUSTOMER,
           cancellationReason: reason,
+          refundPercentage: refundEligiblePercentage,
         },
       });
       if (claimed.count === 0) {
@@ -314,7 +316,7 @@ export class BookingsService {
       // Les places de ce client sont libérées sur les tronçons qu'il occupait — recalcul plutôt qu'incrément.
       await syncTripSeats(tx, booking.tripId);
       // Annulation sans rien perdre (rien n'avait été payé, ou remboursement intégral) : le code promo est rendu.
-      if (booking.status === BookingStatus.PENDING_PAYMENT || (refundEligiblePercentage ?? 0) >= 100) {
+      if (booking.status === BookingStatus.PENDING_PAYMENT || refundEligiblePercentage >= 100) {
         await this.promoCodes.release({ bookingId: id }, tx);
       }
 
@@ -348,12 +350,14 @@ export class BookingsService {
   private async computeCustomerRefundPercentage(trip: {
     departureAt: Date;
     originCity: { countryId: string };
-  }): Promise<number | null> {
-    const policy = await this.pricing.getCancellationPolicy({
-      serviceType: ServiceType.TRIP,
-      countryId: trip.originCity.countryId,
-    });
-    if (!policy) return null; // aucune politique configurée pour ce pays/service
+  }): Promise<number> {
+    // Aucune politique configurée pour ce pays : on applique la règle par défaut (remboursement intégral jusqu'à 24 h avant le
+    // départ, rien ensuite, comme BlaBlaCar) plutôt que de ne rien rembourser par oubli de configuration.
+    const policy =
+      (await this.pricing.getCancellationPolicy({
+        serviceType: ServiceType.TRIP,
+        countryId: trip.originCity.countryId,
+      })) ?? DEFAULT_TRIP_CANCELLATION_POLICY;
     const hoursUntilDeparture = (trip.departureAt.getTime() - Date.now()) / 3_600_000;
     return hoursUntilDeparture >= policy.hoursBeforeDeparture ? policy.refundPercentage : 0;
   }
@@ -395,6 +399,7 @@ export class BookingsService {
           cancelledAt: new Date(),
           cancelledBy: initiatedBy,
           cancellationReason: reason,
+          refundPercentage: 100,
         },
       });
       if (claimed.count === 0) continue;
@@ -482,6 +487,7 @@ export class BookingsService {
           cancelledAt: new Date(),
           cancelledBy: CancellationInitiator.SYSTEM,
           cancellationReason: reason,
+          refundPercentage: 0,
         },
       });
       if (claimed.count === 0) return false;

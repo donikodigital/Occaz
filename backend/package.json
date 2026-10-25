@@ -32,7 +32,7 @@
     "@nestjs/throttler": "^5.2.0",
     "@prisma/client": "^5.22.0",
     "@sentry/nestjs": "^11.4.0",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "bwip-js": "^4.11.4",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
@@ -43,8 +43,7 @@
     "passport-jwt": "^4.0.1",
     "pdfkit": "^0.20.2",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2",
-    "uuid": "^9.0.1"
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",
@@ -57,7 +56,6 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/pdfkit": "^0.17.6",
     "@types/supertest": "^7.2.1",
-    "@types/uuid": "^9.0.8",
     "jest": "^30.5.1",
     "prisma": "^5.22.0",
     "supertest": "^7.2.2",
@@ -81,5 +79,12 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "overrides": {
+    "body-parser": "1.20.9",
+    "multer": "2.5.0",
+    "js-yaml": "^4.3.2",
+    "lodash": "^4.18.1",
+    "qs": "6.16.1"
   }
 }

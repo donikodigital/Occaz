@@ -49,7 +49,7 @@ function build(options: {
       findUniqueOrThrow: jest.fn().mockResolvedValue(payment),
       update: jest.fn().mockResolvedValue({}),
     },
-    booking: { findUniqueOrThrow: jest.fn().mockResolvedValue(booking) },
+    booking: { findUniqueOrThrow: jest.fn().mockResolvedValue(booking), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     shipment: { findUniqueOrThrow: jest.fn().mockResolvedValue(shipment) },
   };
   const wallets = {

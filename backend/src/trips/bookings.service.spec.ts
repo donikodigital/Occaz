@@ -28,13 +28,12 @@ function hoursFromNow(hours: number): Date {
 describe('BookingsService.computeCustomerRefundPercentage', () => {
   const trip = { originCity: { countryId: 'country-1' } };
 
-  it("renvoie null si aucune politique n'est configurée pour ce pays/service", async () => {
+  it("applique la règle par défaut (100 % jusqu'à 24 h avant) si aucune politique n'est configurée", async () => {
     const service = createService(null);
-    const result = await (service as any).computeCustomerRefundPercentage({
-      ...trip,
-      departureAt: hoursFromNow(48),
-    });
-    expect(result).toBeNull();
+    const early = await (service as any).computeCustomerRefundPercentage({ ...trip, departureAt: hoursFromNow(48) });
+    expect(early).toBe(100);
+    const late = await (service as any).computeCustomerRefundPercentage({ ...trip, departureAt: hoursFromNow(5) });
+    expect(late).toBe(0);
   });
 
   it('renvoie le pourcentage de remboursement complet si annulé largement avant le délai', async () => {

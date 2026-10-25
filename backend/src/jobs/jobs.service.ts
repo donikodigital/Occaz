@@ -1,4 +1,5 @@
 // backend/src/jobs/jobs.service.ts
+// [25/10/2026] v5 — + reprise automatique des remboursements d'annulation en échec.
 // [25/10/2026] v4 — + envoi automatique des retraits programmés, clôture automatique des trajets restés à l'arrivée (client absent / dépose jamais validée).
 // [20/10/2026] v3 — + suppression des comptes suspendus depuis 6 mois (rappels mensuels par e-mail avant).
 // [19/10/2026] v2 — + rappels d'intégration (dossier conducteur tous les 2 jours, adresse e-mail).
@@ -10,6 +11,7 @@ import { BookingExpiryService } from '../trips/booking-expiry.service';
 import { TripExpiryService } from '../trips/trip-expiry.service';
 import { TripReminderService } from '../trips/trip-reminder.service';
 import { TripCompletionService } from '../trips/trip-completion.service';
+import { RefundRecoveryService } from '../payments/refund-recovery.service';
 import { PayoutAutoReleaseService } from '../wallets/payout-auto-release.service';
 import { ShipmentWindowService } from '../shipments/shipment-window.service';
 import { OnboardingReminderService } from '../onboarding-reminders/onboarding-reminder.service';
@@ -35,6 +37,7 @@ export class JobsService {
     private readonly suspendedAccountPurge: SuspendedAccountPurgeService,
     private readonly tripCompletion: TripCompletionService,
     private readonly payoutAutoRelease: PayoutAutoReleaseService,
+    private readonly refundRecovery: RefundRecoveryService,
   ) {}
 
   /** Les traitements, dans l'ordre. Un échec n'empêche jamais les suivants. */
@@ -44,6 +47,7 @@ export class JobsService {
       ['trip-expiry', () => this.tripExpiry.runOnce()],
       ['trip-reminders', () => this.tripReminder.runOnce()],
       ['trip-autoclose', () => this.tripCompletion.runOnce()],
+      ['refund-recovery', () => this.refundRecovery.runOnce()],
       ['payout-auto-release', () => this.payoutAutoRelease.runOnce()],
       ['shipment-window', () => this.shipmentWindow.runOnce()],
       ['onboarding-reminders', () => this.onboardingReminders.runOnce()],

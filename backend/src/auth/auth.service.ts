@@ -14,7 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AccountType, OtpPurpose, OtpStatus, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { UsersService, SafeUser } from '../users/users.service';
@@ -718,7 +718,7 @@ export class AuthService {
     user: User,
     params: { deviceId?: string | null; ipAddress?: string; userAgent?: string },
   ): Promise<AuthResult> {
-    const sessionId = uuidv4();
+    const sessionId = randomUUID();
     const refreshExpiresIn = this.configService.get<string>('jwt.refreshExpiresIn')!;
 
     const tokens = this.signTokenPairRaw(user, sessionId);

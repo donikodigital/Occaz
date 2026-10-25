@@ -1,6 +1,7 @@
 // backend/src/pricing/pricing.service.ts
 // [10/10/2026] v3 — envoi colis par colis : chaque colis a son propre prix (base + poids facturé + distance, × catégorie, + frais de valeur
 // déclarée) ; la majoration d'urgence s'ajoute une seule fois à l'envoi. Sans liste de colis, l'ancien calcul global est inchangé.
+// [25/10/2026] DEFAULT_TRIP_CANCELLATION_POLICY : règle d'annulation par défaut des trajets quand aucune politique n'est configurée.
 // [21/09/2026] v2 — devis d'envoi : poids volumétrique, valeur déclarée, distance routière ; repli sur les villes au lieu d'une distance de 0.
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ServiceType } from '@prisma/client';
@@ -65,6 +66,12 @@ export interface ShipmentQuote {
   /** Majoration d'urgence, comptée une seule fois pour tout l'envoi (0 si l'envoi n'est pas urgent). */
   urgentSurcharge: bigint;
 }
+
+/**
+ * Règle d'annulation appliquée aux trajets quand aucune politique active n'existe pour le pays ni au niveau global : remboursement
+ * intégral jusqu'à 24 h avant l'heure de prise en charge, rien ensuite. Une politique créée dans le back-office la remplace toujours.
+ */
+export const DEFAULT_TRIP_CANCELLATION_POLICY = { hoursBeforeDeparture: 24, refundPercentage: 100 } as const;
 
 @Injectable()
 export class PricingService {

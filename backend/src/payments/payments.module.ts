@@ -1,4 +1,5 @@
 // backend/src/payments/payments.module.ts
+// [25/10/2026] v+ — RefundRecoveryService (reprise automatique des remboursements d'annulation en échec) ; PricingModule pour son interrupteur.
 // [23/09/2026] v+ — ReferralsModule (détection de la première prestation payée d'un filleul).
 import { Module } from '@nestjs/common';
 import { PaymentsController } from './payments.controller';
@@ -13,6 +14,8 @@ import { ShipmentsModule } from '../shipments/shipments.module';
 import { CustomerProfilesModule } from '../profiles/customer-profiles/customer-profiles.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ReferralsModule } from '../referrals/referrals.module';
+import { PricingModule } from '../pricing/pricing.module';
+import { RefundRecoveryService } from './refund-recovery.service';
 
 /**
  * Importe TripsModule et ShipmentsModule (pour confirmer les paiements
@@ -31,9 +34,10 @@ import { ReferralsModule } from '../referrals/referrals.module';
     CustomerProfilesModule,
     NotificationsModule,
     ReferralsModule,
+    PricingModule,
   ],
   controllers: [PaymentsController],
-  providers: [PaymentsService, PaymentProviderRegistry, SimulatedPaymentProvider, ProductionSafetyService],
-  exports: [PaymentsService],
+  providers: [PaymentsService, PaymentProviderRegistry, SimulatedPaymentProvider, ProductionSafetyService, RefundRecoveryService],
+  exports: [PaymentsService, RefundRecoveryService],
 })
 export class PaymentsModule {}

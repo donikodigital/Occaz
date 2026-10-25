@@ -948,6 +948,9 @@ model Booking {
   cancelledAt        DateTime?
   cancelledBy        CancellationInitiator?
   cancellationReason String?
+  // Part du paiement à rendre au client, décidée au moment de l'annulation (null : annulation sans remboursement automatique, ex. litige).
+  // Permet de reprendre un remboursement qui a échoué (RefundRecoveryService) exactement comme prévu.
+  refundPercentage   Float?
 
   passengers         TripPassenger[]
   payment            Payment?
@@ -1077,6 +1080,9 @@ model Shipment {
   cancelledAt        DateTime?
   cancelledBy        CancellationInitiator?
   cancellationReason String?
+  // Part du paiement à rendre au client, décidée au moment de l'annulation (null : annulation sans remboursement automatique, ex. litige).
+  // Permet de reprendre un remboursement qui a échoué (RefundRecoveryService) exactement comme prévu.
+  refundPercentage   Float?
 
   items              ShipmentItem[]
   tracking           ShipmentTracking[]

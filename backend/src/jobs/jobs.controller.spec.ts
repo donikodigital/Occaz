@@ -56,18 +56,19 @@ describe('JobsService.runAll', () => {
   it('un traitement en échec n\'empêche pas les suivants', async () => {
     const ok = { runOnce: jest.fn().mockResolvedValue(undefined) };
     const boom = { runOnce: jest.fn().mockRejectedValue(new Error('boom')) };
-    const service = new JobsService(ok as never, boom as never, ok as never, ok as never, ok as never, ok as never, ok as never, ok as never);
+    const service = new JobsService(ok as never, boom as never, ok as never, ok as never, ok as never, ok as never, ok as never, ok as never, ok as never);
     const results = await service.runAll();
     expect(results.map((r) => [r.job, r.ok])).toEqual([
       ['booking-expiry', true],
       ['trip-expiry', false],
       ['trip-reminders', true],
       ['trip-autoclose', true],
+      ['refund-recovery', true],
       ['payout-auto-release', true],
       ['shipment-window', true],
       ['onboarding-reminders', true],
       ['suspended-account-purge', true],
     ]);
-    expect(ok.runOnce).toHaveBeenCalledTimes(7);
+    expect(ok.runOnce).toHaveBeenCalledTimes(8);
   });
 });

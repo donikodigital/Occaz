@@ -38,6 +38,7 @@ function createService(options: { shipment?: Record<string, unknown>; claimCount
       update: jest.fn().mockResolvedValue({}),
     },
     shipmentTracking: { create: jest.fn().mockResolvedValue({}) },
+    otpCode: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
   };
   const prisma = {
     shipment: { findUnique: jest.fn().mockResolvedValue(options.shipment ?? shipment()) },

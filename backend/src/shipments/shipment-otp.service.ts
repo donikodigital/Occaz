@@ -1,4 +1,5 @@
 // backend/src/shipments/shipment-otp.service.ts
+// [25/10/2026] v6 — transitions d'état conditionnelles (advance) et statut contrôlé avant de consommer un code : un envoi annulé ne peut plus être « récupéré » ni « livré ».
 // [19/10/2026] v5 — Politique SMS : le code de RÉCUPÉRATION n'est plus envoyé par SMS à l'expéditeur (il a un compte) : une notification dans l'application
 // l'envoie vers « Voir mon code ». Le code de LIVRAISON part toujours par SMS vers le destinataire, qui n'a pas besoin de compte.
 // [10/10/2026] v4 — chaque étape visible du suivi (récupéré, en route, livraison imminente, livré) est annoncée par un événement, et la position du trajet est enregistrée dans l'historique.
@@ -68,6 +69,17 @@ export class ShipmentOtpService {
     this.eventEmitter.emit(DOMAIN_EVENTS.SHIPMENT_STATUS_CHANGED, new ShipmentStatusChangedEvent(shipmentId, status));
   }
 
+  /**
+   * Fait passer l'envoi de `from` à `to` SEULEMENT s'il est encore à `from` au moment de l'écriture (mise à jour conditionnelle).
+   * Sans cela, une annulation, une résolution de litige ou un second appel arrivés entre la lecture et l'écriture étaient écrasés :
+   * un envoi annulé et remboursé pouvait repasser « récupéré » puis « livré ».
+   */
+  private async advance(shipmentId: string, from: ShipmentStatus, to: ShipmentStatus, message: string) {
+    const claimed = await this.prisma.shipment.updateMany({ where: { id: shipmentId, status: from }, data: { status: to } });
+    if (claimed.count === 0) throw new BadRequestException(message);
+    return this.prisma.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
+  }
+
   private async currentTripPosition(shipmentId: string) {
     try {
       const shipment = await this.prisma.shipment.findUnique({
@@ -91,10 +103,12 @@ export class ShipmentOtpService {
     if (shipment.status !== ShipmentStatus.DRIVER_ASSIGNED) {
       throw new BadRequestException('Seul un envoi DRIVER_ASSIGNED peut passer en attente de récupération.');
     }
-    const updated = await this.prisma.shipment.update({
-      where: { id: shipmentId },
-      data: { status: ShipmentStatus.PICKUP_PENDING },
-    });
+    const updated = await this.advance(
+      shipmentId,
+      ShipmentStatus.DRIVER_ASSIGNED,
+      ShipmentStatus.PICKUP_PENDING,
+      "L'état de cet envoi a changé : actualisez l'écran.",
+    );
     await this.recordTracking(shipmentId, ShipmentStatus.PICKUP_PENDING);
     return updated;
   }
@@ -105,10 +119,12 @@ export class ShipmentOtpService {
     if (shipment.status !== ShipmentStatus.PICKED_UP) {
       throw new BadRequestException('Seul un envoi PICKED_UP peut passer en transit.');
     }
-    const updated = await this.prisma.shipment.update({
-      where: { id: shipmentId },
-      data: { status: ShipmentStatus.IN_TRANSIT },
-    });
+    const updated = await this.advance(
+      shipmentId,
+      ShipmentStatus.PICKED_UP,
+      ShipmentStatus.IN_TRANSIT,
+      "L'état de cet envoi a changé : actualisez l'écran.",
+    );
     await this.recordTracking(shipmentId, ShipmentStatus.IN_TRANSIT);
     return updated;
   }
@@ -119,10 +135,12 @@ export class ShipmentOtpService {
     if (shipment.status !== ShipmentStatus.IN_TRANSIT) {
       throw new BadRequestException('Seul un envoi IN_TRANSIT peut passer en attente de livraison.');
     }
-    const updated = await this.prisma.shipment.update({
-      where: { id: shipmentId },
-      data: { status: ShipmentStatus.DELIVERY_PENDING },
-    });
+    const updated = await this.advance(
+      shipmentId,
+      ShipmentStatus.IN_TRANSIT,
+      ShipmentStatus.DELIVERY_PENDING,
+      "L'état de cet envoi a changé : actualisez l'écran.",
+    );
     await this.recordTracking(shipmentId, ShipmentStatus.DELIVERY_PENDING);
     return updated;
   }
@@ -190,6 +208,10 @@ export class ShipmentOtpService {
   async verifyPickupOtp(shipmentId: string, driverId: string, code: string) {
     const shipment = await this.getShipmentWithContext(shipmentId);
     this.assertDriverOwnsShipment(shipment, driverId);
+    // Contrôle AVANT de consommer le code : un envoi annulé, en litige ou déjà récupéré ne peut plus être validé avec un code encore valable.
+    if (shipment.status !== ShipmentStatus.PICKUP_PENDING) {
+      throw new BadRequestException("Cet envoi n'est plus en attente de récupération : actualisez l'écran.");
+    }
 
     await this.otpService.verify({ purpose: OtpPurpose.SHIPMENT_PICKUP, shipmentId, code });
     return this.markPickedUp(shipmentId);
@@ -211,10 +233,12 @@ export class ShipmentOtpService {
   }
 
   private async markPickedUp(shipmentId: string) {
-    const updated = await this.prisma.shipment.update({
-      where: { id: shipmentId },
-      data: { status: ShipmentStatus.PICKED_UP },
-    });
+    const updated = await this.advance(
+      shipmentId,
+      ShipmentStatus.PICKUP_PENDING,
+      ShipmentStatus.PICKED_UP,
+      "Cet envoi n'est plus en attente de récupération : actualisez l'écran.",
+    );
     await this.recordTracking(shipmentId, ShipmentStatus.PICKED_UP);
     return updated;
   }
@@ -270,6 +294,9 @@ export class ShipmentOtpService {
   async verifyDeliveryOtp(shipmentId: string, driverId: string, code: string) {
     const shipment = await this.getShipmentWithContext(shipmentId);
     this.assertDriverOwnsShipment(shipment, driverId);
+    if (shipment.status !== ShipmentStatus.DELIVERY_PENDING) {
+      throw new BadRequestException("Cet envoi n'est plus en attente de livraison : actualisez l'écran.");
+    }
 
     await this.otpService.verify({ purpose: OtpPurpose.SHIPMENT_DELIVERY, shipmentId, code });
     return this.markDelivered(shipment);
@@ -294,16 +321,22 @@ export class ShipmentOtpService {
   private async markDelivered(
     shipment: Awaited<ReturnType<ShipmentOtpService['getShipmentWithContext']>>,
   ) {
-    await this.prisma.shipment.update({
-      where: { id: shipment.id },
-      data: { status: ShipmentStatus.DELIVERED },
-    });
+    // La première étape « réclame » la livraison : un second appel (conducteur et support en même temps) s'arrête ici et ne
+    // libère pas les fonds ni ne compte la livraison une deuxième fois.
+    await this.advance(
+      shipment.id,
+      ShipmentStatus.DELIVERY_PENDING,
+      ShipmentStatus.DELIVERED,
+      "Cet envoi n'est plus en attente de livraison : actualisez l'écran.",
+    );
     await this.recordTracking(shipment.id, ShipmentStatus.DELIVERED);
 
-    const completed = await this.prisma.shipment.update({
-      where: { id: shipment.id },
-      data: { status: ShipmentStatus.COMPLETED },
-    });
+    const completed = await this.advance(
+      shipment.id,
+      ShipmentStatus.DELIVERED,
+      ShipmentStatus.COMPLETED,
+      "Cet envoi n'est plus en attente de livraison : actualisez l'écran.",
+    );
     await this.recordTracking(shipment.id, ShipmentStatus.COMPLETED);
 
     const driverId = shipment.driverId ?? shipment.trip?.driverId;

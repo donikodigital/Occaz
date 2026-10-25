@@ -1,4 +1,5 @@
 // backend/src/payments/payments.service.ts
+// [25/10/2026] v3 — settleCancelledBooking / settleCancelledShipment (réutilisés par la reprise automatique RefundRecoveryService) ; paiement tardif : pourcentage noté.
 // [21/09/2026] v2 — retenue via Shipment.driverId ; commission déduite une seule fois du montant unique payé (fin du double prélèvement).
 import {
   BadRequestException,
@@ -293,6 +294,8 @@ export class PaymentsService {
         // Paiement arrivé après l'annulation / l'expiration de la réservation (mobile money asynchrone) : la place
         // n'est plus réservée. On rembourse intégralement le client et on ne crédite pas le conducteur.
         this.logger.warn(`Paiement reçu pour la réservation ${booking.id} déjà annulée — remboursement intégral.`);
+        // On note la décision (100 %) pour que la reprise automatique finisse le travail si le prestataire échoue maintenant.
+        await this.prisma.booking.updateMany({ where: { id: booking.id, status: BookingStatus.CANCELLED }, data: { refundPercentage: 100 } });
         await this.refundBooking(booking.id, 100);
         return;
       }
@@ -387,53 +390,67 @@ export class PaymentsService {
   @OnEvent(DOMAIN_EVENTS.BOOKING_CANCELLED)
   async handleBookingCancelled(event: BookingCancelledEvent): Promise<void> {
     try {
-      const booking = await this.prisma.booking.findUnique({
-        where: { id: event.bookingId },
-        include: { trip: true },
-      });
-      if (!booking) return;
-
-      const percentage = event.refundEligiblePercentage ?? 0;
-      await this.refundBooking(event.bookingId, percentage);
-      if (percentage >= 100) {
-        // Remboursement intégral : le conducteur ne touche rien (idempotent, refundBooking l'a déjà fait dans la plupart des cas).
-        await this.wallets.reverseHeldFunds({
-          driverId: booking.trip.driverId,
-          bookingId: event.bookingId,
-          reason: event.reason,
-        });
-      } else {
-        // Annulation tardive du client (remboursement partiel ou nul) : comme sur BlaBlaCar, le conducteur qui avait réservé sa
-        // place garde la part non remboursée. La part rendue au client a déjà été retirée de ses fonds (refundBooking) ; le reste
-        // est libéré dans son solde disponible. Sans paiement capturé, il n'y a rien en attente et rien n'est versé.
-        await this.wallets.releaseHeldFunds({ driverId: booking.trip.driverId, bookingId: event.bookingId });
-      }
+      await this.settleCancelledBooking(event.bookingId, event.refundEligiblePercentage ?? 0, event.reason);
     } catch (error) {
-      // Une réservation annulée ne doit jamais rester bloquée parce que
-      // le remboursement a échoué : l'erreur est journalisée pour reprise
-      // manuelle (support) plutôt que de remonter dans le flux d'annulation.
+      // Une réservation annulée ne doit jamais rester bloquée parce que le remboursement a échoué : l'erreur est journalisée et
+      // RefundRecoveryService reprend l'opération quelques minutes plus tard (puis alerte le support si elle persiste).
       this.logger.error(`Échec du remboursement pour la réservation ${event.bookingId}`, error as Error);
+    }
+  }
+
+  /**
+   * Suites financières d'une réservation annulée : remboursement du client, puis sort des fonds du conducteur. Chaque étape est
+   * rejouable sans danger (remboursement plafonné et réclamé en base, libération des fonds seulement sur les lignes encore en attente).
+   * `skipRefund` : la reprise automatique ne rembourse pas une seconde fois un paiement déjà (partiellement) remboursé, elle termine
+   * seulement le sort des fonds du conducteur.
+   * Lève l'erreur si une étape échoue.
+   */
+  async settleCancelledBooking(
+    bookingId: string,
+    percentage: number,
+    reason: string,
+    options: { skipRefund?: boolean } = {},
+  ): Promise<void> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { trip: true },
+    });
+    if (!booking) return;
+
+    if (!options.skipRefund) await this.refundBooking(bookingId, percentage);
+    if (percentage >= 100) {
+      // Remboursement intégral : le conducteur ne touche rien (idempotent, refundBooking l'a déjà fait dans la plupart des cas).
+      await this.wallets.reverseHeldFunds({ driverId: booking.trip.driverId, bookingId, reason });
+    } else {
+      // Annulation tardive du client (remboursement partiel ou nul) : comme sur BlaBlaCar, le conducteur qui avait réservé sa
+      // place garde la part non remboursée. La part rendue au client a déjà été retirée de ses fonds (refundBooking) ; le reste
+      // est libéré dans son solde disponible. Sans paiement capturé, il n'y a rien en attente et rien n'est versé.
+      await this.wallets.releaseHeldFunds({ driverId: booking.trip.driverId, bookingId });
     }
   }
 
   @OnEvent(DOMAIN_EVENTS.SHIPMENT_CANCELLED)
   async handleShipmentCancelled(event: ShipmentCancelledEvent): Promise<void> {
     try {
-      const shipment = await this.prisma.shipment.findUnique({
-        where: { id: event.shipmentId },
-      });
-      if (!shipment) return;
-
-      await this.refundShipment(event.shipmentId, event.refundEligiblePercentage ?? 0);
-      if (shipment.driverId) {
-        await this.wallets.reverseHeldFunds({
-          driverId: shipment.driverId,
-          shipmentId: event.shipmentId,
-          reason: event.reason,
-        });
-      }
+      await this.settleCancelledShipment(event.shipmentId, event.refundEligiblePercentage ?? 0, event.reason);
     } catch (error) {
       this.logger.error(`Échec du remboursement pour l'envoi ${event.shipmentId}`, error as Error);
+    }
+  }
+
+  /** Équivalent de settleCancelledBooking pour un envoi annulé (voir ce commentaire). Lève l'erreur si une étape échoue. */
+  async settleCancelledShipment(
+    shipmentId: string,
+    percentage: number,
+    reason: string,
+    options: { skipRefund?: boolean } = {},
+  ): Promise<void> {
+    const shipment = await this.prisma.shipment.findUnique({ where: { id: shipmentId } });
+    if (!shipment) return;
+
+    if (!options.skipRefund) await this.refundShipment(shipmentId, percentage);
+    if (shipment.driverId) {
+      await this.wallets.reverseHeldFunds({ driverId: shipment.driverId, shipmentId, reason });
     }
   }
 

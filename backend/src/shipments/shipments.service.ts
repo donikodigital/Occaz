@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.service.ts
+// [25/10/2026] v+ — annulation : les codes de remise / de livraison encore valables sont invalidés ; le pourcentage remboursé est enregistré (reprise des remboursements).
 // [25/10/2026] v+ — uploadEvidence : la clé de stockage doit avoir été fabriquée pour la personne qui envoie la preuve.
 // [10/10/2026] v6 — saisie colis par colis : `parcels` (poids, dimensions, valeur de chacun) ; le serveur en tire quantité, poids total et
 // valeur déclarée totale, calcule le prix de chaque colis (devis : `parcels`, `urgentSurcharge`) et enregistre chaque colis (ShipmentItem).
@@ -23,6 +24,7 @@ import {
   DriverAccountStatus,
   NotificationChannel,
   NotificationType,
+  OtpStatus,
   Prisma,
   ServiceType,
   ShipmentStatus,
@@ -768,6 +770,7 @@ export class ShipmentsService {
           cancelledAt: new Date(),
           cancelledBy: CancellationInitiator.SYSTEM,
           cancellationReason: reason,
+          refundPercentage: FULL_REFUND_PERCENTAGE,
         },
       });
       if (claimed.count === 0) return false;
@@ -804,6 +807,7 @@ export class ShipmentsService {
           cancelledAt: new Date(),
           cancelledBy: CancellationInitiator.SYSTEM,
           cancellationReason: reason,
+          refundPercentage: FULL_REFUND_PERCENTAGE,
         },
       });
       if (claimed.count === 0) return false;
@@ -885,6 +889,7 @@ export class ShipmentsService {
           cancelledAt: new Date(),
           cancelledBy,
           cancellationReason: reason,
+          refundPercentage: FULL_REFUND_PERCENTAGE,
         },
       });
       if (claimed.count === 0) {
@@ -906,6 +911,8 @@ export class ShipmentsService {
       });
       // Remboursement intégral : le code promo consommé est rendu au client.
       await this.promoCodes.release({ shipmentId: id }, tx);
+      // Les codes de remise / de livraison encore valables ne servent plus à rien : un envoi annulé ne doit plus pouvoir être « récupéré ».
+      await tx.otpCode.updateMany({ where: { shipmentId: id, status: OtpStatus.PENDING }, data: { status: OtpStatus.EXPIRED } });
 
       return tx.shipment.findUniqueOrThrow({ where: { id } });
     });

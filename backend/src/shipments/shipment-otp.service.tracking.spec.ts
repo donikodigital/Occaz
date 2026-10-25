@@ -8,7 +8,8 @@ function build(shipmentRow: Record<string, unknown>, trip: Record<string, unknow
   const prisma = {
     shipment: {
       findUnique: jest.fn().mockImplementation(async (args: { select?: unknown }) => (args.select ? { trip } : shipmentRow)),
-      update: jest.fn().mockResolvedValue({ id: 's1' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 's1' }),
     },
     shipmentTracking: { create: jest.fn().mockResolvedValue({}) },
     customerProfile: { findUnique: jest.fn().mockResolvedValue({ userId: 'u1' }) },
