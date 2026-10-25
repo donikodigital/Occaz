@@ -1,4 +1,6 @@
 // backend/src/trips/trips.service.ts
+// [25/10/2026] v+ — recherche, détail et trajets proches : le conducteur n'est plus renvoyé en entier (date de naissance, numéro Mobile Money…) mais
+// avec les seuls champs publics (PUBLIC_DRIVER_SELECT).
 // [19/10/2026] v+ — create() et publish() vérifient la régularisation du dossier conducteur (DriverComplianceService, délai de tolérance).
 // [10/10/2026] v+ — markArrivedAtStop annonce le passage dans la ville (suivi des colis).
 // [03/10/2026] v+ — Étapes (villes traversées) : un trajet Conakry → Labé peut desservir Kindia, Mamou… Chaque étape a
@@ -57,6 +59,7 @@ import {
 import { TripRoutePlanner, loadRouteSettings } from './trip-route.planner';
 import { freeSeatsOnSegment, seatsByLeg, seatsOccupiedByLeg, type SeatHoldInput } from './trip-seats';
 import { SEAT_HOLDING_STATUSES, SEAT_HOLD_SELECT } from './trip-seats.db';
+import { PUBLIC_DRIVER_SELECT } from '../common/selects/public-profiles';
 
 const DEFAULT_SEARCH_RADIUS_KM = 5;
 /** Nombre maximal de trajets examinés par une recherche par villes (le tri exact par tronçon se fait ensuite en mémoire). */
@@ -120,7 +123,7 @@ export class TripsService {
     const trip = await this.prisma.trip.findUnique({
       where: { id },
       include: {
-        driver: true,
+        driver: { select: PUBLIC_DRIVER_SELECT },
         vehicle: true,
         // Villes avec leur pays : l'app affiche « Kindia, Guinée » sous chaque adresse.
         originCity: { include: { country: true } },
@@ -804,7 +807,7 @@ export class TripsService {
         skip: query.skip,
         take: query.take,
         orderBy: { departureAt: 'desc' },
-        include: { driver: true, originCity: true, destinationCity: true, currency: CURRENCY_SELECT },
+        include: { driver: { select: PUBLIC_DRIVER_SELECT }, originCity: true, destinationCity: true, currency: CURRENCY_SELECT },
       }),
       this.prisma.trip.count({ where }),
     ]);
@@ -1092,7 +1095,7 @@ export class TripsService {
       orderBy: { departureAt: 'asc' },
       take: SEARCH_CANDIDATE_LIMIT,
       include: {
-        driver: true,
+        driver: { select: PUBLIC_DRIVER_SELECT },
         vehicle: true,
         originCity: true,
         destinationCity: true,
@@ -1162,7 +1165,7 @@ export class TripsService {
     const trips = await this.prisma.trip.findMany({
       where: { id: { in: tripIds.map((row) => row.id) } },
       orderBy: { departureAt: 'asc' },
-      include: { driver: true, vehicle: true, originCity: true, destinationCity: true, currency: CURRENCY_SELECT },
+      include: { driver: { select: PUBLIC_DRIVER_SELECT }, vehicle: true, originCity: true, destinationCity: true, currency: CURRENCY_SELECT },
     });
 
     // Le compte total exact en mode géospatial demanderait une seconde

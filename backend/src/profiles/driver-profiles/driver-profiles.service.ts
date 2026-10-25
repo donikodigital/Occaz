@@ -1,4 +1,6 @@
 // backend/src/profiles/driver-profiles/driver-profiles.service.ts
+// [25/10/2026] v+ — la clé de stockage confirmée (photo, document) doit avoir été fabriquée pour CE conducteur ; photoUrl n'est accepté que s'il pointe vers
+// notre stockage public (storage-key.util).
 // [20/10/2026] v+ — suspend() enregistre le début de la suspension (User.suspendedAt), reactivate() l'efface (voir common/utils/suspension.ts).
 // [19/10/2026] v+ — createForUser accepte aussi un compte client (compte à deux profils).
 import {
@@ -15,6 +17,7 @@ import { DOCUMENT_TYPES } from '../../documents/constants/document-types.constan
 import { CreateDocumentDto } from '../../documents/dto/create-document.dto';
 import { StorageService } from '../../storage/storage.service';
 import { RequestUploadUrlDto, extensionForContentType } from '../../storage/dto/request-upload-url.dto';
+import { assertStorageKeyOwnedBy, ownPublicPhotoUrl } from '../../storage/storage-key.util';
 import { ConfirmPhotoDto } from './dto/confirm-photo.dto';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
@@ -119,7 +122,7 @@ export class DriverProfilesService {
           userId,
           firstName: dto.firstName,
           lastName: dto.lastName,
-          photoUrl: dto.photoUrl,
+          photoUrl: ownPublicPhotoUrl(dto.photoUrl),
           countryId: dto.countryId,
           cityId: dto.cityId,
           dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
@@ -185,7 +188,7 @@ export class DriverProfilesService {
         data: {
           firstName: dto.firstName,
           lastName: dto.lastName,
-          photoUrl: dto.photoUrl,
+          photoUrl: ownPublicPhotoUrl(dto.photoUrl),
           dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
           mobileMoneyNumber: dto.mobileMoneyNumber,
         },
@@ -429,6 +432,7 @@ export class DriverProfilesService {
    */
   async confirmPhotoForUser(userId: string, dto: ConfirmPhotoDto) {
     const driverId = await this.getProfileIdForUser(userId);
+    assertStorageKeyOwnedBy(dto.storageKey, [{ folder: 'driver-avatar', ownerId: driverId }]);
     const photoUrl = await this.storageService.createDownloadUrl(dto.storageKey, { public: true });
     return this.prisma.driverProfile.update({
       where: { id: driverId },
@@ -438,6 +442,7 @@ export class DriverProfilesService {
 
   async uploadDocumentForUser(userId: string, dto: CreateDocumentDto) {
     const driverId = await this.getProfileIdForUser(userId);
+    assertStorageKeyOwnedBy(dto.storageKey, [{ folder: 'driver', ownerId: driverId }]);
     const document = await this.documentsService.create(DocumentOwnerType.DRIVER, driverId, dto);
     await this.alertStaff('document.verify', 'Document à vérifier', 'Un conducteur a envoyé un document à contrôler.', '/drivers');
     return document;

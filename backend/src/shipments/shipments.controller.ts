@@ -204,7 +204,7 @@ export class ShipmentsController {
   @Post(':id/documents')
   async uploadEvidence(@Param('id') id: string, @Body() dto: CreateDocumentDto, @CurrentUser() user: AuthenticatedUser) {
     await this.access.assertCanAccessEvidence(user, id, 'write');
-    return this.shipmentsService.uploadEvidence(id, dto);
+    return this.shipmentsService.uploadEvidence(id, dto, user.id);
   }
 
   @Get(':id/documents')

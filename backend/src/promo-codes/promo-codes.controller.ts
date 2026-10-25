@@ -9,6 +9,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CustomerProfilesService } from '../profiles/customer-profiles/customer-profiles.service';
 import { PromoCodesService } from './promo-codes.service';
 import { UpsertPromoCodeDto } from './dto/upsert-promo-code.dto';
+import { UpdatePromoCodeDto } from './dto/update-promo-code.dto';
 import { ValidatePromoCodeDto } from './dto/validate-promo-code.dto';
 import { LookupPromoCodeDto } from './dto/lookup-promo-code.dto';
 
@@ -56,7 +57,7 @@ export class PromoCodesController {
 
   @Permissions(PERMISSIONS.PROMOTION_MANAGE)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: Partial<UpsertPromoCodeDto>) {
+  update(@Param('id') id: string, @Body() dto: UpdatePromoCodeDto) {
     return this.promoCodesService.update(id, dto);
   }
 

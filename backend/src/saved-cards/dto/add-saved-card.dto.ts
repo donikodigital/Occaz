@@ -6,7 +6,7 @@
 // intégré côté mobile (le paiement de l'app repose sur le mobile money) —
 // ce service est prêt à le recevoir dès que cette intégration existera.
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 
 export class AddSavedCardDto {
   @ApiProperty()
@@ -24,6 +24,7 @@ export class AddSavedCardDto {
 
   @ApiProperty({ description: '4 derniers chiffres uniquement' })
   @IsString()
+  @Matches(/^\d{4}$/, { message: 'last4 doit contenir exactement 4 chiffres.' })
   last4: string;
 
   @ApiProperty()

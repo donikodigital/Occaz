@@ -1,4 +1,5 @@
 // backend/src/user-safety/user-safety.controllers.ts
+// [25/10/2026] v4 — PATCH /reports/:id et PATCH /sos/:id respectent la portée par pays (404 hors périmètre).
 // [23/10/2026] v3 — listes /reports et /sos : filtres via ListUserReportsQueryDto / ListSosQueryDto (le filtre de statut faisait échouer la requête en 400).
 // [16/10/2026] v2 — POST /reports/:id/remind : message de rappel du service client.
 // [11/10/2026] v1 — routes de la sécurité : /blocks, /reports, /emergency-contacts, /sos. Les routes d'administration (support) demandent une
@@ -91,7 +92,8 @@ export class UserReportsController {
 
   @Permissions(PERMISSIONS.USER_REPORT_MANAGE)
   @Patch(':id')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserReportDto, @CurrentUser() user: AuthenticatedUser) {
+  async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserReportDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertUser(user, PERMISSIONS.USER_REPORT_MANAGE, await this.reports.reportedUserIdOf(id));
     return this.reports.update(id, dto, user.id);
   }
 }
@@ -163,7 +165,8 @@ export class SosController {
 
   @Permissions(PERMISSIONS.SOS_MANAGE)
   @Patch(':id')
-  handle(@Param('id', ParseUUIDPipe) id: string, @Body() dto: HandleSosDto, @CurrentUser() user: AuthenticatedUser) {
+  async handle(@Param('id', ParseUUIDPipe) id: string, @Body() dto: HandleSosDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.scope.assertUser(user, PERMISSIONS.SOS_MANAGE, await this.sos.userIdOf(id));
     return this.sos.handle(id, dto, user.id);
   }
 }

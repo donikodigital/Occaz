@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { UpsertPromoCodeDto } from './dto/upsert-promo-code.dto';
+import { UpdatePromoCodeDto } from './dto/update-promo-code.dto';
 import { ValidatePromoCodeDto } from './dto/validate-promo-code.dto';
 import { LookupPromoCodeDto } from './dto/lookup-promo-code.dto';
 
@@ -55,7 +56,7 @@ export class PromoCodesService {
     });
   }
 
-  async update(id: string, dto: Partial<UpsertPromoCodeDto>) {
+  async update(id: string, dto: UpdatePromoCodeDto) {
     await this.findOne(id);
     return this.prisma.promoCode.update({
       where: { id },

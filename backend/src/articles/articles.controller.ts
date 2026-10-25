@@ -1,4 +1,5 @@
 // backend/src/articles/articles.controller.ts
+// [25/10/2026] v+ — GET /articles/:id ne renvoie un brouillon / une actualité désactivée qu'à la gestion des promotions ; PATCH validé (UpdateArticleDto).
 // [23/10/2026] v+ — actualités publiées : le filtre pays passe par ListPublishedArticlesQueryDto (il faisait échouer la requête en 400).
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -6,8 +7,11 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { ListPublishedArticlesQueryDto } from './dto/list-published-articles-query.dto';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { ArticlesService } from './articles.service';
 import { UpsertArticleDto } from './dto/upsert-article.dto';
+import { UpdateArticleDto } from './dto/update-article.dto';
 
 @ApiTags('Actualités')
 @ApiBearerAuth()
@@ -27,8 +31,9 @@ export class ArticlesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.articlesService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const canSeeDrafts = user.permissions.includes(PERMISSIONS.PROMOTION_MANAGE);
+    return canSeeDrafts ? this.articlesService.findOne(id) : this.articlesService.findOnePublished(id);
   }
 
   @Permissions(PERMISSIONS.PROMOTION_MANAGE)
@@ -39,7 +44,7 @@ export class ArticlesController {
 
   @Permissions(PERMISSIONS.PROMOTION_MANAGE)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: Partial<UpsertArticleDto>) {
+  update(@Param('id') id: string, @Body() dto: UpdateArticleDto) {
     return this.articlesService.update(id, dto);
   }
 

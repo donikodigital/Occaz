@@ -119,7 +119,10 @@ export class PaymentsController {
       shipmentId: string | null;
     };
 
-    if (!user.permissions.includes(PERMISSIONS.PAYMENT_READ)) {
+    if (user.permissions.includes(PERMISSIONS.PAYMENT_READ)) {
+      // Personnel : seulement les paiements de son périmètre (pays), 404 sinon.
+      await this.scope.assertPayment(user, PERMISSIONS.PAYMENT_READ, id);
+    } else {
       const customer = await this.customerProfilesService.findByUserId(user.id).catch(() => null);
       const isOwner = customer
         ? await this.paymentsService.isOwnedByCustomer(payment, customer.id)
@@ -127,6 +130,9 @@ export class PaymentsController {
       if (!isOwner) {
         throw new ForbiddenException('Ce paiement ne vous appartient pas.');
       }
+      // Le client ne voit pas les données brutes du prestataire (rawPayload).
+      const { transactions, ...rest } = payment as unknown as { transactions?: { rawPayload?: unknown }[] };
+      return { ...rest, transactions: (transactions ?? []).map(({ rawPayload: _raw, ...tx }) => tx) };
     }
     return payment;
   }

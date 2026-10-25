@@ -1,4 +1,6 @@
 // backend/src/payment-providers/payment-providers.controller.ts
+// [25/10/2026] v2 — `config` (réglages techniques du prestataire) n'est renvoyé qu'à la gestion des moyens de paiement : la liste publique
+// /active et GET /:id n'exposent plus que les champs d'affichage.
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PaymentProviderType } from '@prisma/client';
@@ -10,6 +12,12 @@ import { PaymentProvidersService } from './payment-providers.service';
 import { CreatePaymentProviderDto } from './dto/create-payment-provider.dto';
 import { UpdatePaymentProviderDto } from './dto/update-payment-provider.dto';
 
+/** Retire les réglages techniques du prestataire d'une ligne avant de l'envoyer à un utilisateur sans droit de gestion. */
+export function withoutConfig<T extends { config?: unknown }>(provider: T): Omit<T, 'config'> {
+  const { config: _config, ...rest } = provider;
+  return rest;
+}
+
 @ApiTags('Paiement — Moyens de paiement')
 @ApiBearerAuth()
 @Controller('payment-providers')
@@ -17,11 +25,12 @@ export class PaymentProvidersController {
   constructor(private readonly paymentProvidersService: PaymentProvidersService) {}
 
   @Get('active')
-  findAllActive(
+  async findAllActive(
     @Query('countryId') countryId?: string,
     @Query('type') type?: PaymentProviderType,
   ) {
-    return this.paymentProvidersService.findAllActiveForCountry(countryId, type);
+    const providers = await this.paymentProvidersService.findAllActiveForCountry(countryId, type);
+    return providers.map(withoutConfig);
   }
 
   @Permissions(PERMISSIONS.PAYMENT_PROVIDER_MANAGE)
@@ -31,8 +40,9 @@ export class PaymentProvidersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.paymentProvidersService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const provider = await this.paymentProvidersService.findOne(id);
+    return user.permissions.includes(PERMISSIONS.PAYMENT_PROVIDER_MANAGE) ? provider : withoutConfig(provider);
   }
 
   @Permissions(PERMISSIONS.PAYMENT_PROVIDER_MANAGE)

@@ -192,6 +192,13 @@ export class SosService {
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 
+  /** Personne qui a déclenché l'alerte (sert à vérifier la portée par pays avant de la traiter). */
+  async userIdOf(id: string): Promise<string> {
+    const alert = await this.prisma.sosAlert.findUnique({ where: { id }, select: { userId: true } });
+    if (!alert) throw new NotFoundException('Alerte introuvable.');
+    return alert.userId;
+  }
+
   async handle(id: string, dto: HandleSosDto, actorId: string) {
     const existing = await this.prisma.sosAlert.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Alerte introuvable.');

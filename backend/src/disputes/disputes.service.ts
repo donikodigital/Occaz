@@ -1,4 +1,5 @@
 // backend/src/disputes/disputes.service.ts
+// [25/10/2026] v+ — addEvidence : la clé de stockage doit avoir été fabriquée pour la personne qui envoie la preuve.
 // [21/09/2026] v2 — parties d'un envoi identifiées via Shipment.driverId.
 import {
   BadRequestException,
@@ -310,8 +311,9 @@ export class DisputesService {
     );
   }
 
-  async addEvidence(disputeId: string, dto: AddDisputeEvidenceDto) {
+  async addEvidence(disputeId: string, dto: AddDisputeEvidenceDto, userId: string) {
     await this.findOne(disputeId);
+    await this.documentsService.assertEvidenceKey(userId, dto.storageKey);
     const document = await this.documentsService.create(DocumentOwnerType.DISPUTE, disputeId, {
       type: dto.type,
       storageKey: dto.storageKey,

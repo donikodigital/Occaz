@@ -1,4 +1,5 @@
 // backend/src/profiles/customer-profiles/customer-profiles.service.ts
+// [25/10/2026] v+ — la clé de la photo confirmée doit avoir été fabriquée pour CE client ; photoUrl n'est accepté que s'il pointe vers notre stockage public.
 // [19/10/2026] v5 — createForUser accepte aussi un compte conducteur (compte à deux profils).
 // [10/10/2026] v4 — updateForUser accepte l'email (qui vit sur User, pas sur CustomerProfile), comme DriverProfilesService.updateForUser :
 // mise à jour de User.email dans la même transaction (409 si l'adresse est déjà utilisée), champs du profil listés explicitement
@@ -25,6 +26,7 @@ import { PaginatedResult } from '../../common/dto/pagination-response.dto';
 import { CreateCustomerProfileDto } from './dto/create-customer-profile.dto';
 import { UpdateCustomerProfileDto } from './dto/update-customer-profile.dto';
 import { ConfirmPhotoDto } from './dto/confirm-photo.dto';
+import { assertStorageKeyOwnedBy, ownPublicPhotoUrl } from '../../storage/storage-key.util';
 
 @Injectable()
 export class CustomerProfilesService {
@@ -104,7 +106,7 @@ export class CustomerProfilesService {
           userId,
           firstName: dto.firstName,
           lastName: dto.lastName,
-          photoUrl: dto.photoUrl,
+          photoUrl: ownPublicPhotoUrl(dto.photoUrl),
           countryId: dto.countryId,
           cityId: dto.cityId,
           address: dto.address,
@@ -144,7 +146,7 @@ export class CustomerProfilesService {
         data: {
           firstName: dto.firstName,
           lastName: dto.lastName,
-          photoUrl: dto.photoUrl,
+          photoUrl: ownPublicPhotoUrl(dto.photoUrl),
           countryId: dto.countryId,
           cityId: dto.cityId,
           address: dto.address,
@@ -170,6 +172,7 @@ export class CustomerProfilesService {
   /** `{ public: true }` — même choix que côté conducteur (voir StorageService.createDownloadUrl) : une photo de profil doit rester affichable durablement, pas seulement 5 minutes. */
   async confirmPhotoForUser(userId: string, dto: ConfirmPhotoDto) {
     const customerId = await this.getProfileIdForUser(userId);
+    assertStorageKeyOwnedBy(dto.storageKey, [{ folder: 'customer-avatar', ownerId: customerId }]);
     const photoUrl = await this.storageService.createDownloadUrl(dto.storageKey, { public: true });
     return this.prisma.customerProfile.update({ where: { id: customerId }, data: { photoUrl } });
   }

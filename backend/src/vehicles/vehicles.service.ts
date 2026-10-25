@@ -1,4 +1,5 @@
 // backend/src/vehicles/vehicles.service.ts
+// [25/10/2026] v+ — la clé de stockage d'un document de véhicule doit avoir été fabriquée pour CE véhicule.
 import {
   ForbiddenException,
   Injectable,
@@ -16,6 +17,7 @@ import { CreateDocumentDto } from '../documents/dto/create-document.dto';
 import { StorageService } from '../storage/storage.service';
 import { RequestUploadUrlDto, extensionForContentType } from '../storage/dto/request-upload-url.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { assertStorageKeyOwnedBy } from '../storage/storage-key.util';
 
 @Injectable()
 export class VehiclesService {
@@ -168,6 +170,7 @@ export class VehiclesService {
 
   async uploadDocument(vehicleId: string, driverId: string, dto: CreateDocumentDto) {
     await this.assertOwnership(vehicleId, driverId);
+    assertStorageKeyOwnedBy(dto.storageKey, [{ folder: 'vehicle', ownerId: vehicleId }]);
     const document = await this.documentsService.create(DocumentOwnerType.VEHICLE, vehicleId, dto);
     // Cloche du back-office : un document de véhicule attend son contrôle (une alerte manquée ne fait jamais échouer l'envoi).
     try {

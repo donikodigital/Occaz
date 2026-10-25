@@ -1,4 +1,5 @@
 // backend/src/disputes/disputes.controller.ts
+// [25/10/2026] v+ — addEvidence reçoit l'utilisateur (contrôle de la clé de stockage).
 // [23/10/2026] v+ — liste : les filtres statut/priorité/agent passent par ListDisputesQueryDto (ils faisaient échouer la requête en 400).
 // [16/10/2026] v+ — libérer d'office l'argent d'un conducteur (DRIVER_PAYOUT) exige aussi `payout.manage` : le service client valide un code ou
 // suspend un compte, il ne déplace pas de fonds. Le SuperAdmin et la finance passent toujours.
@@ -74,7 +75,7 @@ export class DisputesController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     await this.disputesService.assertCanAccess(id, user.id, await this.scope.hasDisputeAccess(user, id));
-    return this.disputesService.addEvidence(id, dto);
+    return this.disputesService.addEvidence(id, dto, user.id);
   }
 
   @Permissions(PERMISSIONS.DISPUTE_ASSIGN)

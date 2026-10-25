@@ -1,4 +1,6 @@
 // backend/src/trips/bookings.service.ts
+// [25/10/2026] v+ — le conducteur d'une réservation n'est plus renvoyé en entier (PUBLIC_DRIVER_SELECT) et le client, vu par le conducteur, se limite
+// à PUBLIC_CUSTOMER_SELECT (plus d'adresse ni de date de naissance).
 import { BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -19,6 +21,7 @@ import { SEGMENT_FAILURE_MESSAGES, buildRoute, resolveSegment } from './trip-rou
 import { loadRouteSettings } from './trip-route.planner';
 import { freeSeatsOnSegment, seatsOccupiedByLeg } from './trip-seats';
 import { loadSeatHolds, lockTrip, syncTripSeats } from './trip-seats.db';
+import { PUBLIC_CUSTOMER_SELECT, PUBLIC_DRIVER_SELECT } from '../common/selects/public-profiles';
 
 /**
  * Relations de Trip attendues côté mobile pour toute réponse contenant
@@ -32,7 +35,7 @@ import { loadSeatHolds, lockTrip, syncTripSeats } from './trip-seats.db';
 const TRIP_INCLUDE_FOR_BOOKING = {
   originCity: true,
   destinationCity: true,
-  driver: true,
+  driver: { select: PUBLIC_DRIVER_SELECT },
   vehicle: true,
   // Devise du trajet (= celle de la réservation) : les montants de la réservation s'affichent dans cette devise.
   currency: { select: { id: true, isoCode: true, symbol: true } },
@@ -53,7 +56,7 @@ const SEGMENT_STOPS_INCLUDE = {
 
 const TRIP_INCLUDE_WITH_DRIVER_PHONE = {
   ...TRIP_INCLUDE_FOR_BOOKING,
-  driver: { include: { user: { select: { phone: true } } } },
+  driver: { select: { ...PUBLIC_DRIVER_SELECT, user: { select: { phone: true } } } },
 } as const;
 
 /**
@@ -103,7 +106,7 @@ export class BookingsService {
       include: {
         trip: { include: TRIP_INCLUDE_WITH_DRIVER_PHONE },
         passengers: true,
-        customer: { include: { user: { select: { phone: true } } } },
+        customer: { select: { ...PUBLIC_CUSTOMER_SELECT, user: { select: { phone: true } } } },
         ...SEGMENT_STOPS_INCLUDE,
       },
     });
@@ -279,7 +282,7 @@ export class BookingsService {
 
     const trip = await this.prisma.trip.findUniqueOrThrow({
       where: { id: booking.tripId },
-      include: { originCity: true, destinationCity: true, driver: true },
+      include: { originCity: true, destinationCity: true, driver: { select: { userId: true } } },
     });
     // Le délai d'annulation se compte depuis l'heure à laquelle LE CLIENT monte (passage estimé à son étape), pas depuis
     // le départ du trajet : un client de Mamou n'a pas à être pénalisé comme s'il partait de Conakry.
@@ -501,7 +504,7 @@ export class BookingsService {
       include: {
         passengers: true,
         trip: { include: TRIP_INCLUDE_WITH_DRIVER_PHONE },
-        customer: { include: { user: { select: { phone: true } } } },
+        customer: { select: { ...PUBLIC_CUSTOMER_SELECT, user: { select: { phone: true } } } },
         ...SEGMENT_STOPS_INCLUDE,
       },
       orderBy: { createdAt: 'asc' },

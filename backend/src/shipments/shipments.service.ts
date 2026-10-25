@@ -1,4 +1,5 @@
 // backend/src/shipments/shipments.service.ts
+// [25/10/2026] v+ — uploadEvidence : la clé de stockage doit avoir été fabriquée pour la personne qui envoie la preuve.
 // [10/10/2026] v6 — saisie colis par colis : `parcels` (poids, dimensions, valeur de chacun) ; le serveur en tire quantité, poids total et
 // valeur déclarée totale, calcule le prix de chaque colis (devis : `parcels`, `urgentSurcharge`) et enregistre chaque colis (ShipmentItem).
 // [19/10/2026] v6 — create() rattache les photos du colis (photoKeys) à l'envoi, dans la même transaction.
@@ -1047,8 +1048,9 @@ export class ShipmentsService {
   // assigné.
   // -----------------------------------------------------------------------
 
-  async uploadEvidence(shipmentId: string, dto: CreateDocumentDto) {
+  async uploadEvidence(shipmentId: string, dto: CreateDocumentDto, userId: string) {
     await this.findOne(shipmentId);
+    await this.documentsService.assertEvidenceKey(userId, dto.storageKey);
     return this.documentsService.create(DocumentOwnerType.SHIPMENT, shipmentId, dto);
   }
 

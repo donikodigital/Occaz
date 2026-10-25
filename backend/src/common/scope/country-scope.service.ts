@@ -230,6 +230,18 @@ export class CountryScopeService {
     );
   }
 
+  /** Un paiement relève du périmètre quand sa réservation ou son envoi en relève. */
+  async assertPayment(actor: Actor, permission: PermissionKey, paymentId: string): Promise<void> {
+    const ids = scopeOf(actor, permission);
+    if (!ids) return;
+    await this.mustExist(
+      this.prisma.payment.count({
+        where: { id: paymentId, OR: [{ booking: bookingScopeWhere(ids) }, { shipment: shipmentScopeWhere(ids) }] },
+      }),
+      'Paiement introuvable.',
+    );
+  }
+
   async assertPayout(actor: Actor, permission: PermissionKey, payoutId: string): Promise<void> {
     const ids = scopeOf(actor, permission);
     if (!ids) return;

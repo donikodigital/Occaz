@@ -1,11 +1,15 @@
 // backend/src/deals/deals.controller.ts
+// [25/10/2026] v+ — GET /deals/:id ne renvoie un bon plan inactif ou hors période qu'à la gestion des promotions ; PATCH validé (UpdateDealDto).
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../common/constants/permissions.constants';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { DealsService } from './deals.service';
 import { UpsertDealDto } from './dto/upsert-deal.dto';
+import { UpdateDealDto } from './dto/update-deal.dto';
 
 @ApiTags('Bons plans')
 @ApiBearerAuth()
@@ -25,8 +29,9 @@ export class DealsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.dealsService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const canSeeAll = user.permissions.includes(PERMISSIONS.PROMOTION_MANAGE);
+    return canSeeAll ? this.dealsService.findOne(id) : this.dealsService.findOneActive(id);
   }
 
   @Permissions(PERMISSIONS.PROMOTION_MANAGE)
@@ -37,7 +42,7 @@ export class DealsController {
 
   @Permissions(PERMISSIONS.PROMOTION_MANAGE)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: Partial<UpsertDealDto>) {
+  update(@Param('id') id: string, @Body() dto: UpdateDealDto) {
     return this.dealsService.update(id, dto);
   }
 

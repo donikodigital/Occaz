@@ -1,7 +1,9 @@
 // backend/src/dashboards/customer-dashboard.service.ts
+// [25/10/2026] v+ — le conducteur de la prochaine réservation est limité à ses champs publics (PUBLIC_DRIVER_SELECT).
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { BookingStatus, DisputeStatus, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PUBLIC_DRIVER_SELECT } from '../common/selects/public-profiles';
 
 /**
  * Section 47. "Favoris" n'est volontairement pas couvert : aucun modèle
@@ -27,7 +29,7 @@ export class CustomerDashboardService {
             trip: { departureAt: { gte: new Date() } },
           },
           orderBy: { trip: { departureAt: 'asc' } },
-          include: { trip: { include: { originCity: true, destinationCity: true, driver: true } } },
+          include: { trip: { include: { originCity: true, destinationCity: true, driver: { select: PUBLIC_DRIVER_SELECT } } } },
         }),
         this.prisma.booking.count({
           where: {

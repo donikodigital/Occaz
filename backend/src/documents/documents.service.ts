@@ -1,4 +1,5 @@
 // backend/src/documents/documents.service.ts
+// [25/10/2026] v3 — assertEvidenceKey : la clé d'une preuve (envoi, litige) doit avoir été fabriquée pour la personne qui l'envoie.
 //
 // [23/10/2026] v2 — Suppression d'une pièce par son propriétaire (removeOwned) : suppression logique (deletedAt) + effacement du fichier
 // dans le stockage, sauf s'il sert encore de justificatif à une vérification ou à un litige. Les lectures ignorent désormais les
@@ -12,6 +13,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { addDuration } from '../common/utils/duration.util';
+import { assertStorageKeyOwnedBy, type StorageKeyOwner } from '../storage/storage-key.util';
 
 /**
  * Service générique (section 43 : un seul modèle Document polymorphique).
@@ -33,6 +35,21 @@ export class DocumentsService {
     const document = await this.findOne(id);
     const url = await this.storageService.createDownloadUrl(document.storageKey);
     return { url, expiresInSeconds: 300 };
+  }
+
+  /**
+   * Preuves versées à un envoi ou à un litige : la clé de stockage doit avoir été fabriquée pour la personne qui l'envoie — sa photo de colis
+   * (client) ou son dossier de pièces (conducteur). Le personnel n'a aucune route d'envoi de fichier : sans profil, rien n'est accepté.
+   */
+  async assertEvidenceKey(userId: string, storageKey: unknown): Promise<void> {
+    const [driver, customer] = await Promise.all([
+      this.prisma.driverProfile.findUnique({ where: { userId }, select: { id: true } }),
+      this.prisma.customerProfile.findUnique({ where: { userId }, select: { id: true } }),
+    ]);
+    const owners: StorageKeyOwner[] = [];
+    if (driver) owners.push({ folder: 'driver', ownerId: driver.id });
+    if (customer) owners.push({ folder: 'shipment-photo', ownerId: customer.id });
+    assertStorageKeyOwnedBy(storageKey, owners);
   }
 
   create(ownerType: DocumentOwnerType, ownerId: string, dto: CreateDocumentDto) {
