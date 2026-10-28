@@ -1,4 +1,5 @@
 // mobile/src/utils/driverJourney.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [09/10/2026] v1 — Le parcours du conducteur, une étape à la fois.
 //
@@ -25,6 +26,7 @@ import type { Trip, TripStop } from '@/types/trips.types';
 import { isPickedUp } from '@/utils/bookingPhase';
 import { currencyOf } from '@/utils/money';
 import { stopAddress, stopName } from '@/utils/tripSegment';
+import { translateN } from '@/i18n';
 
 export interface Waypoint {
   /** null pour le départ et la destination du trajet. */
@@ -269,5 +271,5 @@ export function tripEarnings(trip: Trip, bookings: Booking[]): { amount: number;
 /** « Boubacar BARRY », ou « 2 places » si aucun nom n'est connu. */
 export function passengerLabel(booking: Booking): string {
   const names = booking.passengers?.map((passenger) => passenger.fullName).filter(Boolean) ?? [];
-  return names.length > 0 ? names.join(', ') : `${booking.seatsCount} place${booking.seatsCount > 1 ? 's' : ''}`;
+  return names.length > 0 ? names.join(', ') : translateN(booking.seatsCount, '{count} place', '{count} places');
 }

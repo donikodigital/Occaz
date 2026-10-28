@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/wallet.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [05/10/2026] v3 — Portefeuille refait.
 //   - Bandeau allégé : une icône de portefeuille (avec sa pièce) pour comprendre d'un coup d'œil que c'est de l'argent gardé, le
@@ -44,6 +45,7 @@ import {
   txTitle,
 } from '@/utils/walletHistory';
 import type { WalletTransaction, WalletTxFilter } from '@/types/wallets.types';
+import { useT, translateN } from '@/i18n';
 
 type Category = Exclude<WalletTxFilter, 'ALL'>;
 
@@ -71,16 +73,15 @@ const PILL_TONE: Record<'ocean' | 'success' | 'danger' | 'neutral', OceanPillTon
 };
 
 function countText(filter: WalletTxFilter, count: number): string {
-  const plural = count > 1 ? 's' : '';
   switch (filter) {
     case 'TRIPS':
-      return `${count} trajet${plural}`;
+      return translateN(count, '{count} trajet', '{count} trajets');
     case 'SHIPMENTS':
-      return `${count} envoi${plural}`;
+      return translateN(count, '{count} envoi', '{count} envois');
     case 'PAYOUTS':
-      return `${count} retrait${plural}`;
+      return translateN(count, '{count} retrait', '{count} retraits');
     default:
-      return `${count} opération${plural}`;
+      return translateN(count, '{count} opération', '{count} opérations');
   }
 }
 
@@ -109,6 +110,7 @@ function WalletHero({
   pending: string | undefined;
   currencyCode: string;
 }) {
+  const t = useT();
   const hasPending = pending !== undefined && Number(pending) > 0;
   return (
     <OceanHeroCard style={styles.hero}>
@@ -122,17 +124,17 @@ function WalletHero({
         </View>
         <View style={styles.heroTitles}>
           <AppText variant="base" weight="semibold" color={OCEAN.onDark}>
-            Mon portefeuille
+            {t('Mon portefeuille')}
           </AppText>
           <AppText variant="xs" color={OCEAN.sky}>
-            Votre argent, prêt à être retiré
+            {t('Votre argent, prêt à être retiré')}
           </AppText>
         </View>
       </View>
 
       <View>
         <AppText variant="xs" weight="medium" color={OCEAN.sky} style={styles.heroLabel}>
-          Solde disponible
+          {t('Solde disponible')}
         </AppText>
         <AppText variant="display" weight="bold" color={OCEAN.onDark} numberOfLines={1} adjustsFontSizeToFit>
           {balance !== undefined ? formatMoney(balance, currencyCode) : '…'}
@@ -143,12 +145,12 @@ function WalletHero({
         <View style={styles.pendingPill}>
           <IconClockHour4 size={14} color={OCEAN.onDark} />
           <AppText variant="xs" color={OCEAN.sky}>
-            + {formatMoney(pending, currencyCode)} en attente · libéré après la dépose
+            {t('+ {money} en attente · libéré après la dépose', { money: formatMoney(pending, currencyCode) })}
           </AppText>
         </View>
       ) : null}
 
-      <OceanButton label="Retirer" onPress={() => router.push('/(driver)/payout-new')} style={styles.withdrawButton} />
+      <OceanButton label={t('Retirer')} onPress={() => router.push('/(driver)/payout-new')} style={styles.withdrawButton} />
     </OceanHeroCard>
   );
 }
@@ -249,6 +251,7 @@ function TotalCard({
   currencyCode: string;
   onReset: () => void;
 }) {
+  const t = useT();
   const Icon = FILTER_ICONS[category];
   const tone = CATEGORY_TONES[category];
   const hasPending = Number(pending) !== 0;
@@ -269,7 +272,7 @@ function TotalCard({
         <Pressable
           onPress={onReset}
           accessibilityRole="button"
-          accessibilityLabel="Retirer le filtre et tout afficher"
+          accessibilityLabel={t('Retirer le filtre et tout afficher')}
           hitSlop={8}
           style={({ pressed }) => [styles.resetButton, pressed && styles.pressed]}
         >
@@ -281,7 +284,7 @@ function TotalCard({
       </AppText>
       {hasPending ? (
         <AppText variant="xs" color="textSecondary">
-          Encore en cours : {signedMoney(pending, currencyCode)} (pas inclus ci-dessus)
+          {t('Encore en cours : {signedMoney} (pas inclus ci-dessus)', { signedMoney: signedMoney(pending, currencyCode) })}
         </AppText>
       ) : null}
     </OceanCard>
@@ -331,6 +334,7 @@ function TransactionRow({ tx, currencyCode }: { tx: WalletTransaction; currencyC
 // ---------------------------------------------------------------------------
 
 export default function DriverWalletScreen() {
+  const t = useT();
   const [filter, setFilter] = useState<WalletTxFilter>('ALL');
   const { data: wallet } = useMyWallet();
   const { data, isLoading, isPlaceholderData, hasNextPage, isFetchingNextPage, fetchNextPage } = useMyWalletHistory(filter);
@@ -375,7 +379,7 @@ export default function DriverWalletScreen() {
           filter === 'ALL' ? (
             <View>
               <AppText variant="base" weight="semibold" color={OCEAN.deep} style={styles.sectionTitle}>
-                Vue d'ensemble
+                {t("Vue d'ensemble")}
               </AppText>
               <View style={styles.tiles}>
                 {overviewCategories.map((category) => (
@@ -405,7 +409,7 @@ export default function DriverWalletScreen() {
         {/* Historique */}
         <View style={[styles.history, isPlaceholderData && styles.loadingDim]}>
           <AppText variant="base" weight="semibold" color={OCEAN.deep} style={styles.sectionTitle}>
-            {filter === 'ALL' ? 'Historique' : `Historique · ${FILTER_LABELS[filter]}`}
+            {filter === 'ALL' ? t('Historique') : t('Historique · {filter}', { filter: FILTER_LABELS[filter] })}
           </AppText>
 
           {isLoading ? (
@@ -436,7 +440,7 @@ export default function DriverWalletScreen() {
 
           {hasNextPage ? (
             <OceanButton
-              label="Afficher plus"
+              label={t('Afficher plus')}
               variant="soft"
               onPress={() => fetchNextPage()}
               loading={isFetchingNextPage}

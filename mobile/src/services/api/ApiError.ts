@@ -1,4 +1,6 @@
 // mobile/src/services/api/ApiError.ts
+import { translate } from '@/i18n';
+
 /**
  * Forme d'erreur unique pour tout appel API — un écran n'a qu'un seul
  * type d'erreur à intercepter, quelle que soit son origine (validation,
@@ -31,7 +33,7 @@ export class ApiError extends Error {
 /** Levée spécifiquement quand le rafraîchissement de session a échoué — l'app doit revenir à l'écran de connexion. */
 export class SessionExpiredError extends ApiError {
   constructor() {
-    super('Votre session a expiré, reconnectez-vous.', 401);
+    super(translate('Votre session a expiré, reconnectez-vous.'), 401);
     this.name = 'SessionExpiredError';
   }
 }

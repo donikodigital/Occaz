@@ -1,4 +1,5 @@
 // mobile/app/suivi/index.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [10/10/2026] v2 — padding ajouté à la carte de saisie (OceanCard n'a pas de padding de base : texte, champ et bouton touchaient le cadre).
 // [10/10/2026] v1 — « Suivre un colis » : on saisit le numéro de suivi (étiquette du colis, e-mail) et on ouvre la page de suivi.
@@ -13,15 +14,17 @@ import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { parseTrackingNumber } from '@/utils/tracking';
+import { useT } from '@/i18n';
 
 export default function TrackParcelScreen() {
+  const t = useT();
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   function submit() {
     const trackingNumber = parseTrackingNumber(value);
     if (!trackingNumber) {
-      setError('Ce numéro n’est pas valide. Il commence par OCZ, suivi de 10 caractères (ex. OCZ 7F3A 91C2 B0).');
+      setError(t('Ce numéro n’est pas valide. Il commence par OCZ, suivi de 10 caractères (ex. OCZ 7F3A 91C2 B0).'));
       return;
     }
     setError(null);
@@ -31,18 +34,18 @@ export default function TrackParcelScreen() {
   return (
     <ScreenContainer scroll maxWidth="form">
       <OceanHeroHeader
-        title="Suivre un colis"
-        subtitle="Sans compte, avec votre numéro de suivi"
+        title={t('Suivre un colis')}
+        subtitle={t('Sans compte, avec votre numéro de suivi')}
         icon={<IconPackage />}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       />
       <OceanCard style={styles.card}>
         <AppText variant="sm" color="textSecondary">
-          Saisissez le numéro de suivi écrit sur l’étiquette du colis ou dans l’e-mail reçu. Aucun compte n’est nécessaire.
+          {t('Saisissez le numéro de suivi écrit sur l’étiquette du colis ou dans l’e-mail reçu. Aucun compte n’est nécessaire.')}
         </AppText>
         <TextField
-          label="Numéro de suivi"
-          placeholder="OCZ 7F3A 91C2 B0"
+          label={t('Numéro de suivi')}
+          placeholder={t('OCZ 7F3A 91C2 B0')}
           value={value}
           onChangeText={(text) => {
             setValue(text);
@@ -54,7 +57,7 @@ export default function TrackParcelScreen() {
           onSubmitEditing={submit}
           error={error ?? undefined}
         />
-        <OceanButton label="Suivre mon colis" icon={<IconSearch size={16} color={OCEAN.onDark} />} onPress={submit} disabled={value.trim().length === 0} />
+        <OceanButton label={t('Suivre mon colis')} icon={<IconSearch size={16} color={OCEAN.onDark} />} onPress={submit} disabled={value.trim().length === 0} />
       </OceanCard>
     </ScreenContainer>
   );

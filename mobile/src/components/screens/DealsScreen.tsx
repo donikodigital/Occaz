@@ -1,4 +1,5 @@
 // mobile/src/components/screens/DealsScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [13/10/2026] v1 — Bons plans, commun aux espaces client et conducteur (les deux écrans étaient identiques).
 // Correctif d'affichage : une image qui ne charge pas (adresse d'une page au lieu d'une image, lien cassé) laissait un grand bloc bleu vide
 // au-dessus du titre. Désormais le bloc n'apparaît que quand l'image est réellement chargée ; sinon la carte ne montre que son texte,
@@ -14,6 +15,7 @@ import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useActiveDeals } from '@/hooks/usePromotions';
 import type { Deal } from '@/types/promotions.types';
+import { useT } from '@/i18n';
 
 function DealCard({ deal }: { deal: Deal }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -50,12 +52,13 @@ function DealCard({ deal }: { deal: Deal }) {
 }
 
 export function DealsScreen() {
+  const t = useT();
   const { data: deals, isLoading } = useActiveDeals();
 
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.headerWrap}>
-        <OceanHeroHeader title="Bons plans" subtitle="Les offres du moment" icon={<IconTicket />} onBack={() => router.back()} />
+        <OceanHeroHeader title={t('Bons plans')} subtitle={t('Les offres du moment')} icon={<IconTicket />} onBack={() => router.back()} />
       </View>
 
       <ResponsiveList
@@ -65,7 +68,7 @@ export function DealsScreen() {
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListEmptyComponent={
           !isLoading ? (
-            <OceanEmpty icon={<IconTicket size={26} color={OCEAN.base} />} title="Aucun bon plan pour l'instant" text="Revenez bientôt !" />
+            <OceanEmpty icon={<IconTicket size={26} color={OCEAN.base} />} title={t("Aucun bon plan pour l'instant")} text={t('Revenez bientôt !')} />
           ) : undefined
         }
         renderItem={({ item }) => <DealCard deal={item} />}

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ParcelPhotosField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v1 — Section « Photos du colis » du formulaire d'envoi : 2 photos au plus (appareil photo ou galerie), aperçu, retrait,
 // nouvel essai si l'envoi a échoué. Les photos partent au stockage dès qu'elles sont prises ; le formulaire n'en garde que les clés.
 import React from 'react';
@@ -11,27 +12,28 @@ import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { MAX_PARCEL_PHOTOS } from '@/types/shipmentPhotos.types';
 import type { ParcelPhotoDrafts } from '@/hooks/useShipmentPhotos';
+import { useT } from '@/i18n';
 
 export function ParcelPhotosField({ drafts }: { drafts: ParcelPhotoDrafts }) {
+  const t = useT();
   const { photos, error, canAddMore, pickFromCamera, pickFromLibrary, remove, retry } = drafts;
   const emptySlots = Math.max(0, MAX_PARCEL_PHOTOS - photos.length);
 
   return (
     <View style={styles.root}>
       <AppText variant="xs" color="textSecondary">
-        Jusqu'à {MAX_PARCEL_PHOTOS} photos de votre colis. Le conducteur les voit avant d'accepter, puis tout au long de l'envoi ; le
-        support Occa'Z peut les consulter en cas de litige.
+        {t("Jusqu'à {MAX_PARCEL_PHOTOS} photos de votre colis. Le conducteur les voit avant d'accepter, puis tout au long de l'envoi ; le support Occa'Z peut les consulter en cas de litige.", { MAX_PARCEL_PHOTOS })}
       </AppText>
 
       <View style={styles.row}>
         {photos.map((photo, index) => (
-          <View key={photo.localId} style={styles.slot} accessibilityLabel={`Photo ${index + 1} du colis`}>
+          <View key={photo.localId} style={styles.slot} accessibilityLabel={t('Photo {value} du colis', { value: index + 1 })}>
             <Image source={{ uri: photo.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
             {photo.status === 'uploading' ? (
               <View style={styles.overlay}>
                 <ActivityIndicator color={colors.onPrimary} />
                 <AppText variant="xs" weight="semibold" color={colors.onPrimary}>
-                  Envoi…
+                  {t('Envoi…')}
                 </AppText>
               </View>
             ) : null}
@@ -39,17 +41,17 @@ export function ParcelPhotosField({ drafts }: { drafts: ParcelPhotoDrafts }) {
               <Pressable
                 onPress={() => retry(photo.localId)}
                 accessibilityRole="button"
-                accessibilityLabel="Réessayer l'envoi de la photo"
+                accessibilityLabel={t("Réessayer l'envoi de la photo")}
                 style={[styles.overlay, styles.overlayError]}
               >
                 <IconAlertTriangle size={20} color={colors.onPrimary} />
                 <AppText variant="xs" weight="semibold" color={colors.onPrimary} style={styles.center}>
-                  Échec de l'envoi
+                  {t("Échec de l'envoi")}
                 </AppText>
                 <View style={styles.retry}>
                   <IconRefresh size={13} color={colors.onPrimary} />
                   <AppText variant="xs" weight="bold" color={colors.onPrimary}>
-                    Réessayer
+                    {t('Réessayer')}
                   </AppText>
                 </View>
               </Pressable>
@@ -57,7 +59,7 @@ export function ParcelPhotosField({ drafts }: { drafts: ParcelPhotoDrafts }) {
             <Pressable
               onPress={() => remove(photo.localId)}
               accessibilityRole="button"
-              accessibilityLabel={`Retirer la photo ${index + 1}`}
+              accessibilityLabel={t('Retirer la photo {value}', { value: index + 1 })}
               hitSlop={8}
               style={({ pressed }) => [styles.remove, pressed && styles.pressed]}
             >
@@ -69,7 +71,7 @@ export function ParcelPhotosField({ drafts }: { drafts: ParcelPhotoDrafts }) {
           <View key={`empty-${index}`} style={[styles.slot, styles.emptySlot]}>
             <IconPhoto size={26} color={OCEAN.base} />
             <AppText variant="xs" color="textSecondary">
-              Photo {photos.length + index + 1}
+              {t('Photo {value}', { value: photos.length + index + 1 })}
             </AppText>
           </View>
         ))}
@@ -78,15 +80,15 @@ export function ParcelPhotosField({ drafts }: { drafts: ParcelPhotoDrafts }) {
       {canAddMore ? (
         <View style={styles.actions}>
           <View style={styles.action}>
-            <OceanButton label="Appareil photo" variant="soft" icon={<IconCamera size={16} color={OCEAN.base} />} onPress={pickFromCamera} />
+            <OceanButton label={t('Appareil photo')} variant="soft" icon={<IconCamera size={16} color={OCEAN.base} />} onPress={pickFromCamera} />
           </View>
           <View style={styles.action}>
-            <OceanButton label="Galerie" variant="outline" icon={<IconPhoto size={16} color={OCEAN.base} />} onPress={pickFromLibrary} />
+            <OceanButton label={t('Galerie')} variant="outline" icon={<IconPhoto size={16} color={OCEAN.base} />} onPress={pickFromLibrary} />
           </View>
         </View>
       ) : (
         <AppText variant="xs" color="textSecondary">
-          {MAX_PARCEL_PHOTOS} photos ajoutées. Retirez-en une pour en choisir une autre.
+          {t('{MAX_PARCEL_PHOTOS} photos ajoutées. Retirez-en une pour en choisir une autre.', { MAX_PARCEL_PHOTOS })}
         </AppText>
       )}
 

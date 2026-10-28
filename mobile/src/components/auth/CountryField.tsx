@@ -1,4 +1,5 @@
 // mobile/src/components/auth/CountryField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Choix du pays avec son drapeau et son indicatif (« 🇬🇳 Guinée  +224 »). `CountryField` est le champ plein écran de
 // l'inscription ; `CountryPickerModal` (la liste) est aussi ouverte par la pastille d'indicatif du champ téléphone.
 import React, { useState } from 'react';
@@ -11,6 +12,7 @@ import { useCountries } from '@/hooks/useCities';
 import { useResponsive } from '@/hooks/useResponsive';
 import { flagEmoji, formatDialCode } from '@/utils/phone';
 import type { Country } from '@/types/geography.types';
+import { useT } from '@/i18n';
 
 export function CountryPickerModal({
   visible,
@@ -26,6 +28,7 @@ export function CountryPickerModal({
   /** Faux à l'étape « Pays de résidence » de l'inscription : l'indicatif n'y sert à rien, il apparaît à l'étape du téléphone. */
   showDialCode?: boolean;
 }) {
+  const t = useT();
   const { data: countries, isLoading } = useCountries();
   const { isTablet } = useResponsive();
 
@@ -34,9 +37,9 @@ export function CountryPickerModal({
       <View style={[styles.modal, isTablet && styles.modalCentered]}>
         <View style={styles.modalHeader}>
           <AppText variant="lg" weight="semibold" style={styles.modalTitle}>
-            Choisir un pays
+            {t('Choisir un pays')}
           </AppText>
-          <IconButton icon={<IconX size={18} color={colors.textPrimary} />} accessibilityLabel="Fermer" onPress={onClose} />
+          <IconButton icon={<IconX size={18} color={colors.textPrimary} />} accessibilityLabel={t('Fermer')} onPress={onClose} />
         </View>
         {isLoading ? <ActivityIndicator color={OCEAN.base} style={styles.loader} /> : null}
         <FlatList
@@ -53,7 +56,7 @@ export function CountryPickerModal({
                   onClose();
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={`${item.name}, indicatif ${formatDialCode(item.phoneCode)}`}
+                accessibilityLabel={t('{itemName}, indicatif {dialCode}', { itemName: item.name, dialCode: formatDialCode(item.phoneCode) })}
                 style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && styles.pressed]}
               >
                 <AppText variant="xl">{flagEmoji(item.isoCode)}</AppText>
@@ -88,6 +91,7 @@ export function CountryField({
   error?: string;
   showDialCode?: boolean;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <View style={styles.fieldWrap}>
@@ -97,12 +101,12 @@ export function CountryField({
       <Pressable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={`${label} : ${value ? value.name : 'aucun pays choisi'}`}
+        accessibilityLabel={`${label} : ${value ? value.name : t('aucun pays choisi')}`}
         style={({ pressed }) => [styles.field, error ? styles.fieldError : null, pressed && styles.pressed]}
       >
         <AppText variant="xl">{value ? flagEmoji(value.isoCode) : '🌍'}</AppText>
         <AppText variant="base" color={value ? 'textPrimary' : 'textSecondary'} style={styles.fieldText}>
-          {value?.name ?? 'Choisir un pays'}
+          {value?.name ?? t('Choisir un pays')}
         </AppText>
         {value && showDialCode ? (
           <AppText variant="sm" weight="semibold" color={OCEAN.base}>

@@ -1,4 +1,6 @@
 // mobile/src/components/screens/NotificationsInboxScreen.tsx
+// [28/10/2026] v+ — Prop `space` : la boîte n'affiche que les notifications de l'espace actif (client ou conducteur).
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [23/10/2026] v4 — Suppression en masse plus visible : une barre d'actions sous l'en-tête (au lieu d'icônes dans l'en-tête, qui faisaient
 // passer le titre « Notifications » sur deux lignes) avec « Sélectionner » et « Tout lire ». En mode sélection : « Tout sélectionner /
 // Tout désélectionner » et « Supprimer (n) » en rouge, avec le même passage par une confirmation qu'avant.
@@ -49,6 +51,8 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { NOTIFICATION_TYPE_LABELS } from '@/utils/notificationLabels';
 import { formatDateLong, formatTime } from '@/utils/date';
 import type { AppNotification, NotificationType } from '@/types/notifications.types';
+import type { Space } from '@/types/roles.types';
+import { useT, translate } from '@/i18n';
 
 const TYPE_ICON: Record<NotificationType, React.ComponentType<{ size?: number; color?: string }>> = {
   BOOKING: IconRoute,
@@ -104,10 +108,10 @@ function sectionLabelFor(dateIso: string, now: Date): string {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfItemDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const diffDays = Math.round((startOfToday.getTime() - startOfItemDay.getTime()) / 86_400_000);
-  if (diffDays <= 0) return "Aujourd'hui";
-  if (diffDays === 1) return 'Hier';
-  if (diffDays < 7) return 'Cette semaine';
-  return 'Plus tôt';
+  if (diffDays <= 0) return translate("Aujourd'hui");
+  if (diffDays === 1) return translate('Hier');
+  if (diffDays < 7) return translate('Cette semaine');
+  return translate('Plus tôt');
 }
 
 /** Titre à afficher — repli sur le libellé générique du type uniquement pour les lignes antérieures à la persistance de title/body (voir notifications.types.ts). */
@@ -130,6 +134,7 @@ function NotificationDetailModal({
   onDelete: (id: string) => void;
   deleting: boolean;
 }) {
+  const t = useT();
   const { isTablet } = useResponsive();
   if (!notification) return null;
 
@@ -148,7 +153,7 @@ function NotificationDetailModal({
               onPress={onClose}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel="Fermer"
+              accessibilityLabel={t('Fermer')}
               style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
             >
               <IconX size={18} color={colors.textMuted} />
@@ -168,7 +173,7 @@ function NotificationDetailModal({
           ) : null}
 
           <Button
-            label="Supprimer"
+            label={t('Supprimer')}
             variant="danger"
             loading={deleting}
             onPress={() => onDelete(notification.id)}
@@ -237,9 +242,10 @@ function NotificationRow({
   );
 }
 
-export function NotificationsInboxScreen() {
-  const { data, isLoading } = useMyNotifications();
-  const markAllRead = useMarkAllNotificationsRead();
+export function NotificationsInboxScreen({ space }: { space?: Space }) {
+  const t = useT();
+  const { data, isLoading } = useMyNotifications(1, space);
+  const markAllRead = useMarkAllNotificationsRead(space);
   const markRead = useMarkNotificationRead();
   const deleteNotifications = useDeleteNotifications();
 
@@ -308,18 +314,18 @@ export function NotificationsInboxScreen() {
   }, [data]);
 
   const subtitle = selectionMode
-    ? `${selectedIds.size} sélectionnée${selectedIds.size > 1 ? 's' : ''}`
+    ? t.n(selectedIds.size, '{count} sélectionnée', '{count} sélectionnées')
     : isLoading
       ? undefined
       : unreadCount > 0
-        ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}`
-        : 'Tout est à jour';
+        ? t.n(unreadCount, '{count} non lue', '{count} non lues')
+        : t('Tout est à jour');
 
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.header}>
         <OceanHeroHeader
-          title="Notifications"
+          title={t('Notifications')}
           subtitle={subtitle}
           onBack={selectionMode ? exitSelectionMode : () => router.back()}
         />
@@ -332,19 +338,19 @@ export function NotificationsInboxScreen() {
               <Pressable
                 onPress={toggleSelectAll}
                 accessibilityRole="button"
-                accessibilityLabel={allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+                accessibilityLabel={allSelected ? t('Tout désélectionner') : t('Tout sélectionner')}
                 style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
               >
                 {allSelected ? <IconSquareCheck size={16} color={OCEAN.base} /> : <IconSquare size={16} color={OCEAN.base} />}
                 <AppText variant="xs" weight="bold" color={OCEAN.base}>
-                  {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+                  {allSelected ? t('Tout désélectionner') : t('Tout sélectionner')}
                 </AppText>
               </Pressable>
               <Pressable
                 onPress={() => setConfirmingDelete(true)}
                 disabled={selectedIds.size === 0 || deleteNotifications.isPending}
                 accessibilityRole="button"
-                accessibilityLabel="Supprimer la sélection"
+                accessibilityLabel={t('Supprimer la sélection')}
                 style={({ pressed }) => [
                   styles.pill,
                   styles.pillDanger,
@@ -354,7 +360,7 @@ export function NotificationsInboxScreen() {
               >
                 <IconTrash size={16} color={colors.danger} />
                 <AppText variant="xs" weight="bold" color={colors.danger}>
-                  {selectedIds.size > 0 ? `Supprimer (${selectedIds.size})` : 'Supprimer'}
+                  {selectedIds.size > 0 ? t('Supprimer ({size})', { size: selectedIds.size }) : t('Supprimer')}
                 </AppText>
               </Pressable>
             </>
@@ -363,12 +369,12 @@ export function NotificationsInboxScreen() {
               <Pressable
                 onPress={() => setSelectionMode(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Sélectionner des notifications"
+                accessibilityLabel={t('Sélectionner des notifications')}
                 style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
               >
                 <IconChecklist size={16} color={OCEAN.base} />
                 <AppText variant="xs" weight="bold" color={OCEAN.base}>
-                  Sélectionner
+                  {t('Sélectionner')}
                 </AppText>
               </Pressable>
               {unreadCount > 0 ? (
@@ -376,12 +382,12 @@ export function NotificationsInboxScreen() {
                   onPress={() => markAllRead.mutate()}
                   disabled={markAllRead.isPending}
                   accessibilityRole="button"
-                  accessibilityLabel="Tout marquer comme lu"
+                  accessibilityLabel={t('Tout marquer comme lu')}
                   style={({ pressed }) => [styles.pill, pressed && styles.pressed, markAllRead.isPending && styles.pillDisabled]}
                 >
                   <IconChecks size={16} color={OCEAN.base} />
                   <AppText variant="xs" weight="bold" color={OCEAN.base}>
-                    Tout lire
+                    {t('Tout lire')}
                   </AppText>
                 </Pressable>
               ) : null}
@@ -399,8 +405,8 @@ export function NotificationsInboxScreen() {
           !isLoading ? (
             <OceanEmpty
               icon={<IconBellRinging size={28} color={OCEAN.base} />}
-              title="Rien de nouveau"
-              text="Vos notifications — paiements, trajets, envois, messages du support — apparaîtront ici."
+              title={t('Rien de nouveau')}
+              text={t('Vos notifications — paiements, trajets, envois, messages du support — apparaîtront ici.')}
             />
           ) : undefined
         }
@@ -430,9 +436,9 @@ export function NotificationsInboxScreen() {
 
       <ConfirmDialog
         visible={confirmingDelete}
-        title={`Supprimer ${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} ?`}
-        message="Cette action ne peut pas être annulée."
-        confirmLabel="Supprimer"
+        title={t.n(selectedIds.size, 'Supprimer {count} notification ?', 'Supprimer {count} notifications ?')}
+        message={t('Cette action ne peut pas être annulée.')}
+        confirmLabel={t('Supprimer')}
         destructive
         loading={deleteNotifications.isPending}
         onConfirm={handleDeleteSelected}

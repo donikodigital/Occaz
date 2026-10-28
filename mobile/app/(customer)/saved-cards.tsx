@@ -1,4 +1,5 @@
 // mobile/app/(customer)/saved-cards.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [10/10/2026] v2 — « Retirer cette carte ? » passe par ConfirmDialog (Alert.alert ne fait rien sur le web), erreur affichée sous la carte.
 //
@@ -18,8 +19,10 @@ import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useMySavedCards, useRemoveSavedCard, useSetDefaultSavedCard } from '@/hooks/usePromotions';
 import type { SavedCard } from '@/types/promotions.types';
+import { useT } from '@/i18n';
 
 function CardRow({ card }: { card: SavedCard }) {
+  const t = useT();
   const removeCard = useRemoveSavedCard();
   const setDefault = useSetDefaultSavedCard();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -36,31 +39,31 @@ function CardRow({ card }: { card: SavedCard }) {
       </View>
       <View style={{ flex: 1 }}>
         <AppText variant="sm" weight="semibold">
-          {card.brand ?? 'Carte'} •••• {card.last4}
+          {card.brand ?? t('Carte')} •••• {card.last4}
         </AppText>
         <AppText variant="xs" color="textSecondary">
-          Expire {String(card.expiryMonth).padStart(2, '0')}/{card.expiryYear}
+          {t('Expire {padStart}/{expiryYear}', { padStart: String(card.expiryMonth).padStart(2, '0'), expiryYear: card.expiryYear })}
         </AppText>
       </View>
       {card.isDefault ? (
-        <OceanPill label="Par défaut" tone="ocean" />
+        <OceanPill label={t('Par défaut')} tone="ocean" />
       ) : (
         <IconButton
           icon={<IconStar size={16} color={colors.textSecondary} />}
-          accessibilityLabel="Définir par défaut"
+          accessibilityLabel={t('Définir par défaut')}
           onPress={() => setDefault.mutate(card.id)}
         />
       )}
-      <IconButton icon={<IconTrash size={16} color={colors.danger} />} accessibilityLabel="Retirer" onPress={() => setConfirmOpen(true)} />
+      <IconButton icon={<IconTrash size={16} color={colors.danger} />} accessibilityLabel={t('Retirer')} onPress={() => setConfirmOpen(true)} />
     </OceanCard>
     {removeCard.isError || setDefault.isError ? (
-      <FeedbackBanner tone="error" text="L’opération sur cette carte a échoué — réessayez dans un instant." />
+      <FeedbackBanner tone="error" text={t('L’opération sur cette carte a échoué — réessayez dans un instant.')} />
     ) : null}
     <ConfirmDialog
       visible={confirmOpen}
-      title="Retirer cette carte ?"
-      message={`Carte se terminant par ${card.last4}`}
-      confirmLabel="Retirer"
+      title={t('Retirer cette carte ?')}
+      message={t('Carte se terminant par {last4}', { last4: card.last4 })}
+      confirmLabel={t('Retirer')}
       destructive
       loading={removeCard.isPending}
       onConfirm={handleRemove}
@@ -71,12 +74,13 @@ function CardRow({ card }: { card: SavedCard }) {
 }
 
 export default function SavedCardsScreen() {
+  const t = useT();
   const { data: cards, isLoading } = useMySavedCards();
 
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.headerWrap}>
-        <OceanHeroHeader title="Mes cartes bancaires" subtitle="Vos moyens de paiement enregistrés" icon={<IconCreditCard />} onBack={() => router.back()} />
+        <OceanHeroHeader title={t('Mes cartes bancaires')} subtitle={t('Vos moyens de paiement enregistrés')} icon={<IconCreditCard />} onBack={() => router.back()} />
       </View>
 
       <ResponsiveList
@@ -88,8 +92,8 @@ export default function SavedCardsScreen() {
           !isLoading ? (
             <OceanEmpty
               icon={<IconCreditCard size={26} color={OCEAN.base} />}
-              title="Aucune carte enregistrée"
-              text="Le paiement par carte n'est pas encore disponible dans l'app — utilisez mobile money pour le moment."
+              title={t('Aucune carte enregistrée')}
+              text={t("Le paiement par carte n'est pas encore disponible dans l'app — utilisez mobile money pour le moment.")}
             />
           ) : undefined
         }

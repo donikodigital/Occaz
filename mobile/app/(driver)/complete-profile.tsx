@@ -1,4 +1,5 @@
 // mobile/app/(driver)/complete-profile.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — bouton « Retour » en haut de l'écran (vers l'espace passager si le compte en a un, sinon vers l'écran précédent).
 // [19/10/2026] v+ — reprend nom, pays et ville du profil passager quand un passager devient conducteur ; l'étape des pièces rappelle le délai de régularisation.
 import React, { useEffect, useState } from 'react';
@@ -18,11 +19,13 @@ import { useAuthStore } from '@/stores/authStore';
 import { useAuthFlowStore } from '@/stores/authFlowStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { City, Country } from '@/types/geography.types';
+import { useT } from '@/i18n';
 
 const CITY_FIELD = 'driver-profile-city';
 
 /** Deuxième étape affichée juste après la création du profil — mêmes principes que VehicleDocumentsStep dans vehicle-new.tsx. */
 function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; lastName: string }) {
+  const t = useT();
   const { data: documents } = useMyDriverDocuments();
   const upload = useDriverDocumentUpload();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -35,10 +38,10 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
   return (
     <ScreenContainer scroll maxWidth="form">
       <AppText variant="xxl" weight="semibold" style={styles.title}>
-        Vos pièces d&apos;identité
+        {t("Vos pièces d'identité")}
       </AppText>
       <AppText variant="base" color="textSecondary" style={styles.subtitle}>
-        Envoyez votre photo de profil, votre CNI et votre permis de conduire pour que votre compte soit validé. Vous pouvez créer des trajets de passagers dès maintenant, mais les pièces doivent être envoyées dans la semaine : vous recevrez des rappels tous les 2 jours.
+        {t('Envoyez votre photo de profil, votre CNI et votre permis de conduire pour que votre compte soit validé. Vous pouvez créer des trajets de passagers dès maintenant, mais les pièces doivent être envoyées dans la semaine : vous recevrez des rappels tous les 2 jours.')}
       </AppText>
 
       <ProfilePhotoField
@@ -53,7 +56,7 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
 
       <View style={styles.fields}>
         <DocumentUploadField
-          label="Carte nationale d'identité"
+          label={t("Carte nationale d'identité")}
           document={nationalIdDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('national_id')}
@@ -61,7 +64,7 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
           onPickCamera={() => upload.pickFromCamera('national_id')}
         />
         <DocumentUploadField
-          label="Permis de conduire"
+          label={t('Permis de conduire')}
           document={licenseDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('driver_license')}
@@ -70,7 +73,7 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
         />
       </View>
 
-      <Button label="Continuer" onPress={() => router.replace('/(driver)/(tabs)/home')} style={styles.submit} />
+      <Button label={t('Continuer')} onPress={() => router.replace('/(driver)/(tabs)/home')} style={styles.submit} />
     </ScreenContainer>
   );
 }
@@ -81,6 +84,7 @@ function IdentityDocumentsStep({ firstName, lastName }: { firstName: string; las
  * précise, contrairement à un client qui peut réserver depuis n'importe où.
  */
 export default function DriverCompleteProfileScreen() {
+  const t = useT();
   // Nom, prénom et pays déjà saisis à l'inscription : on les reprend ; l'e-mail aussi est déjà géré à l'inscription (étape facultative).
   const draft = useAuthFlowStore();
   const accountEmail = useAuthStore((state) => state.user?.email);
@@ -124,16 +128,16 @@ export default function DriverCompleteProfileScreen() {
   function handleSubmit() {
     setErrorMessage(undefined);
     if (firstName.trim().length < 2 || lastName.trim().length < 2) {
-      setErrorMessage('Renseignez votre prénom et votre nom.');
+      setErrorMessage(t('Renseignez votre prénom et votre nom.'));
       return;
     }
     if (!country || !city) {
-      setErrorMessage('Choisissez votre pays et votre ville.');
+      setErrorMessage(t('Choisissez votre pays et votre ville.'));
       return;
     }
     const trimmedEmail = email.trim();
     if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setErrorMessage('Adresse email invalide.');
+      setErrorMessage(t('Adresse email invalide.'));
       return;
     }
 
@@ -152,7 +156,7 @@ export default function DriverCompleteProfileScreen() {
           setProfileCreated(true);
         },
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -162,40 +166,40 @@ export default function DriverCompleteProfileScreen() {
     <ScreenContainer scroll maxWidth="form">
       {goBack ? (
         <View style={styles.topBar}>
-          <IconButton icon={<IconArrowLeft size={18} color={colors.textPrimary} />} accessibilityLabel="Retour" onPress={goBack} />
+          <IconButton icon={<IconArrowLeft size={18} color={colors.textPrimary} />} accessibilityLabel={t('Retour')} onPress={goBack} />
         </View>
       ) : null}
       <AppText variant="xxl" weight="semibold" style={styles.title}>
-        Complétez votre profil
+        {t('Complétez votre profil')}
       </AppText>
       <AppText variant="base" color="textSecondary" style={styles.subtitle}>
-        Ces informations sont nécessaires avant de pouvoir proposer des trajets.
+        {t('Ces informations sont nécessaires avant de pouvoir proposer des trajets.')}
       </AppText>
 
       <View style={styles.fields}>
-        <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Mamadou" autoFocus={!draft.firstName} />
-        <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Barry" />
+        <TextField label={t('Prénom')} value={firstName} onChangeText={setFirstName} placeholder={t('Mamadou')} autoFocus={!draft.firstName} />
+        <TextField label={t('Nom')} value={lastName} onChangeText={setLastName} placeholder={t('Barry')} />
         {hasEmail ? null : (
           <>
             <TextField
-              label="Email (optionnel)"
+              label={t('Email (optionnel)')}
               value={email}
               onChangeText={setEmail}
-              placeholder="vous@exemple.com"
+              placeholder={t('vous@exemple.com')}
               keyboardType="email-address"
               autoCapitalize="none"
             />
             <AppText variant="xs" color="textMuted">
-              Pour recevoir aussi vos notifications par email.
+              {t('Pour recevoir aussi vos notifications par email.')}
             </AppText>
           </>
         )}
 
-        <CountrySelectField label="Pays" value={country} onSelect={setCountry} />
+        <CountrySelectField label={t('Pays')} value={country} onSelect={setCountry} />
 
         <View>
           <AppText variant="sm" weight="medium" color="textSecondary" style={styles.cityLabel}>
-            Ville
+            {t('Ville')}
           </AppText>
           <Card
             onPress={() => {
@@ -207,14 +211,14 @@ export default function DriverCompleteProfileScreen() {
             <View style={styles.cityRow}>
               <IconMapPin size={16} color={colors.textSecondary} />
               <AppText variant="base" color={city ? 'textPrimary' : 'textSecondary'}>
-                {city?.name ?? 'Choisir une ville'}
+                {city?.name ?? t('Choisir une ville')}
               </AppText>
             </View>
           </Card>
         </View>
 
         <TextField
-          label="Numéro Mobile Money (optionnel)"
+          label={t('Numéro Mobile Money (optionnel)')}
           value={mobileMoneyNumber}
           onChangeText={setMobileMoneyNumber}
           placeholder="+224620000000"
@@ -228,7 +232,7 @@ export default function DriverCompleteProfileScreen() {
         </AppText>
       ) : null}
 
-      <Button label="Continuer" onPress={handleSubmit} loading={createProfile.isPending} style={styles.submit} />
+      <Button label={t('Continuer')} onPress={handleSubmit} loading={createProfile.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }

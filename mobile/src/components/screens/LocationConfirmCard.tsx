@@ -1,4 +1,5 @@
 // mobile/src/components/screens/LocationConfirmCard.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Étape 2 du parcours de saisie d'adresse (voir useLocationPicker) :
 // vérification du nom du lieu et de la ville avant validation. La ville
@@ -14,12 +15,14 @@ import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import type { LocationPickerController } from '@/hooks/useLocationPicker';
 import { CitySearchPanel } from './CitySearchPanel';
+import { useT } from '@/i18n';
 
 export interface LocationConfirmCardProps {
   picker: LocationPickerController;
 }
 
 export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
+  const t = useT();
   const { draft, city, cityStatus, isChangingCity } = picker;
   if (!draft) return null;
 
@@ -32,12 +35,12 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
       <Pressable
         onPress={picker.backToSearch}
         accessibilityRole="button"
-        accessibilityLabel="Changer de lieu"
+        accessibilityLabel={t('Changer de lieu')}
         style={({ pressed }) => [styles.backLink, pressed && styles.pressed]}
       >
         <IconArrowLeft size={16} color={colors.textSecondary} />
         <AppText variant="sm" color="textSecondary">
-          Changer de lieu
+          {t('Changer de lieu')}
         </AppText>
       </Pressable>
 
@@ -48,35 +51,35 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
           </View>
           <View style={styles.placeText}>
             <AppText variant="sm" weight="semibold">
-              {hasPoint ? 'Adresse trouvée' : 'Adresse saisie à la main'}
+              {hasPoint ? t('Adresse trouvée') : t('Adresse saisie à la main')}
             </AppText>
             <AppText variant="xs" color="textSecondary" numberOfLines={2}>
-              {draft.formattedAddress ?? 'Sans position GPS'}
+              {draft.formattedAddress ?? t('Sans position GPS')}
             </AppText>
           </View>
         </View>
 
         <TextField
-          label="Nom du lieu ou repère"
+          label={t('Nom du lieu ou repère')}
           value={draft.label}
           onChangeText={picker.setLabel}
-          placeholder="Ex : nom du lieu, près de la station"
+          placeholder={t('Ex : nom du lieu, près de la station')}
         />
 
         <View style={styles.citySection}>
           <AppText variant="sm" weight="medium" color="textSecondary">
-            Ville
+            {t('Ville')}
           </AppText>
 
           {isDetecting ? (
             <View style={styles.detecting}>
               <ActivityIndicator size="small" color={colors.primary} />
               <AppText variant="sm" color="textSecondary" style={styles.detectingText}>
-                Détection de la ville…
+                {t('Détection de la ville…')}
               </AppText>
               <Pressable onPress={picker.chooseCityManually} accessibilityRole="button" hitSlop={8}>
                 <AppText variant="sm" weight="medium" color="primary">
-                  Choisir moi-même
+                  {t('Choisir moi-même')}
                 </AppText>
               </Pressable>
             </View>
@@ -93,13 +96,13 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
               <Pressable
                 onPress={picker.toggleChangeCity}
                 accessibilityRole="button"
-                accessibilityLabel="Modifier la ville"
+                accessibilityLabel={t('Modifier la ville')}
                 hitSlop={8}
                 style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
               >
                 <IconPencil size={14} color={colors.primary} />
                 <AppText variant="sm" weight="medium" color="primary">
-                  Modifier
+                  {t('Modifier')}
                 </AppText>
               </Pressable>
             </View>
@@ -108,7 +111,7 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
           {showCityPanel ? (
             <View>
               <AppText variant="sm" color="textSecondary" style={styles.cityPrompt}>
-                {city ? 'Choisissez une autre ville.' : 'Dans quelle ville se trouve ce lieu ?'}
+                {city ? t('Choisissez une autre ville.') : t('Dans quelle ville se trouve ce lieu ?')}
               </AppText>
               <CitySearchPanel autoFocus onSelect={picker.selectCity} selectedCityId={city?.id} />
               {city ? (
@@ -118,7 +121,7 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
                   style={({ pressed }) => [styles.cancelLink, pressed && styles.pressed]}
                 >
                   <AppText variant="sm" color="textSecondary">
-                    Garder {city.name}
+                    {t('Garder {cityName}', { cityName: city.name })}
                   </AppText>
                 </Pressable>
               ) : null}
@@ -128,7 +131,7 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
 
         {!hasPoint ? (
           <AppText variant="xs" color="textMuted">
-            Sans position GPS, l'itinéraire ne pourra pas s'afficher sur la carte.
+            {t("Sans position GPS, l'itinéraire ne pourra pas s'afficher sur la carte.")}
           </AppText>
         ) : null}
 
@@ -140,7 +143,7 @@ export function LocationConfirmCard({ picker }: LocationConfirmCardProps) {
       </View>
 
       <OceanButton
-        label="Confirmer l'adresse"
+        label={t("Confirmer l'adresse")}
         onPress={() => {
           // Le champ « Nom du lieu » a souvent encore le focus ici (voir
           // capture) : fermer le clavier avant l'appel réseau, plutôt que

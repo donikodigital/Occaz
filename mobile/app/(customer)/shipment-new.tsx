@@ -1,4 +1,5 @@
 // mobile/app/(customer)/shipment-new.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v10 — Étape « Photos du colis » (facultative, 2 photos au plus : appareil photo ou galerie) avant la période. Les photos
 // partent au stockage dès qu'elles sont prises ; l'envoi n'est validé qu'une fois elles toutes arrivées (clés `photoKeys` envoyées à la création).
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
@@ -78,6 +79,7 @@ import { locationsApi } from '@/services/api/locations.api';
 import { ApiError } from '@/services/api/ApiError';
 import type { ParcelInput, QuoteShipmentPayload } from '@/types/shipments.types';
 import type { TripLocation } from '@/types/trips.types';
+import { useT } from '@/i18n';
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -100,6 +102,7 @@ function AddressCard({
   /** Petite mention à côté du libellé (ex. « Adresse du profil »). */
   tag?: string;
 }) {
+  const t = useT();
   return (
     <OceanCard onPress={onPress} style={styles.addressCard} accessibilityLabel={label}>
       <View style={[styles.addressIcon, location && styles.addressIconDone]}>
@@ -110,7 +113,7 @@ function AddressCard({
           {tag ? `${label} · ${tag}` : label}
         </AppText>
         <AppText variant="sm" weight="semibold" numberOfLines={1} color={location ? 'textPrimary' : OCEAN.base}>
-          {location ? location.label : 'Appuyez pour choisir'}
+          {location ? location.label : t('Appuyez pour choisir')}
         </AppText>
         {location && formatCityCountry(location) ? (
           <AppText variant="xs" color="textSecondary" numberOfLines={1}>
@@ -193,25 +196,26 @@ function ParcelFields({
   onCopyPrevious?: () => void;
   previousLabel?: string;
 }) {
+  const t = useT();
   const optionalDetails = [
-    parcel.declared.trim() ? 'Valeur déclarée' : null,
-    parcel.description.trim() ? 'Description' : null,
+    parcel.declared.trim() ? t('Valeur déclarée') : null,
+    parcel.description.trim() ? t('Description') : null,
   ].filter(Boolean) as string[];
 
   const dimensions = (
     <View style={styles.block}>
       <AppText variant="sm" weight="medium" color="textSecondary">
-        {inline ? "Dimensions d'un colis, en cm (optionnel)" : 'Dimensions de ce colis, en cm (optionnel)'}
+        {inline ? t("Dimensions d'un colis, en cm (optionnel)") : t('Dimensions de ce colis, en cm (optionnel)')}
       </AppText>
       <View style={styles.dimensionsRow}>
         <View style={styles.dimensionCell}>
-          <TextField value={parcel.length} onChangeText={(length) => onChange({ length })} keyboardType="decimal-pad" placeholder="Long." />
+          <TextField value={parcel.length} onChangeText={(length) => onChange({ length })} keyboardType="decimal-pad" placeholder={t('Long.')} />
         </View>
         <View style={styles.dimensionCell}>
-          <TextField value={parcel.width} onChangeText={(width) => onChange({ width })} keyboardType="decimal-pad" placeholder="Larg." />
+          <TextField value={parcel.width} onChangeText={(width) => onChange({ width })} keyboardType="decimal-pad" placeholder={t('Larg.')} />
         </View>
         <View style={styles.dimensionCell}>
-          <TextField value={parcel.height} onChangeText={(height) => onChange({ height })} keyboardType="decimal-pad" placeholder="Haut." />
+          <TextField value={parcel.height} onChangeText={(height) => onChange({ height })} keyboardType="decimal-pad" placeholder={t('Haut.')} />
         </View>
       </View>
     </View>
@@ -219,20 +223,20 @@ function ParcelFields({
 
   const declared = (
     <TextField
-      label="Valeur déclarée (optionnel)"
+      label={t('Valeur déclarée (optionnel)')}
       value={parcel.declared}
       onChangeText={(declaredValue) => onChange({ declared: declaredValue })}
       keyboardType="numeric"
-      placeholder="Montant en chiffres"
+      placeholder={t('Montant en chiffres')}
     />
   );
 
   const description = (
     <TextField
-      label="Description (optionnel)"
+      label={t('Description (optionnel)')}
       value={parcel.description}
       onChangeText={(text) => onChange({ description: text })}
-      placeholder="Contenu du colis"
+      placeholder={t('Contenu du colis')}
       multiline
       style={styles.multiline}
     />
@@ -241,16 +245,16 @@ function ParcelFields({
   return (
     <>
       {onCopyPrevious ? (
-        <OceanButton label={previousLabel ?? 'Mêmes mesures que le colis précédent'} variant="soft" onPress={onCopyPrevious} />
+        <OceanButton label={previousLabel ?? t('Mêmes mesures que le colis précédent')} variant="soft" onPress={onCopyPrevious} />
       ) : null}
 
       {part !== 'details' ? (
         <TextField
-          label="Poids (kg)"
+          label={t('Poids (kg)')}
           value={parcel.weight}
           onChangeText={(weight) => onChange({ weight })}
           keyboardType="decimal-pad"
-          placeholder="Ex : 3"
+          placeholder={t('Ex : 3')}
         />
       ) : null}
 
@@ -259,10 +263,10 @@ function ParcelFields({
       {part === 'weight' ? null : inline ? (
         <Disclosure
           icon={<IconAdjustmentsHorizontal size={15} color={OCEAN.base} />}
-          label="Plus de détails (optionnel)"
+          label={t('Plus de détails (optionnel)')}
           preview={
-            [dimensionsState(parcel) === 'ok' ? 'Dimensions' : null, ...optionalDetails].filter(Boolean).join(' · ') ||
-            'Dimensions, valeur déclarée, description'
+            [dimensionsState(parcel) === 'ok' ? t('Dimensions') : null, ...optionalDetails].filter(Boolean).join(' · ') ||
+            t('Dimensions, valeur déclarée, description')
           }
         >
           {dimensions}
@@ -272,8 +276,8 @@ function ParcelFields({
       ) : (
         <Disclosure
           icon={<IconAdjustmentsHorizontal size={15} color={OCEAN.base} />}
-          label="Valeur et description (optionnel)"
-          preview={optionalDetails.join(' · ') || 'Valeur déclarée, description'}
+          label={t('Valeur et description (optionnel)')}
+          preview={optionalDetails.join(' · ') || t('Valeur déclarée, description')}
         >
           {declared}
           {description}
@@ -283,7 +287,7 @@ function ParcelFields({
       {!inline && (cost || costLoading) ? (
         <View style={styles.parcelCost}>
           <AppText variant="xs" color="textSecondary">
-            Coût de ce colis
+            {t('Coût de ce colis')}
           </AppText>
           {cost ? (
             <AppText variant="md" weight="bold" color={OCEAN.deep}>
@@ -293,7 +297,7 @@ function ParcelFields({
             <View style={styles.computing}>
               <ActivityIndicator size="small" color={colors.primary} />
               <AppText variant="xs" color="textSecondary">
-                Calcul…
+                {t('Calcul…')}
               </AppText>
             </View>
           )}
@@ -304,6 +308,7 @@ function ParcelFields({
 }
 
 export default function NewShipmentScreen() {
+  const t = useT();
   const { data: profile } = useCustomerProfile();
   const accountUser = useAuthStore((state) => state.user);
 
@@ -484,13 +489,13 @@ export default function NewShipmentScreen() {
   /** Les contrôles d'un colis : poids, puis dimensions (les trois ou aucune). */
   function validateParcel(index: number, section: SectionKey): boolean {
     const parcel = parcels[index];
-    const name = quantity > 1 ? `du colis ${index + 1}` : 'du colis';
+    const name = quantity > 1 ? t('du colis {value}', { value: index + 1 }) : t('du colis');
     if (!weightIsValid(parcel)) {
-      fail(section, `Indiquez le poids ${name}.`);
+      fail(section, t('Indiquez le poids {name}.', { name }));
       return false;
     }
     if (dimensionsState(parcel) === 'partial') {
-      fail(section, `Renseignez les trois dimensions ${name} (longueur, largeur, hauteur), ou aucune.`);
+      fail(section, t('Renseignez les trois dimensions {name} (longueur, largeur, hauteur), ou aucune.', { name }));
       return false;
     }
     return true;
@@ -500,48 +505,48 @@ export default function NewShipmentScreen() {
   function validateStep(key: SectionKey): boolean {
     if (key === 'sender') {
       if (senderName.length < 2) {
-        fail('sender', "Complétez votre profil (nom) avant d'envoyer un colis.");
+        fail('sender', t("Complétez votre profil (nom) avant d'envoyer un colis."));
         return false;
       }
       if (!senderLocation) {
-        fail('sender', "Choisissez l'adresse de récupération.");
+        fail('sender', t("Choisissez l'adresse de récupération."));
         return false;
       }
     } else if (key === 'recipient') {
       if (recipientName.trim().length < 2) {
-        fail('recipient', 'Renseignez le nom du destinataire.');
+        fail('recipient', t('Renseignez le nom du destinataire.'));
         return false;
       }
       if (!isValidPhoneNumber(recipientPhone)) {
-        fail('recipient', 'Renseignez le téléphone du destinataire au format international, par exemple +224620000000.');
+        fail('recipient', t('Renseignez le téléphone du destinataire au format international, par exemple +224620000000.'));
         return false;
       }
       if (recipientEmail.trim() && !EMAIL_PATTERN.test(recipientEmail.trim())) {
-        fail('recipient', "L'adresse e-mail du destinataire n'est pas valide (laissez le champ vide si vous n'en avez pas).");
+        fail('recipient', t("L'adresse e-mail du destinataire n'est pas valide (laissez le champ vide si vous n'en avez pas)."));
         return false;
       }
       if (!recipientLocation) {
-        fail('recipient', "Choisissez l'adresse de livraison.");
+        fail('recipient', t("Choisissez l'adresse de livraison."));
         return false;
       }
     } else if (key === 'parcel') {
       if (!categoryId) {
-        fail('parcel', 'Choisissez une catégorie de colis.');
+        fail('parcel', t('Choisissez une catégorie de colis.'));
         return false;
       }
       if (quantity === 1 && !validateParcel(0, 'parcel')) return false;
     } else if (key === 'photos') {
       if (photoDrafts.isUploading) {
-        fail('photos', "Patientez : une photo est encore en cours d'envoi.");
+        fail('photos', t("Patientez : une photo est encore en cours d'envoi."));
         return false;
       }
       if (photoDrafts.hasFailed) {
-        fail('photos', "Une photo n'a pas pu être envoyée : touchez-la pour réessayer, ou retirez-la.");
+        fail('photos', t("Une photo n'a pas pu être envoyée : touchez-la pour réessayer, ou retirez-la."));
         return false;
       }
     } else if (key === 'window') {
       if (!windowStart || !windowEnd) {
-        fail('window', 'Indiquez la période pendant laquelle le colis peut partir.');
+        fail('window', t('Indiquez la période pendant laquelle le colis peut partir.'));
         return false;
       }
     } else if (!validateParcel(Number(key.slice('parcel-'.length)), key)) {
@@ -569,21 +574,21 @@ export default function NewShipmentScreen() {
   const summaries: Record<'sender' | 'recipient' | 'parcel' | 'photos' | 'window', string> = {
     sender: senderLocation
       ? `${senderLocation.label}${pickupPlace ? ` · ${pickupPlace}` : ''}`
-      : 'Adresse de récupération à choisir',
+      : t('Adresse de récupération à choisir'),
     recipient: [
       recipientName.trim() || null,
       recipientLocation ? (deliveryPlace ?? recipientLocation.label) : null,
-      recipientDone ? null : !recipientLocation ? 'adresse à choisir' : !isValidPhoneNumber(recipientPhone) ? 'téléphone à compléter' : null,
+      recipientDone ? null : !recipientLocation ? t('adresse à choisir') : !isValidPhoneNumber(recipientPhone) ? t('téléphone à compléter') : null,
     ]
       .filter(Boolean)
-      .join(' · ') || 'À renseigner',
+      .join(' · ') || t('À renseigner'),
     parcel: parcelDone
-      ? `${categoryName ?? 'Colis'}${quantity > 1 ? ` · ${quantity} colis` : ''}${totalWeight > 0 ? ` · ${totalWeight} kg` : ''}${isUrgent ? ' · Urgent' : ''}`
+      ? `${categoryName ?? t('Colis')}${quantity > 1 ? t(' · {quantity} colis', { quantity }) : ''}${totalWeight > 0 ? t(' · {totalWeight} kg', { totalWeight }) : ''}${isUrgent ? t(' · Urgent') : ''}`
       : quantity > 1
-        ? 'Catégorie et nombre de colis'
-        : 'Catégorie et poids à indiquer',
-    photos: photoDrafts.photos.length === 0 ? 'Aucune photo (facultatif)' : `${photoDrafts.photos.length} photo${photoDrafts.photos.length > 1 ? 's' : ''}`,
-    window: windowStart && windowEnd ? formatWindow(toShipmentWindow(windowStart, windowEnd)) : 'Dates à choisir',
+        ? t('Catégorie et nombre de colis')
+        : t('Catégorie et poids à indiquer'),
+    photos: photoDrafts.photos.length === 0 ? t('Aucune photo (facultatif)') : t.n(photoDrafts.photos.length, '{count} photo', '{count} photos'),
+    window: windowStart && windowEnd ? formatWindow(toShipmentWindow(windowStart, windowEnd)) : t('Dates à choisir'),
   };
 
   const noop = () => undefined;
@@ -591,10 +596,10 @@ export default function NewShipmentScreen() {
   /** Résumé d'un colis : « 3 kg · 40×30×20 cm ». */
   function parcelSummary(index: number): string {
     const parcel = parcels[index];
-    if (!parcel || !weightIsValid(parcel)) return 'Poids à indiquer';
+    if (!parcel || !weightIsValid(parcel)) return t('Poids à indiquer');
     return [
       `${toNumber(parcel.weight)} kg`,
-      dimensionsState(parcel) === 'ok' ? `${toNumber(parcel.length)}×${toNumber(parcel.width)}×${toNumber(parcel.height)} cm` : null,
+      dimensionsState(parcel) === 'ok' ? t('{toNumber}×{toNumber2}×{toNumber3} cm', { toNumber: toNumber(parcel.length), toNumber2: toNumber(parcel.width), toNumber3: toNumber(parcel.height) }) : null,
     ]
       .filter(Boolean)
       .join(' · ');
@@ -609,10 +614,10 @@ export default function NewShipmentScreen() {
 
   // Ce qui manque pour afficher le prix — dit sous le « — » du pied de page.
   const missingForQuote = [
-    !senderLocation ? 'adresse de récupération' : null,
-    !recipientLocation ? 'adresse de livraison' : null,
-    !categoryId ? 'catégorie' : null,
-    validParcels.length === 0 ? 'poids' : validParcels.length < quantity ? 'poids de chaque colis' : null,
+    !senderLocation ? t('adresse de récupération') : null,
+    !recipientLocation ? t('adresse de livraison') : null,
+    !categoryId ? t('catégorie') : null,
+    validParcels.length === 0 ? t('poids') : validParcels.length < quantity ? t('poids de chaque colis') : null,
   ].filter(Boolean) as string[];
   const isPriceComputing = quotePayload !== null && (quotePayload !== debouncedQuotePayload || !quote || isQuoteFetching);
   const discountNumber = promoDiscount ? Number(promoDiscount) : 0;
@@ -622,7 +627,7 @@ export default function NewShipmentScreen() {
     openLocationPicker(field);
     router.push({
       pathname: '/(customer)/select-location',
-      params: { title: field === 'sender' ? 'Adresse de récupération' : 'Adresse de livraison' },
+      params: { title: field === 'sender' ? t('Adresse de récupération') : t('Adresse de livraison') },
     });
   }
 
@@ -663,7 +668,7 @@ export default function NewShipmentScreen() {
         onSuccess: (shipment) =>
           router.replace({ pathname: '/(customer)/shipment/[id]', params: { id: shipment.id, ...FLOW_DONE_PARAM } }),
         onError: (error) => {
-          setFormError({ message: error instanceof ApiError ? error.message : 'Une erreur est survenue.' });
+          setFormError({ message: error instanceof ApiError ? error.message : t('Une erreur est survenue.') });
         },
       },
     );
@@ -685,21 +690,21 @@ export default function NewShipmentScreen() {
       {isLastStep ? (
         <View style={styles.footerPrice}>
           <AppText variant="xs" color="textSecondary">
-            Prix à payer
+            {t('Prix à payer')}
           </AppText>
           {quotePayload === null ? (
             <AppText variant="xs" color="textMuted" numberOfLines={2}>
-              {missingForQuote.length > 0 ? `Il manque : ${missingForQuote.join(', ')}` : '—'}
+              {missingForQuote.length > 0 ? t('Il manque : {missingForQuote}', { missingForQuote: missingForQuote.join(', ') }) : '—'}
             </AppText>
           ) : quoteError ? (
             <AppText variant="sm" color="danger" numberOfLines={2}>
-              Prix indisponible pour le moment
+              {t('Prix indisponible pour le moment')}
             </AppText>
           ) : isPriceComputing ? (
             <View style={styles.computing}>
               <ActivityIndicator size="small" color={colors.primary} />
               <AppText variant="xs" color="textSecondary">
-                Calcul…
+                {t('Calcul…')}
               </AppText>
             </View>
           ) : (
@@ -709,7 +714,7 @@ export default function NewShipmentScreen() {
               </AppText>
               {discountNumber > 0 ? (
                 <AppText variant="xs" color={colors.successDark}>
-                  Code promo appliqué
+                  {t('Code promo appliqué')}
                 </AppText>
               ) : null}
             </>
@@ -719,7 +724,7 @@ export default function NewShipmentScreen() {
       <WizardNav
         onBack={stepIndex > 0 ? goBack : undefined}
         onNext={isLastStep ? handleSubmit : goNext}
-        nextLabel={isLastStep ? "Confirmer l'envoi" : 'Continuer'}
+        nextLabel={isLastStep ? t("Confirmer l'envoi") : t('Continuer')}
         loading={isLastStep && createShipment.isPending}
       />
     </View>
@@ -729,8 +734,8 @@ export default function NewShipmentScreen() {
     // Un nouveau conteneur à chaque étape : l'écran repart en haut.
     <ScreenContainer key={`step-${stepIndex}`} scroll maxWidth="detail" footer={footer}>
       <OceanHeroHeader
-        title="Envoyer un colis"
-        subtitle="Complétez les étapes, une à la fois"
+        title={t('Envoyer un colis')}
+        subtitle={t('Complétez les étapes, une à la fois')}
         icon={<IconPackage />}
         onBack={() => (stepIndex > 0 ? goBack() : router.back())}
       />
@@ -743,7 +748,7 @@ export default function NewShipmentScreen() {
           step={1}
           total={steps.length}
           icon={<IconUser size={15} color={OCEAN.base} />}
-          title="Expéditeur"
+          title={t('Expéditeur')}
           summary={summaries.sender}
           status={statusOf('sender')}
           expanded
@@ -752,12 +757,12 @@ export default function NewShipmentScreen() {
         >
           {!hasProfileAddress ? (
             <AppText variant="xs" color="danger">
-              Ajoutez votre adresse et votre ville dans votre profil pour qu'elles soient proposées comme adresse de récupération.
+              {t("Ajoutez votre adresse et votre ville dans votre profil pour qu'elles soient proposées comme adresse de récupération.")}
             </AppText>
           ) : null}
           <AddressCard
-            label="Adresse de récupération"
-            tag={senderLocation && senderLocation.id === profilePickup?.id ? 'adresse du profil' : undefined}
+            label={t('Adresse de récupération')}
+            tag={senderLocation && senderLocation.id === profilePickup?.id ? t('adresse du profil') : undefined}
             location={senderLocation}
             onPress={() => openAddressPicker('sender')}
           />
@@ -772,28 +777,28 @@ export default function NewShipmentScreen() {
             >
               <IconCheck size={14} color={OCEAN.base} />
               <AppText variant="xs" weight="semibold" color={OCEAN.base}>
-                Utiliser l'adresse de mon profil
+                {t("Utiliser l'adresse de mon profil")}
               </AppText>
             </Pressable>
           ) : null}
 
           <Disclosure
             icon={<IconLock size={15} color={OCEAN.base} />}
-            label="Mes informations (profil)"
-            preview={[senderName || 'Nom non renseigné', senderPhone || null].filter(Boolean).join(' · ')}
+            label={t('Mes informations (profil)')}
+            preview={[senderName || t('Nom non renseigné'), senderPhone || null].filter(Boolean).join(' · ')}
           >
-            <LockedField label="Nom complet" value={senderName} placeholder="Nom non renseigné" />
-            <LockedField label="Téléphone" value={senderPhone} placeholder="Téléphone non renseigné" />
+            <LockedField label={t('Nom complet')} value={senderName} placeholder={t('Nom non renseigné')} />
+            <LockedField label={t('Téléphone')} value={senderPhone} placeholder={t('Téléphone non renseigné')} />
             <LockedField
-              label="Adresse du profil"
+              label={t('Adresse du profil')}
               value={profileAddress}
               secondary={profilePlace || null}
-              placeholder="Adresse non renseignée"
+              placeholder={t('Adresse non renseignée')}
             />
             <View style={styles.lockedNote}>
               <IconLock size={14} color={OCEAN.base} />
               <AppText variant="xs" color="textSecondary" style={styles.lockedNoteText}>
-                Ces informations sont celles de votre profil : elles ne se modifient que dans{' '}
+                {t('Ces informations sont celles de votre profil : elles ne se modifient que dans')}{' '}
                 <AppText
                   variant="xs"
                   weight="semibold"
@@ -801,7 +806,7 @@ export default function NewShipmentScreen() {
                   onPress={() => router.push('/(customer)/edit-profile')}
                   accessibilityRole="link"
                 >
-                  mon profil
+                  {t('mon profil')}
                 </AppText>
                 .
               </AppText>
@@ -816,7 +821,7 @@ export default function NewShipmentScreen() {
           step={2}
           total={steps.length}
           icon={<IconUserCheck size={15} color={OCEAN.base} />}
-          title="Destinataire"
+          title={t('Destinataire')}
           summary={summaries.recipient}
           status={statusOf('recipient')}
           expanded
@@ -824,31 +829,31 @@ export default function NewShipmentScreen() {
           onToggle={noop}
         >
           <TextField
-            label="Nom complet"
+            label={t('Nom complet')}
             value={recipientName}
             onChangeText={setRecipientName}
-            placeholder="Nom du destinataire"
+            placeholder={t('Nom du destinataire')}
           />
           <TextField
-            label="Téléphone"
+            label={t('Téléphone')}
             value={recipientPhone}
             onChangeText={(t) => setRecipientPhone(normalizePhoneInput(t))}
             keyboardType="phone-pad"
             placeholder="+224620000000"
           />
           <TextField
-            label="E-mail (facultatif)"
+            label={t('E-mail (facultatif)')}
             value={recipientEmail}
             onChangeText={setRecipientEmail}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="destinataire@exemple.com"
+            placeholder={t('destinataire@exemple.com')}
           />
           <AppText variant="xs" color="textSecondary">
-            Avec son e-mail, le destinataire suit son colis en direct, sans compte.
+            {t('Avec son e-mail, le destinataire suit son colis en direct, sans compte.')}
           </AppText>
-          <AddressCard label="Adresse de livraison" location={recipientLocation} onPress={() => openAddressPicker('recipient')} />
+          <AddressCard label={t('Adresse de livraison')} location={recipientLocation} onPress={() => openAddressPicker('recipient')} />
         </FormAccordionSection>
       ) : null}
 
@@ -858,7 +863,7 @@ export default function NewShipmentScreen() {
           step={steps.indexOf('parcel') + 1}
           total={steps.length}
           icon={<IconPackage size={15} color={OCEAN.base} />}
-          title="Colis"
+          title={t('Colis')}
           summary={summaries.parcel}
           status={statusOf('parcel')}
           expanded
@@ -867,7 +872,7 @@ export default function NewShipmentScreen() {
         >
           <View style={styles.block}>
             <AppText variant="sm" weight="medium" color="textSecondary">
-              Catégorie
+              {t('Catégorie')}
             </AppText>
             <View style={styles.categoryRow}>
               {(categories ?? []).map((category) => (
@@ -885,12 +890,12 @@ export default function NewShipmentScreen() {
 
           <View style={styles.block}>
             <AppText variant="sm" weight="medium" color="textSecondary">
-              Nombre de colis
+              {t('Nombre de colis')}
             </AppText>
-            <OceanStepper value={quantity} onChange={setQuantity} min={1} max={MAX_PARCELS} label="quantité" />
+            <OceanStepper value={quantity} onChange={setQuantity} min={1} max={MAX_PARCELS} label={t('quantité')} />
             {quantity > 1 ? (
               <AppText variant="xs" color="textSecondary">
-                Vous renseignerez le poids et les dimensions de chaque colis, un par un, aux étapes suivantes.
+                {t('Vous renseignerez le poids et les dimensions de chaque colis, un par un, aux étapes suivantes.')}
               </AppText>
             ) : null}
           </View>
@@ -898,8 +903,8 @@ export default function NewShipmentScreen() {
           <OceanSwitchRow
             value={isUrgent}
             onChange={setIsUrgent}
-            label="Envoi urgent"
-            description="Une majoration peut s’appliquer au prix — voir le devis."
+            label={t('Envoi urgent')}
+            description={t('Une majoration peut s’appliquer au prix — voir le devis.')}
             icon={<IconAlertCircle size={18} color={OCEAN.base} />}
           />
 
@@ -913,7 +918,7 @@ export default function NewShipmentScreen() {
           step={stepIndex + 1}
           total={steps.length}
           icon={<IconPackage size={15} color={OCEAN.base} />}
-          title={`Colis ${currentParcelIndex + 1} sur ${quantity}`}
+          title={t('Colis {value} sur {quantity}', { value: currentParcelIndex + 1, quantity })}
           summary={parcelSummary(currentParcelIndex)}
           status={statusOf(currentKey)}
           expanded
@@ -927,7 +932,7 @@ export default function NewShipmentScreen() {
             cost={parcelCost(currentParcelIndex)}
             costLoading={isPriceComputing && !quoteError && Boolean(validParcels[currentParcelIndex])}
             onCopyPrevious={currentParcelIndex > 0 ? () => copyFromPrevious(currentParcelIndex) : undefined}
-            previousLabel={`Mêmes mesures que le colis ${currentParcelIndex}`}
+            previousLabel={t('Mêmes mesures que le colis {currentParcelIndex}', { currentParcelIndex })}
           />
         </FormAccordionSection>
       ) : null}
@@ -938,7 +943,7 @@ export default function NewShipmentScreen() {
           step={steps.indexOf('photos') + 1}
           total={steps.length}
           icon={<IconCamera size={15} color={OCEAN.base} />}
-          title="Photos du colis"
+          title={t('Photos du colis')}
           summary={summaries.photos}
           status={statusOf('photos')}
           expanded
@@ -955,7 +960,7 @@ export default function NewShipmentScreen() {
           step={steps.length}
           total={steps.length}
           icon={<IconCalendarEvent size={15} color={OCEAN.base} />}
-          title="Période"
+          title={t('Période')}
           summary={summaries.window}
           status={statusOf('window')}
           expanded
@@ -964,16 +969,16 @@ export default function NewShipmentScreen() {
         >
           <View style={styles.stepRecap}>
             <AppText variant="xs" weight="bold" color={OCEAN.base} style={styles.stepRecapTitle}>
-              VOTRE ENVOI
+              {t('Votre envoi').toUpperCase()}
             </AppText>
             <AppText variant="sm" weight="semibold" numberOfLines={2}>
               {summaries.parcel}
             </AppText>
             <AppText variant="xs" color="textSecondary" numberOfLines={2}>
-              De {summaries.sender}
+              {t('De {sender}', { sender: summaries.sender })}
             </AppText>
             <AppText variant="xs" color="textSecondary" numberOfLines={2}>
-              Vers {summaries.recipient}
+              {t('Vers {recipient}', { recipient: summaries.recipient })}
             </AppText>
           </View>
           <ShipmentWindowField
@@ -995,7 +1000,7 @@ export default function NewShipmentScreen() {
 
         <Disclosure
           icon={<IconDiscount2 size={15} color={OCEAN.base} />}
-          label={promoCode ? `Code ${promoCode} appliqué` : "J'ai un code promo"}
+          label={promoCode ? t('Code {promoCode} appliqué', { promoCode }) : t("J'ai un code promo")}
           preview={promoDiscount ? `− ${formatMoney(promoDiscount, quote?.currencyCode ?? undefined)}` : null}
           keepMounted
         >
@@ -1013,8 +1018,8 @@ export default function NewShipmentScreen() {
 
         <Disclosure
           icon={<IconInfoCircle size={15} color={OCEAN.base} />}
-          label="Détail du prix"
-          preview="Distance, poids facturé, remboursement"
+          label={t('Détail du prix')}
+          preview={t('Distance, poids facturé, remboursement')}
         >
           <ShipmentQuoteCard payload={quotePayload} discountAmount={promoDiscount} />
         </Disclosure>

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/DriverComplianceBanner.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v1 — Bandeau de régularisation du dossier conducteur (accueil conducteur).
 // Tant que le compte n'est pas validé, le conducteur peut créer des trajets de passagers pendant la durée de tolérance (réglage
 // « driver.pending_grace_days », 7 jours par défaut). Ce bandeau dit combien de jours il reste et quelles pièces manquent ; passé le délai,
@@ -12,13 +13,15 @@ import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useDriverCompliance } from '@/hooks/useDriverCompliance';
+import { useT, translate } from '@/i18n';
 
 function joinLabels(labels: string[]): string {
   if (labels.length <= 1) return labels[0] ?? '';
-  return `${labels.slice(0, -1).join(', ')} et ${labels[labels.length - 1]}`;
+  return `${labels.slice(0, -1).join(', ')} ${translate('et')} ${labels[labels.length - 1]}`;
 }
 
 export function DriverComplianceBanner() {
+  const t = useT();
   const { data } = useDriverCompliance();
   if (!data || data.isCompliant) return null;
   // Compte suspendu, bloqué ou désactivé : le bandeau de statut de l'accueil s'en charge.
@@ -31,15 +34,15 @@ export function DriverComplianceBanner() {
   let text: string;
   if (data.awaitingReview) {
     tone = 'wait';
-    title = 'Dossier complet : examen en cours';
-    text = "Notre équipe examine vos pièces. En attendant, vous pouvez créer des trajets de passagers. Les colis s'ouvrent après la validation.";
+    title = t('Dossier complet : examen en cours');
+    text = t("Notre équipe examine vos pièces. En attendant, vous pouvez créer des trajets de passagers. Les colis s'ouvrent après la validation.");
   } else if (data.graceExpired) {
     tone = 'blocked';
-    title = 'Création de trajets bloquée';
-    text = `Le délai de ${data.graceDays} jour${data.graceDays > 1 ? 's' : ''} est dépassé. Envoyez : ${missing}. Vous pourrez de nouveau créer des trajets dès l'envoi.`;
+    title = t('Création de trajets bloquée');
+    text = t.n(data.graceDays, "Le délai de {count} jour est dépassé. Envoyez : {missing}. Vous pourrez de nouveau créer des trajets dès l'envoi.", "Le délai de {count} jours est dépassé. Envoyez : {missing}. Vous pourrez de nouveau créer des trajets dès l'envoi.", { missing });
   } else {
-    title = data.daysLeft <= 1 ? 'Dernier jour pour régulariser votre dossier' : `Il vous reste ${data.daysLeft} jours pour régulariser votre dossier`;
-    text = `À envoyer : ${missing}. Passé ce délai, la création de trajets sera bloquée. Les colis s'ouvrent après la validation.`;
+    title = data.daysLeft <= 1 ? t('Dernier jour pour régulariser votre dossier') : t('Il vous reste {daysLeft} jours pour régulariser votre dossier', { daysLeft: data.daysLeft });
+    text = t("À envoyer : {missing}. Passé ce délai, la création de trajets sera bloquée. Les colis s'ouvrent après la validation.", { missing });
   }
 
   const palette =
@@ -66,7 +69,7 @@ export function DriverComplianceBanner() {
           {text}
         </AppText>
         <AppText variant="xs" weight="semibold" color={palette.foreground}>
-          {data.awaitingReview ? 'Voir mon dossier' : 'Compléter mon dossier'}
+          {data.awaitingReview ? t('Voir mon dossier') : t('Compléter mon dossier')}
         </AppText>
       </View>
       <IconChevronRight size={16} color={palette.foreground} />

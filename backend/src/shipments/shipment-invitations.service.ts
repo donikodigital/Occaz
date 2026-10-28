@@ -229,6 +229,7 @@ export class ShipmentInvitationsService {
           destinationCity,
         });
         return this.notifications.notify({
+          audience: 'DRIVER',
           userId: trip.driver.userId,
           type: NotificationType.SHIPMENT_INVITATION,
           channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
@@ -366,6 +367,7 @@ export class ShipmentInvitationsService {
       });
       if (shipment) {
         await this.notifications.notify({
+          audience: 'CUSTOMER',
           userId: shipment.customer.userId,
           type: NotificationType.DRIVER_REJECTED,
           channels: [NotificationChannel.PUSH],

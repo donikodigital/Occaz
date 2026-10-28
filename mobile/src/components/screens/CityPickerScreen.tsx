@@ -1,4 +1,5 @@
 // mobile/src/components/screens/CityPickerScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // v2 — Look Ocean : bandeau héro (icône, titre, aide, fermeture) qui porte le
 // champ de recherche ; en dessous, les résultats en carte ou une invitation à
@@ -15,8 +16,10 @@ import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import type { City } from '@/types/geography.types';
 import { CitySearchPanel } from './CitySearchPanel';
 import { SearchHeroHeader, SearchHeroInput } from './SearchHeroHeader';
+import { useT } from '@/i18n';
 
 export function CityPickerScreen() {
+  const t = useT();
   const selectCity = useCitySelectionStore((state) => state.select);
   const [search, setSearch] = useState('');
   const [isLoading, setLoading] = useState(false);
@@ -30,15 +33,15 @@ export function CityPickerScreen() {
     <ScreenContainer edges={['top', 'bottom']} maxWidth="form" padded={false}>
       <SearchHeroHeader
         icon={<IconBuildingCommunity size={24} color={OCEAN.onDark} strokeWidth={1.7} />}
-        caption="Recherche de ville"
-        title="Choisir une ville"
-        subtitle="Tapez les premières lettres de son nom."
+        caption={t('Recherche de ville')}
+        title={t('Choisir une ville')}
+        subtitle={t('Tapez les premières lettres de son nom.')}
         onClose={() => router.back()}
       >
         <SearchHeroInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Rechercher une ville…"
+          placeholder={t('Rechercher une ville…')}
           autoFocus
           loading={isLoading}
         />

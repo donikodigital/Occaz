@@ -1,4 +1,5 @@
 // mobile/src/components/home/CurrentTripCard.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [19/10/2026] v1.2 — une colonne peut être forcée sur une seule ligne (`singleLine`) : « Confirmée » et « 253 000 GNF » ne sont plus coupés
 // (espaces insécables + réduction légère de la police si la place manque).
@@ -14,6 +15,7 @@ import { IconMapPin, IconFlag } from '@tabler/icons-react-native';
 import { AppText, RouteMap, type RouteMapPoint } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 const MAP_HEIGHT = 150;
 const hasMapToken = Boolean(process.env.EXPO_PUBLIC_MAPBOX_TOKEN);
@@ -90,11 +92,12 @@ export function CurrentTripCard({
   secondary,
   onPress,
 }: CurrentTripCardProps) {
+  const t = useT();
   const canShowMap = Boolean(origin && destination) && (Platform.OS === 'web' || hasMapToken);
 
   return (
     <View style={styles.card}>
-      <Pressable onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel="Ouvrir le trajet">
+      <Pressable onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel={t('Ouvrir le trajet')}>
         <View style={styles.mapBox}>
           {canShowMap ? (
             <RouteMap origin={origin ?? null} destination={destination ?? null} height={MAP_HEIGHT} />
@@ -105,10 +108,10 @@ export function CurrentTripCard({
 
         <View style={styles.body}>
           <AppText variant="xs" weight="bold" color={OCEAN.base} style={styles.eyebrow}>
-            DÉTAILS DU TRAJET
+            {t('Détails du trajet').toUpperCase()}
           </AppText>
           <AppText variant="md" weight="bold" color={OCEAN.deep} numberOfLines={2}>
-            {eyebrow} · {originName} à {destinationName}
+            {t('{eyebrow} · {originName} à {destinationName}', { eyebrow, originName, destinationName })}
           </AppText>
 
           <View style={styles.columns}>

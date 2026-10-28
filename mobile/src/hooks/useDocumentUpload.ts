@@ -1,4 +1,5 @@
 // mobile/src/hooks/useDocumentUpload.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v2 — plus d'Alert.alert (sans effet sur le web) : l'erreur est gardée par type de pièce (errorFor) et affichée sous son champ.
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,6 +10,7 @@ import type {
   UploadableContentType,
   UploadUrlResult,
 } from '@/types/documents.types';
+import { useT } from '@/i18n';
 
 export interface UseDocumentUploadParams {
   requestUploadUrl: (payload: RequestUploadUrlPayload) => Promise<UploadUrlResult>;
@@ -34,6 +36,7 @@ function mimeTypeToContentType(mimeType: string | undefined): UploadableContentT
  * upload interrompu ne laisse donc aucune trace incohérente en base.
  */
 export function useDocumentUpload({ requestUploadUrl, confirmDocument, onUploaded }: UseDocumentUploadParams) {
+  const t = useT();
   const [isUploading, setUploading] = useState(false);
   // Une seule erreur à la fois, rattachée à la pièce concernée : chaque champ n'affiche que la sienne.
   const [error, setError] = useState<{ documentType: string; message: string } | null>(null);
@@ -41,7 +44,7 @@ export function useDocumentUpload({ requestUploadUrl, confirmDocument, onUploade
   async function uploadFromAsset(documentType: string, asset: ImagePicker.ImagePickerAsset) {
     const contentType = mimeTypeToContentType(asset.mimeType);
     if (!contentType) {
-      setError({ documentType, message: 'Format non supporté : choisissez une photo au format JPEG, PNG ou WebP.' });
+      setError({ documentType, message: t('Format non supporté : choisissez une photo au format JPEG, PNG ou WebP.') });
       return;
     }
 
@@ -59,13 +62,13 @@ export function useDocumentUpload({ requestUploadUrl, confirmDocument, onUploade
         body: fileBlob,
       });
       if (!putResponse.ok) {
-        throw new Error(`Échec de l'envoi vers le stockage (${putResponse.status}).`);
+        throw new Error(t("Échec de l'envoi vers le stockage ({status}).", { status: putResponse.status }));
       }
 
       const document = await confirmDocument({ type: documentType, storageKey });
       onUploaded?.(document);
     } catch {
-      setError({ documentType, message: "Échec de l'envoi : le document n'a pas pu être envoyé — vérifiez votre connexion et réessayez." });
+      setError({ documentType, message: t("Échec de l'envoi : le document n'a pas pu être envoyé — vérifiez votre connexion et réessayez.") });
     } finally {
       setUploading(false);
     }
@@ -75,7 +78,7 @@ export function useDocumentUpload({ requestUploadUrl, confirmDocument, onUploade
     setError(null);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError({ documentType, message: "Autorisation requise : autorisez l'accès à vos photos pour envoyer ce document." });
+      setError({ documentType, message: t("Autorisation requise : autorisez l'accès à vos photos pour envoyer ce document.") });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -91,7 +94,7 @@ export function useDocumentUpload({ requestUploadUrl, confirmDocument, onUploade
     setError(null);
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      setError({ documentType, message: "Autorisation requise : autorisez l'accès à l'appareil photo pour envoyer ce document." });
+      setError({ documentType, message: t("Autorisation requise : autorisez l'accès à l'appareil photo pour envoyer ce document.") });
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: false });

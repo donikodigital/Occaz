@@ -533,6 +533,7 @@ export class PayoutsService {
       const driver = await this.prisma.driverProfile.findUnique({ where: { id: driverId }, select: { userId: true } });
       if (!driver) return;
       await this.notifications.notify({
+        audience: 'DRIVER',
         userId: driver.userId,
         type: NotificationType.DRIVER_PAYMENT,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],

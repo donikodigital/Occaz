@@ -1,4 +1,5 @@
 // mobile/src/hooks/usePushNotifications.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [25/10/2026] v6 — notification d'état reçue app ouverte (STATUS_CHANGE, REFUND, DRIVER_PAYMENT…) : les listes concernées se rechargent aussitôt.
 // [19/10/2026] v5 — notifications DRIVER_COMPLIANCE (ouvre « Mon dossier ») et ADD_EMAIL (ouvre l'ajout d'adresse e-mail) ; l'espace des conversations suit l'espace actif.
 // [10/10/2026] v4 — SHIPMENT_TRACKING : le toucher ouvre le suivi en direct du colis ; reçue app ouverte, elle rafraîchit le suivi.
@@ -16,6 +17,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useActiveSpaceStore } from '@/stores/activeSpaceStore';
 import { groupOfSpace, spaceOfAccountType } from '@/utils/spaces';
 import { getActiveConversation, playMessageSound } from '@/utils/messageSound';
+import { translate } from '@/i18n';
 
 /**
  * Sans ce réglage, une notification reçue pendant que l'app est ouverte
@@ -79,7 +81,7 @@ const MESSAGE_CHANNEL_ID = 'messages';
 async function ensureAndroidChannels(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(SHIPMENT_REQUEST_CHANNEL_ID, {
-    name: "Nouvelles demandes d'envoi",
+    name: translate("Nouvelles demandes d'envoi"),
     importance: Notifications.AndroidImportance.MAX,
     sound: 'default',
     vibrationPattern: [0, 400, 250, 400],
@@ -87,8 +89,8 @@ async function ensureAndroidChannels(): Promise<void> {
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
   await Notifications.setNotificationChannelAsync(MESSAGE_CHANNEL_ID, {
-    name: 'Messages',
-    description: 'Messages reçus dans vos conversations',
+    name: translate('Messages'),
+    description: translate('Messages reçus dans vos conversations'),
     importance: Notifications.AndroidImportance.HIGH,
     sound: 'message.wav',
     vibrationPattern: [0, 200, 120, 200],

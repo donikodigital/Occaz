@@ -1,4 +1,5 @@
 // mobile/app/(customer)/(tabs)/trips.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [25/10/2026] v4 — chargement de la suite en bas de liste, compteurs réels (total du serveur), tirer pour actualiser, état d'échec avec « Réessayer ».
 // [20/10/2026] v3b — la carte d'un envoi affiche sa date d'envoi (« Envoyé le 17 oct. 2026 »).
 // [07/10/2026] v3 — « Mon activité » et sa phrase passent dans un bandeau (hero) bleu océan ; le reste de l'écran est inchangé.
@@ -30,6 +31,7 @@ import { formatCityCountry, formatShipmentRoute } from '@/utils/shipmentDisplay'
 import { bookingBoardingAt, bookingRouteLabel } from '@/utils/tripSegment';
 import type { Booking, BookingStatus } from '@/types/bookings.types';
 import type { Shipment, ShipmentStatus } from '@/types/shipments.types';
+import { useT, translate } from '@/i18n';
 
 type Segment = 'trips' | 'shipments';
 type StatusTone = 'primary' | 'success' | 'danger' | 'neutral';
@@ -52,13 +54,13 @@ const BOOKING_STATUS_TONE: Record<BookingStatus, StatusTone> = {
 };
 
 const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
-  PENDING_PAYMENT: 'À payer',
-  PAID: 'Payée',
-  CONFIRMED: 'Confirmée',
-  CANCELLED: 'Annulée',
-  COMPLETED: 'Terminée',
-  REFUNDED: 'Remboursée',
-  DISPUTED: 'En litige',
+  get PENDING_PAYMENT() { return translate('À payer'); },
+  get PAID() { return translate('Payée'); },
+  get CONFIRMED() { return translate('Confirmée'); },
+  get CANCELLED() { return translate('Annulée'); },
+  get COMPLETED() { return translate('Terminée'); },
+  get REFUNDED() { return translate('Remboursée'); },
+  get DISPUTED() { return translate('En litige'); },
 };
 
 const SHIPMENT_STATUS_TONE: Record<ShipmentStatus, StatusTone> = {
@@ -77,30 +79,31 @@ const SHIPMENT_STATUS_TONE: Record<ShipmentStatus, StatusTone> = {
 };
 
 const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
-  CREATED: 'À payer',
-  SEARCHING_DRIVER: 'Recherche',
-  DRIVER_ASSIGNED: 'Assigné',
-  PICKUP_PENDING: 'Récupération',
-  PICKED_UP: 'Récupéré',
-  IN_TRANSIT: 'En transit',
-  DELIVERY_PENDING: 'Livraison',
-  DELIVERED: 'Livré',
-  COMPLETED: 'Terminé',
-  CANCELLED: 'Annulé',
-  DISPUTED: 'En litige',
-  REFUNDED: 'Remboursé',
+  get CREATED() { return translate('À payer'); },
+  get SEARCHING_DRIVER() { return translate('Recherche'); },
+  get DRIVER_ASSIGNED() { return translate('Assigné'); },
+  get PICKUP_PENDING() { return translate('Récupération'); },
+  get PICKED_UP() { return translate('Récupéré'); },
+  get IN_TRANSIT() { return translate('En transit'); },
+  get DELIVERY_PENDING() { return translate('Livraison'); },
+  get DELIVERED() { return translate('Livré'); },
+  get COMPLETED() { return translate('Terminé'); },
+  get CANCELLED() { return translate('Annulé'); },
+  get DISPUTED() { return translate('En litige'); },
+  get REFUNDED() { return translate('Remboursé'); },
 };
 
 function BookingRow({ booking }: { booking: Booking }) {
+  const t = useT();
   const trip = booking.trip;
   return (
-    <OceanCard onPress={() => router.push(`/(customer)/booking/${booking.id}`)} style={styles.row} accessibilityLabel="Ouvrir la réservation">
+    <OceanCard onPress={() => router.push(`/(customer)/booking/${booking.id}`)} style={styles.row} accessibilityLabel={t('Ouvrir la réservation')}>
       <View style={styles.rowIcon}>
         <IconRoute size={19} color={OCEAN.base} />
       </View>
       <View style={styles.rowText}>
         <AppText variant="sm" weight="semibold" numberOfLines={1}>
-          {bookingRouteLabel(booking) ?? 'Trajet'}
+          {bookingRouteLabel(booking) ?? t('Trajet')}
         </AppText>
         <AppText variant="xs" color="textSecondary">
           {trip ? `${formatDateShort(bookingBoardingAt(booking) ?? trip.departureAt)} · ${formatTime(bookingBoardingAt(booking) ?? trip.departureAt)}` : ''}
@@ -117,8 +120,9 @@ function BookingRow({ booking }: { booking: Booking }) {
 }
 
 function ShipmentRow({ shipment }: { shipment: Shipment }) {
+  const t = useT();
   return (
-    <OceanCard onPress={() => router.push(`/(customer)/shipment/${shipment.id}`)} style={styles.row} accessibilityLabel="Ouvrir l'envoi">
+    <OceanCard onPress={() => router.push(`/(customer)/shipment/${shipment.id}`)} style={styles.row} accessibilityLabel={t("Ouvrir l'envoi")}>
       <View style={[styles.rowIcon, styles.rowIconShipment]}>
         <IconPackage size={19} color={OCEAN.goldInk} />
       </View>
@@ -130,10 +134,10 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
           {formatShipmentRoute(shipment) ??
             formatCityCountry(shipment.recipientLocation) ??
             shipment.recipientLocation?.label ??
-            'Colis'}
+            t('Colis')}
         </AppText>
         <AppText variant="xs" color="textMuted" numberOfLines={1}>
-          Envoyé le {formatDateWithYear(shipment.createdAt)}
+          {t('Envoyé le {dateWithYear}', { dateWithYear: formatDateWithYear(shipment.createdAt) })}
         </AppText>
       </View>
       <View style={styles.rowEnd}>
@@ -185,6 +189,7 @@ function Segmented({
 }
 
 export default function ActivityScreen() {
+  const t = useT();
   const [segment, setSegment] = useState<Segment>('trips');
   const bookingsQuery = useMyBookingsList();
   const shipmentsQuery = useMyShipmentsList();
@@ -212,10 +217,10 @@ export default function ActivityScreen() {
         </View>
         <View style={styles.heroTitles}>
           <AppText variant="xl" weight="bold" color={OCEAN.onDark}>
-            Mon activité
+            {t('Mon activité')}
           </AppText>
           <AppText variant="xs" color={OCEAN.sky}>
-            Vos réservations et vos envois, au même endroit.
+            {t('Vos réservations et vos envois, au même endroit.')}
           </AppText>
         </View>
       </OceanHeroCard>
@@ -224,8 +229,8 @@ export default function ActivityScreen() {
         value={segment}
         onChange={setSegment}
         items={[
-          { id: 'trips', label: 'Trajets', count: bookingsQuery.total },
-          { id: 'shipments', label: 'Envois', count: shipmentsQuery.total },
+          { id: 'trips', label: t('Trajets'), count: bookingsQuery.total },
+          { id: 'shipments', label: t('Envois'), count: shipmentsQuery.total },
         ]}
       />
 
@@ -238,10 +243,10 @@ export default function ActivityScreen() {
           <IconAlertTriangle size={18} color={OCEAN.goldInk} />
           <View style={styles.bannerText}>
             <AppText variant="sm" weight="semibold" color={OCEAN.goldInk}>
-              {pendingCount} {segment === 'trips' ? (pendingCount > 1 ? 'réservations' : 'réservation') : pendingCount > 1 ? 'envois' : 'envoi'} à payer
+              {segment === 'trips' ? t.n(pendingCount, '{count} réservation à payer', '{count} réservations à payer') : t.n(pendingCount, '{count} envoi à payer', '{count} envois à payer')}
             </AppText>
             <AppText variant="xs" color={OCEAN.goldInk}>
-              Ouvrez-{pendingCount > 1 ? 'en une' : 'la'} pour finaliser le paiement.
+              {pendingCount > 1 ? t('Ouvrez-en une pour finaliser le paiement.') : t('Ouvrez-la pour finaliser le paiement.')}
             </AppText>
           </View>
           <IconChevronRight size={16} color={OCEAN.goldInk} />
@@ -253,18 +258,18 @@ export default function ActivityScreen() {
   const emptyTrips = (
     <OceanEmpty
       icon={<IconRoute size={28} color={OCEAN.base} />}
-      title="Aucune réservation"
-      text="Vos réservations de trajets apparaîtront ici."
-      action={<OceanButton label="Trouver un trajet" onPress={() => router.push('/(customer)/trip-search')} style={styles.emptyButton} />}
+      title={t('Aucune réservation')}
+      text={t('Vos réservations de trajets apparaîtront ici.')}
+      action={<OceanButton label={t('Trouver un trajet')} onPress={() => router.push('/(customer)/trip-search')} style={styles.emptyButton} />}
     />
   );
 
   const emptyShipments = (
     <OceanEmpty
       icon={<IconPackage size={28} color={OCEAN.base} />}
-      title="Aucun envoi"
-      text="Les colis que vous envoyez apparaîtront ici, avec leur suivi."
-      action={<OceanButton label="Envoyer un colis" onPress={() => router.push('/(customer)/shipment-new')} style={styles.emptyButton} />}
+      title={t('Aucun envoi')}
+      text={t('Les colis que vous envoyez apparaîtront ici, avec leur suivi.')}
+      action={<OceanButton label={t('Envoyer un colis')} onPress={() => router.push('/(customer)/shipment-new')} style={styles.emptyButton} />}
     />
   );
 

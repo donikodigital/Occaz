@@ -1,4 +1,5 @@
 // mobile/app/(customer)/trip-results.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // v2 — Refonte bleu océan. Bandeau d'itinéraire (départ → arrivée, date,
 // passagers), filtre « Vérifiés » en puce, et une carte par trajet : le
@@ -41,8 +42,10 @@ import { formatDateShort, formatTime } from '@/utils/date';
 import { formatSeatsAvailability } from '@/utils/seats';
 import { segmentAvailableSeats } from '@/utils/tripSegment';
 import type { Trip } from '@/types/trips.types';
+import { useT } from '@/i18n';
 
 function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => void; showRoute?: boolean }) {
+  const t = useT();
   const initials = `${trip.driver.firstName[0] ?? ''}${trip.driver.lastName[0] ?? ''}`;
   const seats = segmentAvailableSeats(trip);
   const isFull = seats <= 0;
@@ -52,7 +55,7 @@ function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => voi
   const routeLabel = `${segment?.boardingCityName ?? trip.originCity.name} → ${segment?.alightingCityName ?? trip.destinationCity.name}`;
 
   return (
-    <OceanCard onPress={onPress} style={[styles.card, isFull && styles.cardFull]} accessibilityLabel={`Trajet de ${trip.driver.firstName}`}>
+    <OceanCard onPress={onPress} style={[styles.card, isFull && styles.cardFull]} accessibilityLabel={t('Trajet de {firstName}', { firstName: trip.driver.firstName })}>
       <View style={styles.cardTop}>
         <Avatar initials={initials} imageUri={trip.driver.photoUrl} />
         <View style={styles.driverInfo}>
@@ -63,24 +66,24 @@ function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => voi
             {trip.driver.isVerifiedBadge ? (
               <IconRosetteDiscountCheck size={16} color={OCEAN.base} />
             ) : (
-              <OceanPill label="Non vérifié" tone="neutral" />
+              <OceanPill label={t('Non vérifié')} tone="neutral" />
             )}
           </View>
           {trip.driver.averageRating ? (
             <View style={styles.ratingRow}>
               <IconStarFilled size={12} color={colors.accent} />
               <AppText variant="xs" color="textSecondary">
-                {trip.driver.averageRating.toFixed(1)} · {trip.driver.completedTripsCount} trajets
+                {t('{averageRating} · {completedTripsCount} trajets', { averageRating: trip.driver.averageRating.toFixed(1), completedTripsCount: trip.driver.completedTripsCount })}
               </AppText>
             </View>
           ) : (
             <AppText variant="xs" color="textSecondary">
-              Nouveau conducteur
+              {t('Nouveau conducteur')}
             </AppText>
           )}
           {isPartial ? (
             <AppText variant="xs" color="textSecondary" numberOfLines={1}>
-              Trajet du conducteur : {trip.originCity.name} → {trip.destinationCity.name}
+              {t('Trajet du conducteur : {originCityName} → {destinationCityName}', { originCityName: trip.originCity.name, destinationCityName: trip.destinationCity.name })}
             </AppText>
           ) : null}
         </View>
@@ -89,7 +92,7 @@ function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => voi
             {formatMoney(trip.customerPricePerSeat ?? trip.pricePerSeat, currencyOf(trip))}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            par place
+            {t('par place')}
           </AppText>
         </View>
       </View>
@@ -109,8 +112,8 @@ function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => voi
             label={
               // Le client qui monte au départ du trajet garde « Départ » ; « Passage à » seulement pour une étape.
               isPartial && segment?.boardingStopId
-                ? `Passage à ${segment.boardingCityName ?? 'votre étape'} vers ${formatTime(segment.boardingAt)}`
-                : `Départ ${formatTime(trip.departureAt)}`
+                ? t('Passage à {value} vers {time}', { value: segment.boardingCityName ?? t('votre étape'), time: formatTime(segment.boardingAt) })
+                : t('Départ {time}', { time: formatTime(trip.departureAt) })
             }
             icon={<IconClock size={13} color={OCEAN.base} />}
           />
@@ -120,7 +123,7 @@ function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => voi
             icon={<IconUsers size={13} color={isFull ? colors.textSecondary : OCEAN.base} />}
           />
           {trip.allowsShipments ? (
-            <OceanPill label="Colis ok" tone="success" icon={<IconPackage size={13} color={colors.successDark} />} />
+            <OceanPill label={t('Colis ok')} tone="success" icon={<IconPackage size={13} color={colors.successDark} />} />
           ) : null}
         </View>
         <IconChevronRight size={18} color={colors.textMuted} />
@@ -130,6 +133,7 @@ function TripCard({ trip, onPress, showRoute }: { trip: Trip; onPress: () => voi
 }
 
 export default function TripResultsScreen() {
+  const t = useT();
   const params = useLocalSearchParams<{
     originCityId?: string;
     originCityName?: string;
@@ -160,28 +164,28 @@ export default function TripResultsScreen() {
   const isOpenSearch = !params.originCityId || !params.destinationCityId;
 
   const passengers = params.passengersCount ?? '1';
-  const dateLabel = params.departureDate ? formatDateShort(params.departureDate) : 'Date flexible';
+  const dateLabel = params.departureDate ? formatDateShort(params.departureDate) : t('Date flexible');
 
   const header = (
     <View>
-      <OceanScreenHeader title="Trajets disponibles" onBack={() => router.back()} />
+      <OceanScreenHeader title={t('Trajets disponibles')} onBack={() => router.back()} />
 
       <OceanHeroCard style={styles.hero}>
         <View style={styles.heroRoute}>
           <IconRoute size={20} color={OCEAN.sky} />
           <AppText variant="lg" weight="bold" color={OCEAN.onDark} numberOfLines={2} style={styles.heroTitle}>
-            {params.originCityName ?? 'Toutes les villes'} → {params.destinationCityName ?? 'Toutes les villes'}
+            {params.originCityName ?? t('Toutes les villes')} → {params.destinationCityName ?? t('Toutes les villes')}
           </AppText>
         </View>
         <AppText variant="sm" color={OCEAN.sky}>
-          {dateLabel} · {passengers} passager{Number(passengers) > 1 ? 's' : ''}
+          {t.n(Number(passengers), '{dateLabel} · {passengers} passager', '{dateLabel} · {passengers} passagers', { dateLabel, passengers })}
         </AppText>
       </OceanHeroCard>
 
       <View style={styles.filters}>
-        <OceanPill label={data ? `${data.meta.total} trajet${data.meta.total > 1 ? 's' : ''}` : '…'} />
+        <OceanPill label={data ? t.n(data.meta.total, '{count} trajet', '{count} trajets') : '…'} />
         <OceanChip
-          label="Vérifiés"
+          label={t('Vérifiés')}
           active={verifiedOnly}
           onPress={() => setVerifiedOnly((value) => !value)}
           icon={<IconRosetteDiscountCheck size={15} color={verifiedOnly ? OCEAN.onDark : OCEAN.base} />}
@@ -197,17 +201,17 @@ export default function TripResultsScreen() {
   ) : isError ? (
     <OceanEmpty
       icon={<IconRoute size={28} color={colors.danger} />}
-      title="Impossible de charger les trajets"
-      text="Vérifiez votre connexion puis réessayez."
+      title={t('Impossible de charger les trajets')}
+      text={t('Vérifiez votre connexion puis réessayez.')}
     />
   ) : (
     <OceanEmpty
       icon={<IconRoute size={28} color={OCEAN.base} />}
-      title="Aucun trajet pour le moment"
+      title={t('Aucun trajet pour le moment')}
       text={
         verifiedOnly
-          ? 'Aucun conducteur vérifié ne correspond. Retirez le filtre « Vérifiés » pour voir tous les trajets.'
-          : 'Aucun trajet ne correspond à cette recherche. Essayez une autre date ou revenez plus tard.'
+          ? t('Aucun conducteur vérifié ne correspond. Retirez le filtre « Vérifiés » pour voir tous les trajets.')
+          : t('Aucun trajet ne correspond à cette recherche. Essayez une autre date ou revenez plus tard.')
       }
     />
   );

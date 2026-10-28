@@ -1,11 +1,14 @@
 // mobile/src/hooks/useNotifications.ts
+// [28/10/2026] v+ — Les hooks reçoivent l'espace actif (client / conducteur) : une personne qui a les deux comptes ne voit plus dans l'un
+// les notifications de l'autre. Sans espace, toute la boîte (comportement d'avant).
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { notificationsApi } from '@/services/api/notifications.api';
+import type { Space } from '@/types/roles.types';
 
-export function useMyNotifications(page = 1) {
+export function useMyNotifications(page = 1, space?: Space) {
   return useQuery({
-    queryKey: ['notifications', 'mine', page],
-    queryFn: () => notificationsApi.listMine({ page, limit: 30 }),
+    queryKey: ['notifications', 'mine', space ?? 'all', page],
+    queryFn: () => notificationsApi.listMine({ page, limit: 30, space }),
     refetchInterval: 30_000,
   });
 }
@@ -15,8 +18,8 @@ export function useMyNotifications(page = 1) {
  * notifications déjà interrogé toutes les 30 s plutôt que de construire
  * un suivi "non lu" séparé côté conversations.
  */
-export function useLatestMessageAlert() {
-  const { data } = useMyNotifications(1);
+export function useLatestMessageAlert(space?: Space) {
+  const { data } = useMyNotifications(1, space);
   return data?.data.find((n) => n.type === 'CONVERSATION_MESSAGE' && !n.readAt) ?? null;
 }
 
@@ -28,10 +31,10 @@ export function useMarkNotificationRead() {
   });
 }
 
-export function useMarkAllNotificationsRead() {
+export function useMarkAllNotificationsRead(space?: Space) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => notificationsApi.markAllRead(),
+    mutationFn: () => notificationsApi.markAllRead(space),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', 'mine'] }),
   });
 }

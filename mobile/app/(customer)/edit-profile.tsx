@@ -1,4 +1,5 @@
 // mobile/app/(customer)/edit-profile.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [10/10/2026] v7 — champ Email (optionnel) pour renseigner / modifier son adresse, comme côté conducteur.
 // L'email vit sur User : sa valeur actuelle vient du store d'authentification, et le store est mis à jour après enregistrement.
@@ -28,6 +29,7 @@ import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/services/api/ApiError';
 import type { City, Country } from '@/types/geography.types';
+import { useT } from '@/i18n';
 
 const CITY_FIELD = 'customer-edit-profile-city';
 
@@ -72,6 +74,7 @@ function isoToDateOfBirthDisplay(iso: string | null | undefined): string {
 }
 
 export default function EditProfileScreen() {
+  const t = useT();
   const { data: profile } = useCustomerProfile();
   const authUser = useAuthStore((state) => state.user);
   const updateAuthUser = useAuthStore((state) => state.updateUser);
@@ -102,12 +105,12 @@ export default function EditProfileScreen() {
   function handleSubmit() {
     setErrorMessage(undefined);
     if (firstName.trim().length < 2 || lastName.trim().length < 2) {
-      setErrorMessage('Renseignez votre prénom et votre nom.');
+      setErrorMessage(t('Renseignez votre prénom et votre nom.'));
       return;
     }
     const trimmedEmail = email.trim();
     if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setErrorMessage('Adresse email invalide.');
+      setErrorMessage(t('Adresse email invalide.'));
       return;
     }
 
@@ -115,7 +118,7 @@ export default function EditProfileScreen() {
     if (dateOfBirth.trim().length > 0) {
       dateOfBirthIso = dateOfBirthToIso(dateOfBirth.trim());
       if (!dateOfBirthIso) {
-        setErrorMessage('Date de naissance invalide (format JJ/MM/AAAA).');
+        setErrorMessage(t('Date de naissance invalide (format JJ/MM/AAAA).'));
         return;
       }
     }
@@ -140,7 +143,7 @@ export default function EditProfileScreen() {
           router.back();
         },
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -148,7 +151,7 @@ export default function EditProfileScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanHeroHeader title="Modifier le profil" subtitle="Compte client" icon={<IconUserCircle />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Modifier le profil')} subtitle={t('Compte client')} icon={<IconUserCircle />} onBack={() => router.back()} />
 
       <ProfilePhotoField
         photoUrl={photoUrl}
@@ -160,29 +163,29 @@ export default function EditProfileScreen() {
       />
       <View style={{ height: spacing.lg }} />
 
-      <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title="Identité">
-        <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Fatoumata" />
-        <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Diallo" />
+      <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title={t('Identité')}>
+        <TextField label={t('Prénom')} value={firstName} onChangeText={setFirstName} placeholder={t('Fatoumata')} />
+        <TextField label={t('Nom')} value={lastName} onChangeText={setLastName} placeholder={t('Diallo')} />
         <TextField
-          label="Email (optionnel)"
+          label={t('Email (optionnel)')}
           value={email}
           onChangeText={setEmail}
-          placeholder="vous@exemple.com"
+          placeholder={t('vous@exemple.com')}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
         />
         <TextField
-          label="Date de naissance (optionnel)"
+          label={t('Date de naissance (optionnel)')}
           value={dateOfBirth}
           onChangeText={(text) => setDateOfBirth(formatDateOfBirthInput(text))}
-          placeholder="JJ/MM/AAAA"
+          placeholder={t('JJ/MM/AAAA')}
           keyboardType="number-pad"
           maxLength={10}
         />
 
         {/* Le numéro est l'identifiant de connexion : il ne se change que par le parcours avec code SMS. */}
-        <LockedField label="Téléphone" value={accountPhone} />
+        <LockedField label={t('Téléphone')} value={accountPhone} />
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/(customer)/change-phone')}
@@ -190,7 +193,7 @@ export default function EditProfileScreen() {
         >
           <IconDeviceMobile size={15} color={OCEAN.base} />
           <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-            Changer mon numéro
+            {t('Changer mon numéro')}
           </AppText>
         </Pressable>
         <Pressable
@@ -200,17 +203,17 @@ export default function EditProfileScreen() {
         >
           <IconLock size={15} color={OCEAN.base} />
           <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-            Changer mon mot de passe
+            {t('Changer mon mot de passe')}
           </AppText>
         </Pressable>
       </OceanSection>
 
-      <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Localisation">
-        <CountrySelectField label="Pays" value={country} onSelect={setCountry} />
+      <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title={t('Localisation')}>
+        <CountrySelectField label={t('Pays')} value={country} onSelect={setCountry} />
 
         <View>
           <AppText variant="sm" weight="medium" color="textSecondary" style={styles.cityLabel}>
-            Ville
+            {t('Ville')}
           </AppText>
           <OceanCard
             onPress={() => {
@@ -218,23 +221,23 @@ export default function EditProfileScreen() {
               router.push('/(customer)/select-city');
             }}
             style={styles.cityCard}
-            accessibilityLabel="Choisir une ville"
+            accessibilityLabel={t('Choisir une ville')}
           >
             <View style={styles.cityIcon}>
               <IconMapPin size={16} color={OCEAN.base} />
             </View>
             <AppText variant="base" weight={city ? 'semibold' : 'medium'} color={city ? 'textPrimary' : 'textSecondary'} style={styles.cityText}>
-              {city?.name ?? 'Choisir une ville'}
+              {city?.name ?? t('Choisir une ville')}
             </AppText>
             <IconChevronRight size={16} color={colors.textMuted} />
           </OceanCard>
         </View>
 
         <TextField
-          label="Adresse (optionnel)"
+          label={t('Adresse (optionnel)')}
           value={address}
           onChangeText={setAddress}
-          placeholder="Ex : quartier, repère connu"
+          placeholder={t('Ex : quartier, repère connu')}
           multiline
           style={styles.addressField}
         />
@@ -246,7 +249,7 @@ export default function EditProfileScreen() {
         </AppText>
       ) : null}
 
-      <OceanButton label="Enregistrer" onPress={handleSubmit} loading={updateProfile.isPending} style={styles.submit} />
+      <OceanButton label={t('Enregistrer')} onPress={handleSubmit} loading={updateProfile.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }

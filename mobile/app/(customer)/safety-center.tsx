@@ -1,4 +1,5 @@
 // mobile/app/(customer)/safety-center.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v1 — Centre de sécurité : conseils pratiques + rappel des mécanismes de
@@ -15,42 +16,43 @@ import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { SosButton } from '@/components/safety/SosButton';
+import { useT, translate } from '@/i18n';
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 
 const TIPS: { icon: IconComponent; title: string; text: string }[] = [
   {
     icon: IconLock,
-    title: 'Ne partagez jamais votre code',
-    text: 'Les codes de récupération, de montée ou de livraison ne servent qu\'à valider une étape en votre présence — ne les donnez à personne par téléphone.',
+    get title() { return translate('Ne partagez jamais votre code'); },
+    get text() { return translate("Les codes de récupération, de montée ou de livraison ne servent qu'à valider une étape en votre présence — ne les donnez à personne par téléphone."); },
   },
   {
     icon: IconMessageStar,
-    title: 'Notez chaque prestation',
-    text: 'Votre avis aide les autres utilisateurs et signale les conducteurs à surveiller de plus près.',
+    get title() { return translate('Notez chaque prestation'); },
+    get text() { return translate('Votre avis aide les autres utilisateurs et signale les conducteurs à surveiller de plus près.'); },
   },
   {
     icon: IconPhoneCall,
-    title: 'Restez joignable',
-    text: 'Le conducteur doit pouvoir vous contacter le jour du trajet ou de l\'envoi — vérifiez que votre numéro est à jour dans votre profil.',
+    get title() { return translate('Restez joignable'); },
+    get text() { return translate("Le conducteur doit pouvoir vous contacter le jour du trajet ou de l'envoi — vérifiez que votre numéro est à jour dans votre profil."); },
   },
   {
     icon: IconAlertTriangle,
-    title: 'Un problème pendant la prestation ?',
-    text: 'Utilisez « Signaler un problème » depuis l\'écran du trajet ou de l\'envoi — un agent du support prend le relais. Pour signaler ou bloquer une personne, ouvrez « Signaler ou bloquer » sur sa fiche.',
+    get title() { return translate('Un problème pendant la prestation ?'); },
+    get text() { return translate("Utilisez « Signaler un problème » depuis l'écran du trajet ou de l'envoi — un agent du support prend le relais. Pour signaler ou bloquer une personne, ouvrez « Signaler ou bloquer » sur sa fiche."); },
   },
 ];
 
 export default function SafetyCenterScreen() {
+  const t = useT();
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title="Centre de sécurité" subtitle="Voyager et envoyer en confiance" icon={<IconShieldCheck />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Centre de sécurité')} subtitle={t('Voyager et envoyer en confiance')} icon={<IconShieldCheck />} onBack={() => router.back()} />
 
       <View style={styles.hero}>
         <IconShieldCheck size={22} color={OCEAN.base} />
         <AppText variant="sm" color="textSecondary" style={styles.heroText}>
-          Chaque prise en charge et chaque livraison sont validées par un code à usage unique — personne ne peut se
-          faire passer pour vous ou pour votre conducteur.
+          {t('Chaque prise en charge et chaque livraison sont validées par un code à usage unique — personne ne peut se faire passer pour vous ou pour votre conducteur.')}
         </AppText>
       </View>
 
@@ -78,7 +80,7 @@ export default function SafetyCenterScreen() {
       </View>
 
       <OceanButton
-        label="Mes proches (alerte SOS)"
+        label={t('Mes proches (alerte SOS)')}
         variant="soft"
         icon={<IconUsersGroup size={18} color={OCEAN.base} />}
         onPress={() => router.push('/(customer)/emergency-contacts')}
@@ -86,7 +88,7 @@ export default function SafetyCenterScreen() {
       />
 
       <OceanButton
-        label="Utilisateurs bloqués"
+        label={t('Utilisateurs bloqués')}
         variant="soft"
         icon={<IconUserOff size={18} color={OCEAN.base} />}
         onPress={() => router.push('/(customer)/blocked-users')}
@@ -94,7 +96,7 @@ export default function SafetyCenterScreen() {
       />
 
       <OceanButton
-        label="Voir mes litiges"
+        label={t('Voir mes litiges')}
         variant="outline"
         onPress={() => router.push('/(customer)/disputes')}
         style={styles.button}

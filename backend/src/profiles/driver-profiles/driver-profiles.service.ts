@@ -147,6 +147,7 @@ export class DriverProfilesService {
     // jamais faire échouer ni retarder l'écriture en base, et un envoi
     // manqué ici n'a pas besoin d'annuler la création du profil.
     await this.notifications.notify({
+      audience: 'DRIVER',
       userId,
       type: NotificationType.STATUS_CHANGE,
       channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
@@ -281,6 +282,7 @@ export class DriverProfilesService {
       action: 'VERIFY',
     });
     await this.notifications.notify({
+      audience: 'DRIVER',
       userId: profile.userId,
       type: NotificationType.STATUS_CHANGE,
       channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],

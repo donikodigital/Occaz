@@ -1,5 +1,6 @@
 // mobile/app/_layout.tsx
 // [19/10/2026] v+ — bandeau « Pas de connexion » (OfflineBanner) et écran « Mise à jour requise » quand la version est sous app.min_version.
+// [28/10/2026] v+ — langue choisie (français / English UK / Português PT) lue au démarrage, avant le premier écran.
 import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
@@ -18,6 +19,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { queryClient } from '@/services/queryClient';
 import { useAuthStore } from '@/stores/authStore';
+import { useLanguageStore } from '@/i18n';
 import { colors } from '@/theme';
 import { usePushNotificationRegistration } from '@/hooks/usePushNotifications';
 import { AnimatedSplash } from '@/components/screens/AnimatedSplash';
@@ -58,6 +60,8 @@ function RootLayout() {
   const hydrate = useAuthStore((state) => state.hydrate);
   const isHydrating = useAuthStore((state) => state.isHydrating);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const hydrateLanguage = useLanguageStore((state) => state.hydrate);
+  const isLanguageReady = useLanguageStore((state) => state.isHydrated);
   usePushNotificationRegistration(isAuthenticated);
   // Le splash natif (SplashScreen) est une image statique — aucune
   // animation n'y est possible, c'est une contrainte système, pas un
@@ -72,12 +76,16 @@ function RootLayout() {
   }, [hydrate]);
 
   useEffect(() => {
-    if (fontsLoaded && !isHydrating) {
+    hydrateLanguage();
+  }, [hydrateLanguage]);
+
+  useEffect(() => {
+    if (fontsLoaded && !isHydrating && isLanguageReady) {
       SplashScreen.hideAsync().catch(() => undefined);
     }
-  }, [fontsLoaded, isHydrating]);
+  }, [fontsLoaded, isHydrating, isLanguageReady]);
 
-  if (!fontsLoaded || isHydrating) {
+  if (!fontsLoaded || isHydrating || !isLanguageReady) {
     return null;
   }
 

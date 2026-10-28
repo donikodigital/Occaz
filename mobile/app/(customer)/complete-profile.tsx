@@ -1,4 +1,5 @@
 // mobile/app/(customer)/complete-profile.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [19/10/2026] v2b — bouton « Retour » en haut de l'écran (vers l'espace conducteur si le compte en a un, sinon vers l'écran précédent).
 // v2 — Habillage bleu océan : un bandeau d'accueil sombre, le formulaire sur
@@ -20,8 +21,10 @@ import { OCEAN } from '@/theme/ocean';
 import { useCreateCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useProfileStepBack } from '@/hooks/useProfileStepBack';
 import { ApiError } from '@/services/api/ApiError';
+import { useT } from '@/i18n';
 
 export default function CompleteProfileScreen() {
+  const t = useT();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -32,12 +35,12 @@ export default function CompleteProfileScreen() {
   function handleSubmit() {
     setErrorMessage(undefined);
     if (firstName.trim().length < 2 || lastName.trim().length < 2) {
-      setErrorMessage('Renseignez votre prénom et votre nom.');
+      setErrorMessage(t('Renseignez votre prénom et votre nom.'));
       return;
     }
     const trimmedEmail = email.trim();
     if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setErrorMessage('Adresse email invalide.');
+      setErrorMessage(t('Adresse email invalide.'));
       return;
     }
     createProfile.mutate(
@@ -45,7 +48,7 @@ export default function CompleteProfileScreen() {
       {
         onSuccess: () => router.replace('/(customer)/(tabs)/home'),
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -56,7 +59,7 @@ export default function CompleteProfileScreen() {
       <View style={styles.body}>
         {goBack ? (
           <View style={styles.topBar}>
-            <IconButton icon={<IconArrowLeft size={18} color={colors.textPrimary} />} accessibilityLabel="Retour" onPress={goBack} />
+            <IconButton icon={<IconArrowLeft size={18} color={colors.textPrimary} />} accessibilityLabel={t('Retour')} onPress={goBack} />
           </View>
         ) : null}
         <OceanHeroCard style={styles.hero}>
@@ -64,26 +67,26 @@ export default function CompleteProfileScreen() {
             <IconUserPlus size={26} color={OCEAN.onDark} />
           </View>
           <AppText variant="xxl" weight="bold" color={OCEAN.onDark}>
-            Complétez votre <AppText variant="xxl" weight="bold" color={OCEAN.gold}>profil</AppText>
+            {t('Complétez votre')}{' '}<AppText variant="xxl" weight="bold" color={OCEAN.gold}>{t('profil')}</AppText>
           </AppText>
           <AppText variant="sm" color={OCEAN.sky}>
-            Ces informations sont partagées avec votre conducteur au moment de la réservation.
+            {t('Ces informations sont partagées avec votre conducteur au moment de la réservation.')}
           </AppText>
         </OceanHeroCard>
 
-        <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title="Vos informations">
-          <TextField label="Prénom" value={firstName} onChangeText={setFirstName} placeholder="Fatoumata" autoFocus />
-          <TextField label="Nom" value={lastName} onChangeText={setLastName} placeholder="Diallo" />
+        <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title={t('Vos informations')}>
+          <TextField label={t('Prénom')} value={firstName} onChangeText={setFirstName} placeholder={t('Fatoumata')} autoFocus />
+          <TextField label={t('Nom')} value={lastName} onChangeText={setLastName} placeholder={t('Diallo')} />
           <TextField
-            label="Email (optionnel)"
+            label={t('Email (optionnel)')}
             value={email}
             onChangeText={setEmail}
-            placeholder="vous@exemple.com"
+            placeholder={t('vous@exemple.com')}
             keyboardType="email-address"
             autoCapitalize="none"
           />
           <AppText variant="xs" color="textMuted">
-            Pour recevoir aussi vos notifications par email.
+            {t('Pour recevoir aussi vos notifications par email.')}
           </AppText>
         </OceanSection>
 
@@ -94,7 +97,7 @@ export default function CompleteProfileScreen() {
         ) : null}
       </View>
 
-      <OceanButton label="Continuer" onPress={handleSubmit} loading={createProfile.isPending} style={styles.submit} />
+      <OceanButton label={t('Continuer')} onPress={handleSubmit} loading={createProfile.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }

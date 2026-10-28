@@ -1,4 +1,5 @@
 // mobile/src/components/screens/OfflineBanner.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v1 — Bandeau « Pas de connexion » en haut de l'écran, affiché seulement quand le réseau est coupé. Il ne bloque rien : les
 // données déjà chargées restent visibles, et tout se recharge tout seul au retour du réseau (useConnectivityProbe).
 import React from 'react';
@@ -9,8 +10,10 @@ import { AppText } from '@/components/ui';
 import { spacing } from '@/theme';
 import { useConnectivityStore } from '@/stores/connectivityStore';
 import { useConnectivityProbe } from '@/hooks/useConnectivityProbe';
+import { useT } from '@/i18n';
 
 export function OfflineBanner() {
+  const t = useT();
   const offline = useConnectivityStore((state) => state.offline);
   const insets = useSafeAreaInsets();
   useConnectivityProbe();
@@ -25,7 +28,7 @@ export function OfflineBanner() {
     >
       <IconWifiOff size={16} color="#FFFFFF" />
       <AppText variant="xs" weight="semibold" color="#FFFFFF" style={styles.text}>
-        Pas de connexion — les données se rechargeront dès que le réseau reviendra.
+        {t('Pas de connexion — les données se rechargeront dès que le réseau reviendra.')}
       </AppText>
     </View>
   );

@@ -1,4 +1,5 @@
 // mobile/app/(driver)/trip-new.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // [09/10/2026] v7 — Parcours pas à pas sur téléphone : une seule étape à l'écran, « Continuer » (pied de page) valide l'étape puis ouvre
@@ -73,6 +74,7 @@ import { FLOW_DONE_PARAM } from '@/utils/navigation';
 import { formatCityCountry } from '@/utils/shipmentDisplay';
 import { ApiError } from '@/services/api/ApiError';
 import type { TripLocation } from '@/types/trips.types';
+import { useT } from '@/i18n';
 
 type SectionKey = 'route' | 'date' | 'vehicle' | 'price';
 const SECTION_ORDER: SectionKey[] = ['route', 'date', 'vehicle', 'price'];
@@ -92,13 +94,14 @@ function capitalize(value: string): string {
 }
 
 function PreviewStop({ eyebrow, label, place }: { eyebrow: string; label?: string; place?: string | null }) {
+  const t = useT();
   return (
     <View style={styles.previewStop}>
       <AppText variant="xs" color={HERO_MUTED}>
         {eyebrow}
       </AppText>
       <AppText variant="lg" weight="bold" color={label ? colors.onPrimary : HERO_MUTED} numberOfLines={1}>
-        {label ?? 'À choisir'}
+        {label ?? t('À choisir')}
       </AppText>
       {place ? (
         <AppText variant="xs" color={HERO_MUTED} numberOfLines={1}>
@@ -146,6 +149,7 @@ function LivePreviewHero({
   totalSeats: number;
   priceLabel: string | null;
 }) {
+  const t = useT();
   return (
     <View style={styles.previewCard}>
       <View style={styles.previewDecoLarge} />
@@ -153,7 +157,7 @@ function LivePreviewHero({
 
       <View style={styles.previewPill}>
         <AppText variant="xs" weight="semibold" color={colors.onPrimary}>
-          Aperçu du trajet
+          {t('Aperçu du trajet')}
         </AppText>
       </View>
 
@@ -173,15 +177,15 @@ function LivePreviewHero({
           <View style={styles.previewRailDotDestination} />
         </View>
         <View style={styles.previewStops}>
-          <PreviewStop eyebrow="Départ" label={origin?.label} place={formatCityCountry(origin)} />
-          <PreviewStop eyebrow="Arrivée" label={destination?.label} place={formatCityCountry(destination)} />
+          <PreviewStop eyebrow={t('Départ')} label={origin?.label} place={formatCityCountry(origin)} />
+          <PreviewStop eyebrow={t('Arrivée')} label={destination?.label} place={formatCityCountry(destination)} />
         </View>
       </View>
 
       <View style={styles.previewFooterRow}>
         <View>
           <AppText variant="xs" color={HERO_MUTED}>
-            Places
+            {t('Places')}
           </AppText>
           <AppText variant="md" weight="bold" color={colors.onPrimary}>
             {totalSeats}
@@ -190,7 +194,7 @@ function LivePreviewHero({
         <View style={styles.previewFooterDivider} />
         <View>
           <AppText variant="xs" color={HERO_MUTED}>
-            Prix par place
+            {t('Prix par place')}
           </AppText>
           <AppText variant="md" weight="bold" color={colors.onPrimary}>
             {priceLabel ?? '—'}
@@ -202,6 +206,7 @@ function LivePreviewHero({
 }
 
 export default function NewTripScreen() {
+  const t = useT();
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [origin, setOrigin] = useState<TripLocation | null>(null);
   const [destination, setDestination] = useState<TripLocation | null>(null);
@@ -280,11 +285,11 @@ export default function NewTripScreen() {
     setErrorMessage(undefined);
     setErrorSection(undefined);
     if (!location.cityId) {
-      fail('route', 'Choisissez une adresse située dans la ville traversée.');
+      fail('route', t('Choisissez une adresse située dans la ville traversée.'));
     } else if (location.cityId === origin?.cityId || location.cityId === destination?.cityId) {
-      fail('route', "Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
+      fail('route', t("Une ville traversée ne peut pas être la ville de départ ou d'arrivée."));
     } else if (stops.some((stop) => stop.cityId === location.cityId)) {
-      fail('route', 'Cette ville est déjà dans la liste.');
+      fail('route', t('Cette ville est déjà dans la liste.'));
     } else {
       setStops((current) => [...current, location]);
     }
@@ -324,7 +329,7 @@ export default function NewTripScreen() {
   const priceDisplayUnit = guidance?.currency?.isoCode ?? currency?.isoCode ?? '';
   const overMaxMessage =
     maxPrice !== null
-      ? `Prix trop élevé pour ce trajet : le maximum autorisé est ${formatMoney(maxPrice, priceDisplayUnit)} par place.`
+      ? t('Prix trop élevé pour ce trajet : le maximum autorisé est {money} par place.', { money: formatMoney(maxPrice, priceDisplayUnit) })
       : '';
   const showRecap = Boolean(origin && destination && vehicleId && hasValidPrice && !overMax);
   const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
@@ -358,29 +363,29 @@ export default function NewTripScreen() {
   function validateStep(key: SectionKey): boolean {
     if (key === 'route') {
       if (!origin || !destination) {
-        fail('route', 'Renseignez le point de départ et la destination.');
+        fail('route', t('Renseignez le point de départ et la destination.'));
         return false;
       }
       if (!origin.cityId || !destination.cityId) {
-        fail('route', 'Les adresses doivent être rattachées à une ville.');
+        fail('route', t('Les adresses doivent être rattachées à une ville.'));
         return false;
       }
       if (orderedStops.some((stop) => stop.cityId === origin.cityId || stop.cityId === destination.cityId)) {
-        fail('route', "Une ville traversée ne peut pas être la ville de départ ou d'arrivée.");
+        fail('route', t("Une ville traversée ne peut pas être la ville de départ ou d'arrivée."));
         return false;
       }
     } else if (key === 'vehicle') {
       if (!vehicleId) {
-        fail('vehicle', 'Choisissez un véhicule.');
+        fail('vehicle', t('Choisissez un véhicule.'));
         return false;
       }
     } else if (key === 'price') {
       if (priceLocked && lockedPrice === null) {
-        fail('price', "Le prix de ce trajet est calculé par Occa'Z à partir de la distance : choisissez des adresses localisées sur la carte.");
+        fail('price', t("Le prix de ce trajet est calculé par Occa'Z à partir de la distance : choisissez des adresses localisées sur la carte."));
         return false;
       }
       if (!hasValidPrice) {
-        fail('price', 'Indiquez le prix par place.');
+        fail('price', t('Indiquez le prix par place.'));
         return false;
       }
       if (overMax) {
@@ -439,7 +444,7 @@ export default function NewTripScreen() {
         onSuccess: (trip) => router.replace({ pathname: '/(driver)/trip/[id]', params: { id: trip.id, ...FLOW_DONE_PARAM } }),
         onError: (error) => {
           setErrorSection(undefined);
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -451,14 +456,14 @@ export default function NewTripScreen() {
     route:
       origin && destination
         ? `${origin.city?.name ?? origin.label} → ${destination.city?.name ?? destination.label}${
-            orderedStops.length > 0 ? ` · ${orderedStops.length} ville${orderedStops.length > 1 ? 's' : ''} traversée${orderedStops.length > 1 ? 's' : ''}` : ''
+            orderedStops.length > 0 ? t.n(orderedStops.length, ' · {count} ville traversée', ' · {count} villes traversées') : ''
           }`
-        : 'Départ et arrivée à choisir',
+        : t('Départ et arrivée à choisir'),
     date: `${formatDateLong(departureAt.toISOString())} · ${formatTime(departureAt.toISOString())}`,
-    vehicle: selectedVehicle ? `${selectedVehicle.brand} ${selectedVehicle.model} · ${selectedVehicle.plateNumber}` : 'Véhicule à choisir',
+    vehicle: selectedVehicle ? `${selectedVehicle.brand} ${selectedVehicle.model} · ${selectedVehicle.plateNumber}` : t('Véhicule à choisir'),
     price: hasValidPrice
-      ? `${totalSeats} place${totalSeats > 1 ? 's' : ''} · ${formatMoney(Math.round(priceNumber), priceUnit ?? '')}`
-      : `${totalSeats} place${totalSeats > 1 ? 's' : ''} · prix à indiquer`,
+      ? t.n(totalSeats, '{count} place · {money}', '{count} places · {money}', { money: formatMoney(Math.round(priceNumber), priceUnit ?? '') })
+      : t.n(totalSeats, '{count} place · prix à indiquer', '{count} places · prix à indiquer'),
   };
 
   return (
@@ -480,17 +485,17 @@ export default function NewTripScreen() {
                 <View style={styles.recapCard}>
                   <AppText variant="xs" weight="semibold" color="textSecondary" style={styles.recapEyebrow}>
                     {selectedVehicle.brand} {selectedVehicle.model}
-                    {routeInfo ? ` · ${routeInfo.distanceKm} km` : ''}
+                    {routeInfo ? t(' · {distanceKm} km', { distanceKm: routeInfo.distanceKm }) : ''}
                   </AppText>
                 </View>
               ) : null}
-              <Button label="Créer le trajet" onPress={handleSubmit} loading={createTrip.isPending} />
+              <Button label={t('Créer le trajet')} onPress={handleSubmit} loading={createTrip.isPending} />
             </>
           ) : (
             <WizardNav
               onBack={stepIndex > 0 ? goBack : undefined}
               onNext={isLastStep ? handleSubmit : goNext}
-              nextLabel={isLastStep ? 'Créer le trajet' : 'Continuer'}
+              nextLabel={isLastStep ? t('Créer le trajet') : t('Continuer')}
               loading={isLastStep && createTrip.isPending}
             />
           )}
@@ -498,8 +503,8 @@ export default function NewTripScreen() {
       }
     >
       <OceanHeroHeader
-        title="Créer un trajet"
-        subtitle="Itinéraire, horaires et prix"
+        title={t('Créer un trajet')}
+        subtitle={t('Itinéraire, horaires et prix')}
         icon={<IconRoute />}
         onBack={() => (!isDesktop && stepIndex > 0 ? goBack() : router.back())}
       />
@@ -526,7 +531,7 @@ export default function NewTripScreen() {
               step={1}
               total={SECTION_ORDER.length}
               icon={<IconRoute size={15} color={colors.primary} />}
-              title="Itinéraire"
+              title={t('Itinéraire')}
               summary={summaries.route}
               status={statusOf('route')}
               expanded
@@ -540,24 +545,24 @@ export default function NewTripScreen() {
                       <LocationAutocompleteField
                         basePath="/(driver)"
                         fieldKey={ORIGIN_CITY_FIELD}
-                        label="Point de départ"
+                        label={t('Point de départ')}
                         value={origin}
                         onChange={setOrigin}
-                        placeholder="Ex : Rond-point de Bambeto, Conakry"
+                        placeholder={t('Ex : Rond-point de Bambeto, Conakry')}
                       />
                       <LocationAutocompleteField
                         basePath="/(driver)"
                         fieldKey={DESTINATION_CITY_FIELD}
-                        label="Point d'arrivée"
+                        label={t("Point d'arrivée")}
                         value={destination}
                         onChange={setDestination}
-                        placeholder="Ex : Rue 7x16, Labé"
+                        placeholder={t('Ex : Rue 7x16, Labé')}
                       />
                     </View>
                     <View style={styles.inlineSwap}>
                       <IconButton
                         icon={<IconArrowsUpDown size={16} color={colors.textPrimary} />}
-                        accessibilityLabel="Inverser le départ et l'arrivée"
+                        accessibilityLabel={t("Inverser le départ et l'arrivée")}
                         onPress={handleSwapLocations}
                         disabled={!origin || !destination}
                       />
@@ -573,22 +578,22 @@ export default function NewTripScreen() {
               ) : (
                 <View style={styles.itineraryRow}>
                   <Card style={styles.locationsCard}>
-                    <Pressable onPress={() => openLocation('trip-origin', 'Point de départ')} style={styles.locationRow}>
+                    <Pressable onPress={() => openLocation('trip-origin', t('Point de départ'))} style={styles.locationRow}>
                       <View style={styles.originDot} />
-                      <LocationRowText location={origin} placeholder="Point de départ" />
+                      <LocationRowText location={origin} placeholder={t('Point de départ')} />
                     </Pressable>
                     <Divider />
                     <Pressable
-                      onPress={() => openLocation('trip-destination', 'Destination')}
+                      onPress={() => openLocation('trip-destination', t('Destination'))}
                       style={styles.locationRow}
                     >
                       <IconMapPin size={14} color={colors.accentDark} />
-                      <LocationRowText location={destination} placeholder="Destination" />
+                      <LocationRowText location={destination} placeholder={t('Destination')} />
                     </Pressable>
                   </Card>
                   <IconButton
                     icon={<IconArrowsUpDown size={16} color={colors.textPrimary} />}
-                    accessibilityLabel="Inverser le départ et l'arrivée"
+                    accessibilityLabel={t("Inverser le départ et l'arrivée")}
                     onPress={handleSwapLocations}
                     disabled={!origin || !destination}
                   />
@@ -597,17 +602,16 @@ export default function NewTripScreen() {
 
               <Disclosure
                 icon={<IconMapPin size={15} color={OCEAN.base} />}
-                label="Villes traversées (facultatif)"
+                label={t('Villes traversées (facultatif)')}
                 preview={
                   orderedStops.length > 0
                     ? orderedStops.map((stop) => stop.city?.name ?? stop.label).join(' · ')
-                    : 'Ajoutez les villes où vous passez'
+                    : t('Ajoutez les villes où vous passez')
                 }
                 defaultExpanded={isDesktop}
               >
                 <AppText variant="sm" color="textSecondary">
-                  Les clients qui y habitent pourront trouver votre trajet et monter ou descendre chez eux. Les prix sont
-                  calculés automatiquement ; vous pourrez les modifier avant de publier.
+                  {t('Les clients qui y habitent pourront trouver votre trajet et monter ou descendre chez eux. Les prix sont calculés automatiquement ; vous pourrez les modifier avant de publier.')}
                 </AppText>
                 {orderedStops.map((stop, index) => (
                   <View key={stop.id} style={styles.stopRow}>
@@ -641,7 +645,7 @@ export default function NewTripScreen() {
                   label=""
                   value={null}
                   onChange={handleAddStop}
-                  placeholder="Ajouter une ville traversée (ex. Kindia)"
+                  placeholder={t('Ajouter une ville traversée (ex. Kindia)')}
                 />
               </Disclosure>
             </FormAccordionSection>
@@ -653,7 +657,7 @@ export default function NewTripScreen() {
               step={2}
               total={SECTION_ORDER.length}
               icon={<IconCalendarEvent size={15} color={colors.primary} />}
-              title="Date et heure"
+              title={t('Date et heure')}
               summary={summaries.date}
               status={statusOf('date')}
               expanded
@@ -697,7 +701,7 @@ export default function NewTripScreen() {
               step={3}
               total={SECTION_ORDER.length}
               icon={<IconCar size={15} color={colors.primary} />}
-              title="Véhicule"
+              title={t('Véhicule')}
               summary={summaries.vehicle}
               status={statusOf('vehicle')}
               expanded
@@ -731,10 +735,10 @@ export default function NewTripScreen() {
               ) : (
                 <View style={styles.emptyVehicle}>
                   <AppText variant="sm" color="textSecondary" style={styles.emptyVehicleText}>
-                    Aucun véhicule enregistré.
+                    {t('Aucun véhicule enregistré.')}
                   </AppText>
                   <Button
-                    label="Ajouter un véhicule"
+                    label={t('Ajouter un véhicule')}
                     variant="outline"
                     fullWidth={false}
                     onPress={() => router.push('/(driver)/vehicle-new')}
@@ -750,7 +754,7 @@ export default function NewTripScreen() {
               step={4}
               total={SECTION_ORDER.length}
               icon={<IconUsers size={15} color={colors.primary} />}
-              title="Places et tarif"
+              title={t('Places et tarif')}
               summary={summaries.price}
               status={statusOf('price')}
               expanded
@@ -760,7 +764,7 @@ export default function NewTripScreen() {
               {!isDesktop ? (
                 <View style={styles.stepRecap}>
                   <AppText variant="xs" weight="bold" color={OCEAN.base} style={styles.stepRecapTitle}>
-                    VOTRE TRAJET
+                    {t('Votre trajet').toUpperCase()}
                   </AppText>
                   <AppText variant="sm" weight="semibold" numberOfLines={2}>
                     {summaries.route}
@@ -776,12 +780,12 @@ export default function NewTripScreen() {
               <View style={styles.fields}>
                 <View style={styles.stepperBlock}>
                   <AppText variant="sm" weight="medium" color="textSecondary">
-                    Places proposées
+                    {t('Places proposées')}
                   </AppText>
                   <View style={styles.stepper}>
                     <IconButton
                       icon={<IconMinus size={16} color={colors.textPrimary} />}
-                      accessibilityLabel="Retirer une place"
+                      accessibilityLabel={t('Retirer une place')}
                       onPress={() => setTotalSeats((value) => Math.max(1, value - 1))}
                     />
                     <AppText variant="lg" weight="semibold" style={styles.stepperValue}>
@@ -789,7 +793,7 @@ export default function NewTripScreen() {
                     </AppText>
                     <IconButton
                       icon={<IconPlus size={16} color={colors.textPrimary} />}
-                      accessibilityLabel="Ajouter une place"
+                      accessibilityLabel={t('Ajouter une place')}
                       onPress={() => setTotalSeats((value) => Math.min(12, value + 1))}
                     />
                   </View>
@@ -797,12 +801,12 @@ export default function NewTripScreen() {
 
                 <View>
                   <AppText variant="sm" weight="medium" color="textSecondary" style={styles.fieldLabel}>
-                    Prix par place
+                    {t('Prix par place')}
                   </AppText>
 
                   {priceLocked ? (
                     // Automatique : le prix est fixé par Occa'Z, le conducteur le voit mais ne peut pas le changer.
-                    <View style={styles.lockedCard} accessibilityLabel="Prix fixé par Occa'Z">
+                    <View style={styles.lockedCard} accessibilityLabel={t("Prix fixé par Occa'Z")}>
                       <IconLock size={18} color={colors.primary} />
                       <View style={styles.lockedBody}>
                         {lockedPrice !== null ? (
@@ -811,23 +815,23 @@ export default function NewTripScreen() {
                               {formatMoney(lockedPrice, priceDisplayUnit)}
                             </AppText>
                             <AppText variant="xs" color="textSecondary">
-                              Prix par place fixé par Occa&apos;Z pour ce trajet. Vous n&apos;avez rien à saisir.
+                              {t("Prix par place fixé par Occa'Z pour ce trajet. Vous n'avez rien à saisir.")}
                             </AppText>
                           </>
                         ) : guidance?.reason === 'NO_DISTANCE' ? (
                           <AppText variant="sm" color="textSecondary">
-                            Le prix est calculé par Occa&apos;Z à partir de la distance. Choisissez des adresses localisées sur la carte.
+                            {t("Le prix est calculé par Occa'Z à partir de la distance. Choisissez des adresses localisées sur la carte.")}
                           </AppText>
                         ) : (
                           <AppText variant="sm" color="textSecondary">
-                            Le prix de ce trajet sera fixé automatiquement par Occa&apos;Z une fois le départ et l&apos;arrivée choisis.
+                            {t("Le prix de ce trajet sera fixé automatiquement par Occa'Z une fois le départ et l'arrivée choisis.")}
                           </AppText>
                         )}
                       </View>
                     </View>
                   ) : guidancePending && origin && destination ? (
                     <AppText variant="xs" color="textMuted">
-                      Calcul du prix conseillé…
+                      {t('Calcul du prix conseillé…')}
                     </AppText>
                   ) : (
                     <>
@@ -840,13 +844,13 @@ export default function NewTripScreen() {
                               setPricePerSeat(value);
                             }}
                             keyboardType="numeric"
-                            placeholder="Ex : 50000"
+                            placeholder={t('Ex : 50000')}
                             error={overMax ? overMaxMessage : undefined}
                           />
                         </View>
                         {/* Devise imposée par le pays de départ : un repère, pas un choix. */}
                         {currency ? (
-                          <View style={styles.currencyBadge} accessibilityLabel={`Devise : ${currency.isoCode}`}>
+                          <View style={styles.currencyBadge} accessibilityLabel={t('Devise : {isoCode}', { isoCode: currency.isoCode })}>
                             <AppText variant="sm" weight="semibold" color="primary">
                               {currency.isoCode}
                             </AppText>
@@ -857,12 +861,11 @@ export default function NewTripScreen() {
                       {pricingMode === 'SEMI_AUTO' && suggestedPrice !== null ? (
                         <View style={styles.guidanceCard}>
                           <AppText variant="sm" weight="semibold" color="primary">
-                            Prix conseillé : {formatMoney(suggestedPrice, priceDisplayUnit)}
+                            {t('Prix conseillé : {money}', { money: formatMoney(suggestedPrice, priceDisplayUnit) })}
                           </AppText>
                           {minPrice !== null && maxPrice !== null ? (
                             <AppText variant="xs" color="textSecondary">
-                              Fourchette habituelle : de {formatMoney(minPrice, '')} à {formatMoney(maxPrice, priceDisplayUnit)}. Au-delà du
-                              maximum, le prix est refusé.
+                              {t('Fourchette habituelle : de {money} à {money2}. Au-delà du maximum, le prix est refusé.', { money: formatMoney(minPrice, ''), money2: formatMoney(maxPrice, priceDisplayUnit) })}
                             </AppText>
                           ) : null}
                           {hasValidPrice && priceNumber !== suggestedPrice ? (
@@ -874,7 +877,7 @@ export default function NewTripScreen() {
                               accessibilityRole="button"
                             >
                               <AppText variant="xs" weight="semibold" color="primary">
-                                Utiliser le prix conseillé
+                                {t('Utiliser le prix conseillé')}
                               </AppText>
                             </Pressable>
                           ) : null}
@@ -883,8 +886,8 @@ export default function NewTripScreen() {
 
                       <AppText variant="xs" color="textMuted" style={styles.currencyHint}>
                         {currency
-                          ? `Devise du pays de départ${originCountry ? ` (${originCountry.name})` : ''}.`
-                          : 'La devise est celle du pays de départ : choisissez d’abord le départ.'}
+                          ? t('Devise du pays de départ{value}.', { value: originCountry ? ` (${originCountry.name})` : '' })
+                          : t('La devise est celle du pays de départ : choisissez d’abord le départ.')}
                       </AppText>
                     </>
                   )}
@@ -893,7 +896,7 @@ export default function NewTripScreen() {
                 <Pressable onPress={() => setAllowsShipments((value) => !value)} style={styles.switchRow}>
                   <IconPackage size={16} color={colors.textSecondary} />
                   <AppText variant="sm" style={styles.switchLabel}>
-                    Accepter les colis sur ce trajet
+                    {t('Accepter les colis sur ce trajet')}
                   </AppText>
                   <Switch
                     value={allowsShipments}
@@ -905,14 +908,14 @@ export default function NewTripScreen() {
 
                 <Disclosure
                   icon={<IconPackage size={15} color={OCEAN.base} />}
-                  label="Notes pour les passagers (optionnel)"
-                  preview={notes.trim() ? notes.trim() : 'Informations complémentaires'}
+                  label={t('Notes pour les passagers (optionnel)')}
+                  preview={notes.trim() ? notes.trim() : t('Informations complémentaires')}
                   defaultExpanded={isDesktop}
                 >
                   <TextField
                     value={notes}
                     onChangeText={setNotes}
-                    placeholder="Informations complémentaires pour les passagers"
+                    placeholder={t('Informations complémentaires pour les passagers')}
                     multiline
                     style={styles.notesField}
                   />

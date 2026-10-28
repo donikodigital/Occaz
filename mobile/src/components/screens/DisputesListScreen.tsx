@@ -1,4 +1,5 @@
 // mobile/src/components/screens/DisputesListScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [07/10/2026] Le titre de la page passe en bandeau (hero) bleu océan : OceanHeroHeader. Le reste de l'écran est inchangé.
 //
 // v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
@@ -18,6 +19,7 @@ import { useMyDisputes } from '@/hooks/useDisputes';
 import { DISPUTE_STATUS_LABELS, DISPUTE_STATUS_TONE } from '@/utils/disputeLabels';
 import { formatDateShort } from '@/utils/date';
 import type { Dispute } from '@/types/disputes.types';
+import { useT } from '@/i18n';
 
 export interface DisputesListScreenProps {
   basePath: '/(customer)' | '/(driver)';
@@ -56,10 +58,11 @@ function DisputeRow({ dispute, basePath }: { dispute: Dispute; basePath: string 
 
 /** Uniquement en lecture — l'ouverture d'un litige se fait depuis le détail d'une réservation ou d'un envoi, où le contexte est déjà là. */
 export function DisputesListScreen({ basePath }: DisputesListScreenProps) {
+  const t = useT();
   const { data: disputes, isLoading } = useMyDisputes();
 
   const header = (
-    <OceanHeroHeader title="Mes litiges" subtitle="Le suivi de vos signalements" icon={<IconAlertTriangle />} onBack={() => router.back()} />
+    <OceanHeroHeader title={t('Mes litiges')} subtitle={t('Le suivi de vos signalements')} icon={<IconAlertTriangle />} onBack={() => router.back()} />
   );
 
   return (
@@ -74,8 +77,8 @@ export function DisputesListScreen({ basePath }: DisputesListScreenProps) {
           !isLoading ? (
             <OceanEmpty
               icon={<IconShieldCheck size={28} color={OCEAN.base} />}
-              title="Aucun litige"
-              text="Tout se passe bien. Si un problème survient, signalez-le depuis le détail d'une réservation ou d'un envoi."
+              title={t('Aucun litige')}
+              text={t("Tout se passe bien. Si un problème survient, signalez-le depuis le détail d'une réservation ou d'un envoi.")}
             />
           ) : undefined
         }

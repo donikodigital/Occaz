@@ -1,4 +1,5 @@
 // mobile/app/(customer)/booking/[id].tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [09/10/2026] v5 — Plus d'annulation une fois pris en charge : le bouton « Annuler la réservation » disparaît dès qu'un passager
 // de la réservation est monté (le serveur refuse aussi). Un court message explique pourquoi et renvoie vers « Signaler un
@@ -77,34 +78,35 @@ import { customerCodeVisibility, isPickedUp } from '@/utils/bookingPhase';
 import { closeToHome } from '@/utils/navigation';
 import { ApiError } from '@/services/api/ApiError';
 import type { BookingStatus } from '@/types/bookings.types';
+import { useT, translate } from '@/i18n';
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
-  PENDING_PAYMENT: 'En attente de paiement',
-  PAID: 'Payée',
-  CONFIRMED: 'Confirmée',
-  CANCELLED: 'Annulée',
-  COMPLETED: 'Terminée',
-  REFUNDED: 'Remboursée',
-  DISPUTED: 'En litige',
+  get PENDING_PAYMENT() { return translate('En attente de paiement'); },
+  get PAID() { return translate('Payée'); },
+  get CONFIRMED() { return translate('Confirmée'); },
+  get CANCELLED() { return translate('Annulée'); },
+  get COMPLETED() { return translate('Terminée'); },
+  get REFUNDED() { return translate('Remboursée'); },
+  get DISPUTED() { return translate('En litige'); },
 };
 
 const CANCELLABLE_STATUSES: BookingStatus[] = ['PENDING_PAYMENT', 'PAID', 'CONFIRMED'];
 
 /** Le titre de la page suit l'étape : « Réservation » n'a plus de sens quand le client est en route. */
 function screenTitleFor(status: BookingStatus, journeyMode: boolean): string {
-  if (journeyMode) return 'Mon voyage';
+  if (journeyMode) return translate('Mon voyage');
   switch (status) {
     case 'PENDING_PAYMENT':
-      return 'Réservation';
+      return translate('Réservation');
     case 'COMPLETED':
-      return 'Voyage terminé';
+      return translate('Voyage terminé');
     case 'CANCELLED':
     case 'REFUNDED':
-      return 'Réservation annulée';
+      return translate('Réservation annulée');
     case 'DISPUTED':
-      return 'Litige en cours';
+      return translate('Litige en cours');
     default:
-      return 'Ma réservation';
+      return translate('Ma réservation');
   }
 }
 
@@ -117,11 +119,12 @@ function heroColorFor(status: BookingStatus): string {
 }
 
 function PickupCodeCard({ bookingId }: { bookingId: string }) {
+  const t = useT();
   const reveal = useRevealPickupOtpForCustomer(bookingId);
   return (
     <OtpCodeCard
-      title="Code de prise en charge"
-      description="Communiquez-le à votre conducteur pour confirmer votre prise en charge — affiché ici (copie directe possible)."
+      title={t('Code de prise en charge')}
+      description={t('Communiquez-le à votre conducteur pour confirmer votre prise en charge — affiché ici (copie directe possible).')}
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
       smsDisabled={reveal.data?.smsDisabled}
@@ -134,11 +137,12 @@ function PickupCodeCard({ bookingId }: { bookingId: string }) {
 }
 
 function DropoffCodeCard({ bookingId }: { bookingId: string }) {
+  const t = useT();
   const reveal = useRevealDropoffOtpForCustomer(bookingId);
   return (
     <OtpCodeCard
-      title="Code de dépose"
-      description="Communiquez-le à votre conducteur pour confirmer la fin de votre trajet — affiché ici (copie directe possible)."
+      title={t('Code de dépose')}
+      description={t('Communiquez-le à votre conducteur pour confirmer la fin de votre trajet — affiché ici (copie directe possible).')}
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
       smsDisabled={reveal.data?.smsDisabled}
@@ -154,6 +158,7 @@ function DropoffCodeCard({ bookingId }: { bookingId: string }) {
 const TICKET_STATUSES: BookingStatus[] = ['PAID', 'CONFIRMED', 'COMPLETED', 'DISPUTED'];
 
 export default function BookingDetailScreen() {
+  const t = useT();
   const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
   const { data: booking, isLoading, isError } = useBooking(id);
   const cancelBooking = useCancelBooking(id ?? '');
@@ -169,7 +174,7 @@ export default function BookingDetailScreen() {
       <ScreenContainer style={styles.center} maxWidth="detail">
         {isError ? (
           <AppText variant="sm" color="danger">
-            Impossible de charger cette réservation.
+            {t('Impossible de charger cette réservation.')}
           </AppText>
         ) : (
           <ActivityIndicator color={OCEAN.base} />
@@ -192,7 +197,7 @@ export default function BookingDetailScreen() {
   const journeyMode =
     booking.status === 'CONFIRMED' && isPickedUp(booking) && (trip?.status === 'IN_PROGRESS' || trip?.status === 'ARRIVED');
   const detailsVisible = !journeyMode || showDetails;
-  const arrivalCity = booking.alightingStop?.city?.name ?? trip?.destinationCity.name ?? 'destination';
+  const arrivalCity = booking.alightingStop?.city?.name ?? trip?.destinationCity.name ?? t('destination');
   const arrived = journeyMode && showDropoffCode;
   const screenTitle = screenTitleFor(booking.status, journeyMode);
   const hasRated = (existingRatings?.length ?? 0) > 0;
@@ -204,7 +209,7 @@ export default function BookingDetailScreen() {
       {
         onSuccess: () => setConfirmCancelOpen(false),
         onError: (error) =>
-          setCancelErrorMessage(error instanceof ApiError ? error.message : "L'annulation a échoué — réessayez."),
+          setCancelErrorMessage(error instanceof ApiError ? error.message : t("L'annulation a échoué — réessayez.")),
       },
     );
   }
@@ -228,7 +233,7 @@ export default function BookingDetailScreen() {
                 })
               }
               accessibilityRole="button"
-              accessibilityLabel="Contacter le conducteur"
+              accessibilityLabel={t('Contacter le conducteur')}
               style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
             >
               <IconMessageCircle size={18} color={OCEAN.base} />
@@ -246,10 +251,10 @@ export default function BookingDetailScreen() {
             </View>
             <View style={styles.heroText}>
               <AppText variant="lg" weight="bold" color={OCEAN.onDark}>
-                {arrived ? `Vous êtes arrivé à ${arrivalCity}` : 'Voyage en cours'}
+                {arrived ? t('Vous êtes arrivé à {arrivalCity}', { arrivalCity }) : t('Voyage en cours')}
               </AppText>
               <AppText variant="sm" color={OCEAN.sky}>
-                {arrived ? 'Donnez votre code de dépose à votre conducteur' : `En route vers ${arrivalCity}`}
+                {arrived ? t('Donnez votre code de dépose à votre conducteur') : t('En route vers {arrivalCity}', { arrivalCity })}
               </AppText>
             </View>
           </View>
@@ -262,7 +267,7 @@ export default function BookingDetailScreen() {
             </View>
             <View style={styles.heroText}>
               <AppText variant="xs" color={OCEAN.sky}>
-                Statut de la réservation
+                {t('Statut de la réservation')}
               </AppText>
               <AppText variant="lg" weight="bold" color={OCEAN.onDark}>
                 {STATUS_LABELS[booking.status]}
@@ -273,12 +278,12 @@ export default function BookingDetailScreen() {
       )}
 
       {booking.status === 'COMPLETED' ? (
-        <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Bienvenue">
+        <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title={t('Bienvenue')}>
           <AppText variant="base" weight="bold" color={OCEAN.deep}>
-            Bienvenue à {booking.alightingStop?.city?.name ?? trip?.destinationCity.name ?? 'destination'} !
+            {t('Bienvenue à {value} !', { value: booking.alightingStop?.city?.name ?? trip?.destinationCity.name ?? t('destination') })}
           </AppText>
           <AppText variant="sm" color="textSecondary" style={styles.welcomeText}>
-            Vous êtes bien arrivé. Toute l'équipe Occa'Z vous souhaite un excellent séjour et vous remercie d'avoir voyagé avec nous.
+            {t("Vous êtes bien arrivé. Toute l'équipe Occa'Z vous souhaite un excellent séjour et vous remercie d'avoir voyagé avec nous.")}
           </AppText>
         </OceanSection>
       ) : null}
@@ -287,7 +292,7 @@ export default function BookingDetailScreen() {
         <View style={styles.journeyOn}>
           <IconShieldCheck size={20} color={colors.successDark} />
           <AppText variant="sm" color={colors.successDark} style={styles.journeyOnText}>
-            N&apos;oubliez pas d&apos;attacher votre ceinture de sécurité. Nous vous souhaitons un bon voyage.
+            {t("N'oubliez pas d'attacher votre ceinture de sécurité. Nous vous souhaitons un bon voyage.")}
           </AppText>
         </View>
       ) : null}
@@ -301,11 +306,11 @@ export default function BookingDetailScreen() {
       {showDropoffCode ? <DropoffCodeCard bookingId={booking.id} /> : null}
 
       {detailsVisible && trip ? (
-        <OceanSection icon={<IconRoute size={17} color={OCEAN.base} />} title="Trajet">
+        <OceanSection icon={<IconRoute size={17} color={OCEAN.base} />} title={t('Trajet')}>
           <View style={styles.tripBlock}>
             {journeyMode ? (
               <AppText variant="xs" color="textSecondary">
-                Statut de la réservation : {STATUS_LABELS[booking.status]}
+                {t('Statut de la réservation : {status}', { status: STATUS_LABELS[booking.status] })}
               </AppText>
             ) : null}
             <AppText variant="base" weight="bold" color={OCEAN.deep}>
@@ -313,11 +318,11 @@ export default function BookingDetailScreen() {
             </AppText>
             {isPartialBooking(booking) ? (
               <AppText variant="xs" color="textSecondary">
-                Trajet du conducteur : {trip.originCity.name} → {trip.destinationCity.name}
+                {t('Trajet du conducteur : {originCityName} → {destinationCityName}', { originCityName: trip.originCity.name, destinationCityName: trip.destinationCity.name })}
               </AppText>
             ) : null}
             <AppText variant="sm" weight="semibold">
-              {formatDateLong(bookingBoardingAt(booking) ?? trip.departureAt)} à {formatTime(bookingBoardingAt(booking) ?? trip.departureAt)}
+              {t('{dateLong} à {time}', { dateLong: formatDateLong(bookingBoardingAt(booking) ?? trip.departureAt), time: formatTime(bookingBoardingAt(booking) ?? trip.departureAt) })}
             </AppText>
             <AppText variant="sm" color="textSecondary">
               {trip.driver.firstName} {trip.driver.lastName[0]}. · {trip.vehicle.brand} {trip.vehicle.model}
@@ -337,7 +342,7 @@ export default function BookingDetailScreen() {
       ) : null}
 
       {detailsVisible && booking.passengers && booking.passengers.length > 0 ? (
-        <OceanSection icon={<IconUsers size={17} color={OCEAN.base} />} title="Passagers">
+        <OceanSection icon={<IconUsers size={17} color={OCEAN.base} />} title={t('Passagers')}>
           <View style={styles.passengers}>
             {booking.passengers.map((passenger) => (
               <View key={passenger.id} style={styles.passengerRow}>
@@ -352,11 +357,11 @@ export default function BookingDetailScreen() {
       ) : null}
 
       {detailsVisible ? (
-        <OceanSection icon={<IconCash size={17} color={OCEAN.base} />} title="Montant">
+        <OceanSection icon={<IconCash size={17} color={OCEAN.base} />} title={t('Montant')}>
           <View style={styles.priceRows}>
             <View style={styles.totalRow}>
               <AppText variant="base" weight="bold">
-                {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
+                {t.n(booking.seatsCount, '{count} place', '{count} places')}
               </AppText>
               <AppText variant="lg" weight="bold" color={OCEAN.deep}>
                 {formatMoney(booking.totalAmount, currencyOf(booking))}
@@ -368,7 +373,7 @@ export default function BookingDetailScreen() {
 
       {journeyMode ? (
         <OceanButton
-          label={showDetails ? 'Masquer les détails' : 'Voir tous les détails'}
+          label={showDetails ? t('Masquer les détails') : t('Voir tous les détails')}
           variant="soft"
           icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
           onPress={() => setShowDetails((value) => !value)}
@@ -378,12 +383,12 @@ export default function BookingDetailScreen() {
 
       {/* Billet PDF A5 avec QR code : disponible dès que la réservation est payée (aussi envoyé par e-mail s'il y a une adresse). */}
       {TICKET_STATUSES.includes(booking.status) && !journeyMode ? (
-        <PdfDownloadButton kind="booking" id={booking.id} label="Télécharger mon billet (PDF)" />
+        <PdfDownloadButton kind="booking" id={booking.id} label={t('Télécharger mon billet (PDF)')} />
       ) : null}
 
       {booking.status === 'PENDING_PAYMENT' ? (
         <OceanButton
-          label="Payer maintenant"
+          label={t('Payer maintenant')}
           onPress={() => router.push({ pathname: '/(customer)/payment', params: { bookingId: booking.id } })}
           style={styles.actionButton}
         />
@@ -391,7 +396,7 @@ export default function BookingDetailScreen() {
 
       {booking.status === 'COMPLETED' && !hasRated ? (
         <OceanButton
-          label="Noter ce trajet"
+          label={t('Noter ce trajet')}
           variant="soft"
           onPress={() => router.push({ pathname: '/(customer)/rate', params: { type: 'booking', id: booking.id } })}
           style={styles.actionButton}
@@ -406,7 +411,7 @@ export default function BookingDetailScreen() {
             </AppText>
           ) : null}
           <OceanButton
-            label="Annuler la réservation"
+            label={t('Annuler la réservation')}
             variant="outline"
             onPress={() => {
               setCancelErrorMessage(undefined);
@@ -419,12 +424,12 @@ export default function BookingDetailScreen() {
 
       {cancelLocked && detailsVisible ? (
         <AppText variant="xs" color="textSecondary" style={styles.cancelLockedNote}>
-          Vous avez été pris en charge : l'annulation n'est plus possible. En cas de problème, utilisez « Signaler un problème ».
+          {t("Vous avez été pris en charge : l'annulation n'est plus possible. En cas de problème, utilisez « Signaler un problème ».")}
         </AppText>
       ) : null}
 
       <OceanButton
-        label="Signaler un problème"
+        label={t('Signaler un problème')}
         variant="soft"
         onPress={() =>
           router.push({
@@ -437,9 +442,9 @@ export default function BookingDetailScreen() {
 
       <ConfirmDialog
         visible={confirmCancelOpen}
-        title="Annuler la réservation ?"
-        message="Cette action ne peut pas être annulée."
-        confirmLabel="Annuler la réservation"
+        title={t('Annuler la réservation ?')}
+        message={t('Cette action ne peut pas être annulée.')}
+        confirmLabel={t('Annuler la réservation')}
         destructive
         loading={cancelBooking.isPending}
         onConfirm={handleConfirmCancel}

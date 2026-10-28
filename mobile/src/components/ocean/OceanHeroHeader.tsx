@@ -1,4 +1,5 @@
 // mobile/src/components/ocean/OceanHeroHeader.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [10/10/2026] v2 — `onClose` (croix « Fermer » qui remplace la flèche, pour les pages affichées juste après une création) et `right`
 // (actions à droite, à la place de la tuile d'icône : sélection, « Tout lire »…) : mêmes props qu'OceanScreenHeader, pour que toutes
@@ -14,6 +15,7 @@ import { AppText } from '@/components/ui';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { OceanHeroCard } from './OceanKit';
+import { useT } from '@/i18n';
 
 export function OceanHeroHeader({
   title,
@@ -35,13 +37,14 @@ export function OceanHeroHeader({
   right?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const t = useT();
   return (
     <OceanHeroCard style={[styles.card, style]}>
       <View style={styles.row}>
         <Pressable
           onPress={onClose ?? onBack}
           accessibilityRole="button"
-          accessibilityLabel={onClose ? 'Fermer et revenir à l’accueil' : 'Retour'}
+          accessibilityLabel={onClose ? t('Fermer et revenir à l’accueil') : t('Retour')}
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
         >
           {onClose ? <IconX size={20} color={OCEAN.onDark} /> : <IconArrowLeft size={20} color={OCEAN.onDark} />}

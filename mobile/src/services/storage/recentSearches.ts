@@ -1,5 +1,7 @@
 // mobile/src/services/storage/recentSearches.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { translate } from '@/i18n';
 
 const STORAGE_KEY = 'recentTripSearches';
 const MAX_ENTRIES = 5;
@@ -15,7 +17,7 @@ export interface RecentSearch {
 
 /** « Kindia → Labé », ou « Toutes les villes → Labé » quand le départ n'est pas précisé. */
 export function formatRecentSearch(search: Pick<RecentSearch, 'originCityName' | 'destinationCityName'>): string {
-  return `${search.originCityName ?? 'Toutes les villes'} → ${search.destinationCityName ?? 'Toutes les villes'}`;
+  return `${search.originCityName ?? translate('Toutes les villes')} → ${search.destinationCityName ?? translate('Toutes les villes')}`;
 }
 
 /**

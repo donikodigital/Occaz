@@ -1,10 +1,12 @@
 // mobile/src/components/ui/CalendarPicker.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { IconCalendar, IconChevronLeft, IconChevronRight, IconX } from '@tabler/icons-react-native';
 import { AppText, Card, IconButton } from '@/components/ui';
 import { colors, maxContentWidth, radius, spacing } from '@/theme';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useT, useLanguage, intlLocale } from '@/i18n';
 
 export interface CalendarPickerProps {
   label: string;
@@ -63,7 +65,7 @@ function buildMonthMatrix(year: number, month: number): CalendarCell[][] {
 /** Lettres L M M J V S D — dérivées d'une semaine connue plutôt que codées en dur, pour rester correct si le format Intl change de convention. */
 function getWeekdayLabels(): string[] {
   const monday = new Date(2024, 0, 1); // un lundi
-  const formatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'narrow' });
+  const formatter = new Intl.DateTimeFormat(intlLocale(), { weekday: 'narrow' });
   return Array.from({ length: 7 }, (_, i) => {
     const day = new Date(monday);
     day.setDate(monday.getDate() + i);
@@ -71,9 +73,10 @@ function getWeekdayLabels(): string[] {
   });
 }
 
-const WEEKDAY_LABELS = getWeekdayLabels();
-
 export function CalendarPicker({ label, selectedDate, onSelectDate, minDate, flexibleLabel }: CalendarPickerProps) {
+  const t = useT();
+  const language = useLanguage();
+  const weekdayLabels = useMemo(() => getWeekdayLabels(), [language]);
   const [isOpen, setOpen] = useState(false);
   const { isTablet } = useResponsive();
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -84,7 +87,7 @@ export function CalendarPicker({ label, selectedDate, onSelectDate, minDate, fle
     () => buildMonthMatrix(visibleMonth.getFullYear(), visibleMonth.getMonth()),
     [visibleMonth],
   );
-  const monthLabel = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(visibleMonth);
+  const monthLabel = new Intl.DateTimeFormat(intlLocale(), { month: 'long', year: 'numeric' }).format(visibleMonth);
 
   function open() {
     setVisibleMonth(selectedDate ?? floor);
@@ -105,8 +108,8 @@ export function CalendarPicker({ label, selectedDate, onSelectDate, minDate, fle
   }
 
   const triggerLabel = selectedDate
-    ? new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' }).format(selectedDate)
-    : (flexibleLabel ?? 'Choisir une date');
+    ? new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', day: 'numeric', month: 'long' }).format(selectedDate)
+    : (flexibleLabel ?? t('Choisir une date'));
 
   return (
     <View>
@@ -130,11 +133,11 @@ export function CalendarPicker({ label, selectedDate, onSelectDate, minDate, fle
           <View style={[styles.sheet, isTablet && styles.sheetCentered]}>
             <View style={styles.header}>
               <AppText variant="lg" weight="semibold">
-                Choisir une date
+                {t('Choisir une date')}
               </AppText>
               <IconButton
                 icon={<IconX size={18} color={colors.textPrimary} />}
-                accessibilityLabel="Fermer"
+                accessibilityLabel={t('Fermer')}
                 onPress={() => setOpen(false)}
               />
             </View>
@@ -156,7 +159,7 @@ export function CalendarPicker({ label, selectedDate, onSelectDate, minDate, fle
             <View style={styles.monthNav}>
               <IconButton
                 icon={<IconChevronLeft size={18} color={colors.textPrimary} />}
-                accessibilityLabel="Mois précédent"
+                accessibilityLabel={t('Mois précédent')}
                 onPress={goToPreviousMonth}
               />
               <AppText variant="base" weight="semibold" style={styles.monthLabel}>
@@ -164,13 +167,13 @@ export function CalendarPicker({ label, selectedDate, onSelectDate, minDate, fle
               </AppText>
               <IconButton
                 icon={<IconChevronRight size={18} color={colors.textPrimary} />}
-                accessibilityLabel="Mois suivant"
+                accessibilityLabel={t('Mois suivant')}
                 onPress={goToNextMonth}
               />
             </View>
 
             <View style={styles.weekdayRow}>
-              {WEEKDAY_LABELS.map((letter, index) => (
+              {weekdayLabels.map((letter, index) => (
                 <View key={index} style={styles.cell}>
                   <AppText variant="xs" color="textMuted" weight="medium">
                     {letter}

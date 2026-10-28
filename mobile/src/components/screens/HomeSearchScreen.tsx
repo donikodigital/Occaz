@@ -1,4 +1,5 @@
 // mobile/src/components/screens/HomeSearchScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [08/10/2026] v1 — Écran ouvert par la barre de recherche de l'accueil. Une seule présentation, deux contenus selon le compte :
 //   - client : ses réservations (trajets), ses envois (colis), les chauffeurs qu'il a croisés, et les villes (pour lancer une recherche
@@ -36,6 +37,7 @@ import { formatShipmentRoute } from '@/utils/shipmentDisplay';
 import { SHIPMENT_STATUS_LABELS } from '@/utils/tripStatusLabels';
 import type { Trip } from '@/types/trips.types';
 import type { Shipment } from '@/types/shipments.types';
+import { useT } from '@/i18n';
 
 type Section = 'Trajets' | 'Colis' | 'Chauffeurs' | 'Villes';
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
@@ -104,6 +106,7 @@ function SearchShell({
   idle: React.ReactNode;
   emptyAction?: React.ReactNode;
 }) {
+  const t = useT();
   const hasQuery = query.trim().length > 0;
 
   const grouped = SECTION_ORDER.map((section) => ({
@@ -117,7 +120,7 @@ function SearchShell({
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('Retour')}
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
         >
           <IconArrowLeft size={20} color={OCEAN.deep} />
@@ -136,7 +139,7 @@ function SearchShell({
             accessibilityLabel={placeholder}
           />
           {hasQuery ? (
-            <Pressable onPress={() => onChangeQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Effacer">
+            <Pressable onPress={() => onChangeQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('Effacer')}>
               <IconX size={18} color={colors.textMuted} />
             </Pressable>
           ) : null}
@@ -149,8 +152,8 @@ function SearchShell({
         <View style={styles.emptyWrap}>
           <OceanEmpty
             icon={<IconSearch size={28} color={OCEAN.base} />}
-            title={loading ? 'Recherche…' : 'Aucun résultat'}
-            text={loading ? 'Un instant.' : 'Essayez avec une ville, un nom, ou une partie du mot.'}
+            title={loading ? 'Recherche…' : t('Aucun résultat')}
+            text={loading ? t('Un instant.') : t('Essayez avec une ville, un nom, ou une partie du mot.')}
             action={emptyAction}
           />
         </View>
@@ -162,7 +165,7 @@ function SearchShell({
               <View style={styles.groupHeader}>
                 <SectionIcon size={15} color={OCEAN.base} />
                 <AppText variant="xs" weight="bold" color={OCEAN.deep} style={styles.groupTitle}>
-                  {group.section.toUpperCase()}
+                  {t(group.section).toUpperCase()}
                 </AppText>
               </View>
               <View style={styles.groupRows}>
@@ -199,6 +202,7 @@ function SearchShell({
 // ---------------------------------------------------------------------------
 
 function CustomerSearch() {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [recent, setRecent] = useState<RecentSearch[]>([]);
   const bookings = useMyBookings().data?.data ?? [];
@@ -250,14 +254,14 @@ function CustomerSearch() {
       const known = drivers.get(driver.id);
       if (known) {
         known.count += 1;
-        known.subtitle = `${known.count} trajets avec vous`;
+        known.subtitle = t('{knownCount} trajets avec vous', { knownCount: known.count });
       } else {
         drivers.set(driver.id, {
           key: `d-${driver.id}`,
           section: 'Chauffeurs',
           icon: IconUser,
           title: fullName(driver),
-          subtitle: '1 trajet avec vous',
+          subtitle: t('1 trajet avec vous'),
           count: 1,
           onPress: () => router.push(`/(customer)/booking/${booking.id}`),
         });
@@ -271,7 +275,7 @@ function CustomerSearch() {
         section: 'Chauffeurs',
         icon: IconUser,
         title: fullName(driver),
-        subtitle: 'Livre un de vos colis',
+        subtitle: t('Livre un de vos colis'),
         count: 1,
         onPress: () => router.push(`/(customer)/shipment/${shipment.id}`),
       });
@@ -279,7 +283,7 @@ function CustomerSearch() {
     result.push(...drivers.values());
 
     return result;
-  }, [bookings, shipments]);
+  }, [bookings, shipments, t]);
 
   const terms = useMemo(() => normalize(trimmed).split(/\s+/).filter(Boolean), [trimmed]);
 
@@ -291,7 +295,7 @@ function CustomerSearch() {
       section: 'Villes',
       icon: IconBuildingSkyscraper,
       title: city.name,
-      subtitle: 'Chercher un trajet vers cette ville',
+      subtitle: t('Chercher un trajet vers cette ville'),
       onPress: () =>
         router.push({
           pathname: '/(customer)/trip-results',
@@ -299,7 +303,7 @@ function CustomerSearch() {
         }),
     }));
     return [...local, ...cityItems];
-  }, [items, terms, cities.data]);
+  }, [items, terms, cities.data, t]);
 
   const idle = (
     <View>
@@ -308,7 +312,7 @@ function CustomerSearch() {
           <View style={styles.groupHeader}>
             <IconClockHour4 size={15} color={OCEAN.base} />
             <AppText variant="xs" weight="bold" color={OCEAN.deep} style={styles.groupTitle}>
-              RECHERCHES RÉCENTES
+              {t('Recherches récentes').toUpperCase()}
             </AppText>
           </View>
           <View style={styles.groupRows}>
@@ -346,14 +350,14 @@ function CustomerSearch() {
         </View>
       ) : null}
       <AppText variant="sm" color="textSecondary" style={styles.hint}>
-        Tapez une ville, le nom d’un chauffeur ou d’un destinataire pour retrouver un trajet ou un colis.
+        {t('Tapez une ville, le nom d’un chauffeur ou d’un destinataire pour retrouver un trajet ou un colis.')}
       </AppText>
     </View>
   );
 
   return (
     <SearchShell
-      placeholder="Rechercher un trajet, un colis ou un chauffeur"
+      placeholder={t('Rechercher un trajet, un colis ou un chauffeur')}
       query={query}
       onChangeQuery={setQuery}
       items={filtered}
@@ -362,7 +366,7 @@ function CustomerSearch() {
       emptyAction={
         <Pressable onPress={() => router.push('/(customer)/trip-search')} style={styles.emptyLink} accessibilityRole="button">
           <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-            Faire une recherche de trajet
+            {t('Faire une recherche de trajet')}
           </AppText>
         </Pressable>
       }
@@ -375,6 +379,7 @@ function CustomerSearch() {
 // ---------------------------------------------------------------------------
 
 function DriverSearch() {
+  const t = useT();
   const [query, setQuery] = useState('');
   const trips = useMyTrips().data?.data ?? [];
   const shipments = useAssignedShipments().data?.data ?? [];
@@ -416,7 +421,7 @@ function DriverSearch() {
       accessibilityRole="button"
     >
       <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-        Voir les envois disponibles
+        {t('Voir les envois disponibles')}
       </AppText>
     </Pressable>
   );
@@ -429,23 +434,23 @@ function DriverSearch() {
         </View>
         <View style={styles.resultText}>
           <AppText variant="sm" weight="semibold">
-            Envois disponibles
+            {t('Envois disponibles')}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            Trouver des colis à livrer sur votre route
+            {t('Trouver des colis à livrer sur votre route')}
           </AppText>
         </View>
         <IconChevronRight size={16} color={colors.textMuted} />
       </OceanCard>
       <AppText variant="sm" color="textSecondary" style={styles.hint}>
-        Tapez une ville, un nom de destinataire ou une plaque pour retrouver un trajet ou un envoi.
+        {t('Tapez une ville, un nom de destinataire ou une plaque pour retrouver un trajet ou un envoi.')}
       </AppText>
     </View>
   );
 
   return (
     <SearchShell
-      placeholder="Rechercher un trajet, un envoi ou une ville"
+      placeholder={t('Rechercher un trajet, un envoi ou une ville')}
       query={query}
       onChangeQuery={setQuery}
       items={filtered}

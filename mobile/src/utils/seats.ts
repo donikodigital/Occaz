@@ -1,4 +1,5 @@
 // mobile/src/utils/seats.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 
 /**
  * Formulation unique de la disponibilité des places : « Complet »,
@@ -7,8 +8,8 @@
  * différemment d'un écran à l'autre (« 0/2 places » se lisait aussi bien
  * « 0 libre » que « 0 réservée »).
  */
+import { translate, translateN } from '@/i18n';
 export function formatSeatsAvailability(availableSeats: number): string {
-  if (availableSeats <= 0) return 'Complet';
-  const plural = availableSeats > 1 ? 's' : '';
-  return `${availableSeats} place${plural} libre${plural}`;
+  if (availableSeats <= 0) return translate('Complet');
+  return translateN(availableSeats, '{count} place libre', '{count} places libres');
 }

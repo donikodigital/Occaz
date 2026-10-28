@@ -1,4 +1,5 @@
 // mobile/src/components/safety/SosButton.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Bouton SOS. Un appui ouvre une confirmation (jamais d'alerte par erreur), puis envoie la position aux proches enregistrés
 // (SMS) et à l'équipe Occa'Z. Tant qu'une alerte est en cours, la carte l'affiche (l'état vient du serveur : il survit à la fermeture de
 // l'écran) avec « Je suis en sécurité » pour l'arrêter. Les erreurs s'affichent dans la page (Alert.alert ne fait rien sur le web).
@@ -11,6 +12,7 @@ import { colors, spacing } from '@/theme';
 import { ApiError } from '@/services/api/ApiError';
 import { useCancelSos, useEmergencyContacts, useMySosAlerts, useTriggerSos } from '@/hooks/useSafety';
 import { getBestEffortPosition } from '@/utils/currentPosition';
+import { useT } from '@/i18n';
 
 export interface SosButtonProps {
   /** Contexte transmis à l'équipe (et nommé dans le SMS) : le trajet, la réservation ou l'envoi en cours. */
@@ -20,6 +22,7 @@ export interface SosButtonProps {
 }
 
 export function SosButton({ tripId, bookingId, shipmentId }: SosButtonProps) {
+  const t = useT();
   const contacts = useEmergencyContacts();
   const mine = useMySosAlerts();
   const trigger = useTriggerSos();
@@ -43,19 +46,19 @@ export function SosButton({ tripId, bookingId, shipmentId }: SosButtonProps) {
           setConfirmOpen(false);
           setFeedback({
             tone: 'success',
-            title: 'Alerte envoyée',
+            title: t('Alerte envoyée'),
             text:
               alert.contactsNotified > 0
-                ? `${alert.contactsNotified} proche${alert.contactsNotified > 1 ? 's' : ''} prévenu${alert.contactsNotified > 1 ? 's' : ''} par SMS, et l’équipe Occa’Z a été alertée.`
-                : 'L’équipe Occa’Z a été alertée.',
+                ? t.n(alert.contactsNotified, '{count} proche prévenu par SMS, et l’équipe Occa’Z a été alertée.', '{count} proches prévenus par SMS, et l’équipe Occa’Z a été alertée.')
+                : t('L’équipe Occa’Z a été alertée.'),
           });
         },
         onError: (error) => {
           setConfirmOpen(false);
           setFeedback({
             tone: 'error',
-            title: 'Alerte non envoyée',
-            text: error instanceof ApiError ? error.message : 'Vérifiez votre connexion puis réessayez. En cas de danger, appelez les secours.',
+            title: t('Alerte non envoyée'),
+            text: error instanceof ApiError ? error.message : t('Vérifiez votre connexion puis réessayez. En cas de danger, appelez les secours.'),
           });
         },
       },
@@ -66,9 +69,9 @@ export function SosButton({ tripId, bookingId, shipmentId }: SosButtonProps) {
     if (!active) return;
     setFeedback(null);
     cancel.mutate(active.id, {
-      onSuccess: () => setFeedback({ tone: 'info', text: 'Alerte arrêtée. Vos proches ont été prévenus que tout va bien.' }),
+      onSuccess: () => setFeedback({ tone: 'info', text: t('Alerte arrêtée. Vos proches ont été prévenus que tout va bien.') }),
       onError: (error) =>
-        setFeedback({ tone: 'error', text: error instanceof ApiError ? error.message : 'Impossible d’arrêter l’alerte pour le moment.' }),
+        setFeedback({ tone: 'error', text: error instanceof ApiError ? error.message : t('Impossible d’arrêter l’alerte pour le moment.') }),
     });
   }
 
@@ -81,28 +84,28 @@ export function SosButton({ tripId, bookingId, shipmentId }: SosButtonProps) {
           </View>
           <View style={styles.topText}>
             <AppText variant="base" weight="bold">
-              {active ? 'Alerte SOS en cours' : 'Besoin d’aide ?'}
+              {active ? t('Alerte SOS en cours') : t('Besoin d’aide ?')}
             </AppText>
             <AppText variant="xs" color="textSecondary">
               {active
                 ? active.status === 'ACKNOWLEDGED'
-                  ? 'L’équipe Occa’Z a vu votre alerte.'
-                  : 'Vos proches et l’équipe Occa’Z ont été prévenus.'
-                : 'Prévenez vos proches et l’équipe Occa’Z en un geste.'}
+                  ? t('L’équipe Occa’Z a vu votre alerte.')
+                  : t('Vos proches et l’équipe Occa’Z ont été prévenus.')
+                : t('Prévenez vos proches et l’équipe Occa’Z en un geste.')}
             </AppText>
           </View>
         </View>
 
         {active ? (
           <OceanButton
-            label="Je suis en sécurité"
+            label={t('Je suis en sécurité')}
             variant="outline"
             icon={<IconShieldCheck size={18} color={colors.success} />}
             onPress={markSafe}
             loading={cancel.isPending}
           />
         ) : (
-          <OceanButton label="Envoyer une alerte SOS" variant="danger" onPress={() => setConfirmOpen(true)} />
+          <OceanButton label={t('Envoyer une alerte SOS')} variant="danger" onPress={() => setConfirmOpen(true)} />
         )}
       </OceanCard>
 
@@ -110,14 +113,14 @@ export function SosButton({ tripId, bookingId, shipmentId }: SosButtonProps) {
 
       <ConfirmDialog
         visible={confirmOpen}
-        title="Envoyer une alerte SOS ?"
+        title={t('Envoyer une alerte SOS ?')}
         message={
           (contactCount > 0
-            ? `Vos ${contactCount} proche${contactCount > 1 ? 's' : ''} enregistré${contactCount > 1 ? 's' : ''} et l’équipe Occa’Z recevront votre position. `
-            : 'L’équipe Occa’Z recevra votre position. Ajoutez des proches dans « Mes proches » pour qu’ils soient prévenus aussi. ') +
-          'Si vous êtes en danger immédiat, appelez aussi les secours.'
+            ? t.n(contactCount, 'Vos {count} proche enregistré et l’équipe Occa’Z recevront votre position. ', 'Vos {count} proches enregistrés et l’équipe Occa’Z recevront votre position. ')
+            : t('L’équipe Occa’Z recevra votre position. Ajoutez des proches dans « Mes proches » pour qu’ils soient prévenus aussi. ')) +
+          t('Si vous êtes en danger immédiat, appelez aussi les secours.')
         }
-        confirmLabel="Envoyer l’alerte"
+        confirmLabel={t('Envoyer l’alerte')}
         destructive
         loading={locating || trigger.isPending}
         onConfirm={() => void send()}

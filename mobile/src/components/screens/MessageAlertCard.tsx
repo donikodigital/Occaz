@@ -1,4 +1,5 @@
 // mobile/src/components/screens/MessageAlertCard.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Alerte "nouveau message" sur l'écran d'accueil (client et conducteur) —
 // icône avec un halo qui pulse, même famille d'animation que le point
@@ -11,6 +12,7 @@ import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-n
 import { IconMessageCircle } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
+import { useT } from '@/i18n';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -23,6 +25,7 @@ export function MessageAlertCard({
   preview: string;
   onPress: () => void;
 }) {
+  const t = useT();
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export function MessageAlertCard({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Nouveau message de ${senderName} : ${preview}`}
+      accessibilityLabel={t('Nouveau message de {senderName} : {preview}', { senderName, preview })}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.iconWrap}>

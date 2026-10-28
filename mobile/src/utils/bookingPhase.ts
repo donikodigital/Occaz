@@ -1,4 +1,5 @@
 // mobile/src/utils/bookingPhase.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Où en est une réservation de trajet, côté conducteur (que doit-il valider ?) et côté client (quel code doit-il voir ?).
 // Fonctions pures, partagées par les deux écrans pour qu'ils racontent la même chose.
@@ -10,6 +11,7 @@
 import type { Booking } from '@/types/bookings.types';
 import type { Trip, TripStatus, TripStop } from '@/types/trips.types';
 import { stopName } from '@/utils/tripSegment';
+import { translateN } from '@/i18n';
 
 export type BookingPhase = 'pickup' | 'dropoff' | 'none';
 
@@ -71,7 +73,7 @@ export function unpickedBoarders(trip: Trip, bookings: Booking[]): Booking[] {
 /** « Boubacar BARRY (Dalaba) » — pour dire qui n'a pas été pris en charge, et où. */
 export function describeUnpicked(booking: Booking, trip: Trip): string {
   const names = booking.passengers?.map((passenger) => passenger.fullName).filter(Boolean) ?? [];
-  const who = names.length > 0 ? names.join(', ') : `${booking.seatsCount} place${booking.seatsCount > 1 ? 's' : ''}`;
+  const who = names.length > 0 ? names.join(', ') : translateN(booking.seatsCount, '{count} place', '{count} places');
   const stop = stopOf(trip, booking.boardingStopId);
   return stop ? `${who} (${stopName(stop)})` : who;
 }

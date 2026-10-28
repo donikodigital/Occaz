@@ -1,4 +1,5 @@
 // mobile/src/components/ui/DocumentUploadField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [23/10/2026] v+ — onDelete : bouton « Supprimer ce document » (avec confirmation) tant que la pièce n'est pas vérifiée. Une pièce vérifiée
 // ne se supprime pas : un petit texte invite à en renvoyer une nouvelle.
 // [10/10/2026] v+ — errorMessage : l'échec d'un envoi s'affiche sous le champ (Alert.alert ne fait rien sur le web).
@@ -13,6 +14,7 @@ import { FeedbackBanner } from './FeedbackBanner';
 import type { BadgeTone } from './Badge';
 import { colors, radius, spacing } from '@/theme';
 import type { AppDocument } from '@/types/documents.types';
+import { useT, translate } from '@/i18n';
 
 export interface DocumentUploadFieldProps {
   label: string;
@@ -33,10 +35,10 @@ export interface DocumentUploadFieldProps {
 type DisplayState = AppDocument['status'] | 'MISSING';
 
 const STATE_LABEL: Record<DisplayState, string> = {
-  MISSING: 'Non envoyé',
-  PENDING: 'En vérification',
-  VERIFIED: 'Vérifié',
-  REJECTED: 'Rejeté',
+  get MISSING() { return translate('Non envoyé'); },
+  get PENDING() { return translate('En vérification'); },
+  get VERIFIED() { return translate('Vérifié'); },
+  get REJECTED() { return translate('Rejeté'); },
 };
 const STATE_TONE: Record<DisplayState, BadgeTone> = {
   MISSING: 'neutral',
@@ -90,6 +92,7 @@ export function DocumentUploadField({
   isDeleting = false,
   deleteError,
 }: DocumentUploadFieldProps) {
+  const t = useT();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const state: DisplayState = document?.status ?? 'MISSING';
   const canDelete = Boolean(onDelete && document && state !== 'VERIFIED');
@@ -120,21 +123,21 @@ export function DocumentUploadField({
         <View style={styles.uploading}>
           <ActivityIndicator color={colors.primary} />
           <AppText variant="sm" color="textSecondary">
-            Envoi en cours…
+            {t('Envoi en cours…')}
           </AppText>
         </View>
       ) : (
         <View style={styles.actions}>
           <ActionButton
             icon={<IconPhoto size={17} color={colors.textPrimary} />}
-            label="Galerie"
-            accessibilityLabel="Choisir depuis la galerie"
+            label={t('Galerie')}
+            accessibilityLabel={t('Choisir depuis la galerie')}
             onPress={onPickLibrary}
           />
           <ActionButton
             icon={<IconCamera size={17} color={colors.textPrimary} />}
-            label="Photo"
-            accessibilityLabel="Prendre une photo"
+            label={t('Photo')}
+            accessibilityLabel={t('Prendre une photo')}
             onPress={onPickCamera}
           />
         </View>
@@ -145,19 +148,19 @@ export function DocumentUploadField({
           onPress={() => setConfirmingDelete(true)}
           disabled={isDeleting}
           accessibilityRole="button"
-          accessibilityLabel={`Supprimer le document : ${label}`}
+          accessibilityLabel={t('Supprimer le document : {label}', { label })}
           style={({ pressed }) => [styles.deleteButton, (pressed || isDeleting) && styles.actionPressed]}
         >
           {isDeleting ? <ActivityIndicator size="small" color={colors.dangerDark} /> : <IconTrash size={16} color={colors.dangerDark} />}
           <AppText variant="sm" weight="semibold" color="dangerDark">
-            {isDeleting ? 'Suppression…' : 'Supprimer ce document'}
+            {isDeleting ? 'Suppression…' : t('Supprimer ce document')}
           </AppText>
         </Pressable>
       ) : null}
 
       {onDelete && document && state === 'VERIFIED' ? (
         <AppText variant="xs" color="textMuted">
-          Document vérifié : pour le changer, envoyez-en un nouveau.
+          {t('Document vérifié : pour le changer, envoyez-en un nouveau.')}
         </AppText>
       ) : null}
 
@@ -166,9 +169,9 @@ export function DocumentUploadField({
 
       <ConfirmDialog
         visible={confirmingDelete}
-        title="Supprimer ce document ?"
-        message="Le fichier envoyé sera effacé. Vous pourrez en envoyer un autre à tout moment."
-        confirmLabel="Supprimer"
+        title={t('Supprimer ce document ?')}
+        message={t('Le fichier envoyé sera effacé. Vous pourrez en envoyer un autre à tout moment.')}
+        confirmLabel={t('Supprimer')}
         destructive
         loading={isDeleting}
         onConfirm={() => {

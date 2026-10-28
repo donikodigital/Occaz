@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ShipmentWindowField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [21/09/2026] v1 — choix de la plage de dates du colis.
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -6,6 +7,7 @@ import { IconInfoCircle } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { colors, spacing } from '@/theme';
+import { useT } from '@/i18n';
 
 export interface ShipmentWindowFieldProps {
   startDate: Date | null;
@@ -26,6 +28,7 @@ function startOfToday(): Date {
  * dernier jour à 23 h 59 (voir toShipmentWindow).
  */
 export function ShipmentWindowField({ startDate, endDate, onChangeStart, onChangeEnd }: ShipmentWindowFieldProps) {
+  const t = useT();
   function handleStart(date: Date | null) {
     onChangeStart(date);
     // La fin ne peut pas précéder le début.
@@ -34,9 +37,9 @@ export function ShipmentWindowField({ startDate, endDate, onChangeStart, onChang
 
   return (
     <View style={styles.container}>
-      <CalendarPicker label="Le colis peut partir à partir du" selectedDate={startDate} onSelectDate={handleStart} minDate={startOfToday()} />
+      <CalendarPicker label={t('Le colis peut partir à partir du')} selectedDate={startDate} onSelectDate={handleStart} minDate={startOfToday()} />
       <CalendarPicker
-        label="Et au plus tard le"
+        label={t('Et au plus tard le')}
         selectedDate={endDate}
         onSelectDate={onChangeEnd}
         minDate={startDate ?? startOfToday()}
@@ -44,8 +47,7 @@ export function ShipmentWindowField({ startDate, endDate, onChangeStart, onChang
       <View style={styles.note}>
         <IconInfoCircle size={14} color={colors.textSecondary} />
         <AppText variant="xs" color="textSecondary" style={styles.noteText}>
-          Sans conducteur avant la fin de cette période, nous vous proposons de la prolonger. Si vous ne le souhaitez
-          pas, vous êtes remboursé intégralement.
+          {t('Sans conducteur avant la fin de cette période, nous vous proposons de la prolonger. Si vous ne le souhaitez pas, vous êtes remboursé intégralement.')}
         </AppText>
       </View>
     </View>

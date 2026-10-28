@@ -1,4 +1,5 @@
 // mobile/src/components/safety/ReportUserLink.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — petit lien « Signaler ou bloquer » à poser sous la fiche d'un conducteur, d'un passager ou d'un expéditeur. Ouvre la page de
 // signalement de l'espace courant en lui passant la personne visée (profil conducteur ou client) et le contexte (trajet, réservation, envoi).
 import React from 'react';
@@ -9,6 +10,7 @@ import { AppText } from '@/components/ui';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import type { UserTarget } from '@/types/safety.types';
+import { translate } from '@/i18n';
 
 export interface ReportUserLinkProps {
   /** Espace courant : détermine la page de signalement ouverte. */
@@ -21,7 +23,7 @@ export interface ReportUserLinkProps {
   label?: string;
 }
 
-export function ReportUserLink({ space, target, name, tripId, bookingId, shipmentId, label = 'Signaler ou bloquer' }: ReportUserLinkProps) {
+export function ReportUserLink({ space, target, name, tripId, bookingId, shipmentId, label = translate('Signaler ou bloquer') }: ReportUserLinkProps) {
   function open() {
     router.push({
       pathname: space === 'customer' ? '/(customer)/report-user' : '/(driver)/report-user',

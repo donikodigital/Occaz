@@ -1,4 +1,5 @@
 // mobile/src/components/screens/DisputeDetailScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
@@ -21,6 +22,7 @@ import { DISPUTE_PRIORITY_LABELS, DISPUTE_STATUS_LABELS, DISPUTE_STATUS_TONE } f
 import { formatTime } from '@/utils/date';
 import { currencyOf, formatMoney } from '@/utils/money';
 import type { DisputeMessage } from '@/types/disputes.types';
+import { useT, translate } from '@/i18n';
 
 export interface DisputeDetailScreenProps {
   /** Page affichée juste après la création du signalement : remplace la flèche « Retour » par une croix qui ferme tout le parcours. */
@@ -49,7 +51,7 @@ function DisputeMessageBubble({
       <View style={styles.agentRow}>
         <View style={styles.agentBubble}>
           <AppText variant="xs" weight="bold" color={OCEAN.goldInk} style={styles.agentLabel}>
-            SUPPORT
+            {translate('Support').toUpperCase()}
           </AppText>
           <AppText variant="sm">{message.message}</AppText>
         </View>
@@ -78,6 +80,7 @@ function DisputeMessageBubble({
  * `ListEmptyComponent`, qui s'affichait à l'envers sur Android : « Aucun message » est donc rendu hors de la liste.
  */
 export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenProps) {
+  const t = useT();
   const [draft, setDraft] = useState('');
   const currentUserId = useAuthStore((state) => state.user?.id);
   const { data: dispute, isLoading, isError } = useDispute(disputeId);
@@ -88,7 +91,7 @@ export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenP
       <ScreenContainer style={styles.center} maxWidth="detail">
         {isError ? (
           <AppText variant="sm" color="danger">
-            Impossible de charger ce litige.
+            {t('Impossible de charger ce litige.')}
           </AppText>
         ) : (
           <ActivityIndicator color={OCEAN.base} />
@@ -117,7 +120,7 @@ export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenP
             <TextField
               value={draft}
               onChangeText={setDraft}
-              placeholder="Écrire un message…"
+              placeholder={t('Écrire un message…')}
               containerStyle={styles.composerInput}
               style={styles.composerInputText}
               multiline
@@ -127,7 +130,7 @@ export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenP
               disabled={!canSend}
               style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
               accessibilityRole="button"
-              accessibilityLabel="Envoyer"
+              accessibilityLabel={t('Envoyer')}
             >
               <IconSend size={18} color={OCEAN.onDark} />
             </Pressable>
@@ -137,7 +140,7 @@ export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenP
     >
       <OceanHeroHeader
         title={dispute.reason}
-        subtitle="Signalement"
+        subtitle={t('Signalement')}
         icon={<IconLifebuoy />}
         // Page affichée juste après la création du signalement : une croix qui revient à l'accueil, pas la flèche vers le
         // formulaire et les écrans d'avant.
@@ -161,13 +164,12 @@ export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenP
           <View style={styles.resolutionTitle}>
             <IconCircleCheck size={18} color={colors.successDark} />
             <AppText variant="sm" weight="bold" color="successDark">
-              Litige résolu
+              {t('Litige résolu')}
             </AppText>
           </View>
           {dispute.resolution.refundAmount ? (
             <AppText variant="xs" color="textSecondary">
-              Remboursement :{' '}
-              {formatMoney(dispute.resolution.refundAmount, currencyOf(dispute.booking) ?? currencyOf(dispute.shipment))}
+              {t('Remboursement : {money}', { money: formatMoney(dispute.resolution.refundAmount, currencyOf(dispute.booking) ?? currencyOf(dispute.shipment)) })}
             </AppText>
           ) : null}
           {dispute.resolution.notes ? (
@@ -181,7 +183,7 @@ export function DisputeDetailScreen({ disputeId, onClose }: DisputeDetailScreenP
       {messages.length === 0 ? (
         <View style={styles.emptyWrap}>
           <AppText variant="sm" color="textMuted" style={styles.empty}>
-            Aucun message pour le moment.
+            {t('Aucun message pour le moment.')}
           </AppText>
         </View>
       ) : (

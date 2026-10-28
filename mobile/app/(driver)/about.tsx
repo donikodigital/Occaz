@@ -1,4 +1,5 @@
 // mobile/app/(driver)/about.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v3 — en-tête en bandeau (héro) bleu océan, comme les autres pages. Le logo et le reste de l'écran sont inchangés.
 //
 // [10/10/2026] v2 — le vrai logo de l'app (icon.png) remplace le pictogramme générique.
@@ -16,45 +17,47 @@ import { OceanCard } from '@/components/ocean/OceanKit';
 import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 // Même image que l'icône de l'application (app.json).
 const APP_LOGO = require('../../assets/images/icon.png');
 
 export default function AboutScreen() {
+  const t = useT();
   const appVersion = Constants.expoConfig?.version ?? '—';
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title="Infos sur l'app" subtitle="Version, conditions et données" icon={<IconInfoCircle />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t("Infos sur l'app")} subtitle={t('Version, conditions et données')} icon={<IconInfoCircle />} onBack={() => router.back()} />
 
       <View style={styles.hero}>
         <View style={styles.logoShadow}>
-          <Image source={APP_LOGO} resizeMode="cover" style={styles.logo} accessibilityLabel="Logo Occaz" />
+          <Image source={APP_LOGO} resizeMode="cover" style={styles.logo} accessibilityLabel={t('Logo Occaz')} />
         </View>
         <AppText variant="lg" weight="bold" color={OCEAN.deep}>
-          Occaz
+          {t('Occaz')}
         </AppText>
         <AppText variant="sm" color="textSecondary">
-          Version {appVersion}
+          {t('Version {appVersion}', { appVersion })}
         </AppText>
       </View>
 
-      <OceanCard onPress={() => router.push('/(driver)/terms')} style={styles.row} accessibilityLabel="Conditions générales">
+      <OceanCard onPress={() => router.push('/(driver)/terms')} style={styles.row} accessibilityLabel={t('Conditions générales')}>
         <IconFileText size={18} color={OCEAN.base} />
         <AppText variant="sm" weight="semibold" style={{ flex: 1 }}>
-          Conditions générales
+          {t('Conditions générales')}
         </AppText>
       </OceanCard>
 
-      <OceanCard onPress={() => router.push('/(driver)/privacy')} style={styles.row} accessibilityLabel="Protection des données">
+      <OceanCard onPress={() => router.push('/(driver)/privacy')} style={styles.row} accessibilityLabel={t('Protection des données')}>
         <IconShieldLock size={18} color={OCEAN.base} />
         <AppText variant="sm" weight="semibold" style={{ flex: 1 }}>
-          Protection des données
+          {t('Protection des données')}
         </AppText>
       </OceanCard>
 
       <AppText variant="xs" color="textMuted" align="center" style={styles.copyright}>
-        © {new Date().getFullYear()} Occaz — Tous droits réservés
+        {t('© {getFullYear} Occaz — Tous droits réservés', { getFullYear: new Date().getFullYear() })}
       </AppText>
     </ScreenContainer>
   );

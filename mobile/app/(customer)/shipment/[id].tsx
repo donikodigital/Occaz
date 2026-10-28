@@ -1,4 +1,5 @@
 // mobile/app/(customer)/shipment/[id].tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v6 — Carte « Suivre mon colis » (numéro de suivi + suivi en direct) dès que l'envoi est payé ; étiquettes PDF A5 par colis.
 // [09/10/2026] v5 — Page allégée, comme le suivi du conducteur : on ne montre que l'essentiel (statut, conducteur, code à donner,
 // action à faire) ; période, suivi détaillé, expéditeur, destinataire et montant passent sous « Voir tous les détails ».
@@ -57,6 +58,7 @@ import { closeToHome } from '@/utils/navigation';
 import { formatTrackingNumber, trackingNumberOf } from '@/utils/tracking';
 import { ApiError } from '@/services/api/ApiError';
 import type { ShipmentStatus } from '@/types/shipments.types';
+import { useT, translate } from '@/i18n';
 
 /** Dès que l'envoi est payé (même sans conducteur), le colis a un numéro de suivi. */
 const TRACKABLE_STATUSES: ShipmentStatus[] = [
@@ -71,18 +73,18 @@ const TRACKABLE_STATUSES: ShipmentStatus[] = [
 ];
 
 const STATUS_LABELS: Record<ShipmentStatus, string> = {
-  CREATED: 'En attente de paiement',
-  SEARCHING_DRIVER: "Recherche d'un conducteur",
-  DRIVER_ASSIGNED: 'Conducteur trouvé',
-  PICKUP_PENDING: 'Récupération en cours',
-  PICKED_UP: 'Colis récupéré',
-  IN_TRANSIT: 'En transit',
-  DELIVERY_PENDING: 'Livraison en cours',
-  DELIVERED: 'Livré',
-  COMPLETED: 'Terminé',
-  CANCELLED: 'Annulé',
-  DISPUTED: 'En litige',
-  REFUNDED: 'Remboursé',
+  get CREATED() { return translate('En attente de paiement'); },
+  get SEARCHING_DRIVER() { return translate("Recherche d'un conducteur"); },
+  get DRIVER_ASSIGNED() { return translate('Conducteur trouvé'); },
+  get PICKUP_PENDING() { return translate('Récupération en cours'); },
+  get PICKED_UP() { return translate('Colis récupéré'); },
+  get IN_TRANSIT() { return translate('En transit'); },
+  get DELIVERY_PENDING() { return translate('Livraison en cours'); },
+  get DELIVERED() { return translate('Livré'); },
+  get COMPLETED() { return translate('Terminé'); },
+  get CANCELLED() { return translate('Annulé'); },
+  get DISPUTED() { return translate('En litige'); },
+  get REFUNDED() { return translate('Remboursé'); },
 };
 
 const CANCELLABLE_STATUSES: ShipmentStatus[] = ['CREATED', 'SEARCHING_DRIVER', 'DRIVER_ASSIGNED', 'PICKUP_PENDING'];
@@ -96,12 +98,13 @@ function heroColorFor(status: ShipmentStatus): string {
 }
 
 function PickupCodeCard({ shipmentId }: { shipmentId: string }) {
+  const t = useT();
   const reveal = useRevealShipmentPickupOtpForSender(shipmentId);
 
   return (
     <OtpCodeCard
-      title="Code de récupération"
-      description="Communiquez-le au conducteur pour confirmer la remise du colis — affiché ici (copie directe possible)."
+      title={t('Code de récupération')}
+      description={t('Communiquez-le au conducteur pour confirmer la remise du colis — affiché ici (copie directe possible).')}
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
       smsDisabled={reveal.data?.smsDisabled}
@@ -115,12 +118,13 @@ function PickupCodeCard({ shipmentId }: { shipmentId: string }) {
 
 /** Même principe que PickupCodeCard, pour la livraison : le SMS part sur le téléphone du destinataire, mais l'expéditeur peut aussi le retrouver ici. */
 function DeliveryCodeCard({ shipmentId }: { shipmentId: string }) {
+  const t = useT();
   const reveal = useRevealShipmentDeliveryOtpForSender(shipmentId);
 
   return (
     <OtpCodeCard
-      title="Code de livraison"
-      description="Envoyé par SMS au destinataire, qui le communique au conducteur pour confirmer la réception — récupérable ici aussi si besoin (copie directe possible)."
+      title={t('Code de livraison')}
+      description={t('Envoyé par SMS au destinataire, qui le communique au conducteur pour confirmer la réception — récupérable ici aussi si besoin (copie directe possible).')}
       code={reveal.data?.code}
       smsSent={reveal.data?.smsSent}
       smsDisabled={reveal.data?.smsDisabled}
@@ -136,6 +140,7 @@ function DeliveryCodeCard({ shipmentId }: { shipmentId: string }) {
 const LABEL_STATUSES: ShipmentStatus[] = ['SEARCHING_DRIVER', 'DRIVER_ASSIGNED', 'PICKUP_PENDING'];
 
 export default function ShipmentDetailScreen() {
+  const t = useT();
   const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
   const { data: shipment, isLoading, isError } = useShipment(id);
   const cancelShipment = useCancelShipment(id ?? '');
@@ -155,7 +160,7 @@ export default function ShipmentDetailScreen() {
       <ScreenContainer style={styles.center} maxWidth="detail">
         {isError ? (
           <AppText variant="sm" color="danger">
-            Impossible de charger cet envoi.
+            {t('Impossible de charger cet envoi.')}
           </AppText>
         ) : (
           <ActivityIndicator color={OCEAN.base} />
@@ -178,7 +183,7 @@ export default function ShipmentDetailScreen() {
       { windowEnd },
       {
         onError: (error) =>
-          setExtensionError(error instanceof ApiError ? error.message : 'La prolongation a échoué — réessayez.'),
+          setExtensionError(error instanceof ApiError ? error.message : t('La prolongation a échoué — réessayez.')),
       },
     );
   }
@@ -191,7 +196,7 @@ export default function ShipmentDetailScreen() {
         onSuccess: () => setConfirmRefundOpen(false),
         onError: (error) => {
           setConfirmRefundOpen(false);
-          setActionError(error instanceof ApiError ? error.message : 'La demande a échoué — réessayez.');
+          setActionError(error instanceof ApiError ? error.message : t('La demande a échoué — réessayez.'));
         },
       },
     );
@@ -205,7 +210,7 @@ export default function ShipmentDetailScreen() {
         onSuccess: () => setConfirmCancelOpen(false),
         onError: (error) => {
           setConfirmCancelOpen(false);
-          setActionError(error instanceof ApiError ? error.message : "L'annulation a échoué — réessayez.");
+          setActionError(error instanceof ApiError ? error.message : t("L'annulation a échoué — réessayez."));
         },
       },
     );
@@ -214,8 +219,8 @@ export default function ShipmentDetailScreen() {
   return (
     <ScreenContainer scroll maxWidth="detail">
       <OceanScreenHeader
-        title="Suivi de l'envoi"
-        subtitle={shipment.category?.name ?? 'Colis'}
+        title={t("Suivi de l'envoi")}
+        subtitle={shipment.category?.name ?? t('Colis')}
         onBack={() => router.back()}
         // Affiché juste après la création ou le paiement : une croix qui revient à l'accueil.
         onClose={created ? () => closeToHome('/(customer)/(tabs)/home') : undefined}
@@ -229,7 +234,7 @@ export default function ShipmentDetailScreen() {
                 })
               }
               accessibilityRole="button"
-              accessibilityLabel="Contacter le conducteur"
+              accessibilityLabel={t('Contacter le conducteur')}
               style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
             >
               <IconMessageCircle size={18} color={OCEAN.base} />
@@ -245,7 +250,7 @@ export default function ShipmentDetailScreen() {
           </View>
           <View style={styles.heroText}>
             <AppText variant="xs" color={OCEAN.sky}>
-              Statut de l’envoi
+              {t('Statut de l’envoi')}
             </AppText>
             <AppText variant="lg" weight="bold" color={OCEAN.onDark}>
               {STATUS_LABELS[shipment.status]}
@@ -253,11 +258,11 @@ export default function ShipmentDetailScreen() {
           </View>
         </View>
         <AppText variant="sm" color={OCEAN.onDark} style={styles.heroWeight}>
-          {shipment.category?.name ?? 'Colis'} · {shipment.weightKg} kg{shipment.quantity > 1 ? ` · ${shipment.quantity} colis` : ''}
+          {shipment.category?.name ?? t('Colis')} · {shipment.weightKg} kg{shipment.quantity > 1 ? t(' · {quantity} colis', { quantity: shipment.quantity }) : ''}
         </AppText>
         {!isPaid ? (
           <AppText variant="sm" weight="bold" color={OCEAN.onDark}>
-            À payer : {formatMoney(shipment.totalAmount, currencyCode)}
+            {t('À payer : {money}', { money: formatMoney(shipment.totalAmount, currencyCode) })}
           </AppText>
         ) : null}
       </OceanHeroCard>
@@ -273,7 +278,7 @@ export default function ShipmentDetailScreen() {
       ) : null}
 
       {shipment.driver && shipment.driverPhone ? (
-        <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title="Votre conducteur">
+        <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title={t('Votre conducteur')}>
           <ContactRow phone={shipment.driverPhone} name={`${shipment.driver.firstName} ${shipment.driver.lastName[0]}.`} />
         </OceanSection>
       ) : null}
@@ -285,20 +290,20 @@ export default function ShipmentDetailScreen() {
       {shipment.status === 'SEARCHING_DRIVER' && !needsExtensionAnswer ? (
         <OceanCard style={styles.infoCard}>
           <AppText variant="sm" weight="semibold" color={OCEAN.deep}>
-            Votre demande est visible de tous les conducteurs
+            {t('Votre demande est visible de tous les conducteurs')}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            Le premier à l&apos;accepter la prend en charge. Vous serez prévenu dès qu&apos;un conducteur est trouvé.
+            {t("Le premier à l'accepter la prend en charge. Vous serez prévenu dès qu'un conducteur est trouvé.")}
           </AppText>
           {pendingInvitations > 0 ? (
             <OceanPill
-              label={`${pendingInvitations} invitation${pendingInvitations > 1 ? 's' : ''} en attente`}
+              label={t.n(pendingInvitations, '{count} invitation en attente', '{count} invitations en attente')}
               tone="gold"
               icon={<IconSend size={13} color={OCEAN.goldInk} />}
             />
           ) : null}
           <OceanButton
-            label="Chercher un conducteur"
+            label={t('Chercher un conducteur')}
             variant="soft"
             icon={<IconSearch size={16} color={OCEAN.base} />}
             onPress={() => router.push({ pathname: '/(customer)/shipment-find-driver', params: { id: shipment.id } })}
@@ -310,13 +315,13 @@ export default function ShipmentDetailScreen() {
       {TRACKABLE_STATUSES.includes(shipment.status) ? (
         <OceanCard style={styles.infoCard}>
           <AppText variant="xs" color="textSecondary">
-            Numéro de suivi
+            {t('Numéro de suivi')}
           </AppText>
           <AppText variant="md" weight="bold" color={OCEAN.deep} selectable>
             {formatTrackingNumber(trackingNumberOf(shipment.id))}
           </AppText>
           <OceanButton
-            label="Suivre mon colis en direct"
+            label={t('Suivre mon colis en direct')}
             icon={<IconMapPin size={16} color={OCEAN.onDark} />}
             onPress={() => router.push({ pathname: '/(customer)/shipment-tracking', params: { id: shipment.id } })}
           />
@@ -328,7 +333,7 @@ export default function ShipmentDetailScreen() {
         <PdfDownloadButton
           kind="shipment"
           id={shipment.id}
-          label={shipment.quantity > 1 ? `Télécharger les ${shipment.quantity} étiquettes (PDF)` : "Télécharger l'étiquette (PDF)"}
+          label={shipment.quantity > 1 ? t('Télécharger les {quantity} étiquettes (PDF)', { quantity: shipment.quantity }) : t("Télécharger l'étiquette (PDF)")}
         />
       ) : null}
 
@@ -336,14 +341,14 @@ export default function ShipmentDetailScreen() {
 
       {showDetails ? (
         <>
-      <OceanSection icon={<IconCalendarEvent size={17} color={OCEAN.base} />} title="Période choisie">
+      <OceanSection icon={<IconCalendarEvent size={17} color={OCEAN.base} />} title={t('Période choisie')}>
         <AppText variant="sm" weight="semibold">
           {formatWindow(shipment)}
         </AppText>
       </OceanSection>
 
       {tracking.length > 0 ? (
-        <OceanSection icon={<IconRoute size={17} color={OCEAN.base} />} title="Suivi">
+        <OceanSection icon={<IconRoute size={17} color={OCEAN.base} />} title={t('Suivi')}>
           <View>
             {tracking.map((entry, index) => (
               <View key={entry.id} style={styles.trackingRow}>
@@ -356,7 +361,7 @@ export default function ShipmentDetailScreen() {
                     {STATUS_LABELS[entry.status]}
                   </AppText>
                   <AppText variant="xs" color="textSecondary">
-                    {formatDateLong(entry.recordedAt)} à {formatTime(entry.recordedAt)}
+                    {t('{dateLong} à {time}', { dateLong: formatDateLong(entry.recordedAt), time: formatTime(entry.recordedAt) })}
                   </AppText>
                 </View>
               </View>
@@ -365,7 +370,7 @@ export default function ShipmentDetailScreen() {
         </OceanSection>
       ) : null}
 
-      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Expéditeur">
+      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title={t('Expéditeur')}>
         <View style={styles.person}>
           <AppText variant="base" weight="semibold">
             {shipment.senderName}
@@ -382,7 +387,7 @@ export default function ShipmentDetailScreen() {
         </View>
       </OceanSection>
 
-      <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title="Destinataire">
+      <OceanSection icon={<IconUserCheck size={17} color={OCEAN.base} />} title={t('Destinataire')}>
         <View style={styles.person}>
           <AppText variant="base" weight="semibold">
             {shipment.recipientName}
@@ -401,22 +406,22 @@ export default function ShipmentDetailScreen() {
 
       <ShipmentParcelsSection items={shipment.items} currencyCode={currencyCode} showPrice />
 
-      <OceanSection icon={<IconCash size={17} color={OCEAN.base} />} title="Montant">
+      <OceanSection icon={<IconCash size={17} color={OCEAN.base} />} title={t('Montant')}>
         <View style={styles.priceRow}>
           <AppText variant="base" weight="semibold">
-            Montant payé
+            {t('Montant payé')}
           </AppText>
           <AppText variant="lg" weight="bold" color={OCEAN.deep}>
             {formatMoney(shipment.totalAmount, currencyCode)}
           </AppText>
         </View>
-        {!isPaid ? <OceanPill label="Paiement en attente" tone="gold" /> : null}
+        {!isPaid ? <OceanPill label={t('Paiement en attente')} tone="gold" /> : null}
       </OceanSection>
         </>
       ) : null}
 
       <OceanButton
-        label={showDetails ? 'Masquer les détails' : 'Voir tous les détails'}
+        label={showDetails ? t('Masquer les détails') : t('Voir tous les détails')}
         variant="soft"
         icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
         onPress={() => setShowDetails((value) => !value)}
@@ -425,7 +430,7 @@ export default function ShipmentDetailScreen() {
 
       {shipment.status === 'CREATED' ? (
         <OceanButton
-          label="Payer maintenant"
+          label={t('Payer maintenant')}
           onPress={() => router.push({ pathname: '/(customer)/payment', params: { shipmentId: shipment.id } })}
           style={styles.actionButton}
         />
@@ -433,7 +438,7 @@ export default function ShipmentDetailScreen() {
 
       {shipment.status === 'COMPLETED' && !hasRated ? (
         <OceanButton
-          label="Noter cet envoi"
+          label={t('Noter cet envoi')}
           variant="soft"
           onPress={() => router.push({ pathname: '/(customer)/rate', params: { type: 'shipment', id: shipment.id } })}
           style={styles.actionButton}
@@ -448,7 +453,7 @@ export default function ShipmentDetailScreen() {
 
       {canCancel ? (
         <OceanButton
-          label="Annuler l'envoi"
+          label={t("Annuler l'envoi")}
           variant="outline"
           onPress={() => {
             setActionError(undefined);
@@ -460,7 +465,7 @@ export default function ShipmentDetailScreen() {
       ) : null}
 
       <OceanButton
-        label="Signaler un problème"
+        label={t('Signaler un problème')}
         variant="soft"
         onPress={() =>
           router.push({
@@ -473,13 +478,13 @@ export default function ShipmentDetailScreen() {
 
       <ConfirmDialog
         visible={confirmCancelOpen}
-        title="Annuler cet envoi ?"
+        title={t('Annuler cet envoi ?')}
         message={
           isPaid
-            ? 'Votre envoi sera annulé et votre paiement vous sera remboursé intégralement.'
-            : 'Cette action ne peut pas être annulée.'
+            ? t('Votre envoi sera annulé et votre paiement vous sera remboursé intégralement.')
+            : t('Cette action ne peut pas être annulée.')
         }
-        confirmLabel="Annuler l'envoi"
+        confirmLabel={t("Annuler l'envoi")}
         destructive
         loading={cancelShipment.isPending}
         onConfirm={handleCancel}
@@ -488,9 +493,9 @@ export default function ShipmentDetailScreen() {
 
       <ConfirmDialog
         visible={confirmRefundOpen}
-        title="Être remboursé ?"
-        message="Votre envoi sera annulé et votre paiement vous sera remboursé intégralement."
-        confirmLabel="Me rembourser"
+        title={t('Être remboursé ?')}
+        message={t('Votre envoi sera annulé et votre paiement vous sera remboursé intégralement.')}
+        confirmLabel={t('Me rembourser')}
         destructive
         loading={cancelShipment.isPending}
         onConfirm={handleRefund}

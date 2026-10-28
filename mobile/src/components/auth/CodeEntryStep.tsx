@@ -1,4 +1,5 @@
 // mobile/src/components/auth/CodeEntryStep.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Écran « Entrez le code » commun à la vérification du numéro, de l'e-mail et du mot de passe oublié : six cases, envoi
 // automatique dès le dernier chiffre, erreur dans la page, « Renvoyer le code » après un délai. La saisie automatique du code reçu par SMS
 // est proposée par le clavier (iOS : au-dessus du clavier ; Android : suggestion du clavier Google).
@@ -10,6 +11,7 @@ import { OtpCodeInput, OTP_CODE_LENGTH } from '@/components/screens/OtpCodeInput
 import { AuthStep, type AuthStepProps } from '@/components/auth/AuthStep';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT, translate } from '@/i18n';
 
 const RESEND_COOLDOWN_SECONDS = 45;
 
@@ -31,10 +33,11 @@ export function CodeEntryStep({
   errorMessage,
   onClearError,
   onResend,
-  submitLabel = 'Vérifier',
+  submitLabel = translate('Vérifier'),
   children,
   ...stepProps
 }: CodeEntryStepProps) {
+  const t = useT();
   const [code, setCode] = useState('');
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
   const [resending, setResending] = useState(false);
@@ -97,12 +100,12 @@ export function CodeEntryStep({
       <View style={styles.resendRow}>
         {cooldown > 0 ? (
           <AppText variant="sm" color="textMuted">
-            Renvoyer le code dans {cooldown} s
+            {t('Renvoyer le code dans {cooldown} s', { cooldown })}
           </AppText>
         ) : (
           <Pressable onPress={() => void resend()} disabled={resending} accessibilityRole="button">
             <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-              {resending ? 'Envoi…' : 'Renvoyer le code'}
+              {resending ? 'Envoi…' : t('Renvoyer le code')}
             </AppText>
           </Pressable>
         )}

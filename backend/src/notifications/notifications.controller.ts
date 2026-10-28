@@ -1,11 +1,12 @@
 // backend/src/notifications/notifications.controller.ts
+// [28/10/2026] v+ — ?space=CUSTOMER|DRIVER sur la liste, le compteur, « tout lire » et « tout vider » (une personne peut être client ET conducteur).
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { NotificationsService } from './notifications.service';
 import { DeleteNotificationsDto } from './dto/delete-notifications.dto';
+import { ListNotificationsQueryDto, NotificationSpaceQueryDto } from './dto/notification-space.dto';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
@@ -14,19 +15,19 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get('mine')
-  findMine(@Query() query: PaginationQueryDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.notificationsService.findMine(user.id, query);
+  findMine(@Query() query: ListNotificationsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.findMine(user.id, query, query.space);
   }
 
   /** Pastille de la cloche : nombre de notifications non lues. */
   @Get('mine/unread-count')
-  unreadCount(@CurrentUser() user: AuthenticatedUser) {
-    return this.notificationsService.unreadCount(user.id);
+  unreadCount(@Query() query: NotificationSpaceQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.unreadCount(user.id, query.space);
   }
 
   @Patch('mine/read-all')
-  markAllRead(@CurrentUser() user: AuthenticatedUser) {
-    return this.notificationsService.markAllRead(user.id);
+  markAllRead(@Query() query: NotificationSpaceQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.markAllRead(user.id, query.space);
   }
 
   @Patch(':id/read')
@@ -43,8 +44,8 @@ export class NotificationsController {
 
   /** Vide toute la boîte de réception. */
   @Post('mine/delete-all')
-  removeAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.notificationsService.removeAll(user.id);
+  removeAll(@Query() query: NotificationSpaceQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.removeAll(user.id, query.space);
   }
 
   @Delete(':id')

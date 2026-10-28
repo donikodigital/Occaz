@@ -1,4 +1,5 @@
 // mobile/src/components/screens/LockedField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Champ en lecture seule pour une information qui vient du profil (nom, téléphone, adresse) : même gabarit qu'un champ de
 // saisie, mais grisé, avec un cadenas, et jamais éditable ici. La note sous le champ dit où la modifier.
@@ -8,6 +9,7 @@ import { IconLock } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 export function LockedField({
   label,
@@ -22,13 +24,14 @@ export function LockedField({
   secondary?: string | null;
   placeholder?: string;
 }) {
+  const t = useT();
   const hasValue = Boolean(value && value.trim().length > 0);
   return (
     <View style={styles.container}>
       <AppText variant="sm" weight="medium" color="textSecondary" style={styles.label}>
         {label}
       </AppText>
-      <View style={styles.field} accessibilityRole="text" accessibilityLabel={`${label} : ${hasValue ? value : 'non renseigné'}, verrouillé`}>
+      <View style={styles.field} accessibilityRole="text" accessibilityLabel={t('{label} : {value}, verrouillé', { label, value: hasValue ? value : t('non renseigné') })}>
         <View style={styles.text}>
           <AppText variant="base" color={hasValue ? 'textPrimary' : 'textMuted'} numberOfLines={2}>
             {hasValue ? value : placeholder}

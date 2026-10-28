@@ -1,4 +1,5 @@
 // mobile/src/components/screens/PromoCodeField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // v1 — Champ « Code promo » partagé par la création d'un envoi et la
 // réservation d'un trajet : saisie + bouton Appliquer, aperçu de la
@@ -17,6 +18,7 @@ import { useValidatePromoCode } from '@/hooks/usePromotions';
 import { formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
 import type { ServiceType } from '@/types/promotions.types';
+import { useT } from '@/i18n';
 
 export interface PromoCodeFieldProps {
   serviceType: ServiceType;
@@ -35,6 +37,7 @@ export interface PromoCodeFieldProps {
 }
 
 export function PromoCodeField({ serviceType, amount, currencyCode, appliedCode, onChange }: PromoCodeFieldProps) {
+  const t = useT();
   const [input, setInput] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const validatePromoCode = useValidatePromoCode();
@@ -43,14 +46,14 @@ export function PromoCodeField({ serviceType, amount, currencyCode, appliedCode,
     setErrorMessage(undefined);
     if (!input.trim()) return;
     if (!amount) {
-      setErrorMessage('Complétez le formulaire pour connaître le montant avant d’appliquer un code.');
+      setErrorMessage(t('Complétez le formulaire pour connaître le montant avant d’appliquer un code.'));
       return;
     }
     validatePromoCode.mutate(
       { code: input.trim().toUpperCase(), serviceType, amount },
       {
         onSuccess: (data) => onChange(input.trim().toUpperCase(), data.discountAmount),
-        onError: (error) => setErrorMessage(error instanceof ApiError ? error.message : 'Code invalide.'),
+        onError: (error) => setErrorMessage(error instanceof ApiError ? error.message : t('Code invalide.')),
       },
     );
   }
@@ -69,7 +72,7 @@ export function PromoCodeField({ serviceType, amount, currencyCode, appliedCode,
         </View>
         <View style={{ flex: 1 }}>
           <AppText variant="sm" weight="semibold" color={colors.successDark}>
-            Code {appliedCode} appliqué
+            {t('Code {appliedCode} appliqué', { appliedCode })}
           </AppText>
           {validatePromoCode.data ? (
             <AppText variant="xs" color="textSecondary">
@@ -87,15 +90,15 @@ export function PromoCodeField({ serviceType, amount, currencyCode, appliedCode,
       <View style={styles.row}>
         <View style={styles.input}>
           <TextField
-            label="Code promo (optionnel)"
+            label={t('Code promo (optionnel)')}
             value={input}
             onChangeText={(t) => setInput(t.toUpperCase())}
-            placeholder="BIENVENUE10"
+            placeholder={t('BIENVENUE10')}
             autoCapitalize="characters"
             leftIcon={<IconDiscount2 size={16} color={OCEAN.base} />}
           />
         </View>
-        <OceanButton label="Appliquer" variant="soft" onPress={handleApply} loading={validatePromoCode.isPending} style={styles.applyButton} />
+        <OceanButton label={t('Appliquer')} variant="soft" onPress={handleApply} loading={validatePromoCode.isPending} style={styles.applyButton} />
       </View>
       {errorMessage ? (
         <AppText variant="xs" color="danger" style={styles.error}>

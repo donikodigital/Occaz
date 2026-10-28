@@ -111,6 +111,7 @@ export class TrackingNotificationsService {
     const senderUserId = shipment.customer?.user?.id;
     if (text && senderUserId) {
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: senderUserId,
         type: NotificationType.STATUS_CHANGE,
         channels: [NotificationChannel.PUSH],
@@ -154,6 +155,7 @@ export class TrackingNotificationsService {
         if (userId) {
           const text = passageNotification(cityName, formatTrackingNumber(shipmentTrackingNumber(shipment.id)));
           await this.notifications.notify({
+            audience: 'CUSTOMER',
             userId,
             type: NotificationType.STATUS_CHANGE,
             channels: [NotificationChannel.PUSH],

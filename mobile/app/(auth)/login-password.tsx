@@ -1,4 +1,5 @@
 // mobile/app/(auth)/login-password.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — la connexion ouvre l'espace choisi à l'accueil (un compte peut avoir les deux espaces).
 // [11/10/2026] v1 — Connexion, étape 2 : le mot de passe à 6 chiffres du numéro saisi à l'écran précédent. La connexion part toute seule au
 // sixième chiffre ; « Se connecter » sert si on préfère valider soi-même. « Mot de passe oublié ? » ouvre la récupération par SMS ou e-mail,
@@ -22,10 +23,12 @@ import { formatInternationalPhone } from '@/utils/phone';
 import { useActiveSpaceStore } from '@/stores/activeSpaceStore';
 import { HOME_HREF } from '@/utils/spaces';
 import type { AccountType } from '@/types/auth.types';
+import { useT } from '@/i18n';
 
 type Space = Extract<AccountType, 'CUSTOMER' | 'DRIVER'>;
 
 export default function LoginPasswordScreen() {
+  const t = useT();
   const { accountType: accountTypeParam, phone = '', notice } = useLocalSearchParams<{
     accountType?: Space;
     phone?: string;
@@ -63,7 +66,7 @@ export default function LoginPasswordScreen() {
       router.replace(HOME_HREF[accountType]);
     },
     onError: (error) => {
-      setFormError(error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.');
+      setFormError(error instanceof ApiError ? error.message : t('Une erreur est survenue. Réessayez.'));
       setPin('');
     },
   });
@@ -81,15 +84,15 @@ export default function LoginPasswordScreen() {
   return (
     <AuthStep
       icon={<IconLock size={26} color={OCEAN.onDark} />}
-      title="Mot de passe"
-      subtitle={`Entrez le mot de passe à 6 chiffres du ${formatInternationalPhone(countries, phone)}.`}
+      title={t('Mot de passe')}
+      subtitle={t('Entrez le mot de passe à 6 chiffres du {internationalPhone}.', { internationalPhone: formatInternationalPhone(countries, phone) })}
       onBack={() => router.back()}
-      footer={<OceanButton label="Se connecter" onPress={() => submit(pin)} loading={login.isPending} disabled={pin.length !== PIN_LENGTH} />}
+      footer={<OceanButton label={t('Se connecter')} onPress={() => submit(pin)} loading={login.isPending} disabled={pin.length !== PIN_LENGTH} />}
     >
       {showNotice ? (
         <FeedbackBanner
           tone="success"
-          text="Votre mot de passe a été modifié. Connectez-vous avec le nouveau."
+          text={t('Votre mot de passe a été modifié. Connectez-vous avec le nouveau.')}
           onDismiss={() => setShowNotice(false)}
         />
       ) : null}
@@ -113,7 +116,7 @@ export default function LoginPasswordScreen() {
         style={styles.forgot}
       >
         <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-          Mot de passe oublié ?
+          {t('Mot de passe oublié ?')}
         </AppText>
       </Pressable>
     </AuthStep>

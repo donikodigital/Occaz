@@ -1,9 +1,11 @@
 // mobile/src/utils/tripSegment.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Tronçon d'une réservation : où le client monte et où il descend (étapes), pour afficher « Kindia → Labé » au lieu du
 // trajet entier « Conakry → Labé ». Sans étape (montée au départ, descente à l'arrivée), on retrouve le trajet entier.
 import type { Booking } from '@/types/bookings.types';
 import type { Trip, TripStop } from '@/types/trips.types';
+import { translate } from '@/i18n';
 
 type BookingWithTrip = Pick<Booking, 'boardingStop' | 'alightingStop'> & { trip?: Trip };
 
@@ -38,7 +40,7 @@ export function routePointOptions(trip: Trip): RoutePointOption[] {
     ...stops.map<RoutePointOption>((stop) => ({
       stopId: stop.id,
       kind: 'STOP',
-      cityName: stop.city?.name ?? stop.location?.label ?? 'Étape',
+      cityName: stop.city?.name ?? stop.location?.label ?? translate('Étape'),
       at: stop.estimatedArrivalAt,
     })),
     { stopId: null, kind: 'DESTINATION', cityName: trip.destinationCity.name, at: null },
@@ -47,7 +49,7 @@ export function routePointOptions(trip: Trip): RoutePointOption[] {
 
 /** Nom d'une étape : sa ville, à défaut le libellé de l'adresse. */
 export function stopName(stop: TripStop): string {
-  return stop.city?.name ?? stop.location?.label ?? 'Étape';
+  return stop.city?.name ?? stop.location?.label ?? translate('Étape');
 }
 
 /** « Ville, Pays » d'une étape (ou seulement la ville si le pays n'est pas connu) ; null sans ville. */

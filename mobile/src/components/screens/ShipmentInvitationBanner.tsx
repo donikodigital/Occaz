@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ShipmentInvitationBanner.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [09/10/2026] v1 — bannière clignotante de l'accueil conducteur : « un client vous invite à prendre son colis ».
 //
 // Même famille que MessageAlertCard (halo qui pulse) mais plus voyante : toute la carte respire (opacité) pour qu'on ne la rate pas.
@@ -8,6 +9,7 @@ import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-n
 import { IconChevronRight, IconPackage } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
+import { useT } from '@/i18n';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -21,6 +23,7 @@ export function ShipmentInvitationBanner({
   destinationCity?: string;
   onPress: () => void;
 }) {
+  const t = useT();
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -34,15 +37,15 @@ export function ShipmentInvitationBanner({
     return () => loop.stop();
   }, [pulse]);
 
-  const title = count > 1 ? `${count} clients vous invitent` : 'Un client vous invite';
-  const subtitle = count > 1 ? 'Ils vous demandent de prendre leur colis' : destinationCity ? `Colis à destination de ${destinationCity}` : 'Il vous demande de prendre son colis';
+  const title = count > 1 ? t('{count2} clients vous invitent', { count2: count }) : t('Un client vous invite');
+  const subtitle = count > 1 ? t('Ils vous demandent de prendre leur colis') : destinationCity ? t('Colis à destination de {destinationCity}', { destinationCity }) : t('Il vous demande de prendre son colis');
 
   return (
     <Animated.View style={{ opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.72] }) }}>
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={`${title}. ${subtitle}. Ouvrir.`}
+        accessibilityLabel={t('{title}. {subtitle}. Ouvrir.', { title, subtitle })}
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       >
         <View style={styles.iconWrap}>

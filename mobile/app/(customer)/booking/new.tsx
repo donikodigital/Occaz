@@ -1,4 +1,5 @@
 // mobile/app/(customer)/booking/new.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [04/10/2026] v3 — Écran refait dans le style bleu océan. Un bandeau en tête réunit l'essentiel du trajet (heure de montée,
 // itinéraire avec ses adresses, conducteur, prix par place) ; le nombre de places et les passagers viennent ensuite ; le code
@@ -41,6 +42,7 @@ import { ApiError } from '@/services/api/ApiError';
 import { segmentAvailableSeats } from '@/utils/tripSegment';
 import { FLOW_DONE_PARAM } from '@/utils/navigation';
 import type { PassengerInput } from '@/types/bookings.types';
+import { useT } from '@/i18n';
 
 const HERO_MUTED = OCEAN.sky;
 const HERO_SOFT = 'rgba(255,255,255,0.16)';
@@ -56,6 +58,7 @@ const initialsOf = (name: string) =>
     .join('');
 
 export default function NewBookingScreen() {
+  const t = useT();
   const { tripId, boardingStopId, alightingStopId } = useLocalSearchParams<{
     tripId: string;
     boardingStopId?: string;
@@ -126,11 +129,11 @@ export default function NewBookingScreen() {
     setErrorMessage(undefined);
 
     if (isFull) {
-      setErrorMessage('Ce trajet est complet sur votre tronçon.');
+      setErrorMessage(t('Ce trajet est complet sur votre tronçon.'));
       return;
     }
     if (seatsCount > 1 && extraPassengers.some((p) => p.fullName.trim().length < 2)) {
-      setErrorMessage('Renseignez le nom de chaque passager.');
+      setErrorMessage(t('Renseignez le nom de chaque passager.'));
       return;
     }
 
@@ -143,7 +146,7 @@ export default function NewBookingScreen() {
         onSuccess: (booking) =>
           router.replace({ pathname: '/(customer)/booking/[id]', params: { id: booking.id, ...FLOW_DONE_PARAM } }),
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -162,19 +165,19 @@ export default function NewBookingScreen() {
       <View style={styles.footerRow}>
         <View style={styles.footerPrice}>
           <AppText variant="xs" color="textSecondary">
-            Total à payer
+            {t('Total à payer')}
           </AppText>
           <AppText variant="xl" weight="bold" color={OCEAN.deep} numberOfLines={1} adjustsFontSizeToFit>
             {money(amountDue)}
           </AppText>
           <AppText variant="xs" color={discountAmount > 0 ? colors.successDark : 'textMuted'} numberOfLines={1}>
             {discountAmount > 0
-              ? 'Code promo appliqué'
-              : `${seatsCount} place${seatsCount > 1 ? 's' : ''} · ${fromCity} → ${toCity}`}
+              ? t('Code promo appliqué')
+              : t.n(seatsCount, '{count} place · {fromCity} → {toCity}', '{count} places · {fromCity} → {toCity}', { fromCity, toCity })}
           </AppText>
         </View>
         <OceanButton
-          label="Confirmer"
+          label={t('Confirmer')}
           onPress={handleConfirm}
           loading={createBooking.isPending}
           disabled={isFull}
@@ -186,7 +189,7 @@ export default function NewBookingScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail" footer={footer}>
-      <OceanScreenHeader title="Réserver" subtitle="Vérifiez, puis confirmez" onBack={() => router.back()} />
+      <OceanScreenHeader title={t('Réserver')} subtitle={t('Vérifiez, puis confirmez')} onBack={() => router.back()} />
 
       {/* Bandeau : quand, où, avec qui, à quel prix */}
       <OceanHeroCard style={styles.hero}>
@@ -201,7 +204,7 @@ export default function NewBookingScreen() {
             {formatTime(boardingAt)}
           </AppText>
           <AppText variant="xs" color={HERO_MUTED}>
-            {segment?.boardingStopId ? `Passage estimé à ${fromCity}` : `Départ de ${fromCity}`}
+            {segment?.boardingStopId ? t('Passage estimé à {fromCity}', { fromCity }) : t('Départ de {fromCity}', { fromCity })}
           </AppText>
         </View>
 
@@ -244,7 +247,7 @@ export default function NewBookingScreen() {
             </View>
             <View>
               <AppText variant="xs" color={HERO_MUTED}>
-                Conducteur
+                {t('Conducteur')}
               </AppText>
               <AppText variant="sm" weight="semibold" color={colors.onPrimary}>
                 {driverName}
@@ -253,7 +256,7 @@ export default function NewBookingScreen() {
           </View>
           <View style={styles.priceBlock}>
             <AppText variant="xs" color={HERO_MUTED}>
-              Par place
+              {t('Par place')}
             </AppText>
             <AppText variant="md" weight="bold" color={colors.onPrimary}>
               {money(customerPricePerSeat)}
@@ -266,31 +269,31 @@ export default function NewBookingScreen() {
         <View style={styles.fullNotice}>
           <IconAlertCircle size={16} color={colors.danger} />
           <AppText variant="sm" color="danger" style={styles.fullNoticeText}>
-            Ce trajet est complet sur votre tronçon. Cherchez un autre trajet ou une autre date.
+            {t('Ce trajet est complet sur votre tronçon. Cherchez un autre trajet ou une autre date.')}
           </AppText>
         </View>
       ) : null}
 
       {/* Places */}
-      <OceanSection icon={<IconUsers size={17} color={OCEAN.base} />} title="Places">
+      <OceanSection icon={<IconUsers size={17} color={OCEAN.base} />} title={t('Places')}>
         <View style={styles.seatsRow}>
           <View style={styles.seatsText}>
             <AppText variant="base" weight="semibold">
-              Nombre de places
+              {t('Nombre de places')}
             </AppText>
             <AppText variant="xs" color="textSecondary">
               {isFull
-                ? 'Aucune place disponible'
-                : `${availableSeats} disponible${availableSeats > 1 ? 's' : ''} sur votre tronçon`}
+                ? t('Aucune place disponible')
+                : t.n(availableSeats, '{count} disponible sur votre tronçon', '{count} disponibles sur votre tronçon')}
             </AppText>
           </View>
-          <OceanStepper value={seatsCount} onChange={changeSeats} min={1} max={maxSeats} label="places" />
+          <OceanStepper value={seatsCount} onChange={changeSeats} min={1} max={maxSeats} label={t('places')} />
         </View>
       </OceanSection>
 
       {/* Passagers : seulement quand on réserve pour plusieurs personnes */}
       {extraPassengers.length > 0 ? (
-        <OceanSection icon={<IconUserPlus size={17} color={OCEAN.base} />} title="Passagers">
+        <OceanSection icon={<IconUserPlus size={17} color={OCEAN.base} />} title={t('Passagers')}>
           <OceanCard style={styles.youCard}>
             <View style={styles.youAvatar}>
               <AppText variant="xs" weight="bold" color={OCEAN.base}>
@@ -299,10 +302,10 @@ export default function NewBookingScreen() {
             </View>
             <View style={styles.youText}>
               <AppText variant="sm" weight="semibold" numberOfLines={1}>
-                {clientName || 'Vous'}
+                {clientName || t('Vous')}
               </AppText>
               <AppText variant="xs" color="textSecondary">
-                Passager 1 · vous
+                {t('Passager 1 · vous')}
               </AppText>
             </View>
           </OceanCard>
@@ -312,7 +315,7 @@ export default function NewBookingScreen() {
               label={`Passager ${index + 2}`}
               value={passenger.fullName}
               onChangeText={(text) => updatePassengerName(index, text)}
-              placeholder="Nom complet"
+              placeholder={t('Nom complet')}
             />
           ))}
         </OceanSection>
@@ -322,7 +325,7 @@ export default function NewBookingScreen() {
       <View style={styles.extras}>
         <Disclosure
           icon={<IconDiscount2 size={15} color={OCEAN.base} />}
-          label={promoCode ? `Code ${promoCode} appliqué` : "J'ai un code promo"}
+          label={promoCode ? t('Code {promoCode} appliqué', { promoCode }) : t("J'ai un code promo")}
           preview={discountAmount > 0 ? `− ${money(discountAmount)}` : null}
           keepMounted
         >
@@ -340,13 +343,13 @@ export default function NewBookingScreen() {
 
         <Disclosure
           icon={<IconReceipt2 size={15} color={OCEAN.base} />}
-          label="Détail du prix"
-          preview={`${money(customerPricePerSeat)} × ${seatsCount} place${seatsCount > 1 ? 's' : ''}`}
+          label={t('Détail du prix')}
+          preview={t.n(seatsCount, '{money} × {count} place', '{money} × {count} places', { money: money(customerPricePerSeat) })}
         >
           <View style={styles.breakdown}>
             <View style={styles.breakdownRow}>
               <AppText variant="sm" color="textSecondary">
-                {money(customerPricePerSeat)} × {seatsCount} place{seatsCount > 1 ? 's' : ''}
+                {t.n(seatsCount, '{money} × {count} place', '{money} × {count} places', { money: money(customerPricePerSeat) })}
               </AppText>
               <AppText variant="sm" weight="semibold">
                 {money(totalAmount)}
@@ -355,7 +358,7 @@ export default function NewBookingScreen() {
             {discountAmount > 0 ? (
               <View style={styles.breakdownRow}>
                 <AppText variant="sm" color={colors.successDark}>
-                  Code promo {promoCode}
+                  {t('Code promo')}{' '}{promoCode}
                 </AppText>
                 <AppText variant="sm" weight="semibold" color={colors.successDark}>
                   − {money(discountAmount)}
@@ -365,14 +368,14 @@ export default function NewBookingScreen() {
             <View style={styles.breakdownDivider} />
             <View style={styles.breakdownRow}>
               <AppText variant="base" weight="bold">
-                Total à payer
+                {t('Total à payer')}
               </AppText>
               <AppText variant="base" weight="bold">
                 {money(amountDue)}
               </AppText>
             </View>
             <AppText variant="xs" color="textMuted">
-              Frais de service inclus dans le prix par place.
+              {t('Frais de service inclus dans le prix par place.')}
             </AppText>
           </View>
         </Disclosure>
@@ -381,7 +384,7 @@ export default function NewBookingScreen() {
       <View style={styles.note}>
         <IconInfoCircle size={15} color={OCEAN.base} />
         <AppText variant="xs" color="textSecondary" style={styles.noteText}>
-          Le paiement se fait à l'étape suivante. Une réservation non payée expire automatiquement.
+          {t("Le paiement se fait à l'étape suivante. Une réservation non payée expire automatiquement.")}
         </AppText>
       </View>
     </ScreenContainer>

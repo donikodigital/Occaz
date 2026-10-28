@@ -1,4 +1,5 @@
 // mobile/src/components/screens/CountrySelectField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 import React, { useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { IconCheck, IconChevronDown, IconWorld, IconX } from '@tabler/icons-react-native';
@@ -7,6 +8,7 @@ import { colors, maxContentWidth, spacing } from '@/theme';
 import { useCountries } from '@/hooks/useCities';
 import { useResponsive } from '@/hooks/useResponsive';
 import type { Country } from '@/types/geography.types';
+import { useT } from '@/i18n';
 
 export interface CountrySelectFieldProps {
   label: string;
@@ -20,6 +22,7 @@ function formatPhoneCode(phoneCode: string): string {
 
 /** Peu de pays existent (contrairement aux villes) — une simple liste dans une modale suffit, pas besoin de recherche. */
 export function CountrySelectField({ label, value, onSelect }: CountrySelectFieldProps) {
+  const t = useT();
   const [isOpen, setOpen] = useState(false);
   const { data: countries } = useCountries();
   const { isTablet } = useResponsive();
@@ -33,7 +36,7 @@ export function CountrySelectField({ label, value, onSelect }: CountrySelectFiel
       <Pressable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={`${label} : ${value?.name ?? 'aucun pays choisi'}`}
+        accessibilityLabel={`${label} : ${value?.name ?? t('aucun pays choisi')}`}
         style={({ pressed }) => [styles.field, pressed && styles.pressed]}
       >
         <View style={[styles.badge, value ? styles.badgeFilled : styles.badgeEmpty]}>
@@ -46,7 +49,7 @@ export function CountrySelectField({ label, value, onSelect }: CountrySelectFiel
           )}
         </View>
         <AppText variant="base" color={value ? 'textPrimary' : 'textSecondary'} style={styles.fieldText}>
-          {value?.name ?? 'Choisir un pays'}
+          {value?.name ?? t('Choisir un pays')}
         </AppText>
         <IconChevronDown size={16} color={colors.textSecondary} />
       </Pressable>
@@ -56,7 +59,7 @@ export function CountrySelectField({ label, value, onSelect }: CountrySelectFiel
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderText}>
               <AppText variant="lg" weight="semibold">
-                Choisir un pays
+                {t('Choisir un pays')}
               </AppText>
               <AppText variant="sm" color="textSecondary">
                 {label}
@@ -64,7 +67,7 @@ export function CountrySelectField({ label, value, onSelect }: CountrySelectFiel
             </View>
             <IconButton
               icon={<IconX size={18} color={colors.textPrimary} />}
-              accessibilityLabel="Fermer"
+              accessibilityLabel={t('Fermer')}
               onPress={() => setOpen(false)}
             />
           </View>

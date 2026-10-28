@@ -1,4 +1,5 @@
 // mobile/src/components/screens/BlockedUsersScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — « Utilisateurs bloqués » : la liste des personnes que vous avez bloquées, avec « Débloquer ». Partagé client / conducteur.
 // Seule la liste de VOS blocages est visible : on ne dit jamais à quelqu'un qu'il a été bloqué.
 import React from 'react';
@@ -13,8 +14,10 @@ import { OCEAN } from '@/theme/ocean';
 import { ApiError } from '@/services/api/ApiError';
 import { useBlockedUsers, useUnblockUser } from '@/hooks/useSafety';
 import { formatDateLong } from '@/utils/date';
+import { useT } from '@/i18n';
 
 export function BlockedUsersScreen() {
+  const t = useT();
   const { data, isLoading, isError, error, refetch } = useBlockedUsers();
   const unblock = useUnblockUser();
   const [workingId, setWorkingId] = React.useState<string | null>(null);
@@ -27,13 +30,13 @@ export function BlockedUsersScreen() {
     setWorkingId(userId);
     unblock.mutate(userId, {
       onSettled: () => setWorkingId(null),
-      onError: (err) => setErrorText(err instanceof ApiError ? err.message : 'Impossible de débloquer pour le moment.'),
+      onError: (err) => setErrorText(err instanceof ApiError ? err.message : t('Impossible de débloquer pour le moment.')),
     });
   }
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanHeroHeader title="Utilisateurs bloqués" subtitle="Aucun contact possible avec eux" icon={<IconUserOff />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Utilisateurs bloqués')} subtitle={t('Aucun contact possible avec eux')} icon={<IconUserOff />} onBack={() => router.back()} />
 
       {errorText ? (
         <View style={styles.banner}>
@@ -46,20 +49,20 @@ export function BlockedUsersScreen() {
       ) : isError ? (
         <OceanEmpty
           icon={<IconUserOff size={26} color={OCEAN.base} />}
-          title="Impossible de charger la liste"
-          text={error instanceof ApiError ? error.message : 'Vérifiez votre connexion puis réessayez.'}
-          action={<OceanButton label="Réessayer" variant="outline" onPress={() => void refetch()} />}
+          title={t('Impossible de charger la liste')}
+          text={error instanceof ApiError ? error.message : t('Vérifiez votre connexion puis réessayez.')}
+          action={<OceanButton label={t('Réessayer')} variant="outline" onPress={() => void refetch()} />}
         />
       ) : blocked.length === 0 ? (
         <OceanEmpty
           icon={<IconUserOff size={26} color={OCEAN.base} />}
-          title="Personne n’est bloqué"
-          text="Vous pouvez bloquer quelqu’un depuis « Signaler ou bloquer », sur la page d’un trajet ou d’une réservation."
+          title={t('Personne n’est bloqué')}
+          text={t('Vous pouvez bloquer quelqu’un depuis « Signaler ou bloquer », sur la page d’un trajet ou d’une réservation.')}
         />
       ) : (
         <View style={styles.list}>
           <AppText variant="xs" color="textSecondary">
-            Une personne bloquée ne peut plus réserver chez vous, vous inviter ni vous écrire — et inversement. Ce qui est déjà réservé reste valable.
+            {t('Une personne bloquée ne peut plus réserver chez vous, vous inviter ni vous écrire — et inversement. Ce qui est déjà réservé reste valable.')}
           </AppText>
           {blocked.map((entry) => (
             <OceanCard key={entry.id} style={styles.card}>
@@ -68,13 +71,13 @@ export function BlockedUsersScreen() {
                   {entry.name}
                 </AppText>
                 <View style={styles.meta}>
-                  <OceanPill label={entry.accountType === 'DRIVER' ? 'Conducteur' : 'Client'} tone="neutral" />
+                  <OceanPill label={entry.accountType === 'DRIVER' ? t('Conducteur') : t('Client')} tone="neutral" />
                   <AppText variant="xs" color="textMuted">
-                    depuis le {formatDateLong(entry.createdAt)}
+                    {t('depuis le {dateLong}', { dateLong: formatDateLong(entry.createdAt) })}
                   </AppText>
                 </View>
               </View>
-              <OceanButton label="Débloquer" variant="outline" onPress={() => handleUnblock(entry.userId)} loading={workingId === entry.userId} disabled={workingId !== null} style={styles.button} />
+              <OceanButton label={t('Débloquer')} variant="outline" onPress={() => handleUnblock(entry.userId)} loading={workingId === entry.userId} disabled={workingId !== null} style={styles.button} />
             </OceanCard>
           ))}
         </View>

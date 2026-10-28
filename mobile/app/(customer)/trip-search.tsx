@@ -1,4 +1,5 @@
 // mobile/app/(customer)/trip-search.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // [07/10/2026] v3.1 — Les trois blocs (Itinéraire, Date, Passagers) prennent le bandeau « hero » des formulaires de création de trajet
@@ -37,6 +38,7 @@ import { recentSearchesStorage } from '@/services/storage/recentSearches';
 import { locationsApi } from '@/services/api/locations.api';
 import { formatDateLong, toDateOnly } from '@/utils/date';
 import type { City } from '@/types/geography.types';
+import { useT } from '@/i18n';
 
 /** Hauteur d'une ligne de l'itinéraire : le tracé est positionné à partir d'elle. */
 const ROW_HEIGHT = 60;
@@ -97,6 +99,7 @@ function RouteRow({
 }
 
 export default function TripSearchScreen() {
+  const t = useT();
   const [origin, setOrigin] = useState<City | null>(null);
   const [destination, setDestination] = useState<City | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -197,24 +200,24 @@ export default function TripSearchScreen() {
         ? `Depuis ${origin.name}`
         : destination
           ? `Vers ${destination.name}`
-          : 'Départ ou arrivée à choisir';
+          : t('Départ ou arrivée à choisir');
   const dateSummary = selectedDate
     ? formatDateLong(selectedDate.toISOString()).replace(/^./, (letter) => letter.toUpperCase())
-    : 'Dates flexibles';
-  const passengersSummary = `${passengersCount} passager${passengersCount > 1 ? 's' : ''}`;
+    : t('Dates flexibles');
+  const passengersSummary = t.n(passengersCount, '{count} passager', '{count} passagers');
 
   const firstDotTop = ROW_HEIGHT / 2 - DOT / 2;
   const secondDotTop = ROW_HEIGHT + ROW_GAP + ROW_HEIGHT / 2 - DOT / 2;
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title="Rechercher un trajet" subtitle="Où allez-vous ?" icon={<IconSearch />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Rechercher un trajet')} subtitle={t('Où allez-vous ?')} icon={<IconSearch />} onBack={() => router.back()} />
 
       <HeroSection
         step={1}
         total={3}
         icon={<IconRoute size={22} color={OCEAN.base} />}
-        title="Itinéraire"
+        title={t('Itinéraire')}
         summary={routeSummary}
         status={canSearch ? 'done' : 'todo'}
         style={styles.routeCard}
@@ -226,9 +229,9 @@ export default function TripSearchScreen() {
 
           <RouteRow
             index={0}
-            label="Départ (facultatif)"
+            label={t('Départ (facultatif)')}
             value={origin?.name}
-            placeholder={isDetectingOrigin ? 'Détection de votre position…' : 'Toutes les villes'}
+            placeholder={isDetectingOrigin ? t('Détection de votre position…') : t('Toutes les villes')}
             onPress={() => pickCity('origin')}
             onClear={() => {
               originClearedByUser.current = true;
@@ -237,9 +240,9 @@ export default function TripSearchScreen() {
           />
           <RouteRow
             index={1}
-            label="Arrivée"
+            label={t('Arrivée')}
             value={destination?.name}
-            placeholder="Ville d’arrivée"
+            placeholder={t('Ville d’arrivée')}
             onPress={() => pickCity('destination')}
           />
 
@@ -247,7 +250,7 @@ export default function TripSearchScreen() {
             <Pressable
               onPress={swapCities}
               accessibilityRole="button"
-              accessibilityLabel="Inverser les villes"
+              accessibilityLabel={t('Inverser les villes')}
               style={({ pressed }) => [styles.swapButton, pressed && styles.pressed]}
             >
               <IconArrowsUpDown size={16} color={OCEAN.base} />
@@ -260,10 +263,10 @@ export default function TripSearchScreen() {
         <IconInfoCircle size={15} color={OCEAN.base} />
         <AppText variant="xs" color="textSecondary" style={styles.hintText}>
           {!origin && destination
-            ? `Sans ville de départ, vous voyez tous les trajets qui mènent à ${destination.name}, d'où qu'ils partent.`
+            ? t("Sans ville de départ, vous voyez tous les trajets qui mènent à {destinationName}, d'où qu'ils partent.", { destinationName: destination.name })
             : origin && !destination
-              ? `Sans ville d'arrivée, vous voyez tous les trajets qui partent de ${origin.name}.`
-              : "Une seule ville suffit : sans départ, vous voyez tous les trajets qui mènent à votre destination."}
+              ? t("Sans ville d'arrivée, vous voyez tous les trajets qui partent de {originName}.", { originName: origin.name })
+              : t('Une seule ville suffit : sans départ, vous voyez tous les trajets qui mènent à votre destination.')}
         </AppText>
       </View>
 
@@ -271,36 +274,36 @@ export default function TripSearchScreen() {
         step={2}
         total={3}
         icon={<IconCalendarEvent size={22} color={OCEAN.base} />}
-        title="Date"
+        title={t('Date')}
         summary={dateSummary}
         status={selectedDate ? 'done' : 'todo'}
       >
-        <CalendarPicker label="" selectedDate={selectedDate} onSelectDate={setSelectedDate} flexibleLabel="Dates flexibles" />
+        <CalendarPicker label="" selectedDate={selectedDate} onSelectDate={setSelectedDate} flexibleLabel={t('Dates flexibles')} />
       </HeroSection>
 
       <HeroSection
         step={3}
         total={3}
         icon={<IconUsers size={22} color={OCEAN.base} />}
-        title="Passagers"
+        title={t('Passagers')}
         summary={passengersSummary}
         status="done"
       >
         <View style={styles.passengersRow}>
           <View style={styles.passengersText}>
             <AppText variant="sm" weight="semibold">
-              Nombre de places
+              {t('Nombre de places')}
             </AppText>
             <AppText variant="xs" color="textSecondary">
-              Pour vous et les personnes qui voyagent avec vous.
+              {t('Pour vous et les personnes qui voyagent avec vous.')}
             </AppText>
           </View>
-          <OceanStepper value={passengersCount} onChange={setPassengersCount} min={1} max={8} label="passager" />
+          <OceanStepper value={passengersCount} onChange={setPassengersCount} min={1} max={8} label={t('passager')} />
         </View>
       </HeroSection>
 
       <OceanButton
-        label="Rechercher"
+        label={t('Rechercher')}
         icon={<IconSearch size={18} color={OCEAN.onDark} />}
         onPress={handleSearch}
         disabled={!canSearch}

@@ -1,4 +1,5 @@
 // mobile/app/(driver)/shipment/[id].tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — le code de récupération n'est plus envoyé par SMS à l'expéditeur (il le voit dans l'application) ; celui de livraison part toujours par SMS au destinataire.
 //
 // [09/10/2026] v4 — Page allégée : on ne montre que l'étape à faire (bouton ou code), le bandeau (statut, itinéraire, gain) et la
@@ -58,6 +59,7 @@ import { closeToHome } from '@/utils/navigation';
 import { useGetOrCreateConversationForShipment } from '@/hooks/useConversations';
 import { ApiError } from '@/services/api/ApiError';
 import type { Shipment, ShipmentStatus } from '@/types/shipments.types';
+import { useT, translate } from '@/i18n';
 
 const HERO_MUTED = OCEAN.sky;
 const HERO_SOFT = 'rgba(255,255,255,0.16)';
@@ -71,16 +73,16 @@ const TONE_TO_PILL: Record<'primary' | 'success' | 'danger' | 'neutral', OceanPi
 
 /** Ce que le conducteur doit faire ensuite — dit avant le bouton qui le déclenche. */
 const NEXT_STEP: Partial<Record<ShipmentStatus, string>> = {
-  DRIVER_ASSIGNED: "Rendez-vous à l'adresse de ramassage, puis signalez que vous êtes en route.",
-  PICKUP_PENDING: "Sur place, demandez le code à l'expéditeur pour valider la récupération.",
-  PICKED_UP: 'Colis récupéré : démarrez le transport quand vous êtes prêt.',
-  IN_TRANSIT: 'Signalez que vous partez pour la livraison.',
-  DELIVERY_PENDING: 'Sur place, demandez le code au destinataire pour valider la livraison.',
-  DELIVERED: 'Livraison validée.',
-  COMPLETED: 'Envoi terminé.',
-  DISPUTED: 'Un litige est ouvert sur cet envoi.',
-  CANCELLED: 'Cet envoi a été annulé.',
-  REFUNDED: 'Cet envoi a été remboursé.',
+  get DRIVER_ASSIGNED() { return translate("Rendez-vous à l'adresse de ramassage, puis signalez que vous êtes en route."); },
+  get PICKUP_PENDING() { return translate("Sur place, demandez le code à l'expéditeur pour valider la récupération."); },
+  get PICKED_UP() { return translate('Colis récupéré : démarrez le transport quand vous êtes prêt.'); },
+  get IN_TRANSIT() { return translate('Signalez que vous partez pour la livraison.'); },
+  get DELIVERY_PENDING() { return translate('Sur place, demandez le code au destinataire pour valider la livraison.'); },
+  get DELIVERED() { return translate('Livraison validée.'); },
+  get COMPLETED() { return translate('Envoi terminé.'); },
+  get DISPUTED() { return translate('Un litige est ouvert sur cet envoi.'); },
+  get CANCELLED() { return translate('Cet envoi a été annulé.'); },
+  get REFUNDED() { return translate('Cet envoi a été remboursé.'); },
 };
 
 /** La couleur du bandeau raconte l'état de l'envoi : bleu profond en cours, vert une fois livré, gris annulé, rouge litige. */
@@ -113,8 +115,8 @@ interface Feedback {
   text: string;
 }
 
-function errorFeedback(error: unknown, title = 'Une erreur est survenue'): Feedback {
-  return { tone: 'error', title, text: error instanceof ApiError ? error.message : 'Réessayez dans un instant.' };
+function errorFeedback(error: unknown, title = translate('Une erreur est survenue')): Feedback {
+  return { tone: 'error', title, text: error instanceof ApiError ? error.message : translate('Réessayez dans un instant.') };
 }
 
 function FeedbackBanner({ feedback, onDismiss }: { feedback: Feedback; onDismiss: () => void }) {
@@ -160,6 +162,7 @@ function OtpSection({
   supportPrompt: string;
   onContactSupport: () => void;
 }) {
+  const t = useT();
   const [codeVisible, setCodeVisible] = useState(false);
   const [code, setCode] = useState('');
 
@@ -170,7 +173,7 @@ function OtpSection({
       </AppText>
       {!codeVisible ? (
         <OceanButton
-          label="Demander le code"
+          label={t('Demander le code')}
           variant="soft"
           onPress={() => {
             onRequest();
@@ -185,13 +188,13 @@ function OtpSection({
               value={code}
               onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
               keyboardType="number-pad"
-              placeholder="Code à 6 chiffres"
+              placeholder={t('Code à 6 chiffres')}
               maxLength={6}
               // `style` ne touche que le <TextInput> interne, jamais son conteneur — d'où le champ resté étroit malgré
               // codeInput (flex: 1) : ce flex n'atteignait jamais l'élément qui partage la rangée avec « Vérifier ».
               containerStyle={styles.codeInput}
             />
-            <OceanButton label="Vérifier" onPress={() => onVerify(code)} loading={isVerifying} disabled={code.length !== 6} />
+            <OceanButton label={t('Vérifier')} onPress={() => onVerify(code)} loading={isVerifying} disabled={code.length !== 6} />
           </View>
           <Pressable
             accessibilityRole="button"
@@ -260,6 +263,7 @@ function PersonCard({
 // ---------------------------------------------------------------------------
 
 export default function DriverShipmentDetailScreen() {
+  const t = useT();
   const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
   const { data: shipment, isLoading, isError } = useShipment(id);
 
@@ -281,7 +285,7 @@ export default function DriverShipmentDetailScreen() {
       <ScreenContainer style={styles.center} maxWidth="detail">
         {isError ? (
           <AppText variant="sm" color="danger">
-            Impossible de charger cet envoi.
+            {t('Impossible de charger cet envoi.')}
           </AppText>
         ) : (
           <ActivityIndicator color={colors.primary} />
@@ -307,7 +311,7 @@ export default function DriverShipmentDetailScreen() {
         onSuccess: () => setConfirmCancelOpen(false),
         onError: (error) => {
           setConfirmCancelOpen(false);
-          setFeedback(errorFeedback(error, "L'annulation a échoué"));
+          setFeedback(errorFeedback(error, t("L'annulation a échoué")));
         },
       },
     );
@@ -322,8 +326,8 @@ export default function DriverShipmentDetailScreen() {
   return (
     <ScreenContainer scroll maxWidth="detail">
       <OceanScreenHeader
-        title="Détail de l'envoi"
-        subtitle={shipment.category?.name ?? 'Colis'}
+        title={t("Détail de l'envoi")}
+        subtitle={shipment.category?.name ?? t('Colis')}
         onBack={() => router.back()}
         // Affiché juste après l'acceptation de l'envoi : une croix qui revient à l'accueil.
         onClose={created ? () => closeToHome('/(driver)/(tabs)/home') : undefined}
@@ -336,7 +340,7 @@ export default function DriverShipmentDetailScreen() {
                 })
               }
               accessibilityRole="button"
-              accessibilityLabel="Contacter le client"
+              accessibilityLabel={t('Contacter le client')}
               style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
             >
               <IconMessageCircle size={18} color={OCEAN.base} />
@@ -360,7 +364,7 @@ export default function DriverShipmentDetailScreen() {
           <View style={styles.parcelChip}>
             <IconPackage size={13} color={colors.onPrimary} />
             <AppText variant="xs" weight="semibold" color={colors.onPrimary}>
-              {shipment.category?.name ?? 'Colis'} · {shipment.weightKg} kg{shipment.quantity > 1 ? ` · ${shipment.quantity} colis` : ''}
+              {shipment.category?.name ?? t('Colis')} · {shipment.weightKg} kg{shipment.quantity > 1 ? t(' · {quantity} colis', { quantity: shipment.quantity }) : ''}
             </AppText>
           </View>
         </View>
@@ -374,7 +378,7 @@ export default function DriverShipmentDetailScreen() {
           <View style={styles.routeCities}>
             <View>
               <AppText variant="xs" color={HERO_MUTED}>
-                Ramassage
+                {t('Ramassage')}
               </AppText>
               <AppText variant="xl" weight="bold" color={colors.onPrimary} numberOfLines={1}>
                 {from.city}
@@ -387,7 +391,7 @@ export default function DriverShipmentDetailScreen() {
             </View>
             <View>
               <AppText variant="xs" color={HERO_MUTED}>
-                Livraison
+                {t('Livraison')}
               </AppText>
               <AppText variant="xl" weight="bold" color={colors.onPrimary} numberOfLines={1}>
                 {to.city}
@@ -404,7 +408,7 @@ export default function DriverShipmentDetailScreen() {
         <View style={styles.heroBottom}>
           <View>
             <AppText variant="xs" color={HERO_MUTED}>
-              Vous recevrez
+              {t('Vous recevrez')}
             </AppText>
             <AppText variant="xxl" weight="bold" color={colors.onPrimary}>
               {formatMoney(driverNetAmount(shipment), currencyCode)}
@@ -423,7 +427,7 @@ export default function DriverShipmentDetailScreen() {
 
       {nextStep ? (
         <View style={styles.nextStep}>
-          <OceanPill label="Prochaine étape" tone={TONE_TO_PILL[SHIPMENT_STATUS_TONE[shipment.status]]} />
+          <OceanPill label={t('Prochaine étape')} tone={TONE_TO_PILL[SHIPMENT_STATUS_TONE[shipment.status]]} />
           <AppText variant="sm" color="textSecondary" style={styles.nextStepText}>
             {nextStep}
           </AppText>
@@ -435,7 +439,7 @@ export default function DriverShipmentDetailScreen() {
       {/* Actions de l'étape en cours */}
       {shipment.status === 'DRIVER_ASSIGNED' ? (
         <OceanButton
-          label="En route pour la récupération"
+          label={t('En route pour la récupération')}
           onPress={() => markPickupPending.mutate(undefined, { onError: reportError })}
           loading={markPickupPending.isPending}
           style={styles.actionButton}
@@ -444,17 +448,17 @@ export default function DriverShipmentDetailScreen() {
 
       {shipment.status === 'PICKUP_PENDING' ? (
         <OtpSection
-          title="Code de récupération"
+          title={t('Code de récupération')}
           onRequest={() =>
             requestPickupOtp.mutate(undefined, {
               onSuccess: (result) => {
                 if (result.smsDisabled || !result.smsSent) {
                   setFeedback({
                     tone: 'info',
-                    title: 'Code généré',
+                    title: t('Code généré'),
                     text: result.smsDisabled
-                      ? "L'expéditeur vient d'être prévenu dans son application : demandez-lui son code (bouton « Voir mon code » sur son envoi)."
-                      : "Le SMS n'a pas pu être envoyé à l'expéditeur — demandez-lui de consulter son code directement dans l'application.",
+                      ? t("L'expéditeur vient d'être prévenu dans son application : demandez-lui son code (bouton « Voir mon code » sur son envoi).")
+                      : t("Le SMS n'a pas pu être envoyé à l'expéditeur — demandez-lui de consulter son code directement dans l'application."),
                   });
                 }
               },
@@ -462,11 +466,11 @@ export default function DriverShipmentDetailScreen() {
             })
           }
           onVerify={(code) =>
-            verifyPickupOtp.mutate(code, { onError: (error) => setFeedback(errorFeedback(error, 'Code invalide')) })
+            verifyPickupOtp.mutate(code, { onError: (error) => setFeedback(errorFeedback(error, t('Code invalide'))) })
           }
           isRequesting={requestPickupOtp.isPending}
           isVerifying={verifyPickupOtp.isPending}
-          supportPrompt="Expéditeur injoignable ou refuse le code ? Contacter le support"
+          supportPrompt={t('Expéditeur injoignable ou refuse le code ? Contacter le support')}
           onContactSupport={() =>
             router.push({
               pathname: '/(driver)/dispute-new',
@@ -474,7 +478,7 @@ export default function DriverShipmentDetailScreen() {
                 subjectType: 'SHIPMENT',
                 shipmentId: shipment.id,
                 reason: 'Expéditeur injoignable ou refuse de communiquer le code de récupération',
-                description: `Colis pour ${shipment.recipientName}.`,
+                description: t('Colis pour {recipientName}.', { recipientName: shipment.recipientName }),
               },
             })
           }
@@ -483,7 +487,7 @@ export default function DriverShipmentDetailScreen() {
 
       {shipment.status === 'PICKED_UP' ? (
         <OceanButton
-          label="Démarrer le transport"
+          label={t('Démarrer le transport')}
           onPress={() => markInTransit.mutate(undefined, { onError: reportError })}
           loading={markInTransit.isPending}
           style={styles.actionButton}
@@ -492,7 +496,7 @@ export default function DriverShipmentDetailScreen() {
 
       {shipment.status === 'IN_TRANSIT' ? (
         <OceanButton
-          label="En route pour la livraison"
+          label={t('En route pour la livraison')}
           onPress={() => markDeliveryPending.mutate(undefined, { onError: reportError })}
           loading={markDeliveryPending.isPending}
           style={styles.actionButton}
@@ -501,15 +505,15 @@ export default function DriverShipmentDetailScreen() {
 
       {shipment.status === 'DELIVERY_PENDING' ? (
         <OtpSection
-          title="Code de livraison"
+          title={t('Code de livraison')}
           onRequest={() =>
             requestDeliveryOtp.mutate(undefined, {
               onSuccess: (result) => {
                 if (!result.smsSent) {
                   setFeedback({
                     tone: 'info',
-                    title: 'Code généré',
-                    text: "Le SMS n'a pas pu être envoyé au destinataire — contrairement à l'expéditeur, il n'a pas de compte dans l'application pour le consulter autrement. Réessayez ou contactez-le directement.",
+                    title: t('Code généré'),
+                    text: t("Le SMS n'a pas pu être envoyé au destinataire — contrairement à l'expéditeur, il n'a pas de compte dans l'application pour le consulter autrement. Réessayez ou contactez-le directement."),
                   });
                 }
               },
@@ -517,11 +521,11 @@ export default function DriverShipmentDetailScreen() {
             })
           }
           onVerify={(code) =>
-            verifyDeliveryOtp.mutate(code, { onError: (error) => setFeedback(errorFeedback(error, 'Code invalide')) })
+            verifyDeliveryOtp.mutate(code, { onError: (error) => setFeedback(errorFeedback(error, t('Code invalide'))) })
           }
           isRequesting={requestDeliveryOtp.isPending}
           isVerifying={verifyDeliveryOtp.isPending}
-          supportPrompt="Destinataire injoignable ou refuse le code ? Contacter le support"
+          supportPrompt={t('Destinataire injoignable ou refuse le code ? Contacter le support')}
           onContactSupport={() =>
             router.push({
               pathname: '/(driver)/dispute-new',
@@ -529,7 +533,7 @@ export default function DriverShipmentDetailScreen() {
                 subjectType: 'SHIPMENT',
                 shipmentId: shipment.id,
                 reason: 'Destinataire injoignable ou refuse de communiquer le code de livraison',
-                description: `Colis de ${shipment.senderName} pour ${shipment.recipientName}.`,
+                description: t('Colis de {senderName} pour {recipientName}.', { senderName: shipment.senderName, recipientName: shipment.recipientName }),
               },
             })
           }
@@ -541,11 +545,11 @@ export default function DriverShipmentDetailScreen() {
 
       {/* La personne concernée par cette étape ; les deux fiches complètes sont sous « Voir tous les détails » */}
       {!showDetails && meetSender && !contactsClosed ? (
-        <PersonCard role="Expéditeur" name={shipment.senderName} location={shipment.senderLocation} phone={shipment.senderPhone} />
+        <PersonCard role={translate('Expéditeur')} name={shipment.senderName} location={shipment.senderLocation} phone={shipment.senderPhone} />
       ) : null}
       {!showDetails && meetRecipient && !contactsClosed ? (
         <PersonCard
-          role="Destinataire"
+          role={translate('Destinataire')}
           name={shipment.recipientName}
           location={shipment.recipientLocation}
           phone={shipment.recipientPhone}
@@ -556,16 +560,16 @@ export default function DriverShipmentDetailScreen() {
         <>
       <ShipmentParcelsSection items={shipment.items} currencyCode={currencyCode} />
 
-      <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Personnes concernées">
+      <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title={t('Personnes concernées')}>
         <View style={styles.people}>
           <PersonCard
-            role="Expéditeur"
+            role={translate('Expéditeur')}
             name={shipment.senderName}
             location={shipment.senderLocation}
             phone={contactsClosed ? null : shipment.senderPhone}
           />
           <PersonCard
-            role="Destinataire"
+            role={translate('Destinataire')}
             name={shipment.recipientName}
             location={shipment.recipientLocation}
             phone={contactsClosed ? null : shipment.recipientPhone}
@@ -576,8 +580,7 @@ export default function DriverShipmentDetailScreen() {
           <View style={styles.lockedNote}>
             <IconLock size={16} color={OCEAN.base} />
             <AppText variant="xs" color="textSecondary" style={styles.lockedText}>
-              Colis livré : les coordonnées de l'expéditeur et du destinataire ne sont plus accessibles. En cas de problème,
-              utilisez « Signaler un problème ».
+              {t("Colis livré : les coordonnées de l'expéditeur et du destinataire ne sont plus accessibles. En cas de problème, utilisez « Signaler un problème ».")}
             </AppText>
           </View>
         ) : null}
@@ -586,7 +589,7 @@ export default function DriverShipmentDetailScreen() {
       ) : null}
 
       <OceanButton
-        label={showDetails ? 'Masquer les détails' : 'Voir tous les détails'}
+        label={showDetails ? t('Masquer les détails') : t('Voir tous les détails')}
         variant="soft"
         icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
         onPress={() => setShowDetails((value) => !value)}
@@ -595,7 +598,7 @@ export default function DriverShipmentDetailScreen() {
 
       {canCancel ? (
         <OceanButton
-          label="Annuler l'envoi"
+          label={t("Annuler l'envoi")}
           variant="outline"
           onPress={() => {
             setFeedback(null);
@@ -606,12 +609,12 @@ export default function DriverShipmentDetailScreen() {
         />
       ) : null}
 
-      {['DRIVER_ASSIGNED', 'PICKUP_PENDING', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERY_PENDING'].includes(shipment.status) ? <TicketScanButton label="Scanner une étiquette" /> : null}
+      {['DRIVER_ASSIGNED', 'PICKUP_PENDING', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERY_PENDING'].includes(shipment.status) ? <TicketScanButton label={t('Scanner une étiquette')} /> : null}
 
       {['PICKED_UP', 'IN_TRANSIT', 'DELIVERY_PENDING'].includes(shipment.status) ? <SosButton shipmentId={shipment.id} /> : null}
 
       <OceanButton
-        label="Signaler un problème"
+        label={t('Signaler un problème')}
         variant="outline"
         onPress={() =>
           router.push({
@@ -624,9 +627,9 @@ export default function DriverShipmentDetailScreen() {
 
       <ConfirmDialog
         visible={confirmCancelOpen}
-        title="Annuler cet envoi ?"
-        message="Le client sera remboursé intégralement et l'envoi sera annulé."
-        confirmLabel="Annuler l'envoi"
+        title={t('Annuler cet envoi ?')}
+        message={t("Le client sera remboursé intégralement et l'envoi sera annulé.")}
+        confirmLabel={t("Annuler l'envoi")}
         destructive
         loading={cancelShipment.isPending}
         onConfirm={handleCancel}

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/PhoneChangeScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — Le code part TOUJOURS par SMS au nouveau numéro ; l'avertissement du changement part par e-mail (plus de SMS à l'ancien numéro).
 // [19/10/2026] v+ — Quand le serveur annonce le changement de numéro fermé (SMS coupé par défaut), l'écran l'explique au lieu de laisser échouer l'envoi.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
@@ -28,16 +29,18 @@ import { ApiError } from '@/services/api/ApiError';
 import { guessCountryPrefix, isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT, translate } from '@/i18n';
 
 const RESEND_COOLDOWN_SECONDS = 45;
 
 type Step = 'number' | 'code' | 'done';
 
 function errorText(error: unknown): string {
-  return error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.';
+  return error instanceof ApiError ? error.message : translate('Une erreur est survenue. Réessayez.');
 }
 
 export function PhoneChangeScreen() {
+  const t = useT();
   const currentPhone = useAuthStore((state) => state.user?.phone ?? '');
   const { data: appConfig } = useAppConfig();
 
@@ -61,11 +64,11 @@ export function PhoneChangeScreen() {
     setErrorMessage(undefined);
     const phone = newPhone.trim();
     if (!isValidPhoneNumber(phone)) {
-      setErrorMessage('Saisissez le numéro au format international, par exemple +224620000000.');
+      setErrorMessage(t('Saisissez le numéro au format international, par exemple +224620000000.'));
       return;
     }
     if (phone === currentPhone) {
-      setErrorMessage("C'est déjà le numéro de votre compte.");
+      setErrorMessage(t("C'est déjà le numéro de votre compte."));
       return;
     }
     requestChange.mutate(phone, {
@@ -115,14 +118,14 @@ export function PhoneChangeScreen() {
   if (step === 'number' && appConfig?.features.phoneChange === false) {
     return (
       <ScreenContainer scroll maxWidth="form">
-        <OceanHeroHeader title="Changer mon numéro" icon={<IconDeviceMobile />} onBack={() => router.back()} />
+        <OceanHeroHeader title={t('Changer mon numéro')} icon={<IconDeviceMobile />} onBack={() => router.back()} />
         <View style={styles.body}>
           <AuthIllustration icon={<IconDeviceMobile size={26} color={OCEAN.onDark} />} size={104} style={styles.illustration} />
           <AppText variant="base" color="textSecondary" align="center" style={styles.subtitle}>
-            Le changement de numéro en ligne n&apos;est pas disponible pour le moment. Contactez le support Occa&apos;Z : il le fera pour vous après vérification de votre identité.
+            {t("Le changement de numéro en ligne n'est pas disponible pour le moment. Contactez le support Occa'Z : il le fera pour vous après vérification de votre identité.")}
           </AppText>
         </View>
-        <OceanButton label="Retour" variant="soft" onPress={() => router.back()} style={styles.submit} />
+        <OceanButton label={t('Retour')} variant="soft" onPress={() => router.back()} style={styles.submit} />
       </ScreenContainer>
     );
   }
@@ -133,16 +136,16 @@ export function PhoneChangeScreen() {
         <View style={styles.centered}>
           <AuthIllustration icon={<IconCircleCheck size={28} color={OCEAN.onDark} />} size={104} style={styles.illustration} />
           <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>
-            Numéro modifié
+            {t('Numéro modifié')}
           </AppText>
           <AppText variant="base" color="textSecondary" align="center" style={styles.subtitle}>
-            Votre compte utilise maintenant le {newPhone.trim()}. Utilisez ce numéro pour vous connecter.
+            {t('Votre compte utilise maintenant le {newPhone}. Utilisez ce numéro pour vous connecter.', { newPhone: newPhone.trim() })}
           </AppText>
           <AppText variant="xs" color="textMuted" align="center">
-            Si votre compte a une adresse e-mail, nous l'avons prévenue du changement.
+            {t("Si votre compte a une adresse e-mail, nous l'avons prévenue du changement.")}
           </AppText>
         </View>
-        <OceanButton label="Terminé" onPress={() => router.back()} style={styles.submit} />
+        <OceanButton label={t('Terminé')} onPress={() => router.back()} style={styles.submit} />
       </ScreenContainer>
     );
   }
@@ -150,15 +153,15 @@ export function PhoneChangeScreen() {
   if (step === 'code') {
     return (
       <ScreenContainer maxWidth="form">
-        <OceanHeroHeader title="Changer mon numéro" subtitle="Étape 2 sur 2" icon={<IconMessage2 />} onBack={backToNumber} />
+        <OceanHeroHeader title={t('Changer mon numéro')} subtitle={t('Étape 2 sur 2')} icon={<IconMessage2 />} onBack={backToNumber} />
 
         <View style={styles.body}>
           <AuthIllustration icon={<IconMessage2 size={26} color={OCEAN.onDark} />} size={104} style={styles.illustration} />
           <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>
-            Entrez le code
+            {t('Entrez le code')}
           </AppText>
           <AppText variant="base" color="textSecondary" align="center" style={styles.subtitle}>
-            Code envoyé par SMS au {newPhone.trim()}
+            {t('Code envoyé par SMS au {newPhone}', { newPhone: newPhone.trim() })}
           </AppText>
 
           <OtpCodeInput
@@ -180,25 +183,25 @@ export function PhoneChangeScreen() {
           <View style={styles.links}>
             {cooldown > 0 ? (
               <AppText variant="sm" color="textMuted">
-                Renvoyer le code dans {cooldown}s
+                {t('Renvoyer le code dans {cooldown}s', { cooldown })}
               </AppText>
             ) : (
               <Pressable onPress={resendCode} disabled={requestChange.isPending} accessibilityRole="button">
                 <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-                  Renvoyer le code
+                  {t('Renvoyer le code')}
                 </AppText>
               </Pressable>
             )}
             <Pressable onPress={backToNumber} accessibilityRole="button">
               <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-                Ce n'est pas le bon numéro ? Le modifier
+                {t("Ce n'est pas le bon numéro ? Le modifier")}
               </AppText>
             </Pressable>
           </View>
         </View>
 
         <OceanButton
-          label="Vérifier"
+          label={t('Vérifier')}
           onPress={() => verify(code)}
           loading={confirmChange.isPending}
           disabled={code.length !== OTP_CODE_LENGTH}
@@ -210,18 +213,18 @@ export function PhoneChangeScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanHeroHeader title="Changer mon numéro" subtitle="Étape 1 sur 2" icon={<IconDeviceMobile />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Changer mon numéro')} subtitle={t('Étape 1 sur 2')} icon={<IconDeviceMobile />} onBack={() => router.back()} />
 
       <View style={styles.body}>
         <AuthIllustration icon={<IconDeviceMobile size={26} color={OCEAN.onDark} />} size={104} style={styles.illustration} />
         <AppText variant="base" color="textSecondary" align="center" style={styles.subtitle}>
-          Saisissez votre nouveau numéro : nous y enverrons un code par SMS pour vérifier qu'il est bien à vous.
+          {t("Saisissez votre nouveau numéro : nous y enverrons un code par SMS pour vérifier qu'il est bien à vous.")}
         </AppText>
 
         <View style={styles.fields}>
-          <LockedField label="Numéro actuel" value={currentPhone} />
+          <LockedField label={t('Numéro actuel')} value={currentPhone} />
           <TextField
-            label="Nouveau numéro"
+            label={t('Nouveau numéro')}
             value={newPhone}
             onChangeText={(text) => {
               setNewPhone(normalizePhoneInput(text));
@@ -235,13 +238,12 @@ export function PhoneChangeScreen() {
         </View>
 
         <AppText variant="xs" color="textMuted" style={styles.note}>
-          Ce numéro devient votre identifiant de connexion. Si votre compte a une adresse e-mail, elle sera prévenue du changement.
-          Un nouveau changement ne sera possible qu'après un délai. Le numéro Mobile Money d'un conducteur n'est pas modifié ici.
+          {t("Ce numéro devient votre identifiant de connexion. Si votre compte a une adresse e-mail, elle sera prévenue du changement. Un nouveau changement ne sera possible qu'après un délai. Le numéro Mobile Money d'un conducteur n'est pas modifié ici.")}
         </AppText>
       </View>
 
       <OceanButton
-        label="Recevoir le code"
+        label={t('Recevoir le code')}
         onPress={sendCode}
         loading={requestChange.isPending}
         disabled={newPhone.trim().length < 8}

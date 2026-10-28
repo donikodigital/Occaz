@@ -1,4 +1,5 @@
 // mobile/app/(driver)/help.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v2 — en-tête en bandeau (héro) bleu océan, comme les autres pages. Le reste de l'écran est inchangé.
 //
 // v1 — « Obtenir de l'aide » : contacter le support par email (nouveau,
@@ -26,6 +27,7 @@ import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { COMPANY } from '@/content/legal';
+import { useT } from '@/i18n';
 
 /** Adresse support : celle de la société (src/content/legal.ts). */
 const SUPPORT_EMAIL: string = COMPANY.supportEmail;
@@ -56,59 +58,60 @@ function Row({ icon, iconBackground, label, onPress, isLast, danger }: RowProps)
 }
 
 export default function HelpScreen() {
+  const t = useT();
   function contactSupport() {
-    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Besoin d’aide — Occaz')}`);
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(t('Besoin d’aide — Occaz'))}`);
   }
 
   const appVersion = Constants.expoConfig?.version ?? '—';
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title="Obtenir de l'aide" subtitle="Nous sommes là pour vous répondre" icon={<IconLifebuoy />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t("Obtenir de l'aide")} subtitle={t('Nous sommes là pour vous répondre')} icon={<IconLifebuoy />} onBack={() => router.back()} />
 
-      <OceanSection icon={<IconMail size={17} color={OCEAN.base} />} title="Nous contacter">
+      <OceanSection icon={<IconMail size={17} color={OCEAN.base} />} title={t('Nous contacter')}>
         <Row
           icon={<IconMail size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Contacter le support par email"
+          label={t('Contacter le support par email')}
           onPress={contactSupport}
           isLast
         />
       </OceanSection>
 
-      <OceanSection icon={<IconShieldCheck size={17} color={OCEAN.base} />} title="Ressources">
+      <OceanSection icon={<IconShieldCheck size={17} color={OCEAN.base} />} title={t('Ressources')}>
         <Row
           icon={<IconShieldCheck size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Centre de sécurité"
+          label={t('Centre de sécurité')}
           onPress={() => router.push('/(driver)/safety-center')}
         />
         <Row
           icon={<IconQuestionMark size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Questions fréquentes"
+          label={t('Questions fréquentes')}
           onPress={() => router.push('/(driver)/faq')}
         />
         <Row
           icon={<IconFileText size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Conditions générales"
+          label={t('Conditions générales')}
           onPress={() => router.push('/(driver)/terms')}
         />
         <Row
           icon={<IconInfoCircle size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Infos sur l'app"
+          label={t("Infos sur l'app")}
           onPress={() => router.push('/(driver)/about')}
           isLast
         />
       </OceanSection>
 
-      <OceanSection icon={<IconTrash size={17} color={colors.dangerDark} />} title="Compte">
+      <OceanSection icon={<IconTrash size={17} color={colors.dangerDark} />} title={t('Compte')}>
         <Row
           icon={<IconTrash size={18} color={colors.dangerDark} />}
           iconBackground={colors.dangerLight}
-          label="Supprimer votre compte"
+          label={t('Supprimer votre compte')}
           onPress={() => router.push('/(driver)/delete-account')}
           danger
           isLast
@@ -116,7 +119,7 @@ export default function HelpScreen() {
       </OceanSection>
 
       <AppText variant="xs" color="textMuted" align="center" style={styles.version}>
-        Version {appVersion}
+        {t('Version {appVersion}', { appVersion })}
       </AppText>
     </ScreenContainer>
   );

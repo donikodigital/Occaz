@@ -1,4 +1,5 @@
 // mobile/src/components/auth/PhoneField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Champ téléphone : pastille « 🇬🇳 +224 » (indicatif du pays choisi) suivie du numéro sans indicatif. Si `onPressCountry`
 // est fourni, la pastille ouvre la liste des pays ; sinon l'indicatif suit le pays choisi plus haut sur l'écran (inscription).
 // Les espaces sont insérés pendant la frappe selon le pays (utils/phone.ts). Un numéro collé avec son indicatif est ramené à sa partie
@@ -11,9 +12,10 @@ import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { flagEmoji, formatDialCode, formatPhoneTyping, phonePlaceholder } from '@/utils/phone';
 import type { Country } from '@/types/geography.types';
+import { useT, translate } from '@/i18n';
 
 export function PhoneField({
-  label = 'Téléphone',
+  label = translate('Téléphone'),
   country,
   value,
   onChangeText,
@@ -29,6 +31,7 @@ export function PhoneField({
   error?: string;
   autoFocus?: boolean;
 }) {
+  const t = useT();
   const chip = (
     <>
       <AppText variant="lg">{country ? flagEmoji(country.isoCode) : '🌍'}</AppText>
@@ -46,7 +49,7 @@ export function PhoneField({
       </AppText>
       <View style={[styles.field, error ? styles.fieldError : null]}>
         {onPressCountry ? (
-          <Pressable onPress={onPressCountry} accessibilityRole="button" accessibilityLabel="Changer de pays" style={styles.chip}>
+          <Pressable onPress={onPressCountry} accessibilityRole="button" accessibilityLabel={t('Changer de pays')} style={styles.chip}>
             {chip}
           </Pressable>
         ) : (

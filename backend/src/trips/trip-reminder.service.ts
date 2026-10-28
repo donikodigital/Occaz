@@ -195,6 +195,7 @@ export class TripReminderService implements OnModuleInit, OnModuleDestroy {
           try {
             await this.notifications.notify({
               userId: recipient.userId,
+              audience: recipient.role === 'driver' ? 'DRIVER' : 'CUSTOMER',
               type: NotificationType.DEPARTURE_IMMINENT,
               channels: [NotificationChannel.PUSH],
               fallbackTitle: texts.title,

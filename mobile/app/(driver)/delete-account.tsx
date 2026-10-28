@@ -1,4 +1,5 @@
 // mobile/app/(driver)/delete-account.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [20/10/2026] Le texte annonce l'effacement des données sous 30 jours (politique de confidentialité, section 8).
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
@@ -17,8 +18,10 @@ import { colors, spacing } from '@/theme';
 import { useDeleteAccount } from '@/hooks/useDeleteAccount';
 import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/services/api/ApiError';
+import { useT } from '@/i18n';
 
 export default function DeleteAccountScreen() {
+  const t = useT();
   const [reason, setReason] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
@@ -33,7 +36,7 @@ export default function DeleteAccountScreen() {
         router.replace('/(auth)/onboarding');
       },
       onError: (error) => {
-        setErrorMessage(error instanceof ApiError ? error.message : 'La suppression a échoué — réessayez.');
+        setErrorMessage(error instanceof ApiError ? error.message : t('La suppression a échoué — réessayez.'));
         setConfirming(false);
       },
     });
@@ -41,25 +44,25 @@ export default function DeleteAccountScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title="Supprimer votre compte" subtitle="Lisez avant de continuer" icon={<IconTrash />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Supprimer votre compte')} subtitle={t('Lisez avant de continuer')} icon={<IconTrash />} onBack={() => router.back()} />
 
       <View style={styles.warning}>
         <IconAlertTriangle size={20} color={colors.dangerDark} />
         <View style={{ flex: 1 }}>
           <AppText variant="sm" weight="semibold" color={colors.dangerDark}>
-            Cette action est définitive
+            {t('Cette action est définitive')}
           </AppText>
           <AppText variant="xs" color={colors.dangerDark} style={styles.warningText}>
-            Votre compte sera désactivé immédiatement et vous ne pourrez plus vous connecter. Vos données personnelles seront ensuite effacées ou anonymisées sous 30 jours, sauf celles que la loi nous oblige à conserver (pièces comptables). Si un trajet, une réservation ou un envoi est encore en cours, terminez-le ou annulez-le d'abord.
+            {t("Votre compte sera désactivé immédiatement et vous ne pourrez plus vous connecter. Vos données personnelles seront ensuite effacées ou anonymisées sous 30 jours, sauf celles que la loi nous oblige à conserver (pièces comptables). Si un trajet, une réservation ou un envoi est encore en cours, terminez-le ou annulez-le d'abord.")}
           </AppText>
         </View>
       </View>
 
       <TextField
-        label="Pourquoi partez-vous ? (optionnel)"
+        label={t('Pourquoi partez-vous ? (optionnel)')}
         value={reason}
         onChangeText={setReason}
-        placeholder="Votre retour nous aide à nous améliorer"
+        placeholder={t('Votre retour nous aide à nous améliorer')}
         multiline
         style={styles.reasonInput}
       />
@@ -72,7 +75,7 @@ export default function DeleteAccountScreen() {
 
       {!confirming ? (
         <OceanButton
-          label="Supprimer mon compte"
+          label={t('Supprimer mon compte')}
           variant="danger"
           icon={<IconTrash size={17} color={colors.onPrimary} />}
           onPress={() => setConfirming(true)}
@@ -81,16 +84,16 @@ export default function DeleteAccountScreen() {
       ) : (
         <View style={styles.confirmRow}>
           <AppText variant="sm" weight="semibold" color={colors.dangerDark} align="center" style={styles.confirmText}>
-            Confirmez-vous la suppression définitive de votre compte ?
+            {t('Confirmez-vous la suppression définitive de votre compte ?')}
           </AppText>
           <OceanButton
-            label="Oui, supprimer définitivement"
+            label={t('Oui, supprimer définitivement')}
             variant="danger"
             onPress={handleConfirm}
             loading={deleteAccount.isPending}
             style={styles.button}
           />
-          <OceanButton label="Annuler" variant="outline" onPress={() => setConfirming(false)} style={styles.button} />
+          <OceanButton label={t('Annuler')} variant="outline" onPress={() => setConfirming(false)} style={styles.button} />
         </View>
       )}
     </ScreenContainer>

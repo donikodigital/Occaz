@@ -1,4 +1,5 @@
 // mobile/src/hooks/useShipmentPhotos.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v1 — Photos du colis.
 //   • useParcelPhotoDrafts : dans le formulaire d'envoi, prend ou choisit jusqu'à 2 photos et les envoie au stockage tout de suite ;
 //     le formulaire ne transmet à POST /shipments que leurs clés (`photoKeys`).
@@ -13,6 +14,7 @@ import {
   type ParcelPhotoContentType,
   type ParcelPhotoDraft,
 } from '@/types/shipmentPhotos.types';
+import { useT } from '@/i18n';
 
 function toContentType(mimeType: string | null | undefined): ParcelPhotoContentType | null {
   if (mimeType === 'image/jpeg' || mimeType === 'image/png' || mimeType === 'image/webp') return mimeType;
@@ -24,6 +26,7 @@ let localCounter = 0;
 const nextLocalId = () => `photo-${Date.now()}-${localCounter++}`;
 
 export function useParcelPhotoDrafts() {
+  const t = useT();
   const [photos, setPhotos] = useState<ParcelPhotoDraft[]>([]);
   // Copie synchrone de la liste : deux choix enchaînés très vite ne doivent pas dépasser 2 photos, ni perdre une mise à jour.
   const photosRef = useRef<ParcelPhotoDraft[]>([]);
@@ -63,44 +66,44 @@ export function useParcelPhotoDrafts() {
     (asset: ImagePicker.ImagePickerAsset) => {
       const contentType = toContentType(asset.mimeType);
       if (!contentType) {
-        setError('Format non supporté : choisissez une photo au format JPEG, PNG ou WebP.');
+        setError(t('Format non supporté : choisissez une photo au format JPEG, PNG ou WebP.'));
         return;
       }
       if (photosRef.current.length >= MAX_PARCEL_PHOTOS) {
-        setError(`Vous pouvez joindre ${MAX_PARCEL_PHOTOS} photos au plus.`);
+        setError(t('Vous pouvez joindre {MAX_PARCEL_PHOTOS} photos au plus.', { MAX_PARCEL_PHOTOS }));
         return;
       }
       const draft: ParcelPhotoDraft = { localId: nextLocalId(), uri: asset.uri, contentType, status: 'uploading' };
       commit((current) => [...current, draft]);
       void upload(draft);
     },
-    [upload, commit],
+    [upload, commit, t],
   );
 
   const pickFromCamera = useCallback(async () => {
     setError(null);
-    if (photosRef.current.length >= MAX_PARCEL_PHOTOS) return setError(`Vous pouvez joindre ${MAX_PARCEL_PHOTOS} photos au plus.`);
+    if (photosRef.current.length >= MAX_PARCEL_PHOTOS) return setError(t('Vous pouvez joindre {MAX_PARCEL_PHOTOS} photos au plus.', { MAX_PARCEL_PHOTOS }));
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        setError("Autorisation requise : autorisez l'accès à l'appareil photo pour photographier votre colis.");
+        setError(t("Autorisation requise : autorisez l'accès à l'appareil photo pour photographier votre colis."));
         return;
       }
       const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
       if (result.canceled || !result.assets?.[0]) return;
       addAsset(result.assets[0]);
     } catch {
-      setError("L'appareil photo n'est pas disponible : choisissez une photo dans votre galerie.");
+      setError(t("L'appareil photo n'est pas disponible : choisissez une photo dans votre galerie."));
     }
-  }, [addAsset]);
+  }, [addAsset, t]);
 
   const pickFromLibrary = useCallback(async () => {
     setError(null);
-    if (photosRef.current.length >= MAX_PARCEL_PHOTOS) return setError(`Vous pouvez joindre ${MAX_PARCEL_PHOTOS} photos au plus.`);
+    if (photosRef.current.length >= MAX_PARCEL_PHOTOS) return setError(t('Vous pouvez joindre {MAX_PARCEL_PHOTOS} photos au plus.', { MAX_PARCEL_PHOTOS }));
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        setError("Autorisation requise : autorisez l'accès à vos photos pour joindre une photo du colis.");
+        setError(t("Autorisation requise : autorisez l'accès à vos photos pour joindre une photo du colis."));
         return;
       }
       const remaining = MAX_PARCEL_PHOTOS - photosRef.current.length;
@@ -113,9 +116,9 @@ export function useParcelPhotoDrafts() {
       if (result.canceled || !result.assets?.length) return;
       for (const asset of result.assets.slice(0, remaining)) addAsset(asset);
     } catch {
-      setError("La galerie n'est pas disponible pour le moment — réessayez.");
+      setError(t("La galerie n'est pas disponible pour le moment — réessayez."));
     }
-  }, [addAsset]);
+  }, [addAsset, t]);
 
   const remove = useCallback((localId: string) => {
     setError(null);

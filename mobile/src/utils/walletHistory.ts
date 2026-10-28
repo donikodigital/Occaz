@@ -1,44 +1,46 @@
 // mobile/src/utils/walletHistory.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Historique du portefeuille — libellés, regroupement par jour et textes des lignes. Fonctions pures, sans écran : l'affichage est
 // dans app/(driver)/(tabs)/wallet.tsx.
 import type { PayoutStatus } from '@/types/payouts.types';
 import type { WalletTransaction, WalletTransactionStatus, WalletTxFilter } from '@/types/wallets.types';
+import { translate, translateN, intlLocale } from '@/i18n';
 
 export const WALLET_FILTERS: WalletTxFilter[] = ['ALL', 'TRIPS', 'SHIPMENTS', 'PAYOUTS', 'OTHER'];
 
 export const FILTER_LABELS: Record<WalletTxFilter, string> = {
-  ALL: 'Tout',
-  TRIPS: 'Trajets',
-  SHIPMENTS: 'Envois',
-  PAYOUTS: 'Retraits',
-  OTHER: 'Autres',
+  get ALL() { return translate('Tout'); },
+  get TRIPS() { return translate('Trajets'); },
+  get SHIPMENTS() { return translate('Envois'); },
+  get PAYOUTS() { return translate('Retraits'); },
+  get OTHER() { return translate('Autres'); },
 };
 
 /** Titre de la carte de total quand un filtre est actif. */
 export const FILTER_TOTAL_LABELS: Record<Exclude<WalletTxFilter, 'ALL'>, string> = {
-  TRIPS: 'Gagné avec les trajets',
-  SHIPMENTS: 'Gagné avec les envois',
-  PAYOUTS: 'Total retiré',
-  OTHER: 'Remboursements et ajustements',
+  get TRIPS() { return translate('Gagné avec les trajets'); },
+  get SHIPMENTS() { return translate('Gagné avec les envois'); },
+  get PAYOUTS() { return translate('Total retiré'); },
+  get OTHER() { return translate('Remboursements et ajustements'); },
 };
 
 export const FILTER_EMPTY_TEXT: Record<WalletTxFilter, string> = {
-  ALL: 'Aucune opération pour le moment.',
-  TRIPS: 'Aucun gain de trajet pour le moment.',
-  SHIPMENTS: 'Aucun gain d\u2019envoi pour le moment.',
-  PAYOUTS: 'Aucun retrait pour le moment.',
-  OTHER: 'Aucun remboursement ni ajustement.',
+  get ALL() { return translate('Aucune opération pour le moment.'); },
+  get TRIPS() { return translate('Aucun gain de trajet pour le moment.'); },
+  get SHIPMENTS() { return translate('Aucun gain d’envoi pour le moment.'); },
+  get PAYOUTS() { return translate('Aucun retrait pour le moment.'); },
+  get OTHER() { return translate('Aucun remboursement ni ajustement.'); },
 };
 
 const TX_TITLES: Record<WalletTransaction['type'], string> = {
-  BOOKING_REVENUE: 'Trajet',
-  SHIPMENT_REVENUE: 'Envoi',
-  COMMISSION: 'Commission',
-  REFUND: 'Remboursement',
-  PAYOUT: 'Retrait',
-  ADJUSTMENT: 'Ajustement',
-  CANCELLATION_FEE: 'Frais d\u2019annulation',
+  get BOOKING_REVENUE() { return translate('Trajet'); },
+  get SHIPMENT_REVENUE() { return translate('Envoi'); },
+  get COMMISSION() { return translate('Commission'); },
+  get REFUND() { return translate('Remboursement'); },
+  get PAYOUT() { return translate('Retrait'); },
+  get ADJUSTMENT() { return translate('Ajustement'); },
+  get CANCELLATION_FEE() { return translate('Frais d’annulation'); },
 };
 
 export function txTitle(tx: Pick<WalletTransaction, 'type'>): string {
@@ -46,11 +48,11 @@ export function txTitle(tx: Pick<WalletTransaction, 'type'>): string {
 }
 
 const METHOD_LABELS: Record<string, string> = {
-  orange_money: 'Orange Money',
-  mobile_money: 'Mobile Money',
-  mobile_money_xof: 'Mobile Money',
-  bank_transfer: 'Virement bancaire',
-  cash: 'Espèces',
+  get orange_money() { return translate('Orange Money'); },
+  get mobile_money() { return translate('Mobile Money'); },
+  get mobile_money_xof() { return translate('Mobile Money'); },
+  get bank_transfer() { return translate('Virement bancaire'); },
+  get cash() { return translate('Espèces'); },
 };
 
 export function methodLabel(method: string | null | undefined): string | null {
@@ -64,7 +66,7 @@ export function txSubtitle(tx: Pick<WalletTransaction, 'subject'>): string | nul
   if (!subject) return null;
   switch (subject.kind) {
     case 'TRIP':
-      return `${subject.from} → ${subject.to} · ${subject.seats} place${subject.seats > 1 ? 's' : ''}`;
+      return translateN(subject.seats, '{from} → {to} · {count} place', '{from} → {to} · {count} places', { from: subject.from, to: subject.to });
     case 'SHIPMENT':
       return [subject.categoryName, `${subject.from} → ${subject.to}`, `${subject.weightKg} kg`].filter(Boolean).join(' · ');
     case 'PAYOUT':
@@ -75,24 +77,24 @@ export function txSubtitle(tx: Pick<WalletTransaction, 'subject'>): string | nul
 /** « Converti du GNF · 1 GNF = 0,062 XOF » — pour qu'un petit montant en XOF ne surprenne pas quand le trajet était en GNF. */
 export function conversionNote(conversion: WalletTransaction['conversion']): string | null {
   if (!conversion) return null;
-  const rate = new Intl.NumberFormat('fr-FR', { maximumSignificantDigits: 4 }).format(conversion.rate);
-  return `Converti du ${conversion.fromIsoCode} · 1 ${conversion.fromIsoCode} = ${rate} ${conversion.toIsoCode}`;
+  const rate = new Intl.NumberFormat(intlLocale(), { maximumSignificantDigits: 4 }).format(conversion.rate);
+  return translate('Converti du {fromIsoCode} · 1 {fromIsoCode} = {rate} {toIsoCode}', { fromIsoCode: conversion.fromIsoCode, rate, toIsoCode: conversion.toIsoCode });
 }
 
 export type StatusTone = 'ocean' | 'success' | 'danger' | 'neutral';
 
 const TX_STATUS: Record<WalletTransactionStatus, { label: string; tone: StatusTone }> = {
-  PENDING: { label: 'En cours', tone: 'ocean' },
-  COMPLETED: { label: 'Payé', tone: 'success' },
-  REVERSED: { label: 'Annulé', tone: 'danger' },
+  PENDING: { get label() { return translate('En cours'); }, tone: 'ocean' },
+  COMPLETED: { get label() { return translate('Payé'); }, tone: 'success' },
+  REVERSED: { get label() { return translate('Annulé'); }, tone: 'danger' },
 };
 
 const PAYOUT_STATUS: Record<PayoutStatus, { label: string; tone: StatusTone }> = {
-  REQUESTED: { label: 'En attente de validation', tone: 'neutral' },
-  PROCESSING: { label: 'En cours', tone: 'ocean' },
-  PAID: { label: 'Payé', tone: 'success' },
-  FAILED: { label: 'Échoué', tone: 'danger' },
-  CANCELLED: { label: 'Annulé', tone: 'danger' },
+  REQUESTED: { get label() { return translate('En attente de validation'); }, tone: 'neutral' },
+  PROCESSING: { get label() { return translate('En cours'); }, tone: 'ocean' },
+  PAID: { get label() { return translate('Payé'); }, tone: 'success' },
+  FAILED: { get label() { return translate('Échoué'); }, tone: 'danger' },
+  CANCELLED: { get label() { return translate('Annulé'); }, tone: 'danger' },
 };
 
 /** Pastille de statut : pour un retrait, celui de la demande de retrait (En attente de validation, En cours, Payé, Échoué) ; sinon celui de l'opération. */
@@ -118,9 +120,9 @@ export function dayLabel(date: Date, now: Date): string {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const diffDays = Math.round((startOfToday.getTime() - startOfDay.getTime()) / 86_400_000);
-  if (diffDays === 0) return "Aujourd'hui";
-  if (diffDays === 1) return 'Hier';
-  const text = new Intl.DateTimeFormat('fr-FR', {
+  if (diffDays === 0) return translate("Aujourd'hui");
+  if (diffDays === 1) return translate('Hier');
+  const text = new Intl.DateTimeFormat(intlLocale(), {
     weekday: 'long',
     day: 'numeric',
     month: 'long',

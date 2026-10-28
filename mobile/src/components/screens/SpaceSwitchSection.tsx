@@ -1,4 +1,5 @@
 // mobile/src/components/screens/SpaceSwitchSection.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v1 — Section « Mes espaces » des menus de profil : un même compte (même numéro, même code PIN) peut être passager ET conducteur.
 // - Depuis l'espace conducteur : « Utiliser Occa'Z comme passager » (code PIN demandé la première fois).
 // - Depuis l'espace passager : « Passer en mode conducteur » / « Devenir conducteur » (création du profil conducteur la première fois).
@@ -14,8 +15,10 @@ import { OCEAN } from '@/theme/ocean';
 import { useAccountRoles, useSwitchSpace } from '@/hooks/useAccountRoles';
 import { useActiveSpaceStore } from '@/stores/activeSpaceStore';
 import type { Space } from '@/types/roles.types';
+import { useT } from '@/i18n';
 
 export function SpaceSwitchSection({ current }: { current: Space }) {
+  const t = useT();
   const { data: roles } = useAccountRoles();
   const switchTo = useSwitchSpace();
   const setSpace = useActiveSpaceStore((state) => state.setSpace);
@@ -25,17 +28,17 @@ export function SpaceSwitchSection({ current }: { current: Space }) {
 
   const isDriverSpace = current === 'DRIVER';
   const label = isDriverSpace
-    ? "Utiliser Occa'Z comme passager"
+    ? t("Utiliser Occa'Z comme passager")
     : roles?.driver
-      ? 'Passer en mode conducteur'
-      : 'Devenir conducteur';
+      ? t('Passer en mode conducteur')
+      : t('Devenir conducteur');
   const hint = isDriverSpace
     ? roles?.customer
-      ? 'Réservez un trajet ou envoyez un colis avec le même compte.'
-      : 'Même numéro, même code PIN. Votre portefeuille conducteur reste séparé.'
+      ? t('Réservez un trajet ou envoyez un colis avec le même compte.')
+      : t('Même numéro, même code PIN. Votre portefeuille conducteur reste séparé.')
     : roles?.driver
-      ? 'Retrouvez vos trajets, vos colis et votre portefeuille conducteur.'
-      : 'Proposez vos trajets avec le même compte : un dossier à compléter, une semaine pour le régulariser.';
+      ? t('Retrouvez vos trajets, vos colis et votre portefeuille conducteur.')
+      : t('Proposez vos trajets avec le même compte : un dossier à compléter, une semaine pour le régulariser.');
 
   function handlePress() {
     if (isDriverSpace) {
@@ -53,7 +56,7 @@ export function SpaceSwitchSection({ current }: { current: Space }) {
   }
 
   return (
-    <OceanSection icon={<IconArrowsExchange size={17} color={OCEAN.base} />} title="Mes espaces">
+    <OceanSection icon={<IconArrowsExchange size={17} color={OCEAN.base} />} title={t('Mes espaces')}>
       <Pressable
         onPress={handlePress}
         accessibilityRole="button"

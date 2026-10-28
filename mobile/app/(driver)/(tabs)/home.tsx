@@ -1,4 +1,6 @@
 // mobile/app/(driver)/(tabs)/home.tsx
+// [28/10/2026] v+ — Notifications et alerte de message limitées à l'espace conducteur.
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v13 — bandeau de régularisation du dossier (jours restants, pièces manquantes) à la place du texte fixe « en cours de vérification » ; rappel d'ajouter une adresse e-mail.
 // [09/10/2026] v12 — bannière clignotante « Un client vous invite » quand un client demande au conducteur de prendre son colis (ShipmentInvitationBanner).
 // [08/10/2026] v11 — (1) la carte de la route s'affiche enfin : GET /trips/mine ne renvoie pas les adresses (donc pas de coordonnées), le trajet
@@ -76,6 +78,7 @@ import { formatMoney } from '@/utils/money';
 import { formatShipmentRoute } from '@/utils/shipmentDisplay';
 import { SHIPMENT_STATUS_LABELS } from '@/utils/tripStatusLabels';
 import type { AppNotification } from '@/types/notifications.types';
+import { useT } from '@/i18n';
 
 // Un trajet reste « en cours » jusqu'à sa clôture (COMPLETED) : ARRIVED = arrivé à destination mais dépose(s) pas encore validée(s).
 const UPCOMING_STATUSES = new Set(['PUBLISHED', 'BOOKING_PENDING', 'CONFIRMED', 'DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS', 'ARRIVED']);
@@ -84,6 +87,7 @@ const RUNNING_STATUSES = new Set(['DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_P
 const ACTIVITY_COUNT = 5;
 
 export default function DriverHomeScreen() {
+  const t = useT();
   const { data: profile } = useDriverProfile();
   const { data: vehicles } = useMyVehicles();
   const { data: tripsPage } = useMyTrips();
@@ -92,8 +96,8 @@ export default function DriverHomeScreen() {
   // Pas d'endpoint compteur dédié — approximation à partir de la première
   // page de notifications (30 les plus récentes). Sous-compte si plus de
   // 30 non lues d'un coup, cas limite acceptable pour un badge d'accueil.
-  const { data: notificationsPage, isLoading: notificationsLoading } = useMyNotifications(1);
-  const messageAlert = useLatestMessageAlert();
+  const { data: notificationsPage, isLoading: notificationsLoading } = useMyNotifications(1, 'DRIVER');
+  const messageAlert = useLatestMessageAlert('DRIVER');
   // Seul un conducteur validé peut recevoir des invitations (le serveur refuse les autres).
   const { data: invitations } = useMyInvitations(profile?.status === 'VALIDATED');
   const pendingInvitations = invitations ?? [];
@@ -130,7 +134,7 @@ export default function DriverHomeScreen() {
         key: `t-${trip.id}`,
         icon: IconRoute,
         tone: 'ocean',
-        title: 'Trajet publié',
+        title: t('Trajet publié'),
         text: `${trip.originCity.name} → ${trip.destinationCity.name} · ${formatDateShort(trip.departureAt)}`,
         at: trip.createdAt,
         onPress: () => router.push(`/(driver)/trip/${trip.id}`),
@@ -139,7 +143,7 @@ export default function DriverHomeScreen() {
         key: `s-${shipment.id}`,
         icon: IconPackage,
         tone: 'gold',
-        title: `Envoi · ${SHIPMENT_STATUS_LABELS[shipment.status]}`,
+        title: t('Envoi · {status}', { status: SHIPMENT_STATUS_LABELS[shipment.status] }),
         text: formatShipmentRoute(shipment) ?? shipment.recipientName,
         at: shipment.updatedAt,
         onPress: () => router.push(`/(driver)/shipment/${shipment.id}`),
@@ -165,19 +169,19 @@ export default function DriverHomeScreen() {
 
         <DashboardCard
           main={{
-            label: 'Solde',
+            label: t('Solde'),
             value: wallet ? formatMoney(wallet.balance, walletCurrency) : '—',
-            hint: wallet && Number(wallet.pendingBalance) > 0 ? `${formatMoney(wallet.pendingBalance, walletCurrency)} en attente` : 'Disponible',
+            hint: wallet && Number(wallet.pendingBalance) > 0 ? t('{money} en attente', { money: formatMoney(wallet.pendingBalance, walletCurrency) }) : t('Disponible'),
             onPress: () => router.navigate('/(driver)/(tabs)/wallet'),
           }}
           stats={[
-            { label: 'Vos trajets', value: tripsPage ? String(tripsPage.meta.total) : '—' },
-            { label: 'Vos colis', value: shipmentsPage ? String(shipmentsPage.meta.total) : '—' },
+            { label: t('Vos trajets'), value: tripsPage ? String(tripsPage.meta.total) : '—' },
+            { label: t('Vos colis'), value: shipmentsPage ? String(shipmentsPage.meta.total) : '—' },
           ]}
         />
 
         <HomeSearchBar
-          placeholder="Rechercher un trajet, un envoi ou une ville"
+          placeholder={t('Rechercher un trajet, un envoi ou une ville')}
           onPress={() => router.push('/(driver)/search')}
         />
 
@@ -197,7 +201,7 @@ export default function DriverHomeScreen() {
           {messageAlert ? (
             <View style={styles.block}>
               <MessageAlertCard
-                senderName={messageAlert.title ?? 'Nouveau message'}
+                senderName={messageAlert.title ?? t('Nouveau message')}
                 preview={messageAlert.body ?? ''}
                 onPress={() => {
                   markNotificationRead.mutate(messageAlert.id);
@@ -223,8 +227,8 @@ export default function DriverHomeScreen() {
               <IconAlertTriangle size={18} color={colors.accentDark} />
               <AppText variant="sm" color={colors.accentDark} style={{ flex: 1 }}>
                 {profile.status === 'SUSPENDED'
-                  ? 'Votre compte est suspendu — contactez le support.'
-                  : 'Votre dossier a été rejeté — contactez le support pour en savoir plus.'}
+                  ? t('Votre compte est suspendu — contactez le support.')
+                  : t('Votre dossier a été rejeté — contactez le support pour en savoir plus.')}
               </AppText>
             </Card>
           ) : null}
@@ -233,7 +237,7 @@ export default function DriverHomeScreen() {
             <Pressable onPress={() => router.push('/(driver)/vehicle-new')} style={[styles.setupCard, styles.block]}>
               <IconCar size={20} color={OCEAN.base} />
               <AppText variant="sm" weight="medium" style={{ flex: 1 }}>
-                Ajoutez un véhicule pour commencer à proposer des trajets
+                {t('Ajoutez un véhicule pour commencer à proposer des trajets')}
               </AppText>
             </Pressable>
           ) : (
@@ -247,10 +251,10 @@ export default function DriverHomeScreen() {
                 </View>
                 <IconCar size={36} color={OCEAN.onDark} style={styles.tileIcon} />
                 <AppText variant="base" weight="semibold" color={OCEAN.onDark}>
-                  Créer un trajet
+                  {t('Créer un trajet')}
                 </AppText>
                 <AppText variant="xs" color={OCEAN.onDark} style={styles.tileSubtitle}>
-                  Partagez votre route, réduisez vos coûts.
+                  {t('Partagez votre route, réduisez vos coûts.')}
                 </AppText>
               </Pressable>
               <Pressable
@@ -262,47 +266,47 @@ export default function DriverHomeScreen() {
                 </View>
                 <IconPackage size={36} color={colors.onAccent} style={styles.tileIcon} />
                 <AppText variant="base" weight="semibold" color={colors.onAccent}>
-                  Envois disponibles
+                  {t('Envois disponibles')}
                 </AppText>
                 <AppText variant="xs" color={colors.onAccent} style={styles.tileSubtitle}>
-                  Livrer des colis
+                  {t('Livrer des colis')}
                 </AppText>
               </Pressable>
             </View>
           )}
 
           <HomeSectionTitle
-            title="Vos trajets en cours"
-            actionLabel={upcomingTrips.length > 1 ? `Voir tout (${upcomingTrips.length})` : 'Voir tout'}
+            title={t('Vos trajets en cours')}
+            actionLabel={upcomingTrips.length > 1 ? t('Voir tout ({upcomingTripsLength})', { upcomingTripsLength: upcomingTrips.length }) : t('Voir tout')}
             onPressAction={() => router.navigate('/(driver)/(tabs)/trips')}
           />
           <View style={styles.block}>
             {nextTrip ? (
               <CurrentTripCard
-                eyebrow="Trajet partagé"
+                eyebrow={t('Trajet partagé')}
                 originName={nextTrip.originCity.name}
                 destinationName={nextTrip.destinationCity.name}
                 origin={routePoint(nextTrip.originLocation, nextTrip.originCity)}
                 destination={routePoint(nextTrip.destinationLocation, nextTrip.destinationCity)}
                 columns={[
-                  { label: 'Date', value: `${formatDateShort(nextTrip.departureAt)} · ${formatTime(nextTrip.departureAt)}`, flex: 1.1 },
-                  { label: 'Places libres', value: `${nextTrip.availableSeats}/${nextTrip.totalSeats}`, flex: 0.8 },
+                  { label: t('Date'), value: `${formatDateShort(nextTrip.departureAt)} · ${formatTime(nextTrip.departureAt)}`, flex: 1.1 },
+                  { label: t('Places libres'), value: `${nextTrip.availableSeats}/${nextTrip.totalSeats}`, flex: 0.8 },
                   // « Passagers » sur la première ligne, « Colis » sur la deuxième : jamais coupé.
-                  { label: 'Type', value: nextTrip.allowsShipments ? 'Passagers\nColis' : 'Passagers', flex: 1.25 },
-                  { label: 'Prix', value: formatMoney(nextTrip.pricePerSeat, nextTrip.currency?.isoCode ?? walletCurrency), flex: 1.1 },
+                  { label: t('Type'), value: nextTrip.allowsShipments ? t('Passagers\nColis') : t('Passagers'), flex: 1.25 },
+                  { label: t('Prix'), value: formatMoney(nextTrip.pricePerSeat, nextTrip.currency?.isoCode ?? walletCurrency), flex: 1.1 },
                 ]}
-                primary={{ label: nextTrip.status === 'ARRIVED' ? 'Valider la dépose' : 'Gérer le trajet', onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
-                secondary={{ label: nextTrip.status === 'ARRIVED' ? 'Voir les passagers à déposer' : 'Voir les passagers', onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
+                primary={{ label: nextTrip.status === 'ARRIVED' ? t('Valider la dépose') : t('Gérer le trajet'), onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
+                secondary={{ label: nextTrip.status === 'ARRIVED' ? t('Voir les passagers à déposer') : t('Voir les passagers'), onPress: () => router.push(`/(driver)/trip/${nextTrip.id}`) }}
                 onPress={() => router.push(`/(driver)/trip/${nextTrip.id}`)}
               />
             ) : (
               <OceanEmpty
                 icon={<IconRoute size={28} color={OCEAN.base} />}
-                title="Aucun trajet en cours"
-                text="Publiez un trajet pour que des passagers puissent réserver une place."
+                title={t('Aucun trajet en cours')}
+                text={t('Publiez un trajet pour que des passagers puissent réserver une place.')}
                 action={
                   vehicles && vehicles.length > 0 ? (
-                    <OceanButton label="Publier un trajet" onPress={() => router.push('/(driver)/trip-new')} style={styles.emptyButton} />
+                    <OceanButton label={t('Publier un trajet')} onPress={() => router.push('/(driver)/trip-new')} style={styles.emptyButton} />
                   ) : undefined
                 }
               />
@@ -310,8 +314,8 @@ export default function DriverHomeScreen() {
           </View>
 
           <HomeSectionTitle
-            title="Activité récente"
-            actionLabel="Mon activité"
+            title={t('Activité récente')}
+            actionLabel={t('Mon activité')}
             onPressAction={() => router.navigate('/(driver)/(tabs)/trips')}
           />
           <RecentActivity
@@ -324,13 +328,13 @@ export default function DriverHomeScreen() {
 
       <HomeFab
         actions={[
-          { label: 'Créer un trajet', icon: <IconCar size={20} color={OCEAN.base} />, onPress: () => router.push('/(driver)/trip-new') },
+          { label: t('Créer un trajet'), icon: <IconCar size={20} color={OCEAN.base} />, onPress: () => router.push('/(driver)/trip-new') },
           {
-            label: 'Envois disponibles',
+            label: t('Envois disponibles'),
             icon: <IconPackage size={20} color={OCEAN.goldInk} />,
             onPress: () => router.push('/(driver)/shipment-available'),
           },
-          { label: 'Rechercher', icon: <IconSearch size={20} color={OCEAN.base} />, onPress: () => router.push('/(driver)/search') },
+          { label: t('Rechercher'), icon: <IconSearch size={20} color={OCEAN.base} />, onPress: () => router.push('/(driver)/search') },
         ]}
       />
     </View>

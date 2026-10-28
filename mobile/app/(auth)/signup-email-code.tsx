@@ -1,4 +1,5 @@
 // mobile/app/(auth)/signup-email-code.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Création de compte, étape 3 (suite) : le code à 6 chiffres reçu dans la boîte mail. Un code correct marque l'adresse
 // comme vérifiée, puis l'inscription continue vers le mot de passe.
 import React, { useState } from 'react';
@@ -11,8 +12,10 @@ import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { useAuthStore } from '@/stores/authStore';
 import { SIGNUP_STEP, SIGNUP_STEPS } from '@/components/auth/signupSteps';
+import { useT } from '@/i18n';
 
 export default function VerifyEmailCodeScreen() {
+  const t = useT();
   const { email = '' } = useLocalSearchParams<{ email?: string }>();
   const updateUser = useAuthStore((state) => state.updateUser);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
@@ -27,7 +30,7 @@ export default function VerifyEmailCodeScreen() {
         router.replace('/(auth)/signup-password');
       },
       onError: (error) => {
-        setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.');
+        setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue. Réessayez.'));
         clear();
       },
     });
@@ -36,10 +39,10 @@ export default function VerifyEmailCodeScreen() {
   return (
     <CodeEntryStep
       icon={<IconMailCheck size={26} color={OCEAN.onDark} />}
-      title="Vérifiez votre e-mail"
-      subtitle={`Code à 6 chiffres envoyé à ${email}. Pensez à regarder dans vos courriers indésirables.`}
+      title={t('Vérifiez votre e-mail')}
+      subtitle={t('Code à 6 chiffres envoyé à {email}. Pensez à regarder dans vos courriers indésirables.', { email })}
       onBack={() => router.back()}
-      step={{ current: SIGNUP_STEP.email, total: SIGNUP_STEPS, label: 'Vérification de l’e-mail' }}
+      step={{ current: SIGNUP_STEP.email, total: SIGNUP_STEPS, label: t('Vérification de l’e-mail') }}
       onSubmit={handleSubmit}
       isSubmitting={verify.isPending}
       errorMessage={errorMessage}
@@ -48,7 +51,7 @@ export default function VerifyEmailCodeScreen() {
         try {
           await authApi.requestEmailCode(email);
         } catch (error) {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Impossible de renvoyer le code pour le moment.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Impossible de renvoyer le code pour le moment.'));
           throw error;
         }
       }}

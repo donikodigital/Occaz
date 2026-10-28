@@ -1,4 +1,5 @@
 // mobile/src/components/screens/CreateDisputeScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v2 — Habillage bleu océan (partagé client / conducteur) : en-tête avec
@@ -17,6 +18,7 @@ import { useCreateDispute } from '@/hooks/useDisputes';
 import { ApiError } from '@/services/api/ApiError';
 import type { DisputeSubjectType } from '@/types/disputes.types';
 import { FLOW_DONE_PARAM } from '@/utils/navigation';
+import { useT } from '@/i18n';
 
 export interface CreateDisputeScreenProps {
   basePath: '/(customer)' | '/(driver)';
@@ -30,6 +32,7 @@ export interface CreateDisputeScreenProps {
  * de code) : l'utilisateur reste libre de les modifier avant l'envoi.
  */
 export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
+  const t = useT();
   const {
     subjectType,
     bookingId,
@@ -51,7 +54,7 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
   function handleSubmit() {
     setErrorMessage(undefined);
     if (reason.trim().length < 3) {
-      setErrorMessage('Décrivez brièvement le problème.');
+      setErrorMessage(t('Décrivez brièvement le problème.'));
       return;
     }
 
@@ -67,7 +70,7 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
         onSuccess: (dispute) =>
           router.replace({ pathname: `${basePath}/dispute/[id]`, params: { id: dispute.id, ...FLOW_DONE_PARAM } }),
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -75,35 +78,35 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanHeroHeader title="Signaler un problème" subtitle="Notre équipe vous répond ici" icon={<IconLifebuoy />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Signaler un problème')} subtitle={t('Notre équipe vous répond ici')} icon={<IconLifebuoy />} onBack={() => router.back()} />
 
       <OceanCard style={styles.intro}>
         <View style={styles.introIcon}>
           <IconLifebuoy size={22} color={OCEAN.base} />
         </View>
         <AppText variant="sm" color="textSecondary" style={styles.introText}>
-          Décrivez ce qui s'est passé — notre équipe support vous répondra directement ici.
+          {t("Décrivez ce qui s'est passé — notre équipe support vous répondra directement ici.")}
         </AppText>
       </OceanCard>
 
-      <OceanSection icon={<IconAlertTriangle size={17} color={OCEAN.base} />} title="Votre signalement">
+      <OceanSection icon={<IconAlertTriangle size={17} color={OCEAN.base} />} title={t('Votre signalement')}>
         {prefillReason ? (
           <AppText variant="xs" color="textMuted">
-            Motif pré-rempli à partir de votre situation — modifiez-le si besoin.
+            {t('Motif pré-rempli à partir de votre situation — modifiez-le si besoin.')}
           </AppText>
         ) : null}
         <TextField
-          label="Motif"
+          label={t('Motif')}
           value={reason}
           onChangeText={setReason}
-          placeholder="Ex : Colis non reçu"
+          placeholder={t('Ex : Colis non reçu')}
           autoFocus
         />
         <TextField
-          label="Détails (optionnel)"
+          label={t('Détails (optionnel)')}
           value={description}
           onChangeText={setDescription}
-          placeholder="Expliquez la situation…"
+          placeholder={t('Expliquez la situation…')}
           multiline
           style={styles.descriptionField}
         />
@@ -115,7 +118,7 @@ export function CreateDisputeScreen({ basePath }: CreateDisputeScreenProps) {
         </AppText>
       ) : null}
 
-      <OceanButton label="Envoyer au support" onPress={handleSubmit} loading={createDispute.isPending} style={styles.submit} />
+      <OceanButton label={t('Envoyer au support')} onPress={handleSubmit} loading={createDispute.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }

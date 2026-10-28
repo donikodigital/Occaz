@@ -1,4 +1,5 @@
 // mobile/app/(auth)/forgot-password-new.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Mot de passe oublié, étape 3 : choisir un nouveau mot de passe à 6 chiffres (saisi, puis confirmé). Ensuite retour à
 // l'écran « Mot de passe » de la connexion, numéro conservé, avec un message de confirmation.
 import React, { useState } from 'react';
@@ -15,8 +16,10 @@ import { OCEAN } from '@/theme/ocean';
 import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { useAuthFlowStore } from '@/stores/authFlowStore';
+import { useT } from '@/i18n';
 
 export default function ForgotPasswordNewScreen() {
+  const t = useT();
   const { phone = '', accountType = 'CUSTOMER' } = useLocalSearchParams<{ phone?: string; accountType?: string }>();
   const resetToken = useAuthFlowStore((state) => state.resetToken);
   const setResetToken = useAuthFlowStore((state) => state.setResetToken);
@@ -40,7 +43,7 @@ export default function ForgotPasswordNewScreen() {
 
   function handleConfirmed(value: string) {
     if (value !== pin) {
-      setErrorMessage('Les deux mots de passe ne sont pas identiques. Recommencez.');
+      setErrorMessage(t('Les deux mots de passe ne sont pas identiques. Recommencez.'));
       setConfirmation('');
       return;
     }
@@ -52,7 +55,7 @@ export default function ForgotPasswordNewScreen() {
         router.dismissTo({ pathname: '/(auth)/login-password', params: { phone, accountType, notice: String(Date.now()) } });
       },
       onError: (error) => {
-        setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.');
+        setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue. Réessayez.'));
         setPhase('choose');
         setPin('');
         setConfirmation('');
@@ -65,18 +68,18 @@ export default function ForgotPasswordNewScreen() {
   return (
     <AuthStep
       icon={<IconLockCheck size={26} color={OCEAN.onDark} />}
-      title={confirming ? 'Confirmez le mot de passe' : 'Nouveau mot de passe'}
-      subtitle={confirming ? 'Saisissez-le une seconde fois.' : '6 chiffres, qui remplaceront l’ancien mot de passe.'}
+      title={confirming ? t('Confirmez le mot de passe') : t('Nouveau mot de passe')}
+      subtitle={confirming ? t('Saisissez-le une seconde fois.') : t('6 chiffres, qui remplaceront l’ancien mot de passe.')}
       footer={
         confirming ? (
           <OceanButton
-            label="Enregistrer"
+            label={t('Enregistrer')}
             onPress={() => handleConfirmed(confirmation)}
             loading={reset.isPending}
             disabled={confirmation.length !== PIN_LENGTH}
           />
         ) : (
-          <OceanButton label="Continuer" onPress={() => handleChosen(pin)} disabled={pin.length !== PIN_LENGTH} />
+          <OceanButton label={t('Continuer')} onPress={() => handleChosen(pin)} disabled={pin.length !== PIN_LENGTH} />
         )
       }
     >
@@ -107,7 +110,7 @@ export default function ForgotPasswordNewScreen() {
       )}
 
       <AppText variant="xs" color="textMuted" align="center" style={styles.hint}>
-        Évitez les suites (123456) et les chiffres répétés (111111).
+        {t('Évitez les suites (123456) et les chiffres répétés (111111).')}
       </AppText>
     </AuthStep>
   );

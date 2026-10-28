@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/trips.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [25/10/2026] v5 — chargement de la suite en bas de liste, compteurs réels (total du serveur), tirer pour actualiser, état d'échec avec « Réessayer ».
 // [07/10/2026] v4 — « Mon activité » et sa phrase passent dans un bandeau (hero) bleu océan ; le reste de l'écran est inchangé.
 //
@@ -28,6 +29,7 @@ import { formatMoney } from '@/utils/money';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_TONE, TRIP_STATUS_LABELS, TRIP_STATUS_TONE } from '@/utils/tripStatusLabels';
 import type { Trip } from '@/types/trips.types';
 import type { Shipment } from '@/types/shipments.types';
+import { useT } from '@/i18n';
 
 type Segment = 'trips' | 'shipments';
 
@@ -40,8 +42,9 @@ const TONE_TO_PILL: Record<'primary' | 'success' | 'danger' | 'neutral', OceanPi
 };
 
 function TripRow({ trip }: { trip: Trip }) {
+  const t = useT();
   return (
-    <OceanCard onPress={() => router.push(`/(driver)/trip/${trip.id}`)} style={styles.row} accessibilityLabel="Ouvrir le trajet">
+    <OceanCard onPress={() => router.push(`/(driver)/trip/${trip.id}`)} style={styles.row} accessibilityLabel={t('Ouvrir le trajet')}>
       <View style={styles.rowIcon}>
         <IconRoute size={19} color={OCEAN.base} />
       </View>
@@ -59,8 +62,9 @@ function TripRow({ trip }: { trip: Trip }) {
 }
 
 function ShipmentRow({ shipment }: { shipment: Shipment }) {
+  const t = useT();
   return (
-    <OceanCard onPress={() => router.push(`/(driver)/shipment/${shipment.id}`)} style={styles.row} accessibilityLabel="Ouvrir l'envoi">
+    <OceanCard onPress={() => router.push(`/(driver)/shipment/${shipment.id}`)} style={styles.row} accessibilityLabel={t("Ouvrir l'envoi")}>
       <View style={[styles.rowIcon, styles.rowIconShipment]}>
         <IconPackage size={19} color={OCEAN.goldInk} />
       </View>
@@ -121,6 +125,7 @@ function Segmented({
 }
 
 export default function DriverActivityScreen() {
+  const t = useT();
   const [segment, setSegment] = useState<Segment>('trips');
   const tripsQuery = useMyTripsList();
   const shipmentsQuery = useAssignedShipmentsList();
@@ -137,10 +142,10 @@ export default function DriverActivityScreen() {
         </View>
         <View style={styles.heroTitles}>
           <AppText variant="xl" weight="bold" color={OCEAN.onDark}>
-            Mon activité
+            {t('Mon activité')}
           </AppText>
           <AppText variant="xs" color={OCEAN.sky}>
-            Vos trajets et les envois que vous avez acceptés.
+            {t('Vos trajets et les envois que vous avez acceptés.')}
           </AppText>
         </View>
       </OceanHeroCard>
@@ -149,8 +154,8 @@ export default function DriverActivityScreen() {
         value={segment}
         onChange={setSegment}
         items={[
-          { id: 'trips', label: 'Trajets', count: tripsQuery.total },
-          { id: 'shipments', label: 'Envois', count: shipmentsQuery.total },
+          { id: 'trips', label: t('Trajets'), count: tripsQuery.total },
+          { id: 'shipments', label: t('Envois'), count: shipmentsQuery.total },
         ]}
       />
     </View>
@@ -159,20 +164,20 @@ export default function DriverActivityScreen() {
   const emptyTrips = (
     <OceanEmpty
       icon={<IconRoute size={28} color={OCEAN.base} />}
-      title="Aucun trajet créé"
-      text="Publiez un trajet pour que des passagers puissent réserver."
-      action={<OceanButton label="Publier un trajet" onPress={() => router.push('/(driver)/trip-new')} style={styles.emptyButton} />}
+      title={t('Aucun trajet créé')}
+      text={t('Publiez un trajet pour que des passagers puissent réserver.')}
+      action={<OceanButton label={t('Publier un trajet')} onPress={() => router.push('/(driver)/trip-new')} style={styles.emptyButton} />}
     />
   );
 
   const emptyShipments = (
     <OceanEmpty
       icon={<IconPackage size={28} color={OCEAN.base} />}
-      title="Aucun envoi accepté"
-      text="Les demandes d'envoi que vous acceptez apparaîtront ici, avec leur suivi."
+      title={t('Aucun envoi accepté')}
+      text={t("Les demandes d'envoi que vous acceptez apparaîtront ici, avec leur suivi.")}
       action={
         <OceanButton
-          label="Voir les envois disponibles"
+          label={t('Voir les envois disponibles')}
           onPress={() => router.push('/(driver)/shipment-available')}
           style={styles.emptyButton}
         />

@@ -1,4 +1,5 @@
 // mobile/app/(customer)/shipment-find-driver.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // [10/10/2026] v2 — padding ajouté aux cartes « conducteur » et « Payez d'abord votre envoi » : OceanCard n'a pas de padding de base,
@@ -35,6 +36,7 @@ import { useDriverSearch, useInviteDrivers } from '@/hooks/useShipmentInvitation
 import { ApiError } from '@/services/api/ApiError';
 import { formatDateLong, formatTime } from '@/utils/date';
 import type { DriverSearchResult } from '@/types/shipments.types';
+import { useT } from '@/i18n';
 
 const ORIGIN_FIELD = 'find-driver-origin';
 const DESTINATION_FIELD = 'find-driver-destination';
@@ -98,6 +100,7 @@ function DriverCard({
   showDetails: boolean;
   onToggle: () => void;
 }) {
+  const t = useT();
   const { driver } = result;
   const initials = `${driver.firstName[0] ?? ''}${driver.lastName[0] ?? ''}`;
   const alreadyInvited = result.invitationStatus !== null && result.invitationStatus !== 'EXPIRED';
@@ -116,11 +119,11 @@ function DriverCard({
             {driver.firstName} {driver.lastName}
           </AppText>
           <AppText variant="sm" color="textSecondary" numberOfLines={1}>
-            Part le {formatDateLong(result.departureAt)} à {formatTime(result.departureAt)}
+            {t('Part le {dateLong} à {time}', { dateLong: formatDateLong(result.departureAt), time: formatTime(result.departureAt) })}
           </AppText>
         </View>
         {alreadyInvited ? (
-          <OceanPill label={declined ? 'A refusé' : result.invitationStatus === 'ACCEPTED' ? 'A accepté' : 'Invité'} tone={declined ? 'neutral' : 'success'} />
+          <OceanPill label={declined ? t('A refusé') : result.invitationStatus === 'ACCEPTED' ? t('A accepté') : t('Invité')} tone={declined ? 'neutral' : 'success'} />
         ) : (
           <View style={[styles.check, selected && styles.checkOn]}>{selected ? <IconCheck size={14} color={OCEAN.onDark} /> : null}</View>
         )}
@@ -133,11 +136,11 @@ function DriverCard({
           </AppText>
           {result.viaCityNames.length > 0 ? (
             <AppText variant="xs" color="textSecondary">
-              Passe par {result.viaCityNames.join(', ')}
+              {t('Passe par {viaCityNames}', { viaCityNames: result.viaCityNames.join(', ') })}
             </AppText>
           ) : null}
           <AppText variant="xs" color="textSecondary">
-            Passage : {capitalize(formatDateLong(result.passingAt))} vers {formatTime(result.passingAt)}
+            {t('Passage : {capitalize} vers {time}', { capitalize: capitalize(formatDateLong(result.passingAt)), time: formatTime(result.passingAt) })}
           </AppText>
           {result.vehicle ? (
             <AppText variant="xs" color="textSecondary">
@@ -149,12 +152,12 @@ function DriverCard({
               <>
                 <IconStarFilled size={12} color={colors.accent} />
                 <AppText variant="xs" color="textSecondary">
-                  {driver.averageRating.toFixed(1)} · {driver.completedTripsCount} trajets effectués
+                  {t('{averageRating} · {completedTripsCount} trajets effectués', { averageRating: driver.averageRating.toFixed(1), completedTripsCount: driver.completedTripsCount })}
                 </AppText>
               </>
             ) : (
               <AppText variant="xs" color="textSecondary">
-                Nouveau conducteur
+                {t('Nouveau conducteur')}
               </AppText>
             )}
           </View>
@@ -165,6 +168,7 @@ function DriverCard({
 }
 
 export default function FindDriverScreen() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: shipment, isLoading: shipmentLoading } = useShipment(id);
 
@@ -235,14 +239,14 @@ export default function FindDriverScreen() {
           tone: 'success',
           text:
             result.invited > 0
-              ? `Invitation envoyée à ${result.invited} conducteur${result.invited > 1 ? 's' : ''}. Vous serez prévenu dès que l’un d’eux accepte.`
-              : 'Ces conducteurs ont déjà reçu votre invitation.',
+              ? t.n(result.invited, 'Invitation envoyée à {count} conducteur. Vous serez prévenu dès que l’un d’eux accepte.', 'Invitation envoyée à {count} conducteurs. Vous serez prévenu dès que l’un d’eux accepte.')
+              : t('Ces conducteurs ont déjà reçu votre invitation.'),
         });
       },
       onError: (error) =>
         setFeedback({
           tone: 'error',
-          text: error instanceof ApiError ? error.message : 'Impossible d’envoyer l’invitation. Réessayez.',
+          text: error instanceof ApiError ? error.message : t('Impossible d’envoyer l’invitation. Réessayez.'),
         }),
     });
   }
@@ -254,7 +258,7 @@ export default function FindDriverScreen() {
       footer={
         canInvite && selectable.length > 0 ? (
           <OceanButton
-            label={selected.length > 0 ? `Inviter ${selected.length} conducteur${selected.length > 1 ? 's' : ''}` : 'Choisissez un conducteur'}
+            label={selected.length > 0 ? t.n(selected.length, 'Inviter {count} conducteur', 'Inviter {count} conducteurs') : t('Choisissez un conducteur')}
             onPress={sendInvitations}
             disabled={selected.length === 0}
             loading={invite.isPending}
@@ -263,8 +267,8 @@ export default function FindDriverScreen() {
       }
     >
       <OceanHeroHeader
-        title="Trouver un conducteur"
-        subtitle="Invitez ceux qui font déjà la route"
+        title={t('Trouver un conducteur')}
+        subtitle={t('Invitez ceux qui font déjà la route')}
         icon={<IconSearch />}
         onBack={() => router.back()}
       />
@@ -272,21 +276,21 @@ export default function FindDriverScreen() {
       {!canInvite ? (
         <OceanCard style={styles.notice}>
           <AppText variant="sm" weight="semibold" color={OCEAN.deep}>
-            {shipment.status === 'CREATED' ? 'Payez d’abord votre envoi' : 'Votre colis a déjà un conducteur ou n’est plus en recherche'}
+            {shipment.status === 'CREATED' ? t('Payez d’abord votre envoi') : t('Votre colis a déjà un conducteur ou n’est plus en recherche')}
           </AppText>
           <AppText variant="xs" color="textSecondary">
             {shipment.status === 'CREATED'
-              ? 'Une fois le paiement confirmé, vous pourrez inviter des conducteurs.'
-              : 'Il n’y a plus d’invitation à envoyer.'}
+              ? t('Une fois le paiement confirmé, vous pourrez inviter des conducteurs.')
+              : t('Il n’y a plus d’invitation à envoyer.')}
           </AppText>
         </OceanCard>
       ) : (
         <>
           <View style={styles.fields}>
             <RouteField
-              label="Départ (facultatif)"
+              label={t('Départ (facultatif)')}
               value={origin?.name ?? null}
-              placeholder="N’importe quelle ville"
+              placeholder={t('N’importe quelle ville')}
               onPress={() => pickCity(ORIGIN_FIELD)}
               onClear={() => {
                 setOrigin(null);
@@ -294,9 +298,9 @@ export default function FindDriverScreen() {
               }}
             />
             <RouteField
-              label="Arrivée"
+              label={t('Arrivée')}
               value={destination?.name ?? null}
-              placeholder="Choisir la ville d’arrivée"
+              placeholder={t('Choisir la ville d’arrivée')}
               onPress={() => pickCity(DESTINATION_FIELD)}
             />
           </View>
@@ -317,29 +321,29 @@ export default function FindDriverScreen() {
           {!destination ? (
             <OceanEmpty
               icon={<IconSearch size={26} color={OCEAN.base} />}
-              title="Où doit arriver votre colis ?"
-              text="Choisissez la ville d’arrivée. La ville de départ est facultative."
+              title={t('Où doit arriver votre colis ?')}
+              text={t('Choisissez la ville d’arrivée. La ville de départ est facultative.')}
             />
           ) : search.isLoading ? (
             <ActivityIndicator color={OCEAN.base} style={styles.loader} />
           ) : search.isError ? (
             <OceanEmpty
               icon={<IconAlertTriangle size={26} color={colors.danger} />}
-              title="Recherche impossible"
-              text={search.error instanceof ApiError ? search.error.message : 'Vérifiez votre connexion puis réessayez.'}
-              action={<OceanButton label="Réessayer" variant="outline" onPress={() => void search.refetch()} />}
+              title={t('Recherche impossible')}
+              text={search.error instanceof ApiError ? search.error.message : t('Vérifiez votre connexion puis réessayez.')}
+              action={<OceanButton label={t('Réessayer')} variant="outline" onPress={() => void search.refetch()} />}
             />
           ) : results.length === 0 ? (
             <OceanEmpty
               icon={<IconSearch size={26} color={OCEAN.base} />}
-              title="Aucun conducteur pour le moment"
-              text="Aucun trajet publié ne correspond à ces villes et à vos dates. Votre colis reste visible de tous les conducteurs : l’un d’eux peut encore l’accepter."
+              title={t('Aucun conducteur pour le moment')}
+              text={t('Aucun trajet publié ne correspond à ces villes et à vos dates. Votre colis reste visible de tous les conducteurs : l’un d’eux peut encore l’accepter.')}
             />
           ) : (
             <>
               <View style={styles.listHeader}>
                 <AppText variant="md" weight="semibold">
-                  {results.length} conducteur{results.length > 1 ? 's' : ''} trouvé{results.length > 1 ? 's' : ''}
+                  {t.n(results.length, '{count} conducteur trouvé', '{count} conducteurs trouvés')}
                 </AppText>
               </View>
               {results.map((result) => (
@@ -352,7 +356,7 @@ export default function FindDriverScreen() {
                 />
               ))}
               <OceanButton
-                label={showDetails ? 'Masquer les détails' : 'Voir tous les détails'}
+                label={showDetails ? t('Masquer les détails') : t('Voir tous les détails')}
                 variant="soft"
                 icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
                 onPress={() => setShowDetails((value) => !value)}

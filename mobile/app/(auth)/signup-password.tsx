@@ -1,4 +1,5 @@
 // mobile/app/(auth)/signup-password.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — l'espace ouvert est mémorisé (activeSpaceStore).
 // [11/10/2026] v1 — Création de compte, dernière étape : choisir son mot de passe à 6 chiffres (saisi, puis confirmé). Il sert désormais à
 // CHAQUE connexion, à la place du code SMS. Cet écran n'a pas de bouton retour : le compte est déjà ouvert et ne doit pas rester sans mot
@@ -20,8 +21,10 @@ import { useActiveSpaceStore } from '@/stores/activeSpaceStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useAuthFlowStore } from '@/stores/authFlowStore';
 import { SIGNUP_STEP, SIGNUP_STEPS } from '@/components/auth/signupSteps';
+import { useT } from '@/i18n';
 
 export default function SignupPasswordScreen() {
+  const t = useT();
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
   const resetFlow = useAuthFlowStore((state) => state.reset);
@@ -49,7 +52,7 @@ export default function SignupPasswordScreen() {
 
   function handleConfirmed(value: string) {
     if (value !== pin) {
-      setErrorMessage('Les deux mots de passe ne sont pas identiques. Recommencez.');
+      setErrorMessage(t('Les deux mots de passe ne sont pas identiques. Recommencez.'));
       setConfirmation('');
       return;
     }
@@ -60,7 +63,7 @@ export default function SignupPasswordScreen() {
         goHome(safeUser.accountType);
       },
       onError: (error) => {
-        const message = error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.';
+        const message = error instanceof ApiError ? error.message : t('Une erreur est survenue. Réessayez.');
         setErrorMessage(message);
         // Mot de passe refusé (trop simple…) : on revient à la première saisie.
         setPhase('choose');
@@ -75,23 +78,23 @@ export default function SignupPasswordScreen() {
   return (
     <AuthStep
       icon={<IconLock size={26} color={OCEAN.onDark} />}
-      title={confirming ? 'Confirmez le mot de passe' : 'Choisissez votre mot de passe'}
+      title={confirming ? t('Confirmez le mot de passe') : t('Choisissez votre mot de passe')}
       subtitle={
         confirming
-          ? 'Saisissez-le une seconde fois.'
-          : '6 chiffres. Il vous sera demandé à chaque connexion, à la place d’un code SMS.'
+          ? t('Saisissez-le une seconde fois.')
+          : t('6 chiffres. Il vous sera demandé à chaque connexion, à la place d’un code SMS.')
       }
-      step={{ current: SIGNUP_STEP.password, total: SIGNUP_STEPS, label: 'Mot de passe' }}
+      step={{ current: SIGNUP_STEP.password, total: SIGNUP_STEPS, label: t('Mot de passe') }}
       footer={
         confirming ? (
           <OceanButton
-            label="Terminer"
+            label={t('Terminer')}
             onPress={() => handleConfirmed(confirmation)}
             loading={save.isPending}
             disabled={confirmation.length !== PIN_LENGTH}
           />
         ) : (
-          <OceanButton label="Continuer" onPress={() => handleChosen(pin)} disabled={pin.length !== PIN_LENGTH} />
+          <OceanButton label={t('Continuer')} onPress={() => handleChosen(pin)} disabled={pin.length !== PIN_LENGTH} />
         )
       }
     >
@@ -122,11 +125,11 @@ export default function SignupPasswordScreen() {
       )}
 
       <AppText variant="xs" color="textMuted" align="center" style={styles.hint}>
-        Évitez les suites (123456) et les chiffres répétés (111111). Ne communiquez jamais ce mot de passe, pas même à Occa’Z.
+        {t('Évitez les suites (123456) et les chiffres répétés (111111). Ne communiquez jamais ce mot de passe, pas même à Occa’Z.')}
       </AppText>
       {user?.mustSetPassword ? (
         <AppText variant="xs" color="textMuted" align="center" style={styles.hint}>
-          Votre compte existait déjà : définissez ce mot de passe une seule fois, il remplace désormais le code SMS.
+          {t('Votre compte existait déjà : définissez ce mot de passe une seule fois, il remplace désormais le code SMS.')}
         </AppText>
       ) : null}
     </AuthStep>

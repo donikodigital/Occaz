@@ -1,4 +1,5 @@
 // mobile/src/components/screens/SearchHeroHeader.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // En-tête « héro » commun aux pages de recherche (ville, point de départ,
 // adresse de récupération / de livraison, destination) : bandeau Ocean avec
@@ -13,6 +14,7 @@ import { AppText } from '@/components/ui';
 import { OceanHeroCard } from '@/components/ocean/OceanKit';
 import { colors, fontFamily, fontSize, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 export interface SearchHeroHeaderProps {
   /** Icône posée dans la pastille translucide (taille 22, couleur OCEAN.onDark conseillées). */
@@ -29,6 +31,7 @@ export interface SearchHeroHeaderProps {
 }
 
 export function SearchHeroHeader({ icon, caption, title, subtitle, onClose, children, fieldHidden }: SearchHeroHeaderProps) {
+  const t = useT();
   return (
     <View style={styles.wrap}>
       <OceanHeroCard style={styles.hero}>
@@ -45,7 +48,7 @@ export function SearchHeroHeader({ icon, caption, title, subtitle, onClose, chil
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Fermer"
+            accessibilityLabel={t('Fermer')}
             hitSlop={8}
             style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
           >
@@ -79,6 +82,7 @@ export interface SearchHeroInputProps {
  * texte d'aide est volontairement court pour ne jamais être coupé.
  */
 export function SearchHeroInput({ value, onChangeText, placeholder, autoFocus, loading }: SearchHeroInputProps) {
+  const t = useT();
   const hasValue = value.length > 0;
 
   return (
@@ -103,7 +107,7 @@ export function SearchHeroInput({ value, onChangeText, placeholder, autoFocus, l
         <Pressable
           onPress={() => onChangeText('')}
           accessibilityRole="button"
-          accessibilityLabel="Effacer la recherche"
+          accessibilityLabel={t('Effacer la recherche')}
           hitSlop={10}
           style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
         >

@@ -98,6 +98,7 @@ export class TripOtpService {
   ): Promise<void> {
     try {
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: booking.customer.userId,
         type: NotificationType.STATUS_CHANGE,
         channels: [NotificationChannel.PUSH],
@@ -193,6 +194,7 @@ export class TripOtpService {
     if (booking.trip.status === TripStatus.IN_PROGRESS) {
       try {
         await this.notifications.notify({
+          audience: 'CUSTOMER',
           userId: booking.customer.userId,
           type: NotificationType.STATUS_CHANGE,
           channels: [NotificationChannel.PUSH],
@@ -306,6 +308,7 @@ export class TripOtpService {
     const place = city ? ` à ${city}` : '';
     try {
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: booking.customer.userId,
         type: NotificationType.ARRIVAL,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],

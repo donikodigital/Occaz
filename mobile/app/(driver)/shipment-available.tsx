@@ -1,4 +1,5 @@
 // mobile/app/(driver)/shipment-available.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [09/10/2026] v5 — Liste allégée : les encarts explicatifs (« Premier arrivé, premier servi », « Comment ça marche ») sont derrière un
 // seul bouton « Comment ça marche ? », fermé par défaut. Le conducteur voit d'abord les demandes.
@@ -57,6 +58,7 @@ import { useCitySelectionStore } from '@/stores/citySelectionStore';
 import type { AvailableShipment } from '@/types/shipments.types';
 import type { City } from '@/types/geography.types';
 import { FLOW_DONE_PARAM } from '@/utils/navigation';
+import { useT, translate } from '@/i18n';
 
 /** Intervalle de rafraîchissement automatique de la liste, tant que l'écran est au premier plan. */
 const REFRESH_INTERVAL_MS = 20_000;
@@ -70,9 +72,9 @@ const ROUTE_ROW_GAP = spacing.xs;
 const RAIL_DOT = 12;
 
 const STEPS = [
-  { title: 'Acceptez', text: 'Choisissez une demande et le trajet sur lequel vous la prenez.' },
-  { title: 'Récupérez', text: 'Validez la prise du colis avec le code de récupération.' },
-  { title: 'Livrez', text: 'Validez la remise au destinataire avec le code de livraison.' },
+  { get title() { return translate('Acceptez'); }, get text() { return translate('Choisissez une demande et le trajet sur lequel vous la prenez.'); } },
+  { get title() { return translate('Récupérez'); }, get text() { return translate('Validez la prise du colis avec le code de récupération.'); } },
+  { get title() { return translate('Livrez'); }, get text() { return translate('Validez la remise au destinataire avec le code de livraison.'); } },
 ];
 
 // ---------------------------------------------------------------------------
@@ -81,6 +83,7 @@ const STEPS = [
 
 /** Point qui pulse + « actualisé il y a … ». Isolé pour que le tic-tac d'une seconde ne redessine pas la liste. */
 function LiveIndicator({ lastUpdatedAt, isRefreshing }: { lastUpdatedAt: number | null; isRefreshing: boolean }) {
+  const t = useT();
   const [now, setNow] = useState(() => Date.now());
   const pulse = useRef(new Animated.Value(0)).current;
 
@@ -105,9 +108,9 @@ function LiveIndicator({ lastUpdatedAt, isRefreshing }: { lastUpdatedAt: number 
     label = 'Actualisation…';
   } else if (lastUpdatedAt !== null) {
     const seconds = Math.max(0, Math.round((now - lastUpdatedAt) / 1000));
-    if (seconds < 5) label = 'À l’instant';
-    else if (seconds < 60) label = `Actualisé il y a ${seconds} s`;
-    else label = `Actualisé il y a ${Math.floor(seconds / 60)} min`;
+    if (seconds < 5) label = t('À l’instant');
+    else if (seconds < 60) label = t('Actualisé il y a {seconds} s', { seconds });
+    else label = t('Actualisé il y a {floor} min', { floor: Math.floor(seconds / 60) });
   }
 
   return (
@@ -126,7 +129,7 @@ function LiveIndicator({ lastUpdatedAt, isRefreshing }: { lastUpdatedAt: number 
       </View>
       <View>
         <AppText variant="xs" weight="bold" color={colors.onAccent}>
-          En direct
+          {t('En direct')}
         </AppText>
         <AppText variant="xs" color={colors.onAccent} style={styles.liveLabel}>
           {label}
@@ -206,6 +209,7 @@ function Hero({
   isRefreshing: boolean;
   onRefresh: () => void;
 }) {
+  const t = useT();
   return (
     <View style={styles.hero}>
       <View style={styles.heroCircleLarge} />
@@ -217,7 +221,7 @@ function Hero({
       <View style={styles.heroTop}>
         <IconButton
           icon={<IconArrowLeft size={18} color={colors.textPrimary} />}
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('Retour')}
           onPress={() => router.back()}
         />
         <IconButton
@@ -228,7 +232,7 @@ function Hero({
               <IconRefresh size={18} color={colors.textPrimary} />
             )
           }
-          accessibilityLabel="Actualiser la liste"
+          accessibilityLabel={t('Actualiser la liste')}
           onPress={onRefresh}
           disabled={isRefreshing}
         />
@@ -236,10 +240,10 @@ function Hero({
 
       <View style={styles.heroBody}>
         <AppText variant="xxl" weight="bold" color={colors.onAccent}>
-          Envois disponibles
+          {t('Envois disponibles')}
         </AppText>
         <AppText variant="sm" color={colors.onAccent} style={styles.heroSubtitle}>
-          Acceptez une demande, livrez le colis et touchez votre gain net.
+          {t('Acceptez une demande, livrez le colis et touchez votre gain net.')}
         </AppText>
       </View>
 
@@ -249,7 +253,7 @@ function Hero({
             {isLoading ? '…' : count}
           </AppText>
           <AppText variant="xs" color={colors.onAccent} style={styles.liveLabel}>
-            {count > 1 ? 'demandes ouvertes' : 'demande ouverte'}
+            {count > 1 ? t('demandes ouvertes') : t('demande ouverte')}
           </AppText>
         </View>
         <View style={styles.statTileWide}>
@@ -330,6 +334,7 @@ function RoutePlanner({
   onSwap: () => void;
   onClearAll: () => void;
 }) {
+  const t = useT();
   const hasFilters = Boolean(originName || destinationName);
   const firstDotTop = ROUTE_ROW_HEIGHT / 2 - RAIL_DOT / 2;
   const secondDotTop = ROUTE_ROW_HEIGHT + ROUTE_ROW_GAP + ROUTE_ROW_HEIGHT / 2 - RAIL_DOT / 2;
@@ -339,10 +344,10 @@ function RoutePlanner({
       <View style={styles.plannerHeader}>
         <View style={styles.plannerTitle}>
           <AppText variant="sm" weight="semibold">
-            Itinéraire
+            {t('Itinéraire')}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            {hasFilters ? 'Filtre actif' : 'Toutes les villes — touchez pour filtrer'}
+            {hasFilters ? t('Filtre actif') : t('Toutes les villes — touchez pour filtrer')}
           </AppText>
         </View>
         {hasFilters ? (
@@ -350,22 +355,22 @@ function RoutePlanner({
             <Pressable
               onPress={onSwap}
               accessibilityRole="button"
-              accessibilityLabel="Inverser départ et arrivée"
+              accessibilityLabel={t('Inverser départ et arrivée')}
               style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
             >
               <IconArrowsUpDown size={14} color={colors.primary} />
               <AppText variant="xs" weight="semibold" color="primary">
-                Inverser
+                {t('Inverser')}
               </AppText>
             </Pressable>
             <Pressable
               onPress={onClearAll}
               accessibilityRole="button"
-              accessibilityLabel="Effacer les filtres"
+              accessibilityLabel={t('Effacer les filtres')}
               style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
             >
               <AppText variant="xs" weight="semibold" color="textSecondary">
-                Effacer
+                {t('Effacer')}
               </AppText>
             </Pressable>
           </View>
@@ -385,17 +390,17 @@ function RoutePlanner({
 
         <RouteRow
           index={0}
-          label="Départ"
+          label={t('Départ')}
           value={originName}
-          placeholder="Toutes les villes"
+          placeholder={t('Toutes les villes')}
           onPress={onPickOrigin}
           onClear={onClearOrigin}
         />
         <RouteRow
           index={1}
-          label="Arrivée"
+          label={t('Arrivée')}
           value={destinationName}
-          placeholder="Toutes les villes"
+          placeholder={t('Toutes les villes')}
           onPress={onPickDestination}
           onClear={onClearDestination}
         />
@@ -405,10 +410,11 @@ function RoutePlanner({
 }
 
 function StepsCard() {
+  const t = useT();
   return (
     <View style={styles.stepsCard}>
       <AppText variant="sm" weight="semibold">
-        Comment ça marche
+        {t('Comment ça marche')}
       </AppText>
       {STEPS.map((step, index) => (
         <View key={step.title} style={styles.step}>
@@ -432,6 +438,7 @@ function StepsCard() {
 }
 
 function RulesBanner() {
+  const t = useT();
   return (
     <View style={styles.rules}>
       <View style={styles.rulesIcon}>
@@ -439,11 +446,10 @@ function RulesBanner() {
       </View>
       <View style={styles.rulesText}>
         <AppText variant="sm" weight="semibold">
-          Premier arrivé, premier servi
+          {t('Premier arrivé, premier servi')}
         </AppText>
         <AppText variant="xs" color="textSecondary">
-          Dès qu’un conducteur accepte, l’envoi disparaît de la liste des autres. Tous les conducteurs validés voient ces
-          demandes, avec ou sans trajet.
+          {t('Dès qu’un conducteur accepte, l’envoi disparaît de la liste des autres. Tous les conducteurs validés voient ces demandes, avec ou sans trajet.')}
         </AppText>
       </View>
     </View>
@@ -459,6 +465,7 @@ function Separator() {
 // ---------------------------------------------------------------------------
 
 export default function AvailableShipmentsScreen() {
+  const t = useT();
   const params = useLocalSearchParams<{ tripId?: string }>();
   // Trajet dont on cherche les colis ; « Voir tous les colis » le retire sans quitter l'écran.
   const [tripFilterId, setTripFilterId] = useState<string | undefined>(params.tripId || undefined);
@@ -530,12 +537,12 @@ export default function AvailableShipmentsScreen() {
         <View style={styles.tripFilterBanner}>
           <View style={styles.tripFilterText}>
             <AppText variant="xs" color="textSecondary">
-              Colis sur votre trajet
+              {t('Colis sur votre trajet')}
             </AppText>
             <AppText variant="sm" weight="bold" numberOfLines={1}>
               {filterTrip ? `${filterTrip.originCity.name} → ${filterTrip.destinationCity.name}` : '…'}
               {filterTrip?.stops && filterTrip.stops.length > 0
-                ? ` · via ${filterTrip.stops.map((stop) => stop.city?.name ?? stop.location?.label ?? '').filter(Boolean).join(', ')}`
+                ? t(' · via {value}', { value: filterTrip.stops.map((stop) => stop.city?.name ?? stop.location?.label ?? '').filter(Boolean).join(', ') })
                 : ''}
             </AppText>
           </View>
@@ -545,7 +552,7 @@ export default function AvailableShipmentsScreen() {
             style={({ pressed }) => [styles.tripFilterButton, pressed && styles.pressed]}
           >
             <AppText variant="xs" weight="semibold" color={colors.primary}>
-              Voir tous les colis
+              {t('Voir tous les colis')}
             </AppText>
           </Pressable>
         </View>
@@ -573,7 +580,7 @@ export default function AvailableShipmentsScreen() {
         style={({ pressed }) => [styles.helpToggle, pressed && styles.pressed]}
       >
         <AppText variant="sm" weight="semibold" color={colors.primary}>
-          {helpOpen ? 'Masquer l’aide' : 'Comment ça marche ?'}
+          {helpOpen ? t('Masquer l’aide') : t('Comment ça marche ?')}
         </AppText>
       </Pressable>
       {helpOpen ? (
@@ -586,7 +593,7 @@ export default function AvailableShipmentsScreen() {
         <>
           <View style={styles.sectionHeader}>
             <AppText variant="md" weight="semibold">
-              Demandes ouvertes
+              {t('Demandes ouvertes')}
             </AppText>
             <View style={styles.countPill}>
               <AppText variant="xs" weight="bold" color={colors.onAccent}>
@@ -611,34 +618,34 @@ export default function AvailableShipmentsScreen() {
         <IconAlertTriangle size={24} color={colors.danger} />
       </View>
       <AppText variant="md" weight="semibold" align="center">
-        Impossible de charger les envois
+        {t('Impossible de charger les envois')}
       </AppText>
       <AppText variant="sm" color="textSecondary" align="center">
-        {error instanceof ApiError ? error.message : 'Vérifiez votre connexion puis réessayez.'}
+        {error instanceof ApiError ? error.message : t('Vérifiez votre connexion puis réessayez.')}
       </AppText>
-      <Button label="Réessayer" variant="outline" size="md" fullWidth={false} onPress={refresh} />
+      <Button label={t('Réessayer')} variant="outline" size="md" fullWidth={false} onPress={refresh} />
     </View>
   ) : (
     <View style={styles.empty}>
       <Radar />
       <AppText variant="md" weight="semibold" align="center">
-        {tripFilterId ? 'Aucun colis sur votre trajet' : hasFilters ? 'Aucun envoi sur cet itinéraire' : 'On guette les nouvelles demandes'}
+        {tripFilterId ? t('Aucun colis sur votre trajet') : hasFilters ? t('Aucun envoi sur cet itinéraire') : t('On guette les nouvelles demandes')}
       </AppText>
       <AppText variant="sm" color="textSecondary" align="center">
         {tripFilterId
-          ? 'Aucun colis ne se trouve entre vos villes de départ, d’arrivée ou traversées pour vos dates. Il en arrivera peut-être d’autres : la liste se met à jour toute seule.'
+          ? t('Aucun colis ne se trouve entre vos villes de départ, d’arrivée ou traversées pour vos dates. Il en arrivera peut-être d’autres : la liste se met à jour toute seule.')
           : hasFilters
-          ? 'Essayez avec d’autres villes ou retirez les filtres.'
-          : 'Dès qu’un client publie un colis, il apparaît ici. La liste se met à jour toute seule.'}
+          ? t('Essayez avec d’autres villes ou retirez les filtres.')
+          : t('Dès qu’un client publie un colis, il apparaît ici. La liste se met à jour toute seule.')}
       </AppText>
       {tripFilterId ? (
-        <Button label="Voir tous les colis" variant="outline" size="md" fullWidth={false} onPress={() => setTripFilterId(undefined)} />
+        <Button label={t('Voir tous les colis')} variant="outline" size="md" fullWidth={false} onPress={() => setTripFilterId(undefined)} />
       ) : hasFilters ? (
-        <Button label="Effacer les filtres" variant="outline" size="md" fullWidth={false} onPress={clearFilters} />
+        <Button label={t('Effacer les filtres')} variant="outline" size="md" fullWidth={false} onPress={clearFilters} />
       ) : (
         <>
           <Button
-            label="Voir mon activité"
+            label={t('Voir mon activité')}
             variant="ghost"
             size="md"
             fullWidth={false}

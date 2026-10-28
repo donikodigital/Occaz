@@ -1,4 +1,5 @@
 // mobile/src/components/screens/DriverJourneyGuide.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — plus de SMS pour les codes de trajet : les messages parlent de l'application (« Voir mon code »).
 //
 // [09/10/2026] v1 — Le guide du conducteur : l'écran ne montre QUE l'étape à faire, avec un seul bouton (ou un seul code à saisir).
@@ -69,6 +70,7 @@ import {
 } from '@/utils/driverJourney';
 import type { Booking } from '@/types/bookings.types';
 import type { Trip } from '@/types/trips.types';
+import { useT, translate } from '@/i18n';
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -106,8 +108,8 @@ interface Feedback {
 
 type Notify = (feedback: Feedback) => void;
 
-function errorFeedback(error: unknown, title = 'Une erreur est survenue'): Feedback {
-  return { tone: 'error', title, text: error instanceof ApiError ? error.message : 'Réessayez dans un instant.' };
+function errorFeedback(error: unknown, title = translate('Une erreur est survenue')): Feedback {
+  return { tone: 'error', title, text: error instanceof ApiError ? error.message : translate('Réessayez dans un instant.') };
 }
 
 /** Bandeau d'erreur / de confirmation, dans la page : visible partout (contrairement à Alert.alert sur le web). */
@@ -139,8 +141,8 @@ function plural(count: number, one: string, many: string): string {
 /** Ce qui attend le conducteur au point visé : « 1 place à prendre · 2 places à déposer ». */
 function describePeople(people: JourneyPeople): string | null {
   const parts = [
-    people.boarding > 0 ? `${plural(people.boarding, 'place à prendre', 'places à prendre')}` : null,
-    people.alighting > 0 ? `${plural(people.alighting, 'place à déposer', 'places à déposer')}` : null,
+    people.boarding > 0 ? `${plural(people.boarding, translate('place à prendre'), translate('places à prendre'))}` : null,
+    people.alighting > 0 ? `${plural(people.alighting, translate('place à déposer'), translate('places à déposer'))}` : null,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
@@ -151,6 +153,7 @@ function describePeople(people: JourneyPeople): string | null {
 
 /** Barre de progression : un segment par point de la route (départ, villes avec des clients, destination). */
 function JourneyProgress({ route, currentIndex, completed }: { route: Waypoint[]; currentIndex: number; completed: boolean }) {
+  const t = useT();
   const current = route[currentIndex];
   return (
     <View style={styles.progress}>
@@ -168,8 +171,8 @@ function JourneyProgress({ route, currentIndex, completed }: { route: Waypoint[]
       </View>
       <AppText variant="xs" color="textSecondary" numberOfLines={1}>
         {completed
-          ? 'Parcours terminé'
-          : `Étape ${currentIndex + 1} sur ${route.length}${current ? ` · ${current.name}` : ''}`}
+          ? t('Parcours terminé')
+          : t('Étape {value} sur {routeLength}{value2}', { value: currentIndex + 1, routeLength: route.length, value2: current ? ` · ${current.name}` : '' })}
       </AppText>
     </View>
   );
@@ -212,6 +215,7 @@ function StepHeader({
 
 /** « Un problème ? » — replié par défaut : les cas rares ne polluent pas l'étape à faire. */
 function ProblemSection({ items }: { items: ProblemItem[] }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
   return (
@@ -224,7 +228,7 @@ function ProblemSection({ items }: { items: ProblemItem[] }) {
       >
         <IconLifebuoy size={15} color={colors.textSecondary} />
         <AppText variant="sm" weight="medium" color="textSecondary">
-          Un problème ?
+          {t('Un problème ?')}
         </AppText>
         {open ? <IconChevronUp size={15} color={colors.textSecondary} /> : <IconChevronDown size={15} color={colors.textSecondary} />}
       </Pressable>
@@ -248,6 +252,7 @@ function ProblemSection({ items }: { items: ProblemItem[] }) {
 
 /** Le client dont c'est le tour : nom, places, tronçon, et de quoi le joindre. */
 function PassengerCard({ booking, tripId }: { booking: Booking; tripId: string }) {
+  const t = useT();
   const getOrCreateConversation = useGetOrCreateConversationForBooking();
   const label = passengerLabel(booking);
   const first = booking.passengers?.[0]?.fullName;
@@ -278,13 +283,13 @@ function PassengerCard({ booking, tripId }: { booking: Booking; tripId: string }
             {label}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            {plural(booking.seatsCount, 'place', 'places')}
+            {plural(booking.seatsCount, translate('place'), translate('places'))}
             {route ? ` · ${route.from} → ${route.to}` : ''}
           </AppText>
         </View>
         <IconButton
           icon={<IconMessageCircle size={16} color={colors.textPrimary} />}
-          accessibilityLabel="Écrire au passager"
+          accessibilityLabel={t('Écrire au passager')}
           onPress={() =>
             getOrCreateConversation.mutate(booking.id, {
               onSuccess: (conversation) => router.push(`/(driver)/conversation/${conversation.id}`),
@@ -319,14 +324,15 @@ function GoToStep({
   pending: boolean;
   problems: ProblemItem[];
 }) {
+  const t = useT();
   const waiting = describePeople(people);
   const where = waypoint.address ?? waypoint.name;
-  const title = isFirst ? 'Allez chercher votre client' : `En route vers ${waypoint.name}`;
-  const text = isFirst ? `Rendez-vous au point de départ : ${where}.` : `Direction : ${where}.`;
+  const title = isFirst ? t('Allez chercher votre client') : t('En route vers {waypointName}', { waypointName: waypoint.name });
+  const text = isFirst ? t('Rendez-vous au point de départ : {where}.', { where }) : t('Direction : {where}.', { where });
   const hint =
     waypoint.kind === 'DESTINATION'
-      ? 'À votre arrivée, chaque passager à bord reçoit automatiquement son code de dépose.'
-      : 'À votre arrivée, vos clients sont prévenus et reçoivent automatiquement leur code.';
+      ? t('À votre arrivée, chaque passager à bord reçoit automatiquement son code de dépose.')
+      : t('À votre arrivée, vos clients sont prévenus et reçoivent automatiquement leur code.');
 
   return (
     <OceanCard style={styles.stepCard}>
@@ -346,12 +352,12 @@ function GoToStep({
       ) : !isFirst ? (
         <AppText variant="xs" color="textMuted" align="center">
           {positionNote.mode === 'background'
-            ? 'Votre position est partagée avec vos passagers, même en arrière-plan.'
-            : 'Votre position est partagée avec vos passagers tant que l’application reste ouverte.'}
+            ? t('Votre position est partagée avec vos passagers, même en arrière-plan.')
+            : t('Votre position est partagée avec vos passagers tant que l’application reste ouverte.')}
         </AppText>
       ) : null}
       <OceanButton
-        label={isFirst ? 'Je suis arrivé au départ' : `Je suis arrivé à ${waypoint.name}`}
+        label={isFirst ? t('Je suis arrivé au départ') : t('Je suis arrivé à {waypointName}', { waypointName: waypoint.name })}
         onPress={onArrived}
         loading={pending}
         style={styles.mainButton}
@@ -381,11 +387,12 @@ function GoToPickupStep({
   onArrived: () => void;
   pending: boolean;
 }) {
-  const names = bookings.map((booking) => passengerLabel(booking)).join(' et ');
+  const t = useT();
+  const names = bookings.map((booking) => passengerLabel(booking)).join(` ${t('et')} `);
   const where = waypoint.address ?? waypoint.name;
   return (
     <OceanCard style={styles.stepCard}>
-      <StepHeader icon={IconMapPin} title={`En route pour chercher ${names}`} text={`Rendez-vous à ${where}.`} />
+      <StepHeader icon={IconMapPin} title={t('En route pour chercher {names}', { names })} text={t('Rendez-vous à {where}.', { where })} />
       {bookings.map((booking) => (
         <PassengerCard key={booking.id} booking={booking} tripId={booking.tripId} />
       ))}
@@ -397,11 +404,11 @@ function GoToPickupStep({
           </AppText>
         </View>
       ) : null}
-      <OceanButton label="Je suis arrivé sur les lieux" onPress={onArrived} loading={pending} style={styles.mainButton} />
+      <OceanButton label={t('Je suis arrivé sur les lieux')} onPress={onArrived} loading={pending} style={styles.mainButton} />
       <AppText variant="xs" color="textMuted" align="center">
         {bookings.length > 1
-          ? 'À votre arrivée, vos clients sont prévenus et reçoivent automatiquement leur code de prise en charge.'
-          : 'À votre arrivée, votre client est prévenu et reçoit automatiquement son code de prise en charge.'}
+          ? t('À votre arrivée, vos clients sont prévenus et reçoivent automatiquement leur code de prise en charge.')
+          : t('À votre arrivée, votre client est prévenu et reçoit automatiquement son code de prise en charge.')}
       </AppText>
     </OceanCard>
   );
@@ -421,6 +428,7 @@ function CodeStep({
   onSkip: (booking: Booking) => void;
   notify: Notify;
 }) {
+  const t = useT();
   const { booking } = step;
   const isPickup = step.kind === 'pickup';
   const requestPickup = useRequestPickupOtp(booking.id, trip.id);
@@ -445,20 +453,20 @@ function CodeStep({
         if (result.smsDisabled) {
           notify({
             tone: 'info',
-            title: 'Code généré',
-            text: "Le passager vient d'être prévenu dans son application : demandez-lui son code (bouton « Voir mon code » sur sa réservation).",
+            title: t('Code généré'),
+            text: t("Le passager vient d'être prévenu dans son application : demandez-lui son code (bouton « Voir mon code » sur sa réservation)."),
           });
         } else if (!result.smsSent) {
           notify({
             tone: 'info',
-            title: 'Code généré',
-            text: "Le SMS n'a pas pu être envoyé au passager — demandez-lui d'ouvrir son code dans l'application (bouton « Voir mon code » sur sa réservation).",
+            title: t('Code généré'),
+            text: t("Le SMS n'a pas pu être envoyé au passager — demandez-lui d'ouvrir son code dans l'application (bouton « Voir mon code » sur sa réservation)."),
           });
         } else {
           onDone?.();
         }
       },
-      onError: () => notify({ tone: 'error', title: 'Erreur', text: 'La demande de code a échoué — réessayez.' }),
+      onError: () => notify({ tone: 'error', title: t('Erreur'), text: t('La demande de code a échoué — réessayez.') }),
     });
   }
 
@@ -468,7 +476,7 @@ function CodeStep({
         setCode('');
         if (!isPickup) onDropoffValidated(booking);
       },
-      onError: (error) => notify(errorFeedback(error, 'Code invalide')),
+      onError: (error) => notify(errorFeedback(error, t('Code invalide'))),
     });
   }
 
@@ -478,12 +486,12 @@ function CodeStep({
 
   const problems: ProblemItem[] = [
     {
-      label: isPickup ? 'Ce client ne vient pas — continuer sans lui' : "Ce passager n'est pas à bord — passer",
+      label: isPickup ? t('Ce client ne vient pas — continuer sans lui') : t("Ce passager n'est pas à bord — passer"),
       onPress: confirmSkip,
       danger: true,
     },
     {
-      label: 'Contacter le support',
+      label: t('Contacter le support'),
       onPress: () =>
         router.push({
           pathname: '/(driver)/dispute-new',
@@ -491,19 +499,19 @@ function CodeStep({
             subjectType: 'TRIP',
             bookingId: booking.id,
             reason: isPickup
-              ? 'Passager injoignable ou refuse de communiquer le code de prise en charge'
-              : 'Passager injoignable ou refuse de communiquer le code de dépose',
-            description: `Réservation de ${label}.`,
+              ? t('Passager injoignable ou refuse de communiquer le code de prise en charge')
+              : t('Passager injoignable ou refuse de communiquer le code de dépose'),
+            description: t('Réservation de {label}.', { label }),
           },
         }),
     },
   ];
 
-  const counter = step.total > 1 ? `Client ${Math.min(step.position, step.total)} sur ${step.total} · ` : '';
-  const title = isPickup ? 'Prise en charge' : 'Dépose';
+  const counter = step.total > 1 ? t('Client {min} sur {total} · ', { min: Math.min(step.position, step.total), total: step.total }) : '';
+  const title = isPickup ? t('Prise en charge') : t('Dépose');
   const text = isPickup
-    ? `${counter}Demandez son code de prise en charge à ${label}.`
-    : `${counter}${step.waypoint.name} : demandez son code de dépose à ${label}.`;
+    ? t('{counter}Demandez son code de prise en charge à {label}.', { counter, label })
+    : t('{counter}{waypointName} : demandez son code de dépose à {label}.', { counter, waypointName: step.waypoint.name, label });
 
   return (
     <OceanCard style={styles.stepCard}>
@@ -514,8 +522,7 @@ function CodeStep({
         <View style={styles.notice}>
           <IconAlertTriangle size={16} color={colors.danger} />
           <AppText variant="xs" color="danger" style={styles.noticeText}>
-            La prise en charge de ce passager n&apos;a pas été validée. Vous pouvez quand même valider sa dépose : elle sera
-            enregistrée sans prise en charge.
+            {t("La prise en charge de ce passager n'a pas été validée. Vous pouvez quand même valider sa dépose : elle sera enregistrée sans prise en charge.")}
           </AppText>
         </View>
       ) : null}
@@ -523,20 +530,20 @@ function CodeStep({
       {codeSent ? (
         <>
           <AppText variant="sm" color="textSecondary" align="center">
-            Le passager voit son code dans son application (« Voir mon code ») : demandez-le lui, puis saisissez-le ci-dessous.
+            {t('Le passager voit son code dans son application (« Voir mon code ») : demandez-le lui, puis saisissez-le ci-dessous.')}
           </AppText>
           <View style={styles.codeRow}>
             <TextField
               value={code}
               onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))}
               keyboardType="number-pad"
-              placeholder="Code à 6 chiffres"
+              placeholder={t('Code à 6 chiffres')}
               maxLength={6}
               containerStyle={styles.codeInput}
             />
           </View>
           <OceanButton
-            label={isPickup ? 'Valider la prise en charge' : 'Valider la dépose'}
+            label={isPickup ? t('Valider la prise en charge') : t('Valider la dépose')}
             onPress={validate}
             loading={verify.isPending}
             disabled={code.length !== 6}
@@ -544,31 +551,31 @@ function CodeStep({
           />
           <Pressable
             accessibilityRole="button"
-            onPress={() => sendCode(() => notify({ tone: 'info', title: 'Code renvoyé', text: 'Le passager est prévenu : il retrouve son nouveau code dans son application.' }))}
+            onPress={() => sendCode(() => notify({ tone: 'info', title: t('Code renvoyé'), text: t('Le passager est prévenu : il retrouve son nouveau code dans son application.') }))}
             disabled={request.isPending}
             style={({ pressed }) => [styles.resend, pressed && styles.pressed]}
           >
             <IconRefresh size={14} color={OCEAN.base} />
             <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-              Le passager ne trouve pas son code ? Le renvoyer
+              {t('Le passager ne trouve pas son code ? Le renvoyer')}
             </AppText>
           </Pressable>
         </>
       ) : (
         <>
           <AppText variant="sm" color="textSecondary" align="center">
-            Ce passager n&apos;a pas encore de code de dépose : demandez-le, il le verra dans son application, puis saisissez celui qu&apos;il vous donne.
+            {t("Ce passager n'a pas encore de code de dépose : demandez-le, il le verra dans son application, puis saisissez celui qu'il vous donne.")}
           </AppText>
-          <OceanButton label="Demander le code au passager" onPress={() => sendCode()} loading={request.isPending} style={styles.mainButton} />
+          <OceanButton label={t('Demander le code au passager')} onPress={() => sendCode()} loading={request.isPending} style={styles.mainButton} />
         </>
       )}
       <ProblemSection items={problems} />
 
       <ConfirmDialog
         visible={confirmSkipOpen}
-        title={isPickup ? `Continuer sans ${label} ?` : `${label} n'est pas à bord ?`}
-        message="Sa réservation restera ouverte : vous devrez la régler avec le support avant de pouvoir clôturer le trajet."
-        confirmLabel="Continuer sans lui"
+        title={isPickup ? t('Continuer sans {label} ?', { label }) : t("{label} n'est pas à bord ?", { label })}
+        message={t('Sa réservation restera ouverte : vous devrez la régler avec le support avant de pouvoir clôturer le trajet.')}
+        confirmLabel={t('Continuer sans lui')}
         destructive
         onConfirm={() => {
           setConfirmSkipOpen(false);
@@ -593,13 +600,14 @@ function StartStep({
   pending: boolean;
   problems: ProblemItem[];
 }) {
+  const t = useT();
   return (
     <OceanCard style={styles.stepCard}>
       <StepHeader
         icon={IconCar}
         tone="success"
-        title="Tout le monde est à bord"
-        text={`Vous pouvez partir. Prochaine étape : ${next.name}.`}
+        title={t('Tout le monde est à bord')}
+        text={t('Vous pouvez partir. Prochaine étape : {nextName}.', { nextName: next.name })}
       />
       {positionNote.error ? (
         <View style={styles.notice}>
@@ -609,9 +617,9 @@ function StartStep({
           </AppText>
         </View>
       ) : null}
-      <OceanButton label="Démarrer le trajet" onPress={onStart} loading={pending} style={styles.mainButton} />
+      <OceanButton label={t('Démarrer le trajet')} onPress={onStart} loading={pending} style={styles.mainButton} />
       <AppText variant="xs" color="textMuted" align="center">
-        Votre position sera partagée avec vos passagers pendant le trajet.
+        {t('Votre position sera partagée avec vos passagers pendant le trajet.')}
       </AppText>
       <ProblemSection items={problems} />
     </OceanCard>
@@ -619,31 +627,33 @@ function StartStep({
 }
 
 function CloseStep({ onClose, pending }: { onClose: () => void; pending: boolean }) {
+  const t = useT();
   return (
     <OceanCard style={styles.stepCard}>
       <StepHeader
         icon={IconFlag}
         tone="success"
-        title="Vous êtes arrivé"
-        text="Tous vos passagers sont déposés. Il ne reste qu’à clôturer le trajet."
+        title={t('Vous êtes arrivé')}
+        text={t('Tous vos passagers sont déposés. Il ne reste qu’à clôturer le trajet.')}
       />
-      <OceanButton label="Clôturer le trajet" onPress={onClose} loading={pending} style={styles.mainButton} />
+      <OceanButton label={t('Clôturer le trajet')} onPress={onClose} loading={pending} style={styles.mainButton} />
     </OceanCard>
   );
 }
 
 function BlockedStep({ bookings, onRetry }: { bookings: Booking[]; onRetry: () => void }) {
+  const t = useT();
   const first = bookings[0];
   return (
     <OceanCard style={styles.stepCard}>
       <StepHeader
         icon={IconAlertTriangle}
         tone="gold"
-        title="Une réservation reste ouverte"
-        text={`${bookings.map((booking) => passengerLabel(booking)).join(', ')} : vous avez continué sans ce client. Le trajet ne peut pas être clôturé avant que le support règle sa réservation.`}
+        title={t('Une réservation reste ouverte')}
+        text={t('{value} : vous avez continué sans ce client. Le trajet ne peut pas être clôturé avant que le support règle sa réservation.', { value: bookings.map((booking) => passengerLabel(booking)).join(', ') })}
       />
       <OceanButton
-        label="Contacter le support"
+        label={t('Contacter le support')}
         onPress={() =>
           router.push({
             pathname: '/(driver)/dispute-new',
@@ -651,7 +661,7 @@ function BlockedStep({ bookings, onRetry }: { bookings: Booking[]; onRetry: () =
               subjectType: 'TRIP',
               bookingId: first.id,
               reason: 'Client absent ou injoignable — réservation à régler avant la clôture du trajet',
-              description: `Réservation de ${passengerLabel(first)}.`,
+              description: t('Réservation de {passengerLabel}.', { passengerLabel: passengerLabel(first) }),
             },
           })
         }
@@ -659,7 +669,7 @@ function BlockedStep({ bookings, onRetry }: { bookings: Booking[]; onRetry: () =
       />
       <Pressable accessibilityRole="button" onPress={onRetry} style={({ pressed }) => [styles.resend, pressed && styles.pressed]}>
         <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-          Finalement, je valide son code
+          {t('Finalement, je valide son code')}
         </AppText>
       </Pressable>
     </OceanCard>
@@ -667,21 +677,22 @@ function BlockedStep({ bookings, onRetry }: { bookings: Booking[]; onRetry: () =
 }
 
 function CompletedStep({ trip, bookings }: { trip: Trip; bookings: Booking[] }) {
+  const t = useT();
   const earned = tripEarnings(trip, bookings);
   return (
     <OceanCard style={styles.stepCard}>
       <StepHeader
         icon={IconCircleCheck}
         tone="success"
-        title="Trajet terminé"
+        title={t('Trajet terminé')}
         text={
           earned
-            ? `Merci ! ${formatMoney(earned.amount, earned.currency)} ont été ajoutés à votre solde pendant ce trajet.`
-            : 'Merci ! Ce trajet est clôturé.'
+            ? t('Merci ! {money} ont été ajoutés à votre solde pendant ce trajet.', { money: formatMoney(earned.amount, earned.currency) })
+            : t('Merci ! Ce trajet est clôturé.')
         }
       />
       <OceanButton
-        label="Voir mon portefeuille"
+        label={t('Voir mon portefeuille')}
         variant="soft"
         onPress={() => router.push('/(driver)/(tabs)/wallet')}
         style={styles.mainButton}
@@ -692,17 +703,18 @@ function CompletedStep({ trip, bookings }: { trip: Trip; bookings: Booking[] }) 
 
 /** Confirmation de l'argent reçu dès qu'une dépose est validée — sans attendre la fin du trajet. */
 function PaidBannerView({ paid }: { paid: PaidBanner }) {
+  const t = useT();
   return (
     <View style={styles.paid}>
       <IconCash size={20} color={colors.successDark} />
       <View style={styles.paidText}>
         <AppText variant="sm" weight="bold" color={colors.successDark}>
-          Dépose validée
+          {t('Dépose validée')}
         </AppText>
         <AppText variant="xs" color={colors.successDark}>
           {paid.amountLabel
-            ? `${paid.amountLabel} ajoutés à votre solde pour ${paid.name}.`
-            : `Votre paiement pour ${paid.name} a été ajouté à votre solde.`}
+            ? t('{amountLabel} ajoutés à votre solde pour {paidName}.', { amountLabel: paid.amountLabel, paidName: paid.name })
+            : t('Votre paiement pour {paidName} a été ajouté à votre solde.', { paidName: paid.name })}
         </AppText>
       </View>
     </View>
@@ -715,7 +727,8 @@ function PaidBannerView({ paid }: { paid: PaidBanner }) {
 
 /** Rappel compact du trajet — remplace le grand billet, qui reste accessible sous « Voir tous les détails ». */
 function TripSummaryBar({ trip }: { trip: Trip }) {
-  const via = (trip.stops ?? []).length > 0 ? ` · via ${(trip.stops ?? []).map((stop) => stop.city?.name ?? stop.location?.label ?? 'étape').join(', ')}` : '';
+  const t = useT();
+  const via = (trip.stops ?? []).length > 0 ? t(' · via {value}', { value: (trip.stops ?? []).map((stop) => stop.city?.name ?? stop.location?.label ?? t('étape')).join(', ') }) : '';
   return (
     <View style={styles.summary}>
       <AppText variant="md" weight="bold" color={OCEAN.deep} numberOfLines={1}>
@@ -730,6 +743,7 @@ function TripSummaryBar({ trip }: { trip: Trip }) {
 }
 
 export function DriverJourneyGuide({ trip, bookings, positionNote, onCancel, cancelPending }: Props) {
+  const t = useT();
   const { skipped, skip, unskipAll } = useSkippedBookings(trip.id);
   const journey = computeJourney(trip, bookings, skipped);
   const { step } = journey;
@@ -770,7 +784,7 @@ export function DriverJourneyGuide({ trip, bookings, positionNote, onCancel, can
 
   function cancelProblem(): ProblemItem[] {
     if (trip.status !== 'PUBLISHED' && trip.status !== 'DRIVER_ARRIVED') return [];
-    return [{ label: 'Annuler le trajet', onPress: onCancel, danger: true }];
+    return [{ label: t('Annuler le trajet'), onPress: onCancel, danger: true }];
   }
 
   const cancelNote = cancelPending ? [] : cancelProblem();

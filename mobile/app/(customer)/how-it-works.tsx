@@ -1,4 +1,5 @@
 // mobile/app/(customer)/how-it-works.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [07/10/2026] Le titre de la page passe en bandeau (hero) bleu océan : OceanHeroHeader. Le reste de l'écran est inchangé.
 //
 // v1 — « Comment ça marche ? » : deux onglets (Trajets / Envois), chacun
@@ -15,6 +16,7 @@ import { OceanCard } from '@/components/ocean/OceanKit';
 import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT, translate } from '@/i18n';
 
 type Segment = 'trips' | 'shipments';
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
@@ -28,40 +30,41 @@ interface Step {
 const TRIP_STEPS: Step[] = [
   {
     icon: IconSearch,
-    title: 'Recherchez un trajet',
-    text: 'Indiquez votre ville de départ, votre destination et la date : vous voyez tous les trajets publiés qui correspondent.',
+    get title() { return translate('Recherchez un trajet'); },
+    get text() { return translate('Indiquez votre ville de départ, votre destination et la date : vous voyez tous les trajets publiés qui correspondent.'); },
   },
   {
     icon: IconCreditCard,
-    title: 'Réservez et payez',
-    text: "Choisissez le nombre de places, payez en une seule fois — votre place n'est confirmée qu'une fois le paiement validé.",
+    get title() { return translate('Réservez et payez'); },
+    get text() { return translate("Choisissez le nombre de places, payez en une seule fois — votre place n'est confirmée qu'une fois le paiement validé."); },
   },
   {
     icon: IconRoute,
-    title: 'Voyagez',
-    text: "Le jour J, un code vous est envoyé : donnez-le au conducteur pour valider votre montée, puis votre descente à l'arrivée.",
+    get title() { return translate('Voyagez'); },
+    get text() { return translate("Le jour J, un code vous est envoyé : donnez-le au conducteur pour valider votre montée, puis votre descente à l'arrivée."); },
   },
 ];
 
 const SHIPMENT_STEPS: Step[] = [
   {
     icon: IconPackage,
-    title: 'Décrivez votre colis',
-    text: 'Poids, dimensions, catégorie et la période pendant laquelle il peut partir — le prix est calculé automatiquement.',
+    get title() { return translate('Décrivez votre colis'); },
+    get text() { return translate('Poids, dimensions, catégorie et la période pendant laquelle il peut partir — le prix est calculé automatiquement.'); },
   },
   {
     icon: IconTruckDelivery,
-    title: 'Un conducteur accepte',
-    text: "Tous les conducteurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s'en charge.",
+    get title() { return translate('Un conducteur accepte'); },
+    get text() { return translate("Tous les conducteurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s'en charge."); },
   },
   {
     icon: IconMapPin,
-    title: "Suivi jusqu'à la livraison",
-    text: 'Un code valide la récupération, un autre la livraison. Sans conducteur avant la fin de la période, vous êtes remboursé à 100 %.',
+    get title() { return translate("Suivi jusqu'à la livraison"); },
+    get text() { return translate('Un code valide la récupération, un autre la livraison. Sans conducteur avant la fin de la période, vous êtes remboursé à 100 %.'); },
   },
 ];
 
 function Segmented({ value, onChange }: { value: Segment; onChange: (segment: Segment) => void }) {
+  const t = useT();
   return (
     <View style={styles.segmented}>
       {(['trips', 'shipments'] as const).map((segment) => {
@@ -75,7 +78,7 @@ function Segmented({ value, onChange }: { value: Segment; onChange: (segment: Se
             color={isActive ? OCEAN.onDark : OCEAN.base}
             style={[styles.segment, isActive && styles.segmentActive]}
           >
-            {segment === 'trips' ? 'Trajets' : 'Envois'}
+            {segment === 'trips' ? t('Trajets') : t('Envois')}
           </AppText>
         );
       })}
@@ -108,12 +111,13 @@ function StepCard({ step, index }: { step: Step; index: number }) {
 }
 
 export default function HowItWorksScreen() {
+  const t = useT();
   const [segment, setSegment] = useState<Segment>('trips');
   const steps = segment === 'trips' ? TRIP_STEPS : SHIPMENT_STEPS;
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title="Comment ça marche ?" icon={<IconInfoCircle />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Comment ça marche ?')} icon={<IconInfoCircle />} onBack={() => router.back()} />
 
       <Segmented value={segment} onChange={setSegment} />
 

@@ -702,6 +702,7 @@ export class ShipmentsService {
     });
     if (customer) {
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: customer.userId,
         type: NotificationType.DRIVER_ACCEPTED,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
@@ -948,6 +949,7 @@ export class ShipmentsService {
         const driver = await this.prisma.driverProfile.findUnique({ where: { id: driverId }, select: { userId: true } });
         if (driver) {
           await this.notifications.notify({
+            audience: 'DRIVER',
             userId: driver.userId,
             type: NotificationType.STATUS_CHANGE,
             channels: [NotificationChannel.PUSH],
@@ -961,6 +963,7 @@ export class ShipmentsService {
         const customer = await this.prisma.customerProfile.findUnique({ where: { id: customerId }, select: { userId: true } });
         if (customer) {
           await this.notifications.notify({
+            audience: 'CUSTOMER',
             userId: customer.userId,
             type: NotificationType.STATUS_CHANGE,
             channels: [NotificationChannel.PUSH],

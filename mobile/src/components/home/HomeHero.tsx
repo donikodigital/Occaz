@@ -1,4 +1,5 @@
 // mobile/src/components/home/HomeHero.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [08/10/2026] v1 — Haut de l'accueil, refait d'après la maquette : un grand bandeau bleu océan aux bords bas arrondis (avatar avec sa
 // coche de vérification, salutation, nom et sceau « profil vérifié », cloche), et par-dessus, à cheval sur le bas du bandeau, la carte
@@ -15,6 +16,7 @@ import { IconBell, IconCheck, IconRosetteDiscountCheckFilled } from '@tabler/ico
 import { AppText, Avatar } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT, translate } from '@/i18n';
 
 const AVATAR_SIZE = 54;
 const BELL_SIZE = 44;
@@ -23,7 +25,7 @@ const OVERLAP = 56;
 
 function getGreeting(date: Date = new Date()): string {
   const hour = date.getHours();
-  return hour >= 18 || hour < 5 ? 'Bonsoir' : 'Bonjour';
+  return hour >= 18 || hour < 5 ? translate('Bonsoir') : translate('Bonjour');
 }
 
 export interface HomeHeroProps {
@@ -48,6 +50,7 @@ export function HomeHero({
   onPressAvatar,
   onPressNotifications,
 }: HomeHeroProps) {
+  const t = useT();
   const insets = useSafeAreaInsets();
 
   // Le bandeau passe sous la barre d'état : icônes claires tant que l'accueil est à l'écran, rétablies en le quittant.
@@ -58,7 +61,7 @@ export function HomeHero({
     }, []),
   );
 
-  const bellLabel = unreadCount > 0 ? `Notifications, ${unreadCount} non lues` : 'Notifications';
+  const bellLabel = unreadCount > 0 ? t('Notifications, {unreadCount} non lues', { unreadCount }) : t('Notifications');
   const fullName = [firstName, lastName].filter(Boolean).join(' ') || '…';
 
   return (
@@ -70,7 +73,7 @@ export function HomeHero({
         <Pressable
           onPress={onPressAvatar}
           accessibilityRole="button"
-          accessibilityLabel="Voir mon profil"
+          accessibilityLabel={t('Voir mon profil')}
           style={({ pressed }) => [styles.identity, pressed && styles.pressed]}
         >
           <View style={styles.avatarWrap}>
@@ -137,9 +140,9 @@ export interface DashboardStat {
 }
 
 export function DashboardCard({
-  title = 'Mon tableau de bord',
+  title = translate('Mon tableau de bord'),
   main,
-  statsTitle = 'Statistiques',
+  statsTitle = translate('Statistiques'),
   stats,
 }: {
   title?: string;

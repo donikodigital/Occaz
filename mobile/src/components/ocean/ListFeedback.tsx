@@ -1,4 +1,5 @@
 // mobile/src/components/ocean/ListFeedback.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [25/10/2026] v1 — États d'une liste chargée depuis le serveur : chargement, échec (avec « Réessayer ») et « charger la suite ».
 // Avant, un échec réseau s'affichait comme « Aucune réservation », ce qui faisait croire à une perte de données.
 import React from 'react';
@@ -7,22 +8,25 @@ import { IconWifiOff } from '@tabler/icons-react-native';
 import { OceanButton, OceanEmpty } from '@/components/ocean/OceanKit';
 import { OCEAN } from '@/theme/ocean';
 import { spacing } from '@/theme';
+import { useT } from '@/i18n';
 
 export function ListLoading() {
+  const t = useT();
   return (
-    <View style={styles.center} accessibilityRole="progressbar" accessibilityLabel="Chargement">
+    <View style={styles.center} accessibilityRole="progressbar" accessibilityLabel={t('Chargement')}>
       <ActivityIndicator color={OCEAN.base} />
     </View>
   );
 }
 
 export function ListFailed({ onRetry }: { onRetry: () => void }) {
+  const t = useT();
   return (
     <OceanEmpty
       icon={<IconWifiOff size={28} color={OCEAN.base} />}
-      title="Impossible de charger la liste"
-      text="Vos données sont en sécurité. Vérifiez votre connexion puis réessayez."
-      action={<OceanButton label="Réessayer" onPress={onRetry} style={styles.retry} />}
+      title={t('Impossible de charger la liste')}
+      text={t('Vos données sont en sécurité. Vérifiez votre connexion puis réessayez.')}
+      action={<OceanButton label={t('Réessayer')} onPress={onRetry} style={styles.retry} />}
     />
   );
 }

@@ -1,4 +1,5 @@
 // mobile/app/(driver)/news.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v2 — en-tête en bandeau (héro) bleu océan, comme les autres pages. Le reste de l'écran est inchangé.
 //
 // v1 — Actualités : liste des articles publiés par l'admin.
@@ -15,6 +16,7 @@ import { OCEAN } from '@/theme/ocean';
 import { usePublishedArticles } from '@/hooks/usePromotions';
 import { formatDateLong } from '@/utils/date';
 import type { Article } from '@/types/promotions.types';
+import { useT } from '@/i18n';
 
 function ArticleCard({ article }: { article: Article }) {
   return (
@@ -43,13 +45,14 @@ function ArticleCard({ article }: { article: Article }) {
 }
 
 export default function NewsScreen() {
+  const t = useT();
   const { data, isLoading } = usePublishedArticles();
   const articles = data?.data ?? [];
 
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.headerWrap}>
-        <OceanHeroHeader title="Actualités" subtitle="Les dernières nouvelles" icon={<IconSpeakerphone />} onBack={() => router.back()} />
+        <OceanHeroHeader title={t('Actualités')} subtitle={t('Les dernières nouvelles')} icon={<IconSpeakerphone />} onBack={() => router.back()} />
       </View>
 
       <ResponsiveList
@@ -59,7 +62,7 @@ export default function NewsScreen() {
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListEmptyComponent={
           !isLoading ? (
-            <OceanEmpty icon={<IconSpeakerphone size={26} color={OCEAN.base} />} title="Aucune actualité pour l'instant" text="Revenez bientôt !" />
+            <OceanEmpty icon={<IconSpeakerphone size={26} color={OCEAN.base} />} title={t("Aucune actualité pour l'instant")} text={t('Revenez bientôt !')} />
           ) : undefined
         }
         renderItem={({ item }) => <ArticleCard article={item} />}

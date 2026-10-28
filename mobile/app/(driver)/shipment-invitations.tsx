@@ -1,4 +1,5 @@
 // mobile/app/(driver)/shipment-invitations.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // [10/10/2026] v2 — la carte d'invitation n'avait aucun padding (OceanCard n'en a pas de base) : en-tête, message, montant et boutons
@@ -31,6 +32,7 @@ import { formatMoney } from '@/utils/money';
 import { driverNetAmount, formatDimensions, formatWindow, timeAgo } from '@/utils/shipmentDisplay';
 import { FLOW_DONE_PARAM } from '@/utils/navigation';
 import type { DriverInvitation } from '@/types/shipments.types';
+import { useT } from '@/i18n';
 
 function InvitationCard({
   invitation,
@@ -45,6 +47,7 @@ function InvitationCard({
   onAccept: () => void;
   onDecline: () => void;
 }) {
+  const t = useT();
   const { shipment, trip } = invitation;
   const dimensions = formatDimensions(shipment);
 
@@ -62,7 +65,7 @@ function InvitationCard({
             {timeAgo(invitation.createdAt)}
           </AppText>
         </View>
-        {shipment.isUrgent ? <OceanPill label="Urgent" tone="danger" /> : null}
+        {shipment.isUrgent ? <OceanPill label={t('Urgent')} tone="danger" /> : null}
       </View>
 
       <View style={styles.message}>
@@ -74,7 +77,7 @@ function InvitationCard({
 
       <View style={styles.gain}>
         <AppText variant="xs" color="textSecondary">
-          Vous recevrez
+          {t('Vous recevrez')}
         </AppText>
         <AppText variant="lg" weight="bold" color="successDark">
           {formatMoney(driverNetAmount(shipment), shipment.currencyCode)}
@@ -84,7 +87,7 @@ function InvitationCard({
       {showDetails ? (
         <View style={styles.details}>
           <AppText variant="sm">
-            {shipment.category.name} · {shipment.weightKg} kg{shipment.quantity > 1 ? ` · ${shipment.quantity} colis` : ''}
+            {shipment.category.name} · {shipment.weightKg} kg{shipment.quantity > 1 ? t(' · {quantity} colis', { quantity: shipment.quantity }) : ''}
           </AppText>
           {dimensions ? (
             <AppText variant="xs" color="textSecondary">
@@ -92,11 +95,11 @@ function InvitationCard({
             </AppText>
           ) : null}
           <AppText variant="xs" color="textSecondary">
-            À transporter : {formatWindow(shipment).toLowerCase()}
+            {t('À transporter : {value}', { value: formatWindow(shipment).toLowerCase() })}
           </AppText>
           {trip ? (
             <AppText variant="xs" color="textSecondary">
-              Votre trajet {trip.originCityName} → {trip.destinationCityName}, le {formatDateLong(trip.departureAt)} à {formatTime(trip.departureAt)}
+              {t('Votre trajet {originCityName} → {destinationCityName}, le {dateLong} à {time}', { originCityName: trip.originCityName, destinationCityName: trip.destinationCityName, dateLong: formatDateLong(trip.departureAt), time: formatTime(trip.departureAt) })}
             </AppText>
           ) : null}
           {shipment.description ? (
@@ -105,20 +108,21 @@ function InvitationCard({
             </AppText>
           ) : null}
           <AppText variant="xs" color="textMuted">
-            Les coordonnées du client vous sont communiquées dès que vous acceptez.
+            {t('Les coordonnées du client vous sont communiquées dès que vous acceptez.')}
           </AppText>
         </View>
       ) : null}
 
       <View style={styles.actions}>
-        <OceanButton label="Accepter" onPress={onAccept} disabled={busy} style={styles.action} />
-        <OceanButton label="Refuser" variant="outline" onPress={onDecline} disabled={busy} style={styles.action} />
+        <OceanButton label={t('Accepter')} onPress={onAccept} disabled={busy} style={styles.action} />
+        <OceanButton label={t('Refuser')} variant="outline" onPress={onDecline} disabled={busy} style={styles.action} />
       </View>
     </OceanCard>
   );
 }
 
 export default function ShipmentInvitationsScreen() {
+  const t = useT();
   const { data, isLoading, isError, error, refetch } = useMyInvitations();
   const accept = useAcceptInvitation();
   const decline = useDeclineInvitation();
@@ -138,7 +142,7 @@ export default function ShipmentInvitationsScreen() {
       },
       onError: (err) => {
         setWorkingId(null);
-        setErrorText(err instanceof ApiError ? err.message : "Impossible d'accepter pour le moment. Réessayez.");
+        setErrorText(err instanceof ApiError ? err.message : t("Impossible d'accepter pour le moment. Réessayez."));
       },
     });
   }
@@ -150,14 +154,14 @@ export default function ShipmentInvitationsScreen() {
       onSuccess: () => setWorkingId(null),
       onError: (err) => {
         setWorkingId(null);
-        setErrorText(err instanceof ApiError ? err.message : 'Impossible de refuser pour le moment. Réessayez.');
+        setErrorText(err instanceof ApiError ? err.message : t('Impossible de refuser pour le moment. Réessayez.'));
       },
     });
   }
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title="Invitations de colis" subtitle="Des clients vous demandent de les aider" icon={<IconMailOpened />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Invitations de colis')} subtitle={t('Des clients vous demandent de les aider')} icon={<IconMailOpened />} onBack={() => router.back()} />
 
       {errorText ? (
         <View style={styles.errorBox}>
@@ -173,16 +177,16 @@ export default function ShipmentInvitationsScreen() {
       ) : isError ? (
         <OceanEmpty
           icon={<IconAlertTriangle size={26} color={colors.danger} />}
-          title="Impossible de charger les invitations"
-          text={error instanceof ApiError ? error.message : 'Vérifiez votre connexion puis réessayez.'}
-          action={<OceanButton label="Réessayer" variant="outline" onPress={() => void refetch()} />}
+          title={t('Impossible de charger les invitations')}
+          text={error instanceof ApiError ? error.message : t('Vérifiez votre connexion puis réessayez.')}
+          action={<OceanButton label={t('Réessayer')} variant="outline" onPress={() => void refetch()} />}
         />
       ) : invitations.length === 0 ? (
         <OceanEmpty
           icon={<IconMailOpened size={26} color={OCEAN.base} />}
-          title="Aucune invitation en attente"
-          text="Quand un client vous demandera de prendre son colis, vous le verrez ici."
-          action={<OceanButton label="Voir les envois disponibles" variant="soft" onPress={() => router.replace('/(driver)/shipment-available')} />}
+          title={t('Aucune invitation en attente')}
+          text={t('Quand un client vous demandera de prendre son colis, vous le verrez ici.')}
+          action={<OceanButton label={t('Voir les envois disponibles')} variant="soft" onPress={() => router.replace('/(driver)/shipment-available')} />}
         />
       ) : (
         <>
@@ -197,7 +201,7 @@ export default function ShipmentInvitationsScreen() {
             />
           ))}
           <OceanButton
-            label={showDetails ? 'Masquer les détails' : 'Voir tous les détails'}
+            label={showDetails ? t('Masquer les détails') : t('Voir tous les détails')}
             variant="soft"
             icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
             onPress={() => setShowDetails((value) => !value)}

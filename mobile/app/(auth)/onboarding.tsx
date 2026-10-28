@@ -1,4 +1,5 @@
 // mobile/app/(auth)/onboarding.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [18/10/2026] v7 — Habillage « cadre blanc » : le logo reste au-dessus, et tout le contenu (Bienvenue, phrase, cartes de rôle,
 // « Créer votre compte », « Suivre un colis ») est posé dans une grande carte blanche aux coins arrondis avec ombre douce.
 // Design uniquement : textes, boutons et logique inchangés. La carte « Je suis conducteur » reçoit un contour bleu clair et une
@@ -31,6 +32,7 @@ import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { colors, maxContentWidth, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import type { AccountType } from '@/types/auth.types';
+import { useT } from '@/i18n';
 
 const SKY_BACKGROUND = require('../../assets/images/onboarding-sky.jpg');
 const LOGO_SOURCE = require('../../assets/images/pin-glyph.png');
@@ -84,6 +86,7 @@ interface SignupSheetProps {
 // bas sur mobile, centrée dès le seuil tablette). Un appui sur le fond assombri
 // ou sur la croix referme la feuille.
 function SignupSheet({ visible, onClose, onSelect }: SignupSheetProps) {
+  const t = useT();
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -91,23 +94,23 @@ function SignupSheet({ visible, onClose, onSelect }: SignupSheetProps) {
           style={StyleSheet.absoluteFill}
           onPress={onClose}
           accessibilityRole="button"
-          accessibilityLabel="Fermer"
+          accessibilityLabel={t('Fermer')}
         />
         <View style={styles.sheet}>
           <View style={styles.sheetHeader}>
             <View style={styles.sheetHeaderText}>
               <AppText variant="xl" weight="bold" color={OCEAN.deep}>
-                Créer votre compte
+                {t('Créer votre compte')}
               </AppText>
               <AppText variant="sm" color="textSecondary" style={styles.sheetSubtitle}>
-                Vous êtes plutôt…
+                {t('Vous êtes plutôt…')}
               </AppText>
             </View>
             <Pressable
               onPress={onClose}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel="Fermer"
+              accessibilityLabel={t('Fermer')}
               style={styles.closeButton}
             >
               <IconX size={18} color={colors.textPrimary} />
@@ -116,16 +119,16 @@ function SignupSheet({ visible, onClose, onSelect }: SignupSheetProps) {
 
           <View style={styles.options}>
             <RoleOption
-              title="Client"
-              subtitle="Réserver un trajet ou un envoi"
+              title={t('Client')}
+              subtitle={t('Réserver un trajet ou un envoi')}
               icon={<IconUser size={19} color={OCEAN.onDark} />}
               iconBackground="rgba(255,255,255,0.16)"
               tone="ocean"
               onPress={() => onSelect('CUSTOMER')}
             />
             <RoleOption
-              title="Conducteur"
-              subtitle="Rentabiliser mes trajets"
+              title={t('Conducteur')}
+              subtitle={t('Rentabiliser mes trajets')}
               icon={<IconSteeringWheel size={19} color={colors.successDark} />}
               iconBackground={colors.successLight}
               tone="surface"
@@ -139,6 +142,7 @@ function SignupSheet({ visible, onClose, onSelect }: SignupSheetProps) {
 }
 
 export default function OnboardingScreen() {
+  const t = useT();
   const [signupOpen, setSignupOpen] = useState(false);
 
   function goToLogin(accountType: AccountType) {
@@ -162,17 +166,17 @@ export default function OnboardingScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center">
-              Bienvenue
+              {t('Bienvenue')}
             </AppText>
             <AppText variant="base" color="textSecondary" align="center" style={styles.tagline}>
-              Trajets partagés et envois de colis,{'\n'}partout où vous allez.
+              {t('Trajets partagés et envois de colis,\npartout où vous allez.')}
             </AppText>
           </View>
 
           <View style={styles.options}>
             <RoleOption
-              title="Je suis client"
-              subtitle="Réserver un trajet ou un envoi"
+              title={t('Je suis client')}
+              subtitle={t('Réserver un trajet ou un envoi')}
               icon={<IconUser size={19} color={OCEAN.onDark} />}
               iconBackground="rgba(255,255,255,0.16)"
               tone="ocean"
@@ -180,8 +184,8 @@ export default function OnboardingScreen() {
               onCard
             />
             <RoleOption
-              title="Je suis conducteur"
-              subtitle="Rentabiliser mes trajets"
+              title={t('Je suis conducteur')}
+              subtitle={t('Rentabiliser mes trajets')}
               icon={<IconSteeringWheel size={19} color={colors.successDark} />}
               iconBackground={colors.successLight}
               tone="surface"
@@ -192,27 +196,27 @@ export default function OnboardingScreen() {
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Créer votre compte"
+            accessibilityLabel={t('Créer votre compte')}
             onPress={() => setSignupOpen(true)}
             style={styles.signupLink}
           >
             <AppText variant="sm" color="textSecondary" align="center">
-              Pas encore client ou conducteur ?{'\n'}
+              {t('Pas encore client ou conducteur ?\n')}
               <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-                Créer votre compte
+                {t('Créer votre compte')}
               </AppText>
             </AppText>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Suivre un colis"
+            accessibilityLabel={t('Suivre un colis')}
             onPress={() => router.push('/suivi' as never)}
             style={styles.trackLink}
           >
             <IconPackage size={16} color={OCEAN.base} />
             <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-              Suivre un colis
+              {t('Suivre un colis')}
             </AppText>
           </Pressable>
         </View>

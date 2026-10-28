@@ -80,6 +80,7 @@ export class ShipmentDispatchService {
       await Promise.allSettled(
         batch.map((driver) =>
           this.notifications.notify({
+            audience: 'DRIVER',
             userId: driver.userId,
             type: NotificationType.SHIPMENT_REQUEST,
             channels,

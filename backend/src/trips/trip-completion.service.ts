@@ -175,6 +175,7 @@ export class TripCompletionService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     try {
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: customerUserId,
         type: NotificationType.STATUS_CHANGE,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
@@ -183,6 +184,7 @@ export class TripCompletionService implements OnModuleInit, OnModuleDestroy {
         pushData: { type: 'STATUS_CHANGE', tripId, bookingId },
       });
       await this.notifications.notify({
+        audience: 'DRIVER',
         userId: driverUserId,
         type: NotificationType.DRIVER_PAYMENT,
         channels: [NotificationChannel.PUSH],

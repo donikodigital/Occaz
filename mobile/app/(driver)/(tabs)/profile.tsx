@@ -1,4 +1,5 @@
 // mobile/app/(driver)/(tabs)/profile.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — section « Mes espaces » (passer d'un espace à l'autre avec le même compte) et rappel d'ajouter une adresse e-mail.
 //
 // v8 — Même refonte que côté client : cet onglet affiche désormais un menu
@@ -34,6 +35,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { SpaceSwitchSection } from '@/components/screens/SpaceSwitchSection';
 import { AddEmailReminderCard } from '@/components/screens/AddEmailReminderCard';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
+import { useT } from '@/i18n';
 
 interface MenuRowProps {
   icon: React.ReactNode;
@@ -60,6 +62,7 @@ function MenuRow({ icon, iconBackground, label, onPress, isLast }: MenuRowProps)
 }
 
 export default function DriverMenuScreen() {
+  const t = useT();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const { data: profile } = useDriverProfile();
@@ -76,7 +79,7 @@ export default function DriverMenuScreen() {
       <Pressable
         onPress={() => router.push('/(driver)/my-profile')}
         accessibilityRole="button"
-        accessibilityLabel="Voir mon profil"
+        accessibilityLabel={t('Voir mon profil')}
         style={({ pressed }) => [pressed && styles.pressed]}
       >
         <OceanHeroCard style={styles.hero}>
@@ -86,7 +89,7 @@ export default function DriverMenuScreen() {
               {profile ? `${profile.firstName} ${profile.lastName}` : user?.phone}
             </AppText>
             <AppText variant="xs" color={OCEAN.sky}>
-              Voir mon profil
+              {t('Voir mon profil')}
             </AppText>
           </View>
           <IconChevronRight size={18} color={OCEAN.sky} />
@@ -97,77 +100,77 @@ export default function DriverMenuScreen() {
 
       <SpaceSwitchSection current="DRIVER" />
 
-      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Espace personnel">
+      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title={t('Espace personnel')}>
         <MenuRow
           icon={<IconUser size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Mon profil"
+          label={t('Mon profil')}
           onPress={() => router.push('/(driver)/my-profile')}
         />
         <MenuRow
           icon={<IconFileCheck size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Mon dossier"
+          label={t('Mon dossier')}
           onPress={() => router.push('/(driver)/documents')}
         />
         <MenuRow
           icon={<IconMessageStar size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Mes avis"
+          label={t('Mes avis')}
           onPress={() => router.push('/(driver)/my-reviews')}
         />
         <MenuRow
           icon={<IconAlertTriangle size={18} color={colors.dangerDark} />}
           iconBackground={colors.dangerLight}
-          label="Mes litiges"
+          label={t('Mes litiges')}
           onPress={() => router.push('/(driver)/disputes')}
           isLast
         />
       </OceanSection>
 
-      <OceanSection icon={<IconTicket size={17} color={OCEAN.base} />} title="Promotions">
+      <OceanSection icon={<IconTicket size={17} color={OCEAN.base} />} title={t('Promotions')}>
         <MenuRow
           icon={<IconTicket size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Bons plans"
+          label={t('Bons plans')}
           onPress={() => router.push('/(driver)/deals')}
         />
         <MenuRow
           icon={<IconGift size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Parrainez des amis"
+          label={t('Parrainez des amis')}
           onPress={() => router.push('/(driver)/referral')}
           isLast
         />
       </OceanSection>
 
-      <OceanSection icon={<IconCompass size={17} color={OCEAN.base} />} title="Informations">
+      <OceanSection icon={<IconCompass size={17} color={OCEAN.base} />} title={t('Informations')}>
         <MenuRow
           icon={<IconSpeakerphone size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Actualités"
+          label={t('Actualités')}
           onPress={() => router.push('/(driver)/news')}
         />
         <MenuRow
           icon={<IconCompass size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Comment ça marche ?"
+          label={t('Comment ça marche ?')}
           onPress={() => router.push('/(driver)/how-it-works')}
           isLast
         />
       </OceanSection>
 
-      <OceanSection icon={<IconHelpCircle size={17} color={OCEAN.base} />} title="Aide">
+      <OceanSection icon={<IconHelpCircle size={17} color={OCEAN.base} />} title={t('Aide')}>
         <MenuRow
           icon={<IconHelpCircle size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Obtenir de l'aide"
+          label={t("Obtenir de l'aide")}
           onPress={() => router.push('/(driver)/help')}
         />
         <MenuRow
           icon={<IconShieldLock size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Protection des données"
+          label={t('Protection des données')}
           onPress={() => router.push('/(driver)/privacy')}
           isLast
         />
@@ -175,7 +178,7 @@ export default function DriverMenuScreen() {
 
       <OceanCard style={styles.logoutCard}>
         <OceanButton
-          label="Se déconnecter"
+          label={t('Se déconnecter')}
           variant="outline"
           icon={<IconLogout size={17} color={OCEAN.base} />}
           onPress={handleLogout}

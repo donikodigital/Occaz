@@ -1,4 +1,5 @@
 // mobile/src/components/screens/TrackingScreenShell.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v2 — padding ajouté à la carte « Colis introuvable » (OceanCard n'a pas de padding de base : le contenu touchait le cadre).
 // [10/10/2026] v1 — Page de suivi d'un colis (chargement, erreur, résultat, actualisation) : même page pour le suivi public et pour
 // celui de l'expéditeur, seule la source des données change.
@@ -12,6 +13,7 @@ import { ApiError } from '@/services/api/ApiError';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import type { ShipmentTracking } from '@/types/tracking.types';
+import { useT } from '@/i18n';
 
 export function TrackingScreenShell({
   title,
@@ -34,7 +36,8 @@ export function TrackingScreenShell({
   isRefreshing: boolean;
   footer?: React.ReactNode;
 }) {
-  const message = error instanceof ApiError ? error.message : error ? "Le suivi n'a pas pu être chargé — réessayez." : null;
+  const t = useT();
+  const message = error instanceof ApiError ? error.message : error ? t("Le suivi n'a pas pu être chargé — réessayez.") : null;
 
   return (
     <ScreenContainer scroll maxWidth="detail">
@@ -49,12 +52,12 @@ export function TrackingScreenShell({
       {!isLoading && !tracking ? (
         <OceanCard style={styles.errorCard}>
           <AppText variant="base" weight="semibold" color={OCEAN.deep}>
-            Colis introuvable
+            {t('Colis introuvable')}
           </AppText>
           <AppText variant="sm" color="textSecondary">
-            {message ?? 'Aucun colis ne correspond à ce numéro.'}
+            {message ?? t('Aucun colis ne correspond à ce numéro.')}
           </AppText>
-          <OceanButton label="Réessayer" variant="soft" icon={<IconRefresh size={16} color={OCEAN.base} />} onPress={onRefresh} loading={isRefreshing} />
+          <OceanButton label={t('Réessayer')} variant="soft" icon={<IconRefresh size={16} color={OCEAN.base} />} onPress={onRefresh} loading={isRefreshing} />
         </OceanCard>
       ) : null}
 
@@ -63,7 +66,7 @@ export function TrackingScreenShell({
           <ShipmentTrackingView tracking={tracking} />
           {tracking.outcome === 'ACTIVE' ? (
             <OceanButton
-              label="Actualiser"
+              label={t('Actualiser')}
               variant="outline"
               icon={<IconRefresh size={16} color={OCEAN.base} />}
               onPress={onRefresh}
@@ -72,7 +75,7 @@ export function TrackingScreenShell({
           ) : null}
           {tracking.outcome === 'ACTIVE' ? (
             <AppText variant="xs" color="textSecondary" align="center">
-              Cette page se met à jour toute seule.
+              {t('Cette page se met à jour toute seule.')}
             </AppText>
           ) : null}
         </>

@@ -1,4 +1,5 @@
 // mobile/app/(driver)/documents.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v1 — « Mon dossier » : l'endroit où un conducteur déjà inscrit envoie (ou renvoie) ses pièces : photo, permis, carte grise du
 // véhicule, et ajoute un véhicule s'il n'en a pas. Un bandeau rappelle les jours restants avant le blocage de la création de trajets.
 // Les envois échoués s'affichent sous le champ concerné (pas d'Alert.alert).
@@ -19,15 +20,17 @@ import { useMyVehicles } from '@/hooks/useVehicles';
 import { useDeleteVehicleDocument, useVehicleDocumentUpload, useVehicleDocuments } from '@/hooks/useVehicleDocuments';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Vehicle } from '@/types/vehicles.types';
+import { useT } from '@/i18n';
 
 function VehicleRegistrationField({ vehicle }: { vehicle: Vehicle }) {
+  const t = useT();
   const { data: documents } = useVehicleDocuments(vehicle.id);
   const upload = useVehicleDocumentUpload(vehicle.id);
   const remove = useDeleteVehicleDocument(vehicle.id);
   const registrationDoc = documents?.find((d) => d.type === 'vehicle_registration');
   return (
     <DocumentUploadField
-      label={`Carte grise · ${vehicle.brand} ${vehicle.model}`}
+      label={t('Carte grise · {brand} {model}', { brand: vehicle.brand, model: vehicle.model })}
       document={registrationDoc}
       isUploading={upload.isUploading}
       onPickLibrary={() => upload.pickFromLibrary('vehicle_registration')}
@@ -41,6 +44,7 @@ function VehicleRegistrationField({ vehicle }: { vehicle: Vehicle }) {
 }
 
 export default function DriverDocumentsScreen() {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data: profile } = useDriverProfile();
   const { data: compliance } = useDriverCompliance();
@@ -67,19 +71,19 @@ export default function DriverDocumentsScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader title="Mon dossier" subtitle="Pièces à fournir pour valider votre compte" onBack={() => router.back()} />
+      <OceanScreenHeader title={t('Mon dossier')} subtitle={t('Pièces à fournir pour valider votre compte')} onBack={() => router.back()} />
 
       <View style={styles.block}>
         <DriverComplianceBanner />
         {compliance?.isCompliant ? (
-          <FeedbackBanner tone="success" text="Votre dossier est validé : trajets et colis sont ouverts." />
+          <FeedbackBanner tone="success" text={t('Votre dossier est validé : trajets et colis sont ouverts.')} />
         ) : null}
         {compliance?.blockedReason && compliance.status !== 'PENDING' && compliance.status !== 'IN_VERIFICATION' ? (
           <FeedbackBanner tone="error" text={compliance.blockedReason} />
         ) : null}
       </View>
 
-      <OceanSection icon={<IconId size={17} color="#0B6BA8" />} title="Vous">
+      <OceanSection icon={<IconId size={17} color="#0B6BA8" />} title={t('Vous')}>
         <ProfilePhotoField
           photoUrl={photoUrl ?? profile?.photoUrl}
           initials={initials}
@@ -90,7 +94,7 @@ export default function DriverDocumentsScreen() {
           isRequired
         />
         <DocumentUploadField
-          label="Permis de conduire"
+          label={t('Permis de conduire')}
           document={licenseDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('driver_license')}
@@ -99,7 +103,7 @@ export default function DriverDocumentsScreen() {
           {...deletion(licenseDoc)}
         />
         <DocumentUploadField
-          label="Carte nationale d'identité"
+          label={t("Carte nationale d'identité")}
           document={nationalIdDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('national_id')}
@@ -109,23 +113,22 @@ export default function DriverDocumentsScreen() {
         />
       </OceanSection>
 
-      <OceanSection icon={<IconCar size={17} color="#0B6BA8" />} title="Votre véhicule">
+      <OceanSection icon={<IconCar size={17} color="#0B6BA8" />} title={t('Votre véhicule')}>
         {hasVehicle ? (
           vehicles!.map((vehicle) => <VehicleRegistrationField key={vehicle.id} vehicle={vehicle} />)
         ) : (
           <>
             <AppText variant="sm" color="textSecondary">
-              Aucun véhicule enregistré. Ajoutez-en un, puis envoyez sa carte grise.
+              {t('Aucun véhicule enregistré. Ajoutez-en un, puis envoyez sa carte grise.')}
             </AppText>
-            <OceanButton label="Ajouter un véhicule" onPress={() => router.push('/(driver)/vehicle-new')} style={styles.addVehicle} />
+            <OceanButton label={t('Ajouter un véhicule')} onPress={() => router.push('/(driver)/vehicle-new')} style={styles.addVehicle} />
           </>
         )}
       </OceanSection>
 
-      <OceanSection icon={<IconFileCheck size={17} color="#0B6BA8" />} title="Et ensuite ?">
+      <OceanSection icon={<IconFileCheck size={17} color="#0B6BA8" />} title={t('Et ensuite ?')}>
         <AppText variant="sm" color="textSecondary">
-          Une fois toutes les pièces envoyées, notre équipe les examine. Vous pouvez créer des trajets de passagers en attendant ; les colis
-          s'ouvrent dès la validation de votre compte.
+          {t("Une fois toutes les pièces envoyées, notre équipe les examine. Vous pouvez créer des trajets de passagers en attendant ; les colis s'ouvrent dès la validation de votre compte.")}
         </AppText>
       </OceanSection>
     </ScreenContainer>

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/LocationAutocompleteField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // v2 — Variante en ligne de LocationPickerScreen, utilisée dans la mise en
 // page desktop de trip-new.tsx. Même parcours que l'écran mobile (voir
@@ -20,6 +21,7 @@ import type { TripLocation } from '@/types/trips.types';
 import { formatCityCountry } from '@/utils/shipmentDisplay';
 import { LocationConfirmCard } from './LocationConfirmCard';
 import { LocationSearchField } from './LocationSearchField';
+import { useT } from '@/i18n';
 
 export interface LocationAutocompleteFieldProps {
   /** @deprecated Plus utilisé — la ville se choisit sur place. */
@@ -40,6 +42,7 @@ export function LocationAutocompleteField({
   placeholder,
   countryCode,
 }: LocationAutocompleteFieldProps) {
+  const t = useT();
   const picker = useLocationPicker(onChange);
   const searchCountryCodes = useSearchCountryCodes(countryCode);
   const isSearchStep = picker.step === 'search';
@@ -70,7 +73,7 @@ export function LocationAutocompleteField({
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Modifier cette adresse"
+            accessibilityLabel={t('Modifier cette adresse')}
             onPress={() => onChange(null)}
             hitSlop={8}
             style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}

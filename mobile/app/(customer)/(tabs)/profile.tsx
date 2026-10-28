@@ -1,4 +1,5 @@
 // mobile/app/(customer)/(tabs)/profile.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — section « Mes espaces » (passer d'un espace à l'autre avec le même compte) et rappel d'ajouter une adresse e-mail.
 // v7 — Sections Promotions (codes promo, parrainage, bons plans) et Actualités/Cartes bancaires ajoutées, maintenant que ces écrans existent.
 // v6 — Refonte : cet onglet affiche désormais un menu (à la CityGo) plutôt
@@ -36,6 +37,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { SpaceSwitchSection } from '@/components/screens/SpaceSwitchSection';
 import { AddEmailReminderCard } from '@/components/screens/AddEmailReminderCard';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
+import { useT } from '@/i18n';
 
 interface MenuRowProps {
   icon: React.ReactNode;
@@ -62,6 +64,7 @@ function MenuRow({ icon, iconBackground, label, onPress, isLast }: MenuRowProps)
 }
 
 export default function CustomerMenuScreen() {
+  const t = useT();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const { data: profile } = useCustomerProfile();
@@ -78,7 +81,7 @@ export default function CustomerMenuScreen() {
       <Pressable
         onPress={() => router.push('/(customer)/my-profile')}
         accessibilityRole="button"
-        accessibilityLabel="Voir mon profil"
+        accessibilityLabel={t('Voir mon profil')}
         style={({ pressed }) => [pressed && styles.pressed]}
       >
         <OceanHeroCard style={styles.hero}>
@@ -88,7 +91,7 @@ export default function CustomerMenuScreen() {
               {profile ? `${profile.firstName} ${profile.lastName}` : user?.phone}
             </AppText>
             <AppText variant="xs" color={OCEAN.sky}>
-              Voir mon profil
+              {t('Voir mon profil')}
             </AppText>
           </View>
           <IconChevronRight size={18} color={OCEAN.sky} />
@@ -99,83 +102,83 @@ export default function CustomerMenuScreen() {
 
       <SpaceSwitchSection current="CUSTOMER" />
 
-      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Espace personnel">
+      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title={t('Espace personnel')}>
         <MenuRow
           icon={<IconUser size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Mon profil"
+          label={t('Mon profil')}
           onPress={() => router.push('/(customer)/my-profile')}
         />
         <MenuRow
           icon={<IconMessageStar size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Mes avis"
+          label={t('Mes avis')}
           onPress={() => router.push('/(customer)/my-reviews')}
         />
         <MenuRow
           icon={<IconAlertTriangle size={18} color={colors.dangerDark} />}
           iconBackground={colors.dangerLight}
-          label="Mes litiges"
+          label={t('Mes litiges')}
           onPress={() => router.push('/(customer)/disputes')}
         />
         <MenuRow
           icon={<IconCreditCard size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Mes cartes bancaires"
+          label={t('Mes cartes bancaires')}
           onPress={() => router.push('/(customer)/saved-cards')}
           isLast
         />
       </OceanSection>
 
-      <OceanSection icon={<IconDiscount2 size={17} color={OCEAN.base} />} title="Promotions">
+      <OceanSection icon={<IconDiscount2 size={17} color={OCEAN.base} />} title={t('Promotions')}>
         <MenuRow
           icon={<IconDiscount2 size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Saisir code promo"
+          label={t('Saisir code promo')}
           onPress={() => router.push('/(customer)/promo-code')}
         />
         <MenuRow
           icon={<IconGift size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Parrainez des amis"
+          label={t('Parrainez des amis')}
           onPress={() => router.push('/(customer)/referral')}
         />
         <MenuRow
           icon={<IconTicket size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Bons plans"
+          label={t('Bons plans')}
           onPress={() => router.push('/(customer)/deals')}
           isLast
         />
       </OceanSection>
 
-      <OceanSection icon={<IconCompass size={17} color={OCEAN.base} />} title="Informations">
+      <OceanSection icon={<IconCompass size={17} color={OCEAN.base} />} title={t('Informations')}>
         <MenuRow
           icon={<IconSpeakerphone size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Actualités"
+          label={t('Actualités')}
           onPress={() => router.push('/(customer)/news')}
         />
         <MenuRow
           icon={<IconCompass size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Comment ça marche ?"
+          label={t('Comment ça marche ?')}
           onPress={() => router.push('/(customer)/how-it-works')}
           isLast
         />
       </OceanSection>
 
-      <OceanSection icon={<IconHelpCircle size={17} color={OCEAN.base} />} title="Aide">
+      <OceanSection icon={<IconHelpCircle size={17} color={OCEAN.base} />} title={t('Aide')}>
         <MenuRow
           icon={<IconHelpCircle size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Obtenir de l'aide"
+          label={t("Obtenir de l'aide")}
           onPress={() => router.push('/(customer)/help')}
         />
         <MenuRow
           icon={<IconShieldLock size={18} color={OCEAN.base} />}
           iconBackground={OCEAN.mist}
-          label="Protection des données"
+          label={t('Protection des données')}
           onPress={() => router.push('/(customer)/privacy')}
           isLast
         />
@@ -183,7 +186,7 @@ export default function CustomerMenuScreen() {
 
       <OceanCard style={styles.logoutCard}>
         <OceanButton
-          label="Se déconnecter"
+          label={t('Se déconnecter')}
           variant="outline"
           icon={<IconLogout size={17} color={OCEAN.base} />}
           onPress={handleLogout}

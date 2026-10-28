@@ -1,4 +1,5 @@
 // mobile/src/components/screens/PdfDownloadButton.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v1 — Bouton « Télécharger… (PDF) » : demande un lien à durée limitée au serveur, puis l'ouvre. Sur téléphone, le PDF s'ouvre
 // dans la visionneuse (enregistrer, partager, imprimer) ; sur le web, il se télécharge sans quitter la page. Les erreurs s'affichent
 // dans la page (Alert.alert ne fait rien sur le web).
@@ -12,6 +13,7 @@ import { spacing } from '@/theme';
 import { ticketsApi } from '@/services/api/tickets.api';
 import { apiUrl } from '@/services/api/client';
 import { ApiError } from '@/services/api/ApiError';
+import { useT } from '@/i18n';
 
 export type PdfKind = 'booking' | 'shipment';
 
@@ -26,6 +28,7 @@ export function PdfDownloadButton({
   label: string;
   variant?: OceanButtonVariant;
 }) {
+  const t = useT();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +44,7 @@ export function PdfDownloadButton({
         await Linking.openURL(apiUrl(link.path));
       }
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Le téléchargement n'a pas pu démarrer — réessayez.");
+      setError(caught instanceof ApiError ? caught.message : t("Le téléchargement n'a pas pu démarrer — réessayez."));
     } finally {
       setLoading(false);
     }

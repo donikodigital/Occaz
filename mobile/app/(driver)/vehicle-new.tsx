@@ -1,4 +1,5 @@
 // mobile/app/(driver)/vehicle-new.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [21/09/2026] v2 — habillage bleu Ocean (en-tête, sections), comme la modale de modification du véhicule.
 import React, { useState } from 'react';
@@ -16,9 +17,11 @@ import { useCreateVehicle } from '@/hooks/useVehicles';
 import { useVehicleDocumentUpload, useVehicleDocuments } from '@/hooks/useVehicleDocuments';
 import { ApiError } from '@/services/api/ApiError';
 import type { VehicleType } from '@/types/vehicles.types';
+import { useT } from '@/i18n';
 
 /** Deuxième étape affichée juste après la création — le véhicule existe déjà en base, seuls ses documents manquent avant validation. */
 function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
+  const t = useT();
   const { data: documents } = useVehicleDocuments(vehicleId);
   const upload = useVehicleDocumentUpload(vehicleId);
 
@@ -27,15 +30,15 @@ function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanHeroHeader title="Documents du véhicule" subtitle="Dernière étape" icon={<IconFileText />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Documents du véhicule')} subtitle={t('Dernière étape')} icon={<IconFileText />} onBack={() => router.back()} />
 
       <AppText variant="sm" color="textSecondary" style={styles.intro}>
-        Véhicule ajouté. Envoyez sa carte grise et son assurance pour qu&apos;il soit validé par notre équipe.
+        {t("Véhicule ajouté. Envoyez sa carte grise et son assurance pour qu'il soit validé par notre équipe.")}
       </AppText>
 
       <View style={styles.docs}>
         <DocumentUploadField
-          label="Carte grise"
+          label={t('Carte grise')}
           document={registrationDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('vehicle_registration')}
@@ -43,7 +46,7 @@ function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
           onPickCamera={() => upload.pickFromCamera('vehicle_registration')}
         />
         <DocumentUploadField
-          label="Assurance"
+          label={t('Assurance')}
           document={insuranceDoc}
           isUploading={upload.isUploading}
           onPickLibrary={() => upload.pickFromLibrary('vehicle_insurance')}
@@ -52,12 +55,13 @@ function VehicleDocumentsStep({ vehicleId }: { vehicleId: string }) {
         />
       </View>
 
-      <OceanButton label="Terminer" onPress={() => router.back()} style={styles.submit} />
+      <OceanButton label={t('Terminer')} onPress={() => router.back()} style={styles.submit} />
     </ScreenContainer>
   );
 }
 
 export default function NewVehicleScreen() {
+  const t = useT();
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [color, setColor] = useState('');
@@ -75,11 +79,11 @@ export default function NewVehicleScreen() {
   function handleSubmit() {
     setErrorMessage(undefined);
     if (brand.trim().length < 1 || model.trim().length < 1) {
-      setErrorMessage('Renseignez la marque et le modèle.');
+      setErrorMessage(t('Renseignez la marque et le modèle.'));
       return;
     }
     if (plateNumber.trim().length < 3) {
-      setErrorMessage("Renseignez la plaque d'immatriculation.");
+      setErrorMessage(t("Renseignez la plaque d'immatriculation."));
       return;
     }
 
@@ -95,7 +99,7 @@ export default function NewVehicleScreen() {
       {
         onSuccess: (vehicle) => setCreatedVehicleId(vehicle.id),
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -103,47 +107,47 @@ export default function NewVehicleScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanHeroHeader title="Ajouter un véhicule" subtitle="Renseignez votre véhicule" icon={<IconCar />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Ajouter un véhicule')} subtitle={t('Renseignez votre véhicule')} icon={<IconCar />} onBack={() => router.back()} />
 
       <View style={styles.sections}>
-        <OceanSection icon={<IconFileText size={17} color={OCEAN.base} />} title="Informations">
+        <OceanSection icon={<IconFileText size={17} color={OCEAN.base} />} title={t('Informations')}>
           <View style={styles.row}>
             <View style={styles.cell}>
               <TextField
-                label="Marque"
+                label={t('Marque')}
                 value={brand}
                 onChangeText={setBrand}
-                placeholder="Toyota"
+                placeholder={t('Toyota')}
                 autoCapitalize="words"
               />
             </View>
             <View style={styles.cell}>
               <TextField
-                label="Modèle"
+                label={t('Modèle')}
                 value={model}
                 onChangeText={setModel}
-                placeholder="Corolla"
+                placeholder={t('Corolla')}
                 autoCapitalize="words"
               />
             </View>
           </View>
           <TextField
-            label="Couleur (optionnel)"
+            label={t('Couleur (optionnel)')}
             value={color}
             onChangeText={setColor}
-            placeholder="Gris"
+            placeholder={t('Gris')}
             autoCapitalize="words"
           />
           <TextField
-            label="Plaque d'immatriculation"
+            label={t("Plaque d'immatriculation")}
             value={plateNumber}
             onChangeText={setPlateNumber}
-            placeholder="RC-1234-GN"
+            placeholder={t('RC-1234-GN')}
             autoCapitalize="characters"
           />
         </OceanSection>
 
-        <OceanSection icon={<IconSteeringWheel size={17} color={OCEAN.base} />} title="Type et capacité">
+        <OceanSection icon={<IconSteeringWheel size={17} color={OCEAN.base} />} title={t('Type et capacité')}>
           <VehicleTypePicker value={type} onChange={setType} />
           <SeatsStepper value={totalSeats} onChange={setTotalSeats} />
         </OceanSection>
@@ -158,7 +162,7 @@ export default function NewVehicleScreen() {
       ) : null}
 
       <OceanButton
-        label="Ajouter le véhicule"
+        label={t('Ajouter le véhicule')}
         onPress={handleSubmit}
         loading={createVehicle.isPending}
         style={styles.submit}

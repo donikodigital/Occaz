@@ -1,4 +1,5 @@
 // mobile/app/(driver)/my-profile.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [23/09/2026] v9 — Déplacé depuis l'onglet Profil (devenu un menu, voir
 // (tabs)/profile.tsx) : ne montre plus que la fiche détaillée. « Mes
 // litiges » et la déconnexion ont suivi vers le menu. La palette locale
@@ -29,6 +30,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useMyVehicles } from '@/hooks/useVehicles';
 import type { Vehicle } from '@/types/vehicles.types';
+import { useT, translate } from '@/i18n';
 
 // Complète la palette partagée avec les quelques teintes propres à cet
 // écran (mistBorder, field, ink) qu'elle ne définit pas — mêmes valeurs
@@ -42,9 +44,9 @@ const OCEAN = {
 } as const;
 
 const VEHICLE_STATUS_LABEL: Record<Vehicle['verificationStatus'], string> = {
-  VERIFIED: 'Vérifié',
-  REJECTED: 'Rejeté',
-  PENDING: 'En attente',
+  get VERIFIED() { return translate('Vérifié'); },
+  get REJECTED() { return translate('Rejeté'); },
+  get PENDING() { return translate('En attente'); },
 };
 const VEHICLE_STATUS_TONE: Record<Vehicle['verificationStatus'], 'success' | 'danger' | 'accent'> = {
   VERIFIED: 'success',
@@ -54,11 +56,11 @@ const VEHICLE_STATUS_TONE: Record<Vehicle['verificationStatus'], 'success' | 'da
 
 /** Statuts DriverProfile.status autres que VALIDATED — mêmes libellés que la bannière de home.tsx, pour rester cohérent entre les deux écrans. */
 const ACCOUNT_STATUS_LABEL: Record<string, string> = {
-  PENDING: 'En attente de vérification',
-  IN_VERIFICATION: 'Vérification en cours',
-  SUSPENDED: 'Compte suspendu',
-  BLOCKED: 'Compte bloqué',
-  DEACTIVATED: 'Compte désactivé',
+  get PENDING() { return translate('En attente de vérification'); },
+  get IN_VERIFICATION() { return translate('Vérification en cours'); },
+  get SUSPENDED() { return translate('Compte suspendu'); },
+  get BLOCKED() { return translate('Compte bloqué'); },
+  get DEACTIVATED() { return translate('Compte désactivé'); },
 };
 
 function RoundButton({
@@ -138,6 +140,7 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 export default function MyDriverProfileScreen() {
+  const t = useT();
   const user = useAuthStore((state) => state.user);
   const { data: profile } = useDriverProfile();
   const { data: vehicles } = useMyVehicles();
@@ -153,15 +156,15 @@ export default function MyDriverProfileScreen() {
       <View style={styles.topBar}>
         <RoundButton
           icon={<IconArrowLeft size={18} color={OCEAN.base} />}
-          label="Retour"
+          label={t('Retour')}
           onPress={() => router.back()}
         />
         <View style={styles.topBarTitle}>
           <AppText variant="base" weight="semibold" color={OCEAN.ink}>
-            Mon profil
+            {t('Mon profil')}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            Compte conducteur
+            {t('Compte conducteur')}
           </AppText>
         </View>
       </View>
@@ -180,7 +183,7 @@ export default function MyDriverProfileScreen() {
               <Pressable
                 onPress={() => router.push('/(driver)/edit-profile')}
                 accessibilityRole="button"
-                accessibilityLabel="Modifier la photo"
+                accessibilityLabel={t('Modifier la photo')}
                 style={({ pressed }) => [styles.cameraBadge, pressed && styles.pressed]}
               >
                 <IconCamera size={13} color={OCEAN.deep} />
@@ -191,7 +194,7 @@ export default function MyDriverProfileScreen() {
               <View style={styles.rolePill}>
                 {isValidated ? <IconShieldCheck size={12} color={OCEAN.gold} /> : null}
                 <AppText variant="xs" weight="bold" color={OCEAN.white} style={styles.roleLabel}>
-                  {isValidated ? 'Conducteur validé' : 'Conducteur'}
+                  {isValidated ? t('Conducteur validé') : t('Conducteur')}
                 </AppText>
               </View>
 
@@ -210,7 +213,7 @@ export default function MyDriverProfileScreen() {
                 <View style={styles.ratingRow}>
                   <IconStarFilled size={12} color={OCEAN.gold} />
                   <AppText variant="xs" weight="semibold" color={OCEAN.white}>
-                    {profile.averageRating.toFixed(1)} · {profile.ratingsCount} avis
+                    {t('{averageRating} · {ratingsCount} avis', { averageRating: profile.averageRating.toFixed(1), ratingsCount: profile.ratingsCount })}
                   </AppText>
                 </View>
               ) : null}
@@ -231,50 +234,50 @@ export default function MyDriverProfileScreen() {
         <Pressable
           onPress={() => router.push('/(driver)/edit-profile')}
           accessibilityRole="button"
-          accessibilityLabel="Modifier mon profil"
+          accessibilityLabel={t('Modifier mon profil')}
           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
         >
           <IconEdit size={18} color={OCEAN.white} />
           <AppText variant="sm" weight="semibold" color={OCEAN.white}>
-            Modifier mon profil
+            {t('Modifier mon profil')}
           </AppText>
         </Pressable>
 
         {/* Identité & contact */}
         <View style={styles.card}>
-          <SectionHeader icon={<IconUser size={16} color={OCEAN.base} />} label="Identité & contact" />
+          <SectionHeader icon={<IconUser size={16} color={OCEAN.base} />} label={t('Identité & contact')} />
 
           <View style={styles.fieldGrid}>
-            <Field label="Prénom" value={profile?.firstName ?? '—'} />
-            <Field label="Nom" value={profile?.lastName ?? '—'} />
+            <Field label={t('Prénom')} value={profile?.firstName ?? '—'} />
+            <Field label={t('Nom')} value={profile?.lastName ?? '—'} />
           </View>
 
           <View>
             <AppText variant="xs" weight="semibold" color="textMuted" style={styles.fieldLabel}>
-              Téléphone
+              {t('Téléphone')}
             </AppText>
             <View style={[styles.fieldBox, styles.phoneBox]}>
               <IconPhone size={16} color={OCEAN.base} />
               <AppText variant="sm" weight="medium" color={OCEAN.ink} style={styles.phoneValue}>
                 {user?.phone}
               </AppText>
-              {user?.isPhoneVerified ? <Badge label="Vérifié" tone="success" /> : null}
+              {user?.isPhoneVerified ? <Badge label={t('Vérifié')} tone="success" /> : null}
             </View>
           </View>
 
-          <Field label="Email" value={user?.email ?? 'Non renseigné'} />
+          <Field label={t('Email')} value={user?.email ?? t('Non renseigné')} />
         </View>
 
         {/* Véhicules */}
         <View style={styles.card}>
           <SectionHeader
             icon={<IconCar size={16} color={OCEAN.base} />}
-            label="Mes véhicules"
+            label={t('Mes véhicules')}
             action={
               <RoundButton
                 size={32}
                 icon={<IconPlus size={16} color={OCEAN.base} />}
-                label="Ajouter un véhicule"
+                label={t('Ajouter un véhicule')}
                 onPress={() => router.push('/(driver)/vehicle-new')}
               />
             }
@@ -296,7 +299,7 @@ export default function MyDriverProfileScreen() {
                     {vehicle.brand} {vehicle.model}
                   </AppText>
                   <AppText variant="xs" color="textSecondary">
-                    {vehicle.plateNumber} · {vehicle.totalSeats} places
+                    {t('{plateNumber} · {totalSeats} places', { plateNumber: vehicle.plateNumber, totalSeats: vehicle.totalSeats })}
                   </AppText>
                 </View>
                 <Badge
@@ -308,7 +311,7 @@ export default function MyDriverProfileScreen() {
             ))}
             {vehicles && vehicles.length === 0 ? (
               <AppText variant="sm" color="textMuted" style={styles.emptyText}>
-                Aucun véhicule ajouté.
+                {t('Aucun véhicule ajouté.')}
               </AppText>
             ) : null}
           </View>

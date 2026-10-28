@@ -1,4 +1,5 @@
 // mobile/src/hooks/useTripPositionBroadcast.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [09/10/2026] v2 — Sur le web, `Location.startLocationUpdatesAsync` n'existe pas (pas de service d'arrière-plan dans un
 // navigateur) : l'écran du trajet plantait avec « startLocationUpdatesAsync is not a function » dès que le trajet passait en
@@ -11,6 +12,7 @@ import { activeTripStorage } from '@/services/storage/activeTripStorage';
 import { tripsApi } from '@/services/api/trips.api';
 import { TRIP_LOCATION_TASK } from '@/tasks/tripLocationTask';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 const FOREGROUND_INTERVAL_MS = 10_000;
 
@@ -33,6 +35,7 @@ type Mode = 'idle' | 'background' | 'foreground';
  *    conducteur qui refuse "Toujours".
  */
 export function useTripPositionBroadcast(tripId: string, isActive: boolean) {
+  const t = useT();
   const [mode, setMode] = useState<Mode>('idle');
   const [error, setError] = useState<string | undefined>();
   const foregroundIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -45,7 +48,7 @@ export function useTripPositionBroadcast(tripId: string, isActive: boolean) {
     async function start() {
       const foreground = await Location.requestForegroundPermissionsAsync();
       if (!foreground.granted) {
-        if (!cancelled) setError('Autorisez la localisation pour partager votre position avec le passager.');
+        if (!cancelled) setError(t('Autorisez la localisation pour partager votre position avec le passager.'));
         return;
       }
 
@@ -67,8 +70,8 @@ export function useTripPositionBroadcast(tripId: string, isActive: boolean) {
               distanceInterval: 25,
               showsBackgroundLocationIndicator: true,
               foregroundService: {
-                notificationTitle: 'Trajet en cours',
-                notificationBody: 'Votre position est partagée avec le passager.',
+                notificationTitle: t('Trajet en cours'),
+                notificationBody: t('Votre position est partagée avec le passager.'),
                 notificationColor: OCEAN.base,
               },
             });
@@ -120,7 +123,7 @@ export function useTripPositionBroadcast(tripId: string, isActive: boolean) {
         await tripsApi.updatePosition(tripId, position.coords.latitude, position.coords.longitude);
         setError(undefined);
       } catch {
-        if (!cancelled) setError('Impossible de partager votre position pour le moment.');
+        if (!cancelled) setError(t('Impossible de partager votre position pour le moment.'));
       }
     }
 

@@ -1,4 +1,5 @@
 // mobile/app/(auth)/forgot-password.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Mot de passe oublié, étape 1 : le numéro de téléphone, puis le choix de l'envoi du code — par SMS au numéro, ou par
 // e-mail (si le compte a une adresse vérifiée ; sinon le serveur l'explique et on propose le SMS).
 import React, { useEffect, useRef, useState } from 'react';
@@ -19,8 +20,10 @@ import { useDefaultSignupCountry } from '@/hooks/useSignupCountry';
 import { buildInternationalPhone, isValidPhoneNumber, splitInternationalPhone } from '@/utils/phone';
 import type { Country } from '@/types/geography.types';
 import type { PasswordResetChannel } from '@/types/auth.types';
+import { useT } from '@/i18n';
 
 export default function ForgotPasswordScreen() {
+  const t = useT();
   const { accountType = 'CUSTOMER', phone: phoneParam } = useLocalSearchParams<{ accountType?: string; phone?: string }>();
   const [country, setCountry] = useState<Country | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -53,7 +56,7 @@ export default function ForgotPasswordScreen() {
       });
     },
     onError: (error) => {
-      setFormError(error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.');
+      setFormError(error instanceof ApiError ? error.message : t('Une erreur est survenue. Réessayez.'));
     },
     onSettled: () => setPendingChannel(null),
   });
@@ -62,7 +65,7 @@ export default function ForgotPasswordScreen() {
     setFormError(undefined);
     const international = buildInternationalPhone(country?.phoneCode ?? '', phone, country?.isoCode);
     if (!country || !isValidPhoneNumber(international)) {
-      setPhoneError('Numéro invalide. Vérifiez-le sans l’indicatif du pays.');
+      setPhoneError(t('Numéro invalide. Vérifiez-le sans l’indicatif du pays.'));
       return;
     }
     setPhoneError(undefined);
@@ -73,19 +76,19 @@ export default function ForgotPasswordScreen() {
   return (
     <AuthStep
       icon={<IconKey size={26} color={OCEAN.onDark} />}
-      title="Mot de passe oublié"
-      subtitle="Indiquez votre numéro, puis choisissez comment recevoir un code pour en définir un nouveau."
+      title={t('Mot de passe oublié')}
+      subtitle={t('Indiquez votre numéro, puis choisissez comment recevoir un code pour en définir un nouveau.')}
       onBack={() => router.back()}
       footer={
         <View style={styles.footer}>
           <OceanButton
-            label="Recevoir le code par SMS"
+            label={t('Recevoir le code par SMS')}
             onPress={() => send('SMS')}
             loading={request.isPending && pendingChannel === 'SMS'}
             disabled={request.isPending && pendingChannel !== 'SMS'}
           />
           <OceanButton
-            label="Recevoir le code par e-mail"
+            label={t('Recevoir le code par e-mail')}
             variant="outline"
             onPress={() => send('EMAIL')}
             loading={request.isPending && pendingChannel === 'EMAIL'}
@@ -112,13 +115,13 @@ export default function ForgotPasswordScreen() {
         <View style={styles.channel}>
           <IconMessage2 size={16} color={OCEAN.base} />
           <AppText variant="xs" color="textSecondary" style={styles.channelText}>
-            Par SMS : un code est envoyé au numéro ci-dessus.
+            {t('Par SMS : un code est envoyé au numéro ci-dessus.')}
           </AppText>
         </View>
         <View style={styles.channel}>
           <IconMail size={16} color={OCEAN.base} />
           <AppText variant="xs" color="textSecondary" style={styles.channelText}>
-            Par e-mail : possible si vous avez ajouté et vérifié une adresse e-mail à votre compte.
+            {t('Par e-mail : possible si vous avez ajouté et vérifié une adresse e-mail à votre compte.')}
           </AppText>
         </View>
       </View>

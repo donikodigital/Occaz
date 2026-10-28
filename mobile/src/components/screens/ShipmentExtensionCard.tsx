@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ShipmentExtensionCard.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [21/09/2026] v1 — le client prolonge sa demande ou demande à être remboursé.
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -6,6 +7,7 @@ import { IconAlertTriangle } from '@tabler/icons-react-native';
 import { AppText, Button } from '@/components/ui';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { colors, radius, spacing } from '@/theme';
+import { useT } from '@/i18n';
 
 export interface ShipmentExtensionCardProps {
   /** Reçoit la nouvelle fin de plage (ISO, 23 h 59 du jour choisi). */
@@ -30,6 +32,7 @@ function tomorrow(): Date {
  * remboursement intégral est déclenché automatiquement au bout du délai.
  */
 export function ShipmentExtensionCard({ onExtend, onRefund, isExtending, isRefunding, errorMessage }: ShipmentExtensionCardProps) {
+  const t = useT();
   const [newEndDate, setNewEndDate] = useState<Date | null>(null);
 
   function handleExtend() {
@@ -44,15 +47,14 @@ export function ShipmentExtensionCard({ onExtend, onRefund, isExtending, isRefun
       <View style={styles.header}>
         <IconAlertTriangle size={18} color={colors.accentDark} />
         <AppText variant="sm" weight="semibold" color={colors.accentDark} style={styles.title}>
-          Aucun conducteur avant la fin de la période
+          {t('Aucun conducteur avant la fin de la période')}
         </AppText>
       </View>
       <AppText variant="sm" color={colors.accentDark}>
-        Souhaitez-vous prolonger votre demande ? Les conducteurs seront prévenus de nouveau. Sinon, votre paiement vous
-        est remboursé intégralement.
+        {t('Souhaitez-vous prolonger votre demande ? Les conducteurs seront prévenus de nouveau. Sinon, votre paiement vous est remboursé intégralement.')}
       </AppText>
 
-      <CalendarPicker label="Nouvelle date limite" selectedDate={newEndDate} onSelectDate={setNewEndDate} minDate={tomorrow()} />
+      <CalendarPicker label={t('Nouvelle date limite')} selectedDate={newEndDate} onSelectDate={setNewEndDate} minDate={tomorrow()} />
 
       {errorMessage ? (
         <AppText variant="sm" color="danger">
@@ -60,8 +62,8 @@ export function ShipmentExtensionCard({ onExtend, onRefund, isExtending, isRefun
         </AppText>
       ) : null}
 
-      <Button label="Prolonger ma demande" onPress={handleExtend} disabled={!newEndDate || isRefunding} loading={isExtending} />
-      <Button label="Non, me rembourser" variant="outline" onPress={onRefund} disabled={isExtending} loading={isRefunding} />
+      <Button label={t('Prolonger ma demande')} onPress={handleExtend} disabled={!newEndDate || isRefunding} loading={isExtending} />
+      <Button label={t('Non, me rembourser')} variant="outline" onPress={onRefund} disabled={isExtending} loading={isRefunding} />
     </View>
   );
 }

@@ -1,4 +1,5 @@
 // mobile/app/(auth)/forgot-password-code.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Mot de passe oublié, étape 2 : le code à 6 chiffres reçu par SMS ou par e-mail. Un code correct donne un jeton
 // (gardé en mémoire seulement) qui autorise le choix du nouveau mot de passe.
 import React, { useState } from 'react';
@@ -11,8 +12,10 @@ import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { useAuthFlowStore } from '@/stores/authFlowStore';
 import type { PasswordResetChannel } from '@/types/auth.types';
+import { useT } from '@/i18n';
 
 export default function ForgotPasswordCodeScreen() {
+  const t = useT();
   const { phone = '', channel = 'SMS', destination = '', accountType = 'CUSTOMER' } = useLocalSearchParams<{
     phone?: string;
     channel?: string;
@@ -33,7 +36,7 @@ export default function ForgotPasswordCodeScreen() {
         router.replace({ pathname: '/(auth)/forgot-password-new', params: { phone, accountType } });
       },
       onError: (error) => {
-        setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.');
+        setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue. Réessayez.'));
         clear();
       },
     });
@@ -44,11 +47,11 @@ export default function ForgotPasswordCodeScreen() {
   return (
     <CodeEntryStep
       icon={<Icon size={26} color={OCEAN.onDark} />}
-      title="Entrez le code"
+      title={t('Entrez le code')}
       subtitle={
         resetChannel === 'EMAIL'
-          ? `Code envoyé par e-mail à ${destination}. Pensez à regarder dans vos courriers indésirables.`
-          : `Code envoyé par SMS au ${destination || phone}`
+          ? t('Code envoyé par e-mail à {destination}. Pensez à regarder dans vos courriers indésirables.', { destination })
+          : t('Code envoyé par SMS au {value}', { value: destination || phone })
       }
       onBack={() => router.back()}
       onSubmit={handleSubmit}
@@ -59,7 +62,7 @@ export default function ForgotPasswordCodeScreen() {
         try {
           await authApi.requestPasswordReset(phone, resetChannel);
         } catch (error) {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Impossible de renvoyer le code pour le moment.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Impossible de renvoyer le code pour le moment.'));
           throw error;
         }
       }}

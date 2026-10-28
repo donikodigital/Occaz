@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ShipmentRequestCard.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [21/09/2026] v1 — carte d'une demande d'envoi pour le conducteur.
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -9,6 +10,7 @@ import { formatMoney } from '@/utils/money';
 import { driverNetAmount, formatDimensions, formatWindow, timeAgo } from '@/utils/shipmentDisplay';
 import type { AvailableShipment } from '@/types/shipments.types';
 import { FactChip, ShipmentRoute } from './ShipmentParts';
+import { useT } from '@/i18n';
 
 export interface ShipmentRequestCardProps {
   shipment: AvailableShipment;
@@ -22,6 +24,7 @@ export interface ShipmentRequestCardProps {
  * sont communiquées qu'après l'acceptation.
  */
 export function ShipmentRequestCard({ shipment, onAccept }: ShipmentRequestCardProps) {
+  const t = useT();
   const dimensions = formatDimensions(shipment);
 
   return (
@@ -42,7 +45,7 @@ export function ShipmentRequestCard({ shipment, onAccept }: ShipmentRequestCardP
           </View>
         </View>
         {shipment.isUrgent ? (
-          <Badge label="Urgent" tone="danger" icon={<IconBolt size={12} color={colors.dangerDark} />} />
+          <Badge label={t('Urgent')} tone="danger" icon={<IconBolt size={12} color={colors.dangerDark} />} />
         ) : null}
       </View>
 
@@ -69,13 +72,13 @@ export function ShipmentRequestCard({ shipment, onAccept }: ShipmentRequestCardP
       <View style={styles.footer}>
         <View>
           <AppText variant="xs" color="textSecondary">
-            Vous recevrez
+            {t('Vous recevrez')}
           </AppText>
           <AppText variant="lg" weight="bold" color="successDark">
             {formatMoney(driverNetAmount(shipment), shipment.currencyCode)}
           </AppText>
         </View>
-        <Button label="Accepter" size="md" fullWidth={false} onPress={onAccept} />
+        <Button label={t('Accepter')} size="md" fullWidth={false} onPress={onAccept} />
       </View>
     </Card>
   );

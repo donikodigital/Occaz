@@ -1,4 +1,5 @@
 // mobile/src/components/screens/SeatsStepper.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [21/09/2026] v+ — bleu Ocean au lieu de l'indigo.
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -6,6 +7,7 @@ import { IconMinus, IconPlus, IconUsers } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 export interface SeatsStepperProps {
   value: number;
@@ -46,19 +48,20 @@ function StepButton({
  * aux bornes (1 à 12 par défaut, comme avant).
  */
 export function SeatsStepper({ value, onChange, min = 1, max = 12 }: SeatsStepperProps) {
+  const t = useT();
   return (
     <View style={styles.row}>
       <View style={styles.iconTile}>
         <IconUsers size={18} color={OCEAN.base} />
       </View>
       <AppText variant="sm" weight="semibold" style={styles.label}>
-        Nombre de places
+        {t('Nombre de places')}
       </AppText>
 
       <View style={styles.stepper}>
         <StepButton
           icon={<IconMinus size={16} color={colors.textPrimary} />}
-          label="Retirer une place"
+          label={t('Retirer une place')}
           onPress={() => onChange(Math.max(min, value - 1))}
           disabled={value <= min}
         />
@@ -67,7 +70,7 @@ export function SeatsStepper({ value, onChange, min = 1, max = 12 }: SeatsSteppe
         </AppText>
         <StepButton
           icon={<IconPlus size={16} color={colors.textPrimary} />}
-          label="Ajouter une place"
+          label={t('Ajouter une place')}
           onPress={() => onChange(Math.min(max, value + 1))}
           disabled={value >= max}
         />

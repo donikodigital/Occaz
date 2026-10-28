@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ChangePasswordScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Changer son mot de passe à 6 chiffres depuis le profil, commun aux espaces Client et Conducteur.
 //   1. Mot de passe actuel  →  2. Nouveau mot de passe  →  3. Confirmation du nouveau  →  « Mot de passe modifié ».
 // Les autres appareils connectés sont déconnectés par le serveur ; celui-ci reste ouvert. Un oubli se règle par « Mot de passe oublié »
@@ -17,16 +18,18 @@ import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT, translate } from '@/i18n';
 
 type Phase = 'current' | 'new' | 'confirm' | 'done';
 
 const COPY: Record<Exclude<Phase, 'done'>, { title: string; subtitle: string; button: string }> = {
-  current: { title: 'Mot de passe actuel', subtitle: 'Pour votre sécurité, saisissez d’abord le mot de passe actuel.', button: 'Continuer' },
-  new: { title: 'Nouveau mot de passe', subtitle: '6 chiffres. Évitez les suites (123456) et les chiffres répétés.', button: 'Continuer' },
-  confirm: { title: 'Confirmez le mot de passe', subtitle: 'Saisissez le nouveau mot de passe une seconde fois.', button: 'Enregistrer' },
+  current: { get title() { return translate('Mot de passe actuel'); }, get subtitle() { return translate('Pour votre sécurité, saisissez d’abord le mot de passe actuel.'); }, get button() { return translate('Continuer'); } },
+  new: { get title() { return translate('Nouveau mot de passe'); }, get subtitle() { return translate('6 chiffres. Évitez les suites (123456) et les chiffres répétés.'); }, get button() { return translate('Continuer'); } },
+  confirm: { get title() { return translate('Confirmez le mot de passe'); }, get subtitle() { return translate('Saisissez le nouveau mot de passe une seconde fois.'); }, get button() { return translate('Enregistrer'); } },
 };
 
 export function ChangePasswordScreen() {
+  const t = useT();
   const [phase, setPhase] = useState<Phase>('current');
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -56,7 +59,7 @@ export function ChangePasswordScreen() {
 
   function save(confirmed: string) {
     if (confirmed !== next) {
-      setErrorMessage('Les deux mots de passe ne sont pas identiques. Recommencez.');
+      setErrorMessage(t('Les deux mots de passe ne sont pas identiques. Recommencez.'));
       setConfirmation('');
       return;
     }
@@ -66,7 +69,7 @@ export function ChangePasswordScreen() {
       {
         onSuccess: () => setPhase('done'),
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue. Réessayez.'));
           // On repart de la saisie du mot de passe actuel : c'est lui qui est le plus souvent en cause.
           setPhase('current');
           setCurrent('');
@@ -86,14 +89,14 @@ export function ChangePasswordScreen() {
 
   if (phase === 'done') {
     return (
-      <ScreenContainer maxWidth="form" footer={<OceanButton label="Terminé" onPress={() => router.back()} />}>
+      <ScreenContainer maxWidth="form" footer={<OceanButton label={t('Terminé')} onPress={() => router.back()} />}>
         <View style={styles.done}>
           <AuthIllustration icon={<IconCircleCheck size={28} color={OCEAN.onDark} />} size={104} style={styles.illustration} />
           <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>
-            Mot de passe modifié
+            {t('Mot de passe modifié')}
           </AppText>
           <AppText variant="base" color="textSecondary" align="center">
-            Utilisez-le à votre prochaine connexion. Vos autres appareils ont été déconnectés.
+            {t('Utilisez-le à votre prochaine connexion. Vos autres appareils ont été déconnectés.')}
           </AppText>
         </View>
       </ScreenContainer>
@@ -111,7 +114,7 @@ export function ChangePasswordScreen() {
       maxWidth="form"
       footer={<OceanButton label={copy.button} onPress={advance} loading={change.isPending} disabled={value.length !== PIN_LENGTH} />}
     >
-      <OceanHeroHeader title="Changer mon mot de passe" subtitle={`Étape ${stepNumber} sur 3`} icon={<IconLock />} onBack={back} />
+      <OceanHeroHeader title={t('Changer mon mot de passe')} subtitle={t('Étape {stepNumber} sur 3', { stepNumber })} icon={<IconLock />} onBack={back} />
 
       <View style={styles.body}>
         <AuthIllustration icon={<IconLock size={26} color={OCEAN.onDark} />} size={96} style={styles.illustration} />

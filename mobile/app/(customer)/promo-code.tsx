@@ -1,4 +1,5 @@
 // mobile/app/(customer)/promo-code.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v4 — Plus aucun montant à saisir : le code suffit. On le saisit, on voit ce qu'il offre (réduction en % ou en montant, plafond,
 // minimum d'achat, prestations concernées, date de fin). Le type de prestation n'est pas demandé non plus : c'est le code qui le porte.
 // Le contrôle se fait via POST /promo-codes/lookup. Le calcul de l'économie sur un montant reste au paiement (PromoCodeField).
@@ -23,26 +24,28 @@ import { useLookupPromoCode } from '@/hooks/usePromotions';
 import { formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
 import type { PromoCodeTerms, ServiceType } from '@/types/promotions.types';
+import { useT, translate, intlLocale } from '@/i18n';
 
 /** Ce que le code offre, en gros : « 10 % » ou « 5 000 GNF ». */
 function offerLabel(terms: PromoCodeTerms): string {
   if (terms.discountType === 'PERCENTAGE') {
-    return `${new Intl.NumberFormat('fr-FR').format(terms.discountValue)} %`;
+    return `${new Intl.NumberFormat(intlLocale()).format(terms.discountValue)} %`;
   }
   return formatMoney(terms.discountValue, terms.currencyCode ?? '');
 }
 
 function scopeLabel(serviceType: ServiceType | null): string {
-  if (serviceType === 'TRIP') return 'les trajets';
-  if (serviceType === 'SHIPMENT') return 'les envois';
-  return 'les trajets et les envois';
+  if (serviceType === 'TRIP') return translate('les trajets');
+  if (serviceType === 'SHIPMENT') return translate('les envois');
+  return translate('les trajets et les envois');
 }
 
 function formatEndDate(iso: string): string {
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
 }
 
 export default function PromoCodeScreen() {
+  const t = useT();
   const [code, setCode] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const lookupPromoCode = useLookupPromoCode();
@@ -62,31 +65,31 @@ export default function PromoCodeScreen() {
     setErrorMessage(undefined);
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) {
-      setErrorMessage('Renseignez votre code promo.');
+      setErrorMessage(t('Renseignez votre code promo.'));
       return;
     }
     lookupPromoCode.mutate(
       { code: trimmed },
-      { onError: (error) => setErrorMessage(error instanceof ApiError ? error.message : 'Code invalide.') },
+      { onError: (error) => setErrorMessage(error instanceof ApiError ? error.message : t('Code invalide.')) },
     );
   }
 
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title="Saisir un code promo" icon={<IconDiscount2 />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Saisir un code promo')} icon={<IconDiscount2 />} onBack={() => router.back()} />
 
       <View style={styles.hero}>
         <IconDiscount2 size={22} color={OCEAN.base} />
         <AppText variant="sm" color="textSecondary" style={{ flex: 1 }}>
-          Entrez votre code pour voir ce qu'il vous offre.
+          {t("Entrez votre code pour voir ce qu'il vous offre.")}
         </AppText>
       </View>
 
       <TextField
-        label="Code promo"
+        label={t('Code promo')}
         value={code}
         onChangeText={handleChangeCode}
-        placeholder="BIENVENUE10"
+        placeholder={t('BIENVENUE10')}
         autoCapitalize="characters"
         autoCorrect={false}
         returnKeyType="done"
@@ -99,18 +102,18 @@ export default function PromoCodeScreen() {
         </AppText>
       ) : null}
 
-      <OceanButton label="Vérifier le code" onPress={handleCheck} loading={lookupPromoCode.isPending} style={styles.button} />
+      <OceanButton label={t('Vérifier le code')} onPress={handleCheck} loading={lookupPromoCode.isPending} style={styles.button} />
 
       {terms ? (
         <OceanCard style={styles.resultCard}>
           <AppText variant="xs" color="textSecondary">
-            Ce code vous offre
+            {t('Ce code vous offre')}
           </AppText>
           <AppText variant="xl" weight="bold" color={colors.successDark}>
             {offerLabel(terms)}
           </AppText>
           <AppText variant="sm" color="textSecondary">
-            de réduction
+            {t('de réduction')}
           </AppText>
           {terms.description ? (
             <AppText variant="sm" align="center" style={styles.description}>
@@ -120,21 +123,21 @@ export default function PromoCodeScreen() {
 
           <View style={styles.conditions}>
             <AppText variant="xs" color="textSecondary">
-              Valable sur {scopeLabel(terms.serviceType)}
+              {t('Valable sur {scopeLabel}', { scopeLabel: scopeLabel(terms.serviceType) })}
             </AppText>
             {terms.discountType === 'PERCENTAGE' && terms.maxDiscountAmount ? (
               <AppText variant="xs" color="textSecondary">
-                Réduction plafonnée à {formatMoney(terms.maxDiscountAmount, terms.currencyCode ?? '')}
+                {t('Réduction plafonnée à {money}', { money: formatMoney(terms.maxDiscountAmount, terms.currencyCode ?? '') })}
               </AppText>
             ) : null}
             {terms.minAmount ? (
               <AppText variant="xs" color="textSecondary">
-                À partir de {formatMoney(terms.minAmount, terms.currencyCode ?? '')} d'achat
+                {t("À partir de {money} d'achat", { money: formatMoney(terms.minAmount, terms.currencyCode ?? '') })}
               </AppText>
             ) : null}
             {terms.expiresAt ? (
               <AppText variant="xs" color="textSecondary">
-                Jusqu'au {formatEndDate(terms.expiresAt)}
+                {t("Jusqu'au {endDate}", { endDate: formatEndDate(terms.expiresAt) })}
               </AppText>
             ) : null}
           </View>

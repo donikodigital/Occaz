@@ -1,4 +1,5 @@
 // mobile/src/components/ui/ProfilePhotoField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v+ — errorMessage : l'échec d'un envoi s'affiche sous la photo (Alert.alert ne fait rien sur le web).
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -8,6 +9,7 @@ import { Avatar } from './Avatar';
 import { FeedbackBanner } from './FeedbackBanner';
 import { IconButton } from './IconButton';
 import { colors, spacing } from '@/theme';
+import { useT } from '@/i18n';
 
 export interface ProfilePhotoFieldProps {
   photoUrl?: string | null;
@@ -30,6 +32,7 @@ export function ProfilePhotoField({
   isRequired,
   errorMessage,
 }: ProfilePhotoFieldProps) {
+  const t = useT();
   return (
     <View style={styles.container}>
       <View style={styles.avatarWrap}>
@@ -44,19 +47,19 @@ export function ProfilePhotoField({
       <View style={styles.actions}>
         <IconButton
           icon={<IconPhoto size={17} color={colors.textPrimary} />}
-          accessibilityLabel="Choisir depuis la galerie"
+          accessibilityLabel={t('Choisir depuis la galerie')}
           onPress={onPickLibrary}
         />
         <IconButton
           icon={<IconCamera size={17} color={colors.textPrimary} />}
-          accessibilityLabel="Prendre une photo"
+          accessibilityLabel={t('Prendre une photo')}
           onPress={onPickCamera}
         />
       </View>
 
       {isRequired && !photoUrl ? (
         <AppText variant="xs" color="danger" style={styles.requiredNote}>
-          Obligatoire avant la validation de votre compte
+          {t('Obligatoire avant la validation de votre compte')}
         </AppText>
       ) : null}
 

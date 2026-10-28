@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ShipmentQuoteCard.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [21/09/2026] v1 — prix calculé par le serveur, affiché avant paiement.
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -8,6 +9,7 @@ import { useShipmentQuote } from '@/hooks/useShipments';
 import { ApiError } from '@/services/api/ApiError';
 import { formatMoney } from '@/utils/money';
 import type { QuoteShipmentPayload } from '@/types/shipments.types';
+import { useT } from '@/i18n';
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -32,6 +34,7 @@ export function ShipmentQuoteCard({
   /** Réduction d'un code promo déjà validé (PromoCodeField) — déduite du prix affiché, jamais un montant à part que le client doit calculer lui-même. */
   discountAmount?: string;
 }) {
+  const t = useT();
   const debouncedPayload = useDebouncedValue(payload, 500);
   const { data: quote, isFetching, error } = useShipmentQuote(debouncedPayload);
 
@@ -40,22 +43,22 @@ export function ShipmentQuoteCard({
   return (
     <View style={styles.card}>
       <AppText variant="sm" weight="medium" color="textSecondary">
-        Prix à payer
+        {t('Prix à payer')}
       </AppText>
 
       {payload === null ? (
         <AppText variant="sm" color="textMuted">
-          Renseignez les adresses, la catégorie et le poids pour voir le prix.
+          {t('Renseignez les adresses, la catégorie et le poids pour voir le prix.')}
         </AppText>
       ) : error ? (
         <AppText variant="sm" color="danger">
-          {error instanceof ApiError ? error.message : 'Impossible de calculer le prix pour le moment.'}
+          {error instanceof ApiError ? error.message : t('Impossible de calculer le prix pour le moment.')}
         </AppText>
       ) : !quote || isFetching ? (
         <View style={styles.loading}>
           <ActivityIndicator size="small" color={colors.primary} />
           <AppText variant="sm" color="textSecondary">
-            Calcul du prix…
+            {t('Calcul du prix…')}
           </AppText>
         </View>
       ) : (
@@ -64,16 +67,15 @@ export function ShipmentQuoteCard({
             {formatMoney(String(amountDue), quote.currencyCode ?? undefined)}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            Distance retenue : {quote.distanceKm} km
+            {t('Distance retenue : {distanceKm} km', { distanceKm: quote.distanceKm })}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            Poids facturé : {quote.chargeableWeightKg} kg
-            {quote.volumetricWeightKg !== null && quote.volumetricWeightKg > 0
-              ? ` (volume équivalent à ${quote.volumetricWeightKg} kg)`
-              : ''}
+            {t('Poids facturé : {chargeableWeightKg} kg{value}', { chargeableWeightKg: quote.chargeableWeightKg, value: quote.volumetricWeightKg !== null && quote.volumetricWeightKg > 0
+              ? t(' (volume équivalent à {volumetricWeightKg} kg)', { volumetricWeightKg: quote.volumetricWeightKg })
+              : '' })}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            Paiement unique. Si vous annulez, vous êtes remboursé à 100 %.
+            {t('Paiement unique. Si vous annulez, vous êtes remboursé à 100 %.')}
           </AppText>
         </>
       )}

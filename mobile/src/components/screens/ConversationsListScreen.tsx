@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ConversationsListScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // v3 — Écran « Messages » modernisé (partagé client / conducteur) :
 //   - un bandeau (hero) bleu océan avec le titre « Mes conversations », une phrase adaptée au rôle et deux compteurs
@@ -23,6 +24,7 @@ import { OCEAN } from '@/theme/ocean';
 import { useMyConversations } from '@/hooks/useConversations';
 import { formatDateShort, formatTime } from '@/utils/date';
 import type { ConversationSummary, TripCities } from '@/types/conversations.types';
+import { useT, translate, intlLocale } from '@/i18n';
 
 export interface ConversationsListScreenProps {
   /** Racine de navigation du groupe appelant — (customer) et (driver) sont deux Stacks Expo Router isolés. */
@@ -49,18 +51,18 @@ function daysAgo(dateIso: string, now: Date): number {
 
 function sectionLabelFor(dateIso: string, now: Date): string {
   const diffDays = daysAgo(dateIso, now);
-  if (diffDays <= 0) return "Aujourd'hui";
-  if (diffDays === 1) return 'Hier';
-  if (diffDays < 7) return 'Cette semaine';
-  return 'Plus tôt';
+  if (diffDays <= 0) return translate("Aujourd'hui");
+  if (diffDays === 1) return translate('Hier');
+  if (diffDays < 7) return translate('Cette semaine');
+  return translate('Plus tôt');
 }
 
 /** Heure aujourd'hui, « Hier », le jour de la semaine cette semaine, sinon la date courte. */
 function formatActivity(dateIso: string, now: Date): string {
   const diffDays = daysAgo(dateIso, now);
   if (diffDays <= 0) return formatTime(dateIso);
-  if (diffDays === 1) return 'Hier';
-  if (diffDays < 7) return new Intl.DateTimeFormat('fr-FR', { weekday: 'short' }).format(new Date(dateIso));
+  if (diffDays === 1) return translate('Hier');
+  if (diffDays < 7) return new Intl.DateTimeFormat(intlLocale(), { weekday: 'short' }).format(new Date(dateIso));
   return formatDateShort(dateIso);
 }
 
@@ -74,9 +76,9 @@ function routeOf(trip: TripCities | null | undefined): string | null {
 function conversationTitle(conversation: ConversationSummary): string {
   if (conversation.shipmentId) {
     const recipient = conversation.shipment?.recipientName?.trim();
-    return recipient ? `Colis pour ${recipient}` : 'Envoi de colis';
+    return recipient ? translate('Colis pour {recipient}', { recipient }) : translate('Envoi de colis');
   }
-  return routeOf(conversation.booking?.trip) ?? 'Trajet partagé';
+  return routeOf(conversation.booking?.trip) ?? translate('Trajet partagé');
 }
 
 /** « Conducteur · Moustapha Diallo » côté client ; « Passager · … » (trajet) ou « Client · … » (colis) côté conducteur. */
@@ -84,14 +86,14 @@ function counterpartLine(conversation: ConversationSummary, isDriver: boolean): 
   const person = conversation.counterpart;
   const name = person ? `${person.firstName} ${person.lastName}`.trim() : '';
   if (!name) return null;
-  const role = !isDriver ? 'Conducteur' : conversation.shipmentId ? 'Client' : 'Passager';
+  const role = !isDriver ? translate('Conducteur') : conversation.shipmentId ? translate('Client') : translate('Passager');
   return `${role} · ${name}`;
 }
 
 function previewOf(conversation: ConversationSummary): { text: string; empty: boolean } {
   const last = conversation.lastMessage;
-  if (!last) return { text: "Aucun message pour l'instant. Écrivez le premier !", empty: true };
-  const prefix = last.isSupportIntervention ? "Support Occa'Z : " : last.fromMe ? 'Vous : ' : '';
+  if (!last) return { text: translate("Aucun message pour l'instant. Écrivez le premier !"), empty: true };
+  const prefix = last.isSupportIntervention ? translate("Support Occa'Z : ") : last.fromMe ? translate('Vous : ') : '';
   return { text: `${prefix}${last.content.replace(/\s+/g, ' ').trim()}`, empty: false };
 }
 
@@ -104,6 +106,7 @@ function ConversationRow({
   basePath: string;
   now: Date;
 }) {
+  const t = useT();
   const isShipment = Boolean(conversation.shipmentId);
   const isDriver = basePath === '/(driver)';
   const unread = conversation.unreadCount ?? 0;
@@ -115,7 +118,7 @@ function ConversationRow({
     <OceanCard
       onPress={() => router.push(`${basePath}/conversation/${conversation.id}`)}
       style={styles.row}
-      accessibilityLabel={`${title}${person ? `, ${person}` : ''}${unread > 0 ? `, ${unread} message${unread > 1 ? 's' : ''} non lu${unread > 1 ? 's' : ''}` : ''}`}
+      accessibilityLabel={`${title}${person ? `, ${person}` : ''}${unread > 0 ? t.n(unread, ', {count} message non lu', ', {count} messages non lus') : ''}`}
     >
       <View style={[styles.rowIcon, isShipment && styles.rowIconShipment]}>
         {isShipment ? <IconPackage size={22} color={OCEAN.goldInk} /> : <IconRoute size={22} color={OCEAN.base} />}
@@ -151,7 +154,7 @@ function ConversationRow({
         </View>
 
         <View style={styles.rowMeta}>
-          <OceanPill label={isShipment ? 'Colis' : 'Trajet'} tone={isShipment ? 'gold' : 'ocean'} />
+          <OceanPill label={isShipment ? t('Colis') : t('Trajet')} tone={isShipment ? 'gold' : 'ocean'} />
           {person ? (
             <AppText variant="xs" color="textMuted" numberOfLines={1} style={styles.rowTitle}>
               {person}
@@ -165,6 +168,7 @@ function ConversationRow({
 
 /** Bandeau de l'écran : titre, phrase adaptée au rôle et deux compteurs (conversations, non lus). */
 function MessagesHero({ isDriver, total, unread }: { isDriver: boolean; total?: number; unread?: number }) {
+  const t = useT();
   return (
     <OceanHeroCard style={styles.hero}>
       <View style={styles.heroTop}>
@@ -173,12 +177,12 @@ function MessagesHero({ isDriver, total, unread }: { isDriver: boolean; total?: 
         </View>
         <View style={styles.heroTitles}>
           <AppText variant="lg" weight="bold" color={OCEAN.onDark}>
-            Mes conversations
+            {t('Mes conversations')}
           </AppText>
           <AppText variant="xs" color={OCEAN.sky}>
             {isDriver
-              ? 'Échangez avec vos passagers et les clients qui vous confient un colis.'
-              : 'Échangez avec votre conducteur à propos de vos trajets et de vos colis.'}
+              ? t('Échangez avec vos passagers et les clients qui vous confient un colis.')
+              : t('Échangez avec votre conducteur à propos de vos trajets et de vos colis.')}
           </AppText>
         </View>
       </View>
@@ -187,12 +191,12 @@ function MessagesHero({ isDriver, total, unread }: { isDriver: boolean; total?: 
         <View style={styles.heroStats}>
           <View style={styles.statPill}>
             <AppText variant="xs" weight="semibold" color={OCEAN.onDark}>
-              {total} conversation{total > 1 ? 's' : ''}
+              {t.n(total, '{count} conversation', '{count} conversations')}
             </AppText>
           </View>
           <View style={[styles.statPill, unread ? styles.statPillAlert : null]}>
             <AppText variant="xs" weight="semibold" color={unread ? OCEAN.goldInk : OCEAN.onDark}>
-              {unread ? `${unread} non lu${unread > 1 ? 's' : ''}` : 'Tout est lu'}
+              {unread ? t.n(unread, '{count} non lu', '{count} non lus') : t('Tout est lu')}
             </AppText>
           </View>
         </View>
@@ -207,6 +211,7 @@ function MessagesHero({ isDriver, total, unread }: { isDriver: boolean; total?: 
  * par jour comme NotificationsInboxScreen.
  */
 export function ConversationsListScreen({ basePath }: ConversationsListScreenProps) {
+  const t = useT();
   const { data, isLoading } = useMyConversations();
   const isDriver = basePath === '/(driver)';
   const now = useMemo(() => new Date(), [data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -252,11 +257,11 @@ export function ConversationsListScreen({ basePath }: ConversationsListScreenPro
           !isLoading ? (
             <OceanEmpty
               icon={<IconMessageCircle size={28} color={OCEAN.base} />}
-              title="Aucune conversation pour l'instant"
+              title={t("Aucune conversation pour l'instant")}
               text={
                 isDriver
-                  ? "Dès qu'un passager réserve un de vos trajets ou qu'un colis vous est confié, la conversation s'ouvre ici."
-                  : "Dès que vous réservez un trajet ou qu'un conducteur prend votre colis, la conversation s'ouvre ici."
+                  ? t("Dès qu'un passager réserve un de vos trajets ou qu'un colis vous est confié, la conversation s'ouvre ici.")
+                  : t("Dès que vous réservez un trajet ou qu'un conducteur prend votre colis, la conversation s'ouvre ici.")
               }
             />
           ) : undefined

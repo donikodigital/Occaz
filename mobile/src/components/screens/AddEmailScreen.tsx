@@ -1,4 +1,5 @@
 // mobile/src/components/screens/AddEmailScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v1 — Ajouter son adresse e-mail depuis l'app (après l'inscription), en deux temps : l'adresse, puis le code à 6 chiffres reçu
 // par e-mail. Même parcours que l'étape facultative de l'inscription. Partagé par l'espace passager et l'espace conducteur.
 // Erreurs affichées dans la page.
@@ -15,14 +16,16 @@ import { OCEAN } from '@/theme/ocean';
 import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { useAuthStore } from '@/stores/authStore';
+import { useT, translate } from '@/i18n';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function messageOf(error: unknown): string {
-  return error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.';
+  return error instanceof ApiError ? error.message : translate('Une erreur est survenue. Réessayez.');
 }
 
 export function AddEmailScreen() {
+  const t = useT();
   const updateUser = useAuthStore((state) => state.updateUser);
   const [email, setEmail] = useState('');
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export function AddEmailScreen() {
   function handleSend() {
     const address = email.trim().toLowerCase();
     if (!EMAIL_PATTERN.test(address)) {
-      setErrorMessage('Adresse e-mail invalide.');
+      setErrorMessage(t('Adresse e-mail invalide.'));
       return;
     }
     setErrorMessage(undefined);
@@ -63,7 +66,7 @@ export function AddEmailScreen() {
 
   function handleVerify(value = code) {
     if (value.length !== OTP_CODE_LENGTH) {
-      setErrorMessage(`Saisissez le code à ${OTP_CODE_LENGTH} chiffres reçu par e-mail.`);
+      setErrorMessage(t('Saisissez le code à {OTP_CODE_LENGTH} chiffres reçu par e-mail.', { OTP_CODE_LENGTH }));
       return;
     }
     setErrorMessage(undefined);
@@ -73,16 +76,16 @@ export function AddEmailScreen() {
   if (done) {
     return (
       <ScreenContainer maxWidth="form">
-        <OceanScreenHeader title="Adresse e-mail" onBack={() => router.back()} />
+        <OceanScreenHeader title={t('Adresse e-mail')} onBack={() => router.back()} />
         <View style={styles.doneBody}>
           <IconMailCheck size={44} color={OCEAN.base} />
           <AppText variant="lg" weight="bold" color={OCEAN.deep} align="center">
-            Adresse e-mail ajoutée
+            {t('Adresse e-mail ajoutée')}
           </AppText>
           <AppText variant="sm" color="textSecondary" align="center">
-            Vous recevrez désormais vos reçus et vos messages importants aussi par e-mail.
+            {t('Vous recevrez désormais vos reçus et vos messages importants aussi par e-mail.')}
           </AppText>
-          <OceanButton label="Terminer" onPress={() => router.back()} style={styles.doneButton} />
+          <OceanButton label={t('Terminer')} onPress={() => router.back()} style={styles.doneButton} />
         </View>
       </ScreenContainer>
     );
@@ -91,28 +94,28 @@ export function AddEmailScreen() {
   return (
     <ScreenContainer scroll maxWidth="form">
       <OceanScreenHeader
-        title="Adresse e-mail"
-        subtitle="Facultatif, mais très utile"
+        title={t('Adresse e-mail')}
+        subtitle={t('Facultatif, mais très utile')}
         onBack={() => (sentTo ? setSentTo(null) : router.back())}
       />
 
       {sentTo ? (
-        <OceanSection icon={<IconMailCheck size={17} color={OCEAN.base} />} title="Vérifiez votre e-mail">
+        <OceanSection icon={<IconMailCheck size={17} color={OCEAN.base} />} title={t('Vérifiez votre e-mail')}>
           <AppText variant="sm" color="textSecondary" style={styles.help}>
-            {`Code à ${OTP_CODE_LENGTH} chiffres envoyé à ${sentTo}. Pensez à regarder dans vos courriers indésirables.`}
+            {t('Code à {OTP_CODE_LENGTH} chiffres envoyé à {sentTo}. Pensez à regarder dans vos courriers indésirables.', { OTP_CODE_LENGTH, sentTo })}
           </AppText>
           <OtpCodeInput value={code} onChange={setCode} onComplete={handleVerify} />
         </OceanSection>
       ) : (
-        <OceanSection icon={<IconMail size={17} color={OCEAN.base} />} title="Votre adresse">
+        <OceanSection icon={<IconMail size={17} color={OCEAN.base} />} title={t('Votre adresse')}>
           <TextField
-            label="Adresse e-mail"
+            label={t('Adresse e-mail')}
             value={email}
             onChangeText={(text) => {
               setEmail(text);
               setErrorMessage(undefined);
             }}
-            placeholder="vous@exemple.com"
+            placeholder={t('vous@exemple.com')}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -120,7 +123,7 @@ export function AddEmailScreen() {
             textContentType="emailAddress"
           />
           <AppText variant="xs" color="textMuted">
-            Avec une adresse e-mail, vous pouvez retrouver votre compte si vous oubliez votre code, recevoir vos reçus et suivre vos colis.
+            {t('Avec une adresse e-mail, vous pouvez retrouver votre compte si vous oubliez votre code, recevoir vos reçus et suivre vos colis.')}
           </AppText>
         </OceanSection>
       )}
@@ -133,9 +136,9 @@ export function AddEmailScreen() {
 
       {sentTo ? (
         <>
-          <OceanButton label="Vérifier" onPress={() => handleVerify()} loading={verify.isPending} />
+          <OceanButton label={t('Vérifier')} onPress={() => handleVerify()} loading={verify.isPending} />
           <OceanButton
-            label="Renvoyer le code"
+            label={t('Renvoyer le code')}
             variant="outline"
             onPress={() => sendCode.mutate(sentTo)}
             loading={sendCode.isPending}
@@ -143,7 +146,7 @@ export function AddEmailScreen() {
           />
         </>
       ) : (
-        <OceanButton label="Recevoir le code" onPress={handleSend} loading={sendCode.isPending} />
+        <OceanButton label={t('Recevoir le code')} onPress={handleSend} loading={sendCode.isPending} />
       )}
     </ScreenContainer>
   );

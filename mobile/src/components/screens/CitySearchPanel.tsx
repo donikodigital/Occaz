@@ -1,4 +1,5 @@
 // mobile/src/components/screens/CitySearchPanel.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Recherche de ville réutilisable : plein écran dans CityPickerScreen,
 // en ligne dans LocationConfirmCard (aucune navigation, aucun store global).
@@ -19,6 +20,7 @@ import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useCitySearch } from '@/hooks/useCities';
 import type { City } from '@/types/geography.types';
+import { useT } from '@/i18n';
 
 const DEBOUNCE_MS = 250;
 const MIN_SEARCH_LENGTH = 2;
@@ -46,6 +48,7 @@ export function CitySearchPanel({
   hideField,
   onLoadingChange,
 }: CitySearchPanelProps) {
+  const t = useT();
   const [ownSearch, setOwnSearch] = useState('');
   const search = value ?? ownSearch;
   const setSearch = onChangeValue ?? setOwnSearch;
@@ -74,7 +77,7 @@ export function CitySearchPanel({
           <TextField
             value={search}
             onChangeText={setSearch}
-            placeholder="Rechercher une ville…"
+            placeholder={t('Rechercher une ville…')}
             autoFocus={autoFocus}
             style={styles.input}
           />
@@ -85,12 +88,12 @@ export function CitySearchPanel({
         hideField ? (
           <OceanEmpty
             icon={<IconMapSearch size={30} color={OCEAN.base} strokeWidth={1.7} />}
-            title="Quelle ville ?"
-            text={`Tapez au moins ${MIN_SEARCH_LENGTH} lettres du nom de la ville, les résultats s'affichent aussitôt.`}
+            title={t('Quelle ville ?')}
+            text={t("Tapez au moins {MIN_SEARCH_LENGTH} lettres du nom de la ville, les résultats s'affichent aussitôt.", { MIN_SEARCH_LENGTH })}
           />
         ) : (
           <AppText variant="sm" color="textMuted" style={styles.message}>
-            Tapez au moins {MIN_SEARCH_LENGTH} lettres du nom de la ville.
+            {t('Tapez au moins {MIN_SEARCH_LENGTH} lettres du nom de la ville.', { MIN_SEARCH_LENGTH })}
           </AppText>
         )
       ) : cities.length > 0 ? (
@@ -102,7 +105,7 @@ export function CitySearchPanel({
                 key={city.id}
                 onPress={() => onSelect(city)}
                 accessibilityRole="button"
-                accessibilityLabel={`Choisir ${city.name}`}
+                accessibilityLabel={t('Choisir {name}', { name: city.name })}
                 style={({ pressed }) => [
                   styles.row,
                   index < cities.length - 1 && styles.rowDivider,
@@ -125,18 +128,18 @@ export function CitySearchPanel({
         <View style={styles.status}>
           <ActivityIndicator size="small" color={OCEAN.base} />
           <AppText variant="sm" color="textSecondary">
-            Recherche…
+            {t('Recherche…')}
           </AppText>
         </View>
       ) : hideField ? (
         <OceanEmpty
           icon={<IconSearchOff size={30} color={OCEAN.base} strokeWidth={1.7} />}
-          title="Aucune ville trouvée"
-          text={`Aucun résultat pour « ${trimmed} ». Vérifiez l'orthographe ou essayez le début du nom.`}
+          title={t('Aucune ville trouvée')}
+          text={t("Aucun résultat pour « {trimmed} ». Vérifiez l'orthographe ou essayez le début du nom.", { trimmed })}
         />
       ) : (
         <AppText variant="sm" color="textMuted" style={styles.message}>
-          Aucune ville trouvée pour « {trimmed} ».
+          {t('Aucune ville trouvée pour « {trimmed} ».', { trimmed })}
         </AppText>
       )}
     </View>

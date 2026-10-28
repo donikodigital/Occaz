@@ -1,8 +1,10 @@
 // mobile/src/utils/shipmentDisplay.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [21/09/2026] v1 — gain net, période, trajets éligibles (plage de dates incluse).
 import type { AvailableShipment, Shipment } from '@/types/shipments.types';
 import type { Trip, TripLocation } from '@/types/trips.types';
 import { formatDateShort } from '@/utils/date';
+import { translate } from '@/i18n';
 
 /**
  * Montant réellement crédité au conducteur à la livraison : le client paie
@@ -25,25 +27,25 @@ export function driverNetAmount(shipment: Pick<Shipment, 'totalAmount' | 'platfo
 /** "À l'instant", "Il y a 12 min", "Il y a 3 h", "Il y a 2 j". */
 export function timeAgo(isoDate: string, now: number = Date.now()): string {
   const minutes = Math.max(0, Math.round((now - new Date(isoDate).getTime()) / 60_000));
-  if (minutes < 1) return "À l'instant";
-  if (minutes < 60) return `Il y a ${minutes} min`;
+  if (minutes < 1) return translate("À l'instant");
+  if (minutes < 60) return translate('Il y a {minutes} min', { minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `Il y a ${hours} h`;
-  return `Il y a ${Math.round(hours / 24)} j`;
+  if (hours < 24) return translate('Il y a {hours} h', { hours });
+  return translate('Il y a {round} j', { round: Math.round(hours / 24) });
 }
 
 /** "40 × 30 × 20 cm" — null si une des trois dimensions manque. */
 export function formatDimensions(shipment: Pick<Shipment, 'lengthCm' | 'widthCm' | 'heightCm'>): string | null {
   const { lengthCm, widthCm, heightCm } = shipment;
   if (lengthCm == null || widthCm == null || heightCm == null) return null;
-  return `${lengthCm} × ${widthCm} × ${heightCm} cm`;
+  return translate('{lengthCm} × {widthCm} × {heightCm} cm', { lengthCm, widthCm, heightCm });
 }
 
 /** "Du 25 sept. au 27 sept." — ou "Le 25 sept." quand début et fin tombent le même jour. */
 export function formatWindow(shipment: Pick<Shipment, 'windowStart' | 'windowEnd'>): string {
   const start = formatDateShort(shipment.windowStart);
   const end = formatDateShort(shipment.windowEnd);
-  return start === end ? `Le ${start}` : `Du ${start} au ${end}`;
+  return start === end ? translate('Le {start}', { start }) : translate('Du {start} au {end}', { start, end });
 }
 
 /**

@@ -367,6 +367,7 @@ export class WalletsService {
     });
     if (driver) {
       await this.notifications.notify({
+        audience: 'DRIVER',
         userId: driver.userId,
         type: NotificationType.DRIVER_PAYMENT,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],

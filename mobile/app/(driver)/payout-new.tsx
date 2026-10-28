@@ -1,4 +1,5 @@
 // mobile/app/(driver)/payout-new.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [25/10/2026] v6 — Nouveau numéro : le retrait n'attend plus l'équipe. Il est programmé (délai de sécurité d'une heure par défaut), l'écran dit à
 // quelle heure il partira, et le conducteur peut l'annuler d'ici là (« Annuler ce retrait ») : les fonds sont remis dans son solde.
@@ -41,58 +42,60 @@ import { OceanButton, OceanCard, OceanSection } from '@/components/ocean/OceanKi
 import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { OCEAN } from '@/theme/ocean';
 import type { Payout } from '@/types/payouts.types';
+import { useT, translate } from '@/i18n';
 
 /** Ce que le conducteur doit comprendre une fois sa demande envoyée, selon l'état du retrait renvoyé par le serveur. */
 function describeOutcome(payout: Payout, amountText: string, destination: string) {
-  const masked = destination.replace(/\D/g, '').length >= 4 ? `••••${destination.replace(/\D/g, '').slice(-4)}` : 'votre compte Mobile Money';
+  const masked = destination.replace(/\D/g, '').length >= 4 ? `••••${destination.replace(/\D/g, '').slice(-4)}` : translate('votre compte Mobile Money');
   switch (payout.status) {
     case 'PAID':
       return {
         Icon: IconCircleCheck,
         tint: colors.successDark,
-        title: 'Retrait effectué',
-        text: `${amountText} ont été envoyés sur votre compte Mobile Money (${masked}).`,
+        title: translate('Retrait effectué'),
+        text: translate('{amountText} ont été envoyés sur votre compte Mobile Money ({masked}).', { amountText, masked }),
       };
     case 'CANCELLED':
       return {
         Icon: IconCircleCheck,
         tint: OCEAN.base,
-        title: 'Retrait annulé',
-        text: `Rien n'a été envoyé : ${amountText} ont été remis dans votre solde disponible.`,
+        title: translate('Retrait annulé'),
+        text: translate("Rien n'a été envoyé : {amountText} ont été remis dans votre solde disponible.", { amountText }),
       };
     case 'FAILED':
       return {
         Icon: IconAlertTriangle,
         tint: colors.danger,
-        title: 'Retrait refusé',
-        text: `${payout.failureReason ? `${payout.failureReason} ` : ''}Le montant a été remis dans votre solde : vous pouvez réessayer avec un autre numéro.`,
+        title: translate('Retrait refusé'),
+        text: translate('{value}Le montant a été remis dans votre solde : vous pouvez réessayer avec un autre numéro.', { value: payout.failureReason ? `${payout.failureReason} ` : '' }),
       };
     case 'PROCESSING':
       return {
         Icon: IconSend,
         tint: OCEAN.base,
-        title: 'Retrait en cours',
-        text: `${amountText} sont en cours d'envoi vers ${masked}. Vous serez prévenu dès que ce sera arrivé.`,
+        title: translate('Retrait en cours'),
+        text: translate("{amountText} sont en cours d'envoi vers {masked}. Vous serez prévenu dès que ce sera arrivé.", { amountText, masked }),
       };
     default:
       if (payout.autoReleaseAt) {
         return {
           Icon: IconClockHour4,
           tint: OCEAN.base,
-          title: 'Retrait programmé',
-          text: `Par sécurité, ${amountText} partiront automatiquement vers ${masked} à ${formatTime(payout.autoReleaseAt)} (nouveau numéro). Le montant est mis de côté. Ce n'est pas vous ? Annulez-le avant cette heure.`,
+          title: translate('Retrait programmé'),
+          text: translate("Par sécurité, {amountText} partiront automatiquement vers {masked} à {time} (nouveau numéro). Le montant est mis de côté. Ce n'est pas vous ? Annulez-le avant cette heure.", { amountText, masked, time: formatTime(payout.autoReleaseAt) }),
         };
       }
       return {
         Icon: IconClockHour4,
         tint: OCEAN.base,
-        title: 'En attente de validation',
-        text: `Votre retrait de ${amountText} a bien été demandé : il doit être validé par l'équipe avant l'envoi vers ${masked} (un nouveau numéro est toujours vérifié la première fois). Le montant est mis de côté, et vous serez prévenu dès que ce sera traité.`,
+        title: translate('En attente de validation'),
+        text: translate("Votre retrait de {amountText} a bien été demandé : il doit être validé par l'équipe avant l'envoi vers {masked} (un nouveau numéro est toujours vérifié la première fois). Le montant est mis de côté, et vous serez prévenu dès que ce sera traité.", { amountText, masked }),
       };
   }
 }
 
 export default function NewPayoutScreen() {
+  const t = useT();
   const { data: wallet } = useMyWallet();
   const { data: profile } = useDriverProfile();
   const [amount, setAmount] = useState('');
@@ -107,20 +110,20 @@ export default function NewPayoutScreen() {
     setErrorMessage(undefined);
     const numericAmount = Number(amount.replace(',', '.'));
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setErrorMessage('Indiquez un montant valide.');
+      setErrorMessage(t('Indiquez un montant valide.'));
       return;
     }
     if (wallet && numericAmount > Number(wallet.balance)) {
-      setErrorMessage('Le montant dépasse votre solde disponible.');
+      setErrorMessage(t('Le montant dépasse votre solde disponible.'));
       return;
     }
     if (!destinationRef.trim()) {
-      setErrorMessage('Indiquez le numéro Mobile Money de destination.');
+      setErrorMessage(t('Indiquez le numéro Mobile Money de destination.'));
       return;
     }
 
     if (pin.length !== PIN_LENGTH) {
-      setErrorMessage('Saisissez votre code PIN de connexion (6 chiffres) pour confirmer le retrait.');
+      setErrorMessage(t('Saisissez votre code PIN de connexion (6 chiffres) pour confirmer le retrait.'));
       return;
     }
 
@@ -141,7 +144,7 @@ export default function NewPayoutScreen() {
         onError: (error) => {
           // Quel que soit l'échec, on efface le PIN : il faut le ressaisir (et rien ne reste affiché à l'écran).
           setPin('');
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -163,23 +166,23 @@ export default function NewPayoutScreen() {
             {outcome.text}
           </AppText>
         </View>
-        {errorMessage ? <FeedbackBanner tone="error" title="Annulation impossible" text={errorMessage} onDismiss={() => setErrorMessage(undefined)} /> : null}
+        {errorMessage ? <FeedbackBanner tone="error" title={t('Annulation impossible')} text={errorMessage} onDismiss={() => setErrorMessage(undefined)} /> : null}
         {result.payout.status === 'REQUESTED' ? (
           <OceanButton
-            label="Annuler ce retrait"
+            label={t('Annuler ce retrait')}
             variant="danger"
             loading={cancelPayout.isPending}
             onPress={() => {
               setErrorMessage(undefined);
               cancelPayout.mutate(result.payout.id, {
                 onSuccess: (payout) => setResult({ ...result, payout }),
-                onError: (error) => setErrorMessage(error instanceof ApiError ? error.message : 'Réessayez dans un instant.'),
+                onError: (error) => setErrorMessage(error instanceof ApiError ? error.message : t('Réessayez dans un instant.')),
               });
             }}
             style={styles.submit}
           />
         ) : null}
-        <OceanButton label="Terminé" onPress={() => router.back()} style={styles.submit} />
+        <OceanButton label={t('Terminé')} onPress={() => router.back()} style={styles.submit} />
       </ScreenContainer>
     );
   }
@@ -187,8 +190,8 @@ export default function NewPayoutScreen() {
   return (
     <ScreenContainer scroll maxWidth="form">
       <OceanHeroHeader
-        title="Retirer des fonds"
-        subtitle="Envoyez votre solde sur votre Mobile Money"
+        title={t('Retirer des fonds')}
+        subtitle={t('Envoyez votre solde sur votre Mobile Money')}
         icon={<IconCash />}
         onBack={() => router.back()}
       />
@@ -199,7 +202,7 @@ export default function NewPayoutScreen() {
         </View>
         <View style={styles.balanceText}>
           <AppText variant="xs" color="textSecondary">
-            Solde disponible
+            {t('Solde disponible')}
           </AppText>
           <AppText variant="xl" weight="bold" color={OCEAN.deep}>
             {wallet ? formatMoney(wallet.balance, wallet.currency?.isoCode) : '…'}
@@ -207,16 +210,16 @@ export default function NewPayoutScreen() {
         </View>
       </OceanCard>
 
-      <OceanSection icon={<IconSend size={17} color={OCEAN.base} />} title="Votre retrait">
+      <OceanSection icon={<IconSend size={17} color={OCEAN.base} />} title={t('Votre retrait')}>
         <TextField
-          label="Montant à retirer"
+          label={t('Montant à retirer')}
           value={amount}
           onChangeText={setAmount}
           keyboardType="numeric"
-          placeholder="Ex : 100000"
+          placeholder={t('Ex : 100000')}
         />
         <TextField
-          label="Numéro Mobile Money"
+          label={t('Numéro Mobile Money')}
           value={destinationRef}
           onChangeText={setDestinationRef}
           keyboardType="phone-pad"
@@ -224,9 +227,9 @@ export default function NewPayoutScreen() {
         />
       </OceanSection>
 
-      <OceanSection icon={<IconLock size={17} color={OCEAN.base} />} title="Confirmez avec votre code PIN">
+      <OceanSection icon={<IconLock size={17} color={OCEAN.base} />} title={t('Confirmez avec votre code PIN')}>
         <PinCodeInput
-          label="Code PIN de connexion"
+          label={t('Code PIN de connexion')}
           value={pin}
           onChange={(next) => {
             setPin(next);
@@ -244,7 +247,7 @@ export default function NewPayoutScreen() {
       ) : null}
 
       <OceanButton
-        label="Confirmer le retrait"
+        label={t('Confirmer le retrait')}
         onPress={handleSubmit}
         loading={requestPayout.isPending}
         style={styles.submit}

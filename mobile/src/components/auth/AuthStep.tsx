@@ -1,4 +1,5 @@
 // mobile/src/components/auth/AuthStep.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Coquille commune des écrans d'inscription, de connexion et de mot de passe oublié : retour, illustration à étincelles,
 // titre, sous-titre, repère « Étape x sur y », contenu qui défile, et bouton d'action fixé en bas. Un seul endroit pour l'habillage Ocean.
 import React from 'react';
@@ -8,6 +9,7 @@ import { AppText, IconButton, ScreenContainer } from '@/components/ui';
 import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 export interface AuthStepProps {
   icon: React.ReactNode;
@@ -22,16 +24,17 @@ export interface AuthStepProps {
 }
 
 export function AuthStep({ icon, title, subtitle, onBack, step, footer, children }: AuthStepProps) {
+  const t = useT();
   return (
     <ScreenContainer scroll maxWidth="form" footer={footer}>
       <View style={styles.header}>
         {onBack ? (
-          <IconButton icon={<IconArrowLeft size={18} color={colors.textPrimary} />} accessibilityLabel="Retour" onPress={onBack} />
+          <IconButton icon={<IconArrowLeft size={18} color={colors.textPrimary} />} accessibilityLabel={t('Retour')} onPress={onBack} />
         ) : (
           <View style={styles.headerSpace} />
         )}
         {step ? (
-          <View style={styles.stepper} accessibilityLabel={`Étape ${step.current} sur ${step.total}`}>
+          <View style={styles.stepper} accessibilityLabel={t('Étape {current} sur {total}', { current: step.current, total: step.total })}>
             {Array.from({ length: step.total }).map((_, index) => (
               <View key={index} style={[styles.dot, index < step.current && styles.dotDone]} />
             ))}
@@ -44,7 +47,7 @@ export function AuthStep({ icon, title, subtitle, onBack, step, footer, children
 
         {step?.label ? (
           <AppText variant="xs" weight="semibold" color={OCEAN.base} align="center" style={styles.stepLabel}>
-            {`Étape ${step.current} sur ${step.total} · ${step.label}`}
+            {t('Étape {current} sur {total} · {stepLabel}', { current: step.current, total: step.total, stepLabel: step.label })}
           </AppText>
         ) : null}
         <AppText variant="xxl" weight="bold" color={OCEAN.deep} align="center" style={styles.title}>

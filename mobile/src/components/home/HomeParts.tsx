@@ -1,4 +1,5 @@
 // mobile/src/components/home/HomeParts.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [08/10/2026] v1 — Petites briques de l'accueil refondu : barre de recherche en pilule, titre de section avec lien « Voir tout »,
 // bouton flottant « + » qui déroule deux raccourcis.
@@ -9,6 +10,7 @@ import { IconChevronRight, IconPlus, IconSearch, IconX } from '@tabler/icons-rea
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT, translate } from '@/i18n';
 
 /** Pilule de recherche : n'est pas un champ de saisie, elle ouvre l'écran de recherche (clavier déjà levé). */
 export function HomeSearchBar({ placeholder, onPress }: { placeholder: string; onPress: () => void }) {
@@ -64,12 +66,13 @@ export interface FabAction {
  * Bouton rond flottant en bas à droite. À poser dans une vue `flex: 1` qui enveloppe l'écran (il est en position absolue) ; il
  * déroule les raccourcis `actions` au toucher et se referme quand on en choisit un ou qu'on touche à côté.
  */
-export function HomeFab({ actions, accessibilityLabel = 'Actions rapides' }: { actions: FabAction[]; accessibilityLabel?: string }) {
+export function HomeFab({ actions, accessibilityLabel = translate('Actions rapides') }: { actions: FabAction[]; accessibilityLabel?: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      {open ? <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Fermer" /> : null}
+      {open ? <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel={t('Fermer')} /> : null}
       <View style={styles.fabWrap} pointerEvents="box-none">
         {open
           ? actions.map((action) => (

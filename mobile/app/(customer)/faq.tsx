@@ -1,4 +1,5 @@
 // mobile/app/(customer)/faq.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 //
 // v1 — Questions fréquentes : accordéon simple, contenu reflétant les
@@ -14,35 +15,32 @@ import { OceanCard } from '@/components/ocean/OceanKit';
 import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT, translate } from '@/i18n';
 
 const QUESTIONS: { question: string; answer: string }[] = [
   {
-    question: 'Comment est calculé le prix d\'un envoi ?',
-    answer:
-      'Le prix dépend du poids (ou du poids volumétrique s\'il est plus grand), de la distance, de la catégorie du colis et d\'une éventuelle valeur déclarée. Il est calculé automatiquement et affiché avant paiement.',
+    get question() { return translate("Comment est calculé le prix d'un envoi ?"); },
+    get answer() { return translate("Le prix dépend du poids (ou du poids volumétrique s'il est plus grand), de la distance, de la catégorie du colis et d'une éventuelle valeur déclarée. Il est calculé automatiquement et affiché avant paiement."); },
   },
   {
-    question: 'Qui accepte ma demande d\'envoi ?',
-    answer:
-      'Tous les conducteurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s\'en charge — vous êtes averti dès qu\'un conducteur est trouvé.',
+    get question() { return translate("Qui accepte ma demande d'envoi ?"); },
+    get answer() { return translate("Tous les conducteurs validés sont prévenus en même temps, avec ou sans trajet établi. Le premier à accepter s'en charge — vous êtes averti dès qu'un conducteur est trouvé."); },
   },
   {
-    question: 'Que se passe-t-il si aucun conducteur n\'accepte avant la fin de ma période ?',
-    answer:
-      'Vous êtes invité à prolonger votre demande. Si vous ne répondez pas, ou si vous préférez annuler, vous êtes remboursé intégralement.',
+    get question() { return translate("Que se passe-t-il si aucun conducteur n'accepte avant la fin de ma période ?"); },
+    get answer() { return translate('Vous êtes invité à prolonger votre demande. Si vous ne répondez pas, ou si vous préférez annuler, vous êtes remboursé intégralement.'); },
   },
   {
-    question: 'Puis-je annuler une réservation ou un envoi payé ?',
-    answer: 'Oui, tant que le colis n\'a pas été récupéré ou que le trajet n\'a pas commencé. Le remboursement est intégral.',
+    get question() { return translate('Puis-je annuler une réservation ou un envoi payé ?'); },
+    get answer() { return translate("Oui, tant que le colis n'a pas été récupéré ou que le trajet n'a pas commencé. Le remboursement est intégral."); },
   },
   {
-    question: 'Comment le conducteur valide-t-il la prise en charge ou la livraison ?',
-    answer:
-      'Un code à usage unique s\'affiche dans l\'application (bouton « Voir mon code ») à chaque étape : montée, descente, remise du colis. Vous le donnez au conducteur pour valider. Pour la livraison d\'un colis, le code est envoyé par SMS au destinataire, qui n\'a pas besoin de compte.',
+    get question() { return translate('Comment le conducteur valide-t-il la prise en charge ou la livraison ?'); },
+    get answer() { return translate("Un code à usage unique s'affiche dans l'application (bouton « Voir mon code ») à chaque étape : montée, descente, remise du colis. Vous le donnez au conducteur pour valider. Pour la livraison d'un colis, le code est envoyé par SMS au destinataire, qui n'a pas besoin de compte."); },
   },
   {
-    question: 'Quels moyens de paiement sont acceptés ?',
-    answer: 'Le paiement se fait via les moyens configurés dans votre pays (mobile money, carte bancaire...), en une seule fois.',
+    get question() { return translate('Quels moyens de paiement sont acceptés ?'); },
+    get answer() { return translate('Le paiement se fait via les moyens configurés dans votre pays (mobile money, carte bancaire...), en une seule fois.'); },
   },
 ];
 
@@ -68,9 +66,10 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export default function FaqScreen() {
+  const t = useT();
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title="Questions fréquentes" subtitle="Les réponses à vos questions" icon={<IconQuestionMark />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Questions fréquentes')} subtitle={t('Les réponses à vos questions')} icon={<IconQuestionMark />} onBack={() => router.back()} />
 
       <View style={styles.list}>
         {QUESTIONS.map((item) => (

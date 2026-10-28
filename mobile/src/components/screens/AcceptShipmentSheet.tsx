@@ -1,4 +1,5 @@
 // mobile/src/components/screens/AcceptShipmentSheet.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [21/09/2026] v1 — feuille d'acceptation : gain net, colis, choix d'un trajet ou « sans trajet précis ».
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -16,6 +17,7 @@ import type { AvailableShipment } from '@/types/shipments.types';
 import type { Trip } from '@/types/trips.types';
 import { FactChip, ShipmentRoute } from './ShipmentParts';
 import { ShipmentPhotosGallery } from './ShipmentPhotosGallery';
+import { useT } from '@/i18n';
 
 export interface AcceptShipmentSheetProps {
   shipment: AvailableShipment | null;
@@ -33,6 +35,7 @@ const NO_TRIP = 'no-trip';
 
 /** Un conducteur validé peut accepter sans avoir de trajet établi : il récupère et livre le colis dans la période demandée. */
 function NoTripOption({ shipment, selected, onPress }: { shipment: AvailableShipment; selected: boolean; onPress: () => void }) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
@@ -45,10 +48,10 @@ function NoTripOption({ shipment, selected, onPress }: { shipment: AvailableShip
       </View>
       <View style={styles.tripText}>
         <AppText variant="sm" weight="semibold">
-          Sans trajet précis
+          {t('Sans trajet précis')}
         </AppText>
         <AppText variant="xs" color="textSecondary">
-          Vous récupérez et livrez le colis pendant la période demandée. {formatWindow(shipment)}.
+          {t('Vous récupérez et livrez le colis pendant la période demandée. {window}.', { window: formatWindow(shipment) })}
         </AppText>
       </View>
     </Pressable>
@@ -66,6 +69,7 @@ function TripOption({
   selected: boolean;
   onPress: () => void;
 }) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
@@ -81,11 +85,10 @@ function TripOption({
           {trip.originCity.name} → {trip.destinationCity.name}
         </AppText>
         <AppText variant="xs" color="textSecondary">
-          {formatDateShort(trip.departureAt)} à {formatTime(trip.departureAt)}
-          {trip.availableShipmentWeightKg !== null ? `, ${trip.availableShipmentWeightKg} kg disponibles` : ''}
+          {t('{dateShort} à {time}{value}', { dateShort: formatDateShort(trip.departureAt), time: formatTime(trip.departureAt), value: trip.availableShipmentWeightKg !== null ? t(', {availableShipmentWeightKg} kg disponibles', { availableShipmentWeightKg: trip.availableShipmentWeightKg }) : '' })}
         </AppText>
       </View>
-      {isSameRoute(trip, shipment) ? <Badge label="Même itinéraire" tone="success" /> : null}
+      {isSameRoute(trip, shipment) ? <Badge label={t('Même itinéraire')} tone="success" /> : null}
     </Pressable>
   );
 }
@@ -103,6 +106,7 @@ function AcceptShipmentContent({
   onAttemptFailed?: () => void;
   preferredTripId?: string;
 }) {
+  const t = useT();
   const { data: tripsPage, isLoading: tripsLoading } = useMyTrips();
   const assignShipment = useAssignShipment(shipment.id);
   const [selection, setSelection] = useState<string | null>(null);
@@ -123,7 +127,7 @@ function AcceptShipmentContent({
       {
         onSuccess: () => onAccepted(shipment.id),
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : "L'acceptation a échoué. Réessayez.");
+          setErrorMessage(error instanceof ApiError ? error.message : t("L'acceptation a échoué. Réessayez."));
           onAttemptFailed?.();
         },
       },
@@ -136,18 +140,18 @@ function AcceptShipmentContent({
         <View style={styles.inner}>
           <View style={styles.topBar}>
             <AppText variant="lg" weight="semibold">
-              Accepter cet envoi
+              {t('Accepter cet envoi')}
             </AppText>
             <IconButton
               icon={<IconX size={18} color={colors.textPrimary} />}
-              accessibilityLabel="Fermer"
+              accessibilityLabel={t('Fermer')}
               onPress={onClose}
             />
           </View>
 
           <View style={styles.earnings}>
             <AppText variant="sm" weight="medium" color="successDark">
-              Vous recevrez
+              {t('Vous recevrez')}
             </AppText>
             <AppText variant="display" weight="bold" color="successDark">
               {formatMoney(driverNetAmount(shipment), shipment.currencyCode)}
@@ -155,7 +159,7 @@ function AcceptShipmentContent({
             <View style={styles.earningsNote}>
               <IconCheck size={14} color={colors.successDark} />
               <AppText variant="xs" color="successDark" style={styles.flex}>
-                Le client a déjà payé. Le montant est crédité dès que le destinataire vous donne son code de livraison.
+                {t('Le client a déjà payé. Le montant est crédité dès que le destinataire vous donne son code de livraison.')}
               </AppText>
             </View>
           </View>
@@ -166,7 +170,7 @@ function AcceptShipmentContent({
                 {shipment.category.name}
               </AppText>
               {shipment.isUrgent ? (
-                <Badge label="Urgent" tone="danger" icon={<IconBolt size={12} color={colors.dangerDark} />} />
+                <Badge label={t('Urgent')} tone="danger" icon={<IconBolt size={12} color={colors.dangerDark} />} />
               ) : null}
             </View>
 
@@ -198,14 +202,14 @@ function AcceptShipmentContent({
             <View style={styles.privacy}>
               <IconLock size={14} color={colors.textSecondary} />
               <AppText variant="xs" color="textSecondary" style={styles.flex}>
-                Nom et téléphone de l&apos;expéditeur et du destinataire vous sont communiqués dès que vous acceptez.
+                {t("Nom et téléphone de l'expéditeur et du destinataire vous sont communiqués dès que vous acceptez.")}
               </AppText>
             </View>
           </View>
 
           <View style={styles.section}>
             <AppText variant="md" weight="semibold">
-              Comment le transporter ?
+              {t('Comment le transporter ?')}
             </AppText>
 
             {tripsLoading ? (
@@ -242,7 +246,7 @@ function AcceptShipmentContent({
             </View>
           ) : null}
           <Button
-            label="Accepter l'envoi"
+            label={t("Accepter l'envoi")}
             onPress={handleConfirm}
             disabled={tripsLoading}
             loading={assignShipment.isPending}

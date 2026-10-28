@@ -1,4 +1,5 @@
 // mobile/src/components/screens/EmergencyContactsScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — les textes suivent le réglage serveur (features.sosSms) : plus de promesse de SMS quand ils sont coupés.
 // [11/10/2026] v1 — « Mes proches » : les personnes (3 au plus) prévenues par SMS, avec votre position, quand vous envoyez une alerte SOS.
 // Partagé entre l'espace client et l'espace conducteur. Erreurs et confirmations dans la page (jamais Alert.alert).
@@ -16,10 +17,12 @@ import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAddEmergencyContact, useEmergencyContacts, useRemoveEmergencyContact } from '@/hooks/useSafety';
 import { isValidPhoneNumber, normalizePhoneInput } from '@/utils/phone';
 import type { EmergencyContact } from '@/types/safety.types';
+import { useT } from '@/i18n';
 
 const MAX_CONTACTS = 3;
 
 export function EmergencyContactsScreen() {
+  const t = useT();
   const { data, isLoading } = useEmergencyContacts();
   // Les SMS d'alerte aux proches sont coupés par défaut (coût) : sans confirmation du serveur, on ne promet pas de SMS.
   const { data: appConfig } = useAppConfig();
@@ -39,11 +42,11 @@ export function EmergencyContactsScreen() {
     setFeedback(null);
     setFieldError(undefined);
     if (name.trim().length < 2) {
-      setFieldError('Indiquez le nom de votre proche.');
+      setFieldError(t('Indiquez le nom de votre proche.'));
       return;
     }
     if (!isValidPhoneNumber(phone)) {
-      setFieldError('Numéro invalide : écrivez-le au format international, par exemple +224620000000.');
+      setFieldError(t('Numéro invalide : écrivez-le au format international, par exemple +224620000000.'));
       return;
     }
     add.mutate(
@@ -52,9 +55,9 @@ export function EmergencyContactsScreen() {
         onSuccess: () => {
           setName('');
           setPhone('+224');
-          setFeedback({ tone: 'success', text: sosSms ? 'Proche ajouté. Il sera prévenu par SMS si vous envoyez une alerte.' : 'Proche ajouté. Ses coordonnées sont enregistrées ; l’envoi de SMS d’alerte aux proches n’est pas actif pour le moment.' });
+          setFeedback({ tone: 'success', text: sosSms ? t('Proche ajouté. Il sera prévenu par SMS si vous envoyez une alerte.') : t('Proche ajouté. Ses coordonnées sont enregistrées ; l’envoi de SMS d’alerte aux proches n’est pas actif pour le moment.') });
         },
-        onError: (error) => setFeedback({ tone: 'error', text: error instanceof ApiError ? error.message : 'Impossible d’ajouter ce proche.' }),
+        onError: (error) => setFeedback({ tone: 'error', text: error instanceof ApiError ? error.message : t('Impossible d’ajouter ce proche.') }),
       },
     );
   }
@@ -65,14 +68,14 @@ export function EmergencyContactsScreen() {
       onSuccess: () => setToRemove(null),
       onError: (error) => {
         setToRemove(null);
-        setFeedback({ tone: 'error', text: error instanceof ApiError ? error.message : 'Impossible de retirer ce proche.' });
+        setFeedback({ tone: 'error', text: error instanceof ApiError ? error.message : t('Impossible de retirer ce proche.') });
       },
     });
   }
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanHeroHeader title="Mes proches" subtitle={sosSms ? 'Prévenus par SMS si vous envoyez un SOS' : 'Vos personnes de confiance'} icon={<IconUsersGroup />} onBack={() => router.back()} />
+      <OceanHeroHeader title={t('Mes proches')} subtitle={sosSms ? t('Prévenus par SMS si vous envoyez un SOS') : t('Vos personnes de confiance')} icon={<IconUsersGroup />} onBack={() => router.back()} />
 
       {feedback ? (
         <View style={styles.banner}>
@@ -83,8 +86,8 @@ export function EmergencyContactsScreen() {
       {contacts.length === 0 && !isLoading ? (
         <OceanEmpty
           icon={<IconUsersGroup size={26} color={OCEAN.base} />}
-          title="Aucun proche enregistré"
-          text={sosSms ? 'Ajoutez jusqu’à 3 personnes de confiance. En cas d’alerte, elles reçoivent un SMS avec votre position.' : 'Ajoutez jusqu’à 3 personnes de confiance. L’envoi de SMS d’alerte à vos proches n’est pas actif pour le moment : en cas d’alerte, l’équipe Occa’Z est prévenue.'}
+          title={t('Aucun proche enregistré')}
+          text={sosSms ? t('Ajoutez jusqu’à 3 personnes de confiance. En cas d’alerte, elles reçoivent un SMS avec votre position.') : t('Ajoutez jusqu’à 3 personnes de confiance. L’envoi de SMS d’alerte à vos proches n’est pas actif pour le moment : en cas d’alerte, l’équipe Occa’Z est prévenue.')}
         />
       ) : (
         <View style={styles.list}>
@@ -101,7 +104,7 @@ export function EmergencyContactsScreen() {
                   {contact.phone}
                 </AppText>
               </View>
-              <OceanButton label="Retirer" variant="danger" icon={<IconTrash size={16} color={colors.danger} />} onPress={() => setToRemove(contact)} style={styles.removeButton} />
+              <OceanButton label={t('Retirer')} variant="danger" icon={<IconTrash size={16} color={colors.danger} />} onPress={() => setToRemove(contact)} style={styles.removeButton} />
             </OceanCard>
           ))}
         </View>
@@ -109,28 +112,28 @@ export function EmergencyContactsScreen() {
 
       {isFull ? (
         <AppText variant="xs" color="textMuted" align="center" style={styles.full}>
-          Vous avez atteint les {MAX_CONTACTS} proches. Retirez-en un pour en ajouter un autre.
+          {t('Vous avez atteint les {MAX_CONTACTS} proches. Retirez-en un pour en ajouter un autre.', { MAX_CONTACTS })}
         </AppText>
       ) : (
-        <OceanSection icon={<IconUserPlus size={17} color={OCEAN.base} />} title="Ajouter un proche" style={styles.section}>
-          <TextField label="Nom" value={name} onChangeText={setName} placeholder="Mariama (sœur)" maxLength={60} />
+        <OceanSection icon={<IconUserPlus size={17} color={OCEAN.base} />} title={t('Ajouter un proche')} style={styles.section}>
+          <TextField label={t('Nom')} value={name} onChangeText={setName} placeholder={t('Mariama (sœur)')} maxLength={60} />
           <TextField
-            label="Téléphone"
+            label={t('Téléphone')}
             value={phone}
             onChangeText={(text) => setPhone(normalizePhoneInput(text))}
             placeholder="+224620000000"
             keyboardType="phone-pad"
             error={fieldError}
           />
-          <OceanButton label="Ajouter" onPress={handleAdd} loading={add.isPending} />
+          <OceanButton label={t('Ajouter')} onPress={handleAdd} loading={add.isPending} />
         </OceanSection>
       )}
 
       <ConfirmDialog
         visible={toRemove !== null}
-        title="Retirer ce proche ?"
-        message={toRemove ? `${toRemove.name} ne sera plus prévenu en cas d’alerte.` : undefined}
-        confirmLabel="Retirer"
+        title={t('Retirer ce proche ?')}
+        message={toRemove ? t('{toRemoveName} ne sera plus prévenu en cas d’alerte.', { toRemoveName: toRemove.name }) : undefined}
+        confirmLabel={t('Retirer')}
         destructive
         loading={remove.isPending}
         onConfirm={confirmRemove}

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ShipmentPhotosGallery.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v1 — Les photos du colis (2 au plus), visibles de bout en bout : expéditeur, conducteur (avant et après acceptation) et
 // support. Vignettes ; un appui ouvre la photo en grand. Rien ne s'affiche s'il n'y a pas de photo ou si l'accès est refusé : un envoi
 // sans photo reste un envoi normal.
@@ -12,6 +13,7 @@ import { OceanSection } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useShipmentPhotos } from '@/hooks/useShipmentPhotos';
+import { useT } from '@/i18n';
 
 export interface ShipmentPhotosGalleryProps {
   shipmentId: string | undefined;
@@ -20,6 +22,7 @@ export interface ShipmentPhotosGalleryProps {
 }
 
 export function ShipmentPhotosGallery({ shipmentId, variant = 'section' }: ShipmentPhotosGalleryProps) {
+  const t = useT();
   const { data: photos } = useShipmentPhotos(shipmentId);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
@@ -32,7 +35,7 @@ export function ShipmentPhotosGallery({ shipmentId, variant = 'section' }: Shipm
           key={photo.id}
           onPress={() => setOpenIndex(index)}
           accessibilityRole="imagebutton"
-          accessibilityLabel={`Voir la photo ${index + 1} du colis en grand`}
+          accessibilityLabel={t('Voir la photo {value} du colis en grand', { value: index + 1 })}
           style={({ pressed }) => [styles.thumb, pressed && styles.pressed]}
         >
           <Image source={{ uri: photo.url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
@@ -47,14 +50,14 @@ export function ShipmentPhotosGallery({ shipmentId, variant = 'section' }: Shipm
         <Pressable
           onPress={() => setOpenIndex(null)}
           accessibilityRole="button"
-          accessibilityLabel="Fermer la photo"
+          accessibilityLabel={t('Fermer la photo')}
           hitSlop={12}
           style={styles.close}
         >
           <IconX size={22} color={colors.onPrimary} />
         </Pressable>
         {openIndex !== null && photos[openIndex] ? (
-          <Pressable style={styles.viewerBody} onPress={() => setOpenIndex(null)} accessibilityLabel="Photo du colis">
+          <Pressable style={styles.viewerBody} onPress={() => setOpenIndex(null)} accessibilityLabel={t('Photo du colis')}>
             <Image source={{ uri: photos[openIndex].url }} style={styles.full} contentFit="contain" />
           </Pressable>
         ) : null}
@@ -78,7 +81,7 @@ export function ShipmentPhotosGallery({ shipmentId, variant = 'section' }: Shipm
     return (
       <View style={styles.plain}>
         <AppText variant="sm" weight="semibold">
-          Photos du colis
+          {t('Photos du colis')}
         </AppText>
         {thumbnails}
         {viewer}
@@ -87,7 +90,7 @@ export function ShipmentPhotosGallery({ shipmentId, variant = 'section' }: Shipm
   }
 
   return (
-    <OceanSection icon={<IconCamera size={17} color={OCEAN.base} />} title="Photos du colis">
+    <OceanSection icon={<IconCamera size={17} color={OCEAN.base} />} title={t('Photos du colis')}>
       {thumbnails}
       {viewer}
     </OceanSection>

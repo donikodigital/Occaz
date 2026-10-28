@@ -1,4 +1,5 @@
 // mobile/src/components/ui/DriverPositionCard.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { IconMapPinFilled } from '@tabler/icons-react-native';
@@ -7,6 +8,7 @@ import { colors, radius, spacing } from '@/theme';
 import { useTripPosition } from '@/hooks/useTripPosition';
 import { formatRelativeTime } from '@/utils/date';
 import { openInMaps } from '@/utils/maps';
+import { useT } from '@/i18n';
 
 export interface DriverPositionCardProps {
   tripId: string;
@@ -16,6 +18,7 @@ export interface DriverPositionCardProps {
 
 /** N'affiche rien tant qu'aucune position n'est encore connue (trajet pas encore démarré, ou conducteur pas encore localisé) — pas de carte vide trompeuse. */
 export function DriverPositionCard({ tripId, isActive }: DriverPositionCardProps) {
+  const t = useT();
   const { data: position } = useTripPosition(tripId, isActive);
 
   if (!isActive || !position) return null;
@@ -28,15 +31,15 @@ export function DriverPositionCard({ tripId, isActive }: DriverPositionCardProps
         </View>
         <View style={{ flex: 1 }}>
           <AppText variant="sm" weight="semibold">
-            Position du conducteur
+            {t('Position du conducteur')}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            Mise à jour {formatRelativeTime(position.updatedAt)}
+            {t('Mise à jour {relativeTime}', { relativeTime: formatRelativeTime(position.updatedAt) })}
           </AppText>
         </View>
       </View>
       <Button
-        label="Ouvrir dans Plans"
+        label={t('Ouvrir dans Plans')}
         variant="secondary"
         onPress={() => openInMaps(position.latitude, position.longitude)}
         fullWidth={false}

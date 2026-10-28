@@ -316,6 +316,7 @@ export class PaymentsService {
         sourceCurrencyId: booking.currencyId,
       });
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: booking.customer.userId,
         type: NotificationType.PAYMENT,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
@@ -323,6 +324,7 @@ export class PaymentsService {
         fallbackBody: 'Votre paiement a été confirmé — votre réservation est validée.',
       });
       await this.notifications.notify({
+        audience: 'DRIVER',
         userId: booking.trip.driver.userId,
         type: NotificationType.BOOKING,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
@@ -360,6 +362,7 @@ export class PaymentsService {
         });
       }
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: shipment.customer.userId,
         type: NotificationType.PAYMENT,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
@@ -543,6 +546,7 @@ export class PaymentsService {
   private async notifyRefund(userId: string, refundAmount: bigint, paidAmount: bigint): Promise<void> {
     const percentage = paidAmount > 0n ? Math.round((Number(refundAmount) * 100) / Number(paidAmount)) : 0;
     await this.notifications.notify({
+      audience: 'CUSTOMER',
       userId,
       type: NotificationType.REFUND,
       channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],

@@ -1,10 +1,12 @@
 // mobile/src/components/screens/HomeHeader.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [21/09/2026] v+ — strokeWidth au lieu de stroke (stroke est la couleur dans Tabler React Native).
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { IconBell, IconCheck } from '@tabler/icons-react-native';
 import { AppText, Avatar } from '@/components/ui';
 import { colors, spacing } from '@/theme';
+import { useT, translate } from '@/i18n';
 
 const AVATAR_SIZE = 48;
 const BELL_SIZE = 44;
@@ -24,7 +26,7 @@ export interface HomeHeaderProps {
 
 function getGreeting(date: Date = new Date()): string {
   const hour = date.getHours();
-  return hour >= 18 || hour < 5 ? 'Bonsoir' : 'Bonjour';
+  return hour >= 18 || hour < 5 ? translate('Bonsoir') : translate('Bonjour');
 }
 
 /**
@@ -42,14 +44,15 @@ export function HomeHeader({
   onPressAvatar,
   onPressNotifications,
 }: HomeHeaderProps) {
-  const bellLabel = unreadCount > 0 ? `Notifications, ${unreadCount} non lues` : 'Notifications';
+  const t = useT();
+  const bellLabel = unreadCount > 0 ? t('Notifications, {unreadCount} non lues', { unreadCount }) : t('Notifications');
 
   return (
     <View style={styles.header}>
       <Pressable
         onPress={onPressAvatar}
         accessibilityRole="button"
-        accessibilityLabel="Voir mon profil"
+        accessibilityLabel={t('Voir mon profil')}
         style={({ pressed }) => [styles.identity, pressed && styles.pressed]}
       >
         <View style={styles.avatarWrap}>

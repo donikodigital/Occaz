@@ -1,4 +1,6 @@
 // mobile/app/(customer)/(tabs)/home.tsx
+// [28/10/2026] v+ — Notifications et alerte de message limitées à l'espace client.
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — carte « Détails du trajet » : le statut (« Confirmée ») et le prix (« 253 000 GNF ») tiennent sur une seule ligne.
 // [19/10/2026] v+ — rappel d'ajouter une adresse e-mail (carte facultative, affichée tant qu'aucune adresse n'est vérifiée).
 // [10/10/2026] v+ — « Message indisponible » s'affiche dans la page (bannière) au lieu d'Alert.alert, sans effet sur le web.
@@ -54,6 +56,7 @@ import { recentSearchesStorage, formatRecentSearch, type RecentSearch } from '@/
 import type { AppNotification } from '@/types/notifications.types';
 import type { Booking, BookingStatus } from '@/types/bookings.types';
 import type { Shipment } from '@/types/shipments.types';
+import { useT, translate } from '@/i18n';
 
 const UPCOMING_TRIP_STATUSES = new Set([
   'PUBLISHED',
@@ -68,13 +71,13 @@ const UPCOMING_TRIP_STATUSES = new Set([
 const ACTIVITY_COUNT = 5;
 
 const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
-  PENDING_PAYMENT: 'En attente de paiement',
-  PAID: 'Payée',
-  CONFIRMED: 'Confirmée',
-  CANCELLED: 'Annulée',
-  COMPLETED: 'Terminée',
-  REFUNDED: 'Remboursée',
-  DISPUTED: 'En litige',
+  get PENDING_PAYMENT() { return translate('En attente de paiement'); },
+  get PAID() { return translate('Payée'); },
+  get CONFIRMED() { return translate('Confirmée'); },
+  get CANCELLED() { return translate('Annulée'); },
+  get COMPLETED() { return translate('Terminée'); },
+  get REFUNDED() { return translate('Remboursée'); },
+  get DISPUTED() { return translate('En litige'); },
 };
 
 /**
@@ -91,26 +94,27 @@ function pendingPayments(bookings: Booking[], shipments: Shipment[]): { value: s
       .map((shipment) => ({ amount: Number(shipment.totalAmount), currency: shipment.currency?.isoCode })),
   ];
 
-  if (lines.length === 0) return { value: 'Aucun', hint: 'Tout est réglé' };
+  if (lines.length === 0) return { value: translate('Aucun'), hint: translate('Tout est réglé') };
 
   const currencies = new Set(lines.map((line) => line.currency));
   const [onlyCurrency] = currencies;
   if (currencies.size === 1 && onlyCurrency) {
     const total = lines.reduce((sum, line) => sum + line.amount, 0);
-    return { value: formatMoney(total, onlyCurrency), hint: lines.length > 1 ? `${lines.length} paiements à régler` : 'À régler' };
+    return { value: formatMoney(total, onlyCurrency), hint: lines.length > 1 ? translate('{linesLength} paiements à régler', { linesLength: lines.length }) : translate('À régler') };
   }
-  return { value: String(lines.length), hint: lines.length > 1 ? 'paiements à régler' : 'paiement à régler' };
+  return { value: String(lines.length), hint: lines.length > 1 ? translate('paiements à régler') : translate('paiement à régler') };
 }
 
 export default function CustomerHomeScreen() {
+  const t = useT();
   const user = useAuthStore((state) => state.user);
   const { data: profile } = useCustomerProfile();
   const { data: bookingsPage } = useMyBookings();
   const { data: shipmentsPage } = useMyShipments();
   // Pas d'endpoint compteur dédié — approximation à partir de la première
   // page de notifications, comme sur l'accueil conducteur.
-  const { data: notificationsPage, isLoading: notificationsLoading } = useMyNotifications(1);
-  const messageAlert = useLatestMessageAlert();
+  const { data: notificationsPage, isLoading: notificationsLoading } = useMyNotifications(1, 'CUSTOMER');
+  const messageAlert = useLatestMessageAlert('CUSTOMER');
   const markNotificationRead = useMarkNotificationRead();
   const getOrCreateConversation = useGetOrCreateConversationForBooking();
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
@@ -136,11 +140,11 @@ export default function CustomerHomeScreen() {
   // Quel code le client doit-il donner maintenant ? Le bouton de la carte y mène directement (pas besoin de passer par « Trajets »).
   const currentCodes = current?.trip ? customerCodeVisibility(current, current.trip.status) : { pickup: false, dropoff: false };
   const currentPrimaryLabel = currentCodes.dropoff
-    ? 'Voir mon code de dépose'
+    ? t('Voir mon code de dépose')
     : currentCodes.pickup
-      ? 'Voir mon code de prise en charge'
-      : 'Voir la réservation';
-  const currentStatusLabel = currentCodes.dropoff ? 'Arrivé' : current?.status === 'PAID' ? 'Payée' : 'Confirmée';
+      ? t('Voir mon code de prise en charge')
+      : t('Voir la réservation');
+  const currentStatusLabel = currentCodes.dropoff ? t('Arrivé') : current?.status === 'PAID' ? t('Payée') : t('Confirmée');
   // La liste ne contient pas les adresses ; le détail du trajet, si : c'est lui qui donne les coordonnées de la carte.
   const { data: currentTripDetail } = useTrip(current?.tripId);
   const currentTrip = current?.trip && currentTripDetail && currentTripDetail.id === current.tripId
@@ -175,7 +179,7 @@ export default function CustomerHomeScreen() {
           key: `b-${booking.id}`,
           icon: IconRoute,
           tone: booking.status === 'DISPUTED' ? 'danger' : 'ocean',
-          title: `Réservation · ${BOOKING_STATUS_LABELS[booking.status]}`,
+          title: t('Réservation · {status}', { status: BOOKING_STATUS_LABELS[booking.status] }),
           text: `${booking.trip!.originCity.name} → ${booking.trip!.destinationCity.name} · ${formatDateShort(booking.trip!.departureAt)}`,
           at: booking.createdAt,
           onPress: () => router.push(`/(customer)/booking/${booking.id}`),
@@ -184,7 +188,7 @@ export default function CustomerHomeScreen() {
         key: `s-${shipment.id}`,
         icon: IconPackage,
         tone: 'gold',
-        title: `Colis · ${SHIPMENT_STATUS_LABELS[shipment.status]}`,
+        title: t('Colis · {status}', { status: SHIPMENT_STATUS_LABELS[shipment.status] }),
         text: formatShipmentRoute(shipment) ?? shipment.recipientName,
         at: shipment.createdAt,
         onPress: () => router.push(`/(customer)/shipment/${shipment.id}`),
@@ -193,7 +197,7 @@ export default function CustomerHomeScreen() {
         key: `r-${search.originCityId ?? 'all'}-${search.destinationCityId ?? 'all'}`,
         icon: IconClockSearch,
         tone: 'ocean',
-        title: 'Recherche de trajet',
+        title: t('Recherche de trajet'),
         text: formatRecentSearch(search),
         at: search.searchedAt,
         onPress: () =>
@@ -215,7 +219,7 @@ export default function CustomerHomeScreen() {
     setContactError(null);
     getOrCreateConversation.mutate(bookingId, {
       onSuccess: (conversation) => router.push(`/(customer)/conversation/${conversation.id}`),
-      onError: () => setContactError('La conversation avec le conducteur n’a pas pu s’ouvrir. Réessayez dans un instant.'),
+      onError: () => setContactError(t('La conversation avec le conducteur n’a pas pu s’ouvrir. Réessayez dans un instant.')),
     });
   }
 
@@ -235,33 +239,33 @@ export default function CustomerHomeScreen() {
 
         <DashboardCard
           main={{
-            label: 'À payer',
+            label: t('À payer'),
             value: pending.value,
             hint: pending.hint,
             onPress: () => router.navigate('/(customer)/(tabs)/trips'),
           }}
           stats={[
-            { label: 'Vos trajets', value: bookingsPage ? String(bookingsPage.meta.total) : '—' },
-            { label: 'Vos colis', value: shipmentsPage ? String(shipmentsPage.meta.total) : '—' },
+            { label: t('Vos trajets'), value: bookingsPage ? String(bookingsPage.meta.total) : '—' },
+            { label: t('Vos colis'), value: shipmentsPage ? String(shipmentsPage.meta.total) : '—' },
           ]}
         />
 
         <HomeSearchBar
-          placeholder="Rechercher un trajet, un colis ou un chauffeur"
+          placeholder={t('Rechercher un trajet, un colis ou un chauffeur')}
           onPress={() => router.push('/(customer)/search')}
         />
 
         <View style={styles.content}>
           {contactError ? (
             <View style={styles.block}>
-              <FeedbackBanner tone="error" title="Message indisponible" text={contactError} onDismiss={() => setContactError(null)} />
+              <FeedbackBanner tone="error" title={t('Message indisponible')} text={contactError} onDismiss={() => setContactError(null)} />
             </View>
           ) : null}
           <AddEmailReminderCard space="CUSTOMER" />
           {messageAlert ? (
             <View style={styles.block}>
               <MessageAlertCard
-                senderName={messageAlert.title ?? 'Nouveau message'}
+                senderName={messageAlert.title ?? t('Nouveau message')}
                 preview={messageAlert.body ?? ''}
                 onPress={() => {
                   markNotificationRead.mutate(messageAlert.id);
@@ -282,10 +286,10 @@ export default function CustomerHomeScreen() {
                 <TripTileIllustration />
               </View>
               <AppText variant="base" weight="semibold" color={OCEAN.onDark} style={styles.tileTitle}>
-                Trouver un trajet
+                {t('Trouver un trajet')}
               </AppText>
               <AppText variant="xs" color={OCEAN.onDark} style={styles.tileSubtitle}>
-                Réserver une place
+                {t('Réserver une place')}
               </AppText>
             </Pressable>
             <Pressable onPress={openShipmentFlow} style={[styles.tile, { backgroundColor: colors.accent }]}>
@@ -293,37 +297,37 @@ export default function CustomerHomeScreen() {
                 <ShipmentTileIllustration />
               </View>
               <AppText variant="base" weight="semibold" color={colors.onAccent} style={styles.tileTitle}>
-                Envoyer un colis
+                {t('Envoyer un colis')}
               </AppText>
               <AppText variant="xs" color={colors.onAccent} style={styles.tileSubtitle}>
-                Expédition rapide et sécurisée.
+                {t('Expédition rapide et sécurisée.')}
               </AppText>
             </Pressable>
           </View>
 
           <HomeSectionTitle
-            title="Vos trajets en cours"
-            actionLabel={currentBookings.length > 1 ? `Voir tout (${currentBookings.length})` : 'Voir tout'}
+            title={t('Vos trajets en cours')}
+            actionLabel={currentBookings.length > 1 ? t('Voir tout ({currentBookingsLength})', { currentBookingsLength: currentBookings.length }) : t('Voir tout')}
             onPressAction={() => router.navigate('/(customer)/(tabs)/trips')}
           />
           <View style={styles.block}>
             {current && currentTrip ? (
               <CurrentTripCard
-                eyebrow="Trajet partagé"
+                eyebrow={t('Trajet partagé')}
                 originName={currentTrip.originCity.name}
                 destinationName={currentTrip.destinationCity.name}
                 origin={routePoint(currentTrip.originLocation, currentTrip.originCity)}
                 destination={routePoint(currentTrip.destinationLocation, currentTrip.destinationCity)}
                 columns={[
-                  { label: 'Date', value: `${formatDateShort(currentTrip.departureAt)} · ${formatTime(currentTrip.departureAt)}` },
-                  { label: 'Places', value: String(current.seatsCount), flex: 0.6 },
+                  { label: t('Date'), value: `${formatDateShort(currentTrip.departureAt)} · ${formatTime(currentTrip.departureAt)}` },
+                  { label: t('Places'), value: String(current.seatsCount), flex: 0.6 },
                   // « Confirmée » et « 253 000 GNF » restent chacun sur une seule ligne.
-                  { label: 'Statut', value: currentStatusLabel, flex: 1.15, singleLine: true },
-                  { label: 'Prix', value: formatMoney(current.totalAmount, currencyOf(current)), flex: 1.35, singleLine: true },
+                  { label: t('Statut'), value: currentStatusLabel, flex: 1.15, singleLine: true },
+                  { label: t('Prix'), value: formatMoney(current.totalAmount, currencyOf(current)), flex: 1.35, singleLine: true },
                 ]}
                 primary={{ label: currentPrimaryLabel, onPress: () => router.push(`/(customer)/booking/${current.id}`) }}
                 secondary={{
-                  label: 'Contacter le chauffeur',
+                  label: t('Contacter le chauffeur'),
                   onPress: () => contactDriver(current.id),
                   loading: getOrCreateConversation.isPending,
                 }}
@@ -332,16 +336,16 @@ export default function CustomerHomeScreen() {
             ) : (
               <OceanEmpty
                 icon={<IconRoute size={28} color={OCEAN.base} />}
-                title="Aucun trajet en cours"
-                text="Vos réservations payées ou confirmées apparaîtront ici."
-                action={<OceanButton label="Trouver un trajet" onPress={openSearch} style={styles.emptyButton} />}
+                title={t('Aucun trajet en cours')}
+                text={t('Vos réservations payées ou confirmées apparaîtront ici.')}
+                action={<OceanButton label={t('Trouver un trajet')} onPress={openSearch} style={styles.emptyButton} />}
               />
             )}
           </View>
 
           <HomeSectionTitle
-            title="Activité récente"
-            actionLabel="Mon activité"
+            title={t('Activité récente')}
+            actionLabel={t('Mon activité')}
             onPressAction={() => router.navigate('/(customer)/(tabs)/trips')}
           />
           <RecentActivity
@@ -354,10 +358,10 @@ export default function CustomerHomeScreen() {
 
       <HomeFab
         actions={[
-          { label: 'Trouver un trajet', icon: <IconRoute size={20} color={OCEAN.base} />, onPress: openSearch },
-          { label: 'Envoyer un colis', icon: <IconSend size={20} color={OCEAN.goldInk} />, onPress: openShipmentFlow },
-          { label: 'Suivre un colis', icon: <IconPackage size={20} color={OCEAN.base} />, onPress: () => router.push('/suivi' as never) },
-          { label: 'Rechercher', icon: <IconSearch size={20} color={OCEAN.base} />, onPress: () => router.push('/(customer)/search') },
+          { label: t('Trouver un trajet'), icon: <IconRoute size={20} color={OCEAN.base} />, onPress: openSearch },
+          { label: t('Envoyer un colis'), icon: <IconSend size={20} color={OCEAN.goldInk} />, onPress: openShipmentFlow },
+          { label: t('Suivre un colis'), icon: <IconPackage size={20} color={OCEAN.base} />, onPress: () => router.push('/suivi' as never) },
+          { label: t('Rechercher'), icon: <IconSearch size={20} color={OCEAN.base} />, onPress: () => router.push('/(customer)/search') },
         ]}
       />
     </View>

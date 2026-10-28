@@ -182,6 +182,7 @@ export class OnboardingReminderService {
         });
         try {
           await this.notifications.notify({
+            audience: 'DRIVER',
             userId: driver.userId,
             type: NotificationType.STATUS_CHANGE,
             channels: driver.user.email ? [NotificationChannel.PUSH, NotificationChannel.EMAIL] : [NotificationChannel.PUSH],

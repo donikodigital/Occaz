@@ -6,6 +6,7 @@ import Constants from 'expo-constants';
 import { secureStorage } from '../storage/secureStorage';
 import { ApiError, SessionExpiredError } from './ApiError';
 import { useConnectivityStore } from '@/stores/connectivityStore';
+import { translate } from '@/i18n';
 import type { ApiErrorEnvelope, ApiSuccessEnvelope } from './types';
 
 const API_URL =
@@ -78,8 +79,8 @@ async function rawFetch<T>(path: string, options: RequestOptions, accessToken?: 
       if (!controller.signal.aborted) useConnectivityStore.getState().markOffline();
       throw new ApiError(
         controller.signal.aborted
-          ? 'Le serveur met trop de temps à répondre — réessayez dans un instant.'
-          : 'Connexion impossible — vérifiez votre réseau.',
+          ? translate('Le serveur met trop de temps à répondre — réessayez dans un instant.')
+          : translate('Connexion impossible — vérifiez votre réseau.'),
         0,
       );
     }
@@ -91,7 +92,7 @@ async function rawFetch<T>(path: string, options: RequestOptions, accessToken?: 
       | null;
 
     if (!response.ok || !json || json.success === false) {
-      const message = json && 'error' in json ? formatMessage(json.error.message) : 'Une erreur est survenue.';
+      const message = json && 'error' in json ? formatMessage(json.error.message) : translate('Une erreur est survenue.');
       throw new ApiError(message, response.status, json && 'error' in json ? json.error.path : undefined);
     }
 
@@ -127,7 +128,7 @@ async function refreshAccessToken(): Promise<string> {
     }
     // Tout le reste (réseau coupé, délai dépassé, 5xx, 429) est passager : les jetons sont conservés, la requête échoue
     // proprement et l'utilisateur réessaie — il ne perd pas sa session parce qu'il passe dans un tunnel.
-    throw error instanceof ApiError ? error : new ApiError('Connexion impossible — vérifiez votre réseau.', 0);
+    throw error instanceof ApiError ? error : new ApiError(translate('Connexion impossible — vérifiez votre réseau.'), 0);
   }
 }
 
@@ -154,7 +155,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       newAccessToken = await refreshPromise;
     } catch (refreshError) {
       if (refreshError instanceof SessionExpiredError) onSessionExpired?.();
-      throw refreshError instanceof ApiError ? refreshError : new ApiError('Connexion impossible — vérifiez votre réseau.', 0);
+      throw refreshError instanceof ApiError ? refreshError : new ApiError(translate('Connexion impossible — vérifiez votre réseau.'), 0);
     }
 
     try {

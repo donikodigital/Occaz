@@ -1,4 +1,5 @@
 // mobile/src/components/screens/VehicleDetailModal.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [21/09/2026] v2 — habillage bleu Ocean : bandeau, sections et bouton Enregistrer comme le reste du profil conducteur.
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
@@ -15,6 +16,7 @@ import { ApiError } from '@/services/api/ApiError';
 import type { Vehicle, VehicleType } from '@/types/vehicles.types';
 import { SeatsStepper } from './SeatsStepper';
 import { VEHICLE_TYPE_ICONS, VehicleTypePicker } from './VehicleTypePicker';
+import { useT, translate } from '@/i18n';
 
 export interface VehicleDetailModalProps {
   vehicle: Vehicle | null;
@@ -22,9 +24,9 @@ export interface VehicleDetailModalProps {
 }
 
 const STATUS_LABEL: Record<Vehicle['verificationStatus'], string> = {
-  VERIFIED: 'Vérifié',
-  REJECTED: 'Rejeté',
-  PENDING: 'En attente',
+  get VERIFIED() { return translate('Vérifié'); },
+  get REJECTED() { return translate('Rejeté'); },
+  get PENDING() { return translate('En attente'); },
 };
 const STATUS_TONE: Record<Vehicle['verificationStatus'], 'success' | 'danger' | 'accent'> = {
   VERIFIED: 'success',
@@ -54,6 +56,7 @@ function fieldsFromVehicle(vehicle: Vehicle): VehicleFields {
 }
 
 function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose: () => void }) {
+  const t = useT();
   const [brand, setBrand] = useState(vehicle.brand);
   const [model, setModel] = useState(vehicle.model);
   const [color, setColor] = useState(vehicle.color ?? '');
@@ -80,13 +83,13 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
   const justSaved = saved !== null && !isDirty;
 
   const TypeIcon = VEHICLE_TYPE_ICONS[type];
-  const title = `${brand} ${model}`.trim() || 'Véhicule';
-  const subtitle = `${VEHICLE_TYPE_LABELS[type]}, ${totalSeats} ${totalSeats > 1 ? 'places' : 'place'}`;
+  const title = `${brand} ${model}`.trim() || t('Véhicule');
+  const subtitle = `${VEHICLE_TYPE_LABELS[type]}, ${totalSeats} ${totalSeats > 1 ? t('places') : t('place')}`;
 
   function handleSave() {
     setErrorMessage(undefined);
     if (current.brand.length < 1 || current.model.length < 1) {
-      setErrorMessage('Renseignez la marque et le modèle.');
+      setErrorMessage(t('Renseignez la marque et le modèle.'));
       return;
     }
     updateVehicle.mutate(
@@ -100,7 +103,7 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
       {
         onSuccess: () => setSaved(current),
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -117,11 +120,11 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
         <View style={styles.inner}>
           <View style={styles.topBar}>
             <AppText variant="lg" weight="bold" color={OCEAN.deep}>
-              Mon véhicule
+              {t('Mon véhicule')}
             </AppText>
             <IconButton
               icon={<IconX size={18} color={OCEAN.base} />}
-              accessibilityLabel="Fermer"
+              accessibilityLabel={t('Fermer')}
               onPress={onClose}
             />
           </View>
@@ -146,7 +149,7 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
               <View
                 style={styles.plate}
                 accessible
-                accessibilityLabel={`Plaque ${vehicle.plateNumber}, non modifiable`}
+                accessibilityLabel={t('Plaque {plateNumber}, non modifiable', { plateNumber: vehicle.plateNumber })}
               >
                 <AppText variant="md" weight="bold" style={styles.plateText}>
                   {vehicle.plateNumber}
@@ -160,44 +163,44 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
             </View>
           </View>
 
-          <OceanSection icon={<IconFileText size={17} color={OCEAN.base} />} title="Informations">
+          <OceanSection icon={<IconFileText size={17} color={OCEAN.base} />} title={t('Informations')}>
             <View style={styles.row}>
               <View style={styles.cell}>
                 <TextField
-                  label="Marque"
+                  label={t('Marque')}
                   value={brand}
                   onChangeText={setBrand}
-                  placeholder="Toyota"
+                  placeholder={t('Toyota')}
                   autoCapitalize="words"
                 />
               </View>
               <View style={styles.cell}>
                 <TextField
-                  label="Modèle"
+                  label={t('Modèle')}
                   value={model}
                   onChangeText={setModel}
-                  placeholder="Corolla"
+                  placeholder={t('Corolla')}
                   autoCapitalize="words"
                 />
               </View>
             </View>
             <TextField
-              label="Couleur (optionnel)"
+              label={t('Couleur (optionnel)')}
               value={color}
               onChangeText={setColor}
-              placeholder="Gris"
+              placeholder={t('Gris')}
               autoCapitalize="words"
             />
           </OceanSection>
 
-          <OceanSection icon={<IconSteeringWheel size={17} color={OCEAN.base} />} title="Type et capacité">
+          <OceanSection icon={<IconSteeringWheel size={17} color={OCEAN.base} />} title={t('Type et capacité')}>
             <VehicleTypePicker value={type} onChange={setType} />
             <SeatsStepper value={totalSeats} onChange={setTotalSeats} />
           </OceanSection>
 
-          <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title="Documents">
+          <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title={t('Documents')}>
             <DocumentUploadField
-              label="Carte grise"
+              label={t('Carte grise')}
               document={registrationDoc}
               isUploading={upload.isUploading}
               onPickLibrary={() => upload.pickFromLibrary('vehicle_registration')}
@@ -205,7 +208,7 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
               onPickCamera={() => upload.pickFromCamera('vehicle_registration')}
             />
             <DocumentUploadField
-              label="Assurance"
+              label={t('Assurance')}
               document={insuranceDoc}
               isUploading={upload.isUploading}
               onPickLibrary={() => upload.pickFromLibrary('vehicle_insurance')}
@@ -227,7 +230,7 @@ function VehicleDetailContent({ vehicle, onClose }: { vehicle: Vehicle; onClose:
             </View>
           ) : null}
           <OceanButton
-            label={justSaved ? 'Enregistré' : 'Enregistrer'}
+            label={justSaved ? t('Enregistré') : t('Enregistrer')}
             icon={justSaved ? <IconCheck size={18} color={OCEAN.onDark} /> : undefined}
             onPress={handleSave}
             loading={updateVehicle.isPending}

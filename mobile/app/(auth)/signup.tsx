@@ -1,4 +1,5 @@
 // mobile/app/(auth)/signup.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v2 — Création de compte pas à pas : UNE question par écran, avec « Continuer » :
 //   1. nom de famille → 2. prénom → 3. pays de résidence (sans indicatif) → 4. téléphone (avec drapeau et indicatif du pays choisi).
 // « Continuer » à l'étape du téléphone envoie IMMÉDIATEMENT le code SMS qui vérifie le numéro (écran suivant). Le bouton retour (et le
@@ -23,18 +24,20 @@ import { useAuthFlowStore, type SignupAccountType } from '@/stores/authFlowStore
 import { useDefaultSignupCountry } from '@/hooks/useSignupCountry';
 import { buildInternationalPhone, isValidPhoneNumber } from '@/utils/phone';
 import type { Country } from '@/types/geography.types';
+import { useT, translate } from '@/i18n';
 
 type Question = 'lastName' | 'firstName' | 'country' | 'phone';
 const QUESTIONS: Question[] = ['lastName', 'firstName', 'country', 'phone'];
 
 const COPY: Record<Question, { title: string; subtitle: string; label: string }> = {
-  lastName: { title: 'Votre nom', subtitle: 'Quel est votre nom de famille ?', label: 'Votre nom' },
-  firstName: { title: 'Votre prénom', subtitle: 'Et comment vous appelez-vous ?', label: 'Votre prénom' },
-  country: { title: 'Pays de résidence', subtitle: 'Dans quel pays habitez-vous ?', label: 'Votre pays' },
-  phone: { title: 'Votre téléphone', subtitle: 'Nous vous envoyons un code par SMS pour vérifier votre numéro.', label: 'Votre téléphone' },
+  lastName: { get title() { return translate('Votre nom'); }, get subtitle() { return translate('Quel est votre nom de famille ?'); }, get label() { return translate('Votre nom'); } },
+  firstName: { get title() { return translate('Votre prénom'); }, get subtitle() { return translate('Et comment vous appelez-vous ?'); }, get label() { return translate('Votre prénom'); } },
+  country: { get title() { return translate('Pays de résidence'); }, get subtitle() { return translate('Dans quel pays habitez-vous ?'); }, get label() { return translate('Votre pays'); } },
+  phone: { get title() { return translate('Votre téléphone'); }, get subtitle() { return translate('Nous vous envoyons un code par SMS pour vérifier votre numéro.'); }, get label() { return translate('Votre téléphone'); } },
 };
 
 export default function SignupScreen() {
+  const t = useT();
   const { accountType: accountTypeParam } = useLocalSearchParams<{ accountType?: SignupAccountType }>();
   const accountType: SignupAccountType = accountTypeParam === 'DRIVER' ? 'DRIVER' : 'CUSTOMER';
   const setSignup = useAuthFlowStore((state) => state.setSignup);
@@ -79,7 +82,7 @@ export default function SignupScreen() {
       router.push('/(auth)/verify-otp');
     },
     onError: (err) => {
-      setFormError(err instanceof ApiError ? err.message : 'Une erreur est survenue. Réessayez.');
+      setFormError(err instanceof ApiError ? err.message : t('Une erreur est survenue. Réessayez.'));
     },
   });
 
@@ -87,17 +90,17 @@ export default function SignupScreen() {
     setError(undefined);
     setFormError(undefined);
     if (question === 'lastName') {
-      if (lastName.trim().length < 2) return setError('Indiquez votre nom.');
+      if (lastName.trim().length < 2) return setError(t('Indiquez votre nom.'));
       setIndex(1);
     } else if (question === 'firstName') {
-      if (firstName.trim().length < 2) return setError('Indiquez votre prénom.');
+      if (firstName.trim().length < 2) return setError(t('Indiquez votre prénom.'));
       setIndex(2);
     } else if (question === 'country') {
-      if (!country) return setError('Choisissez votre pays de résidence.');
+      if (!country) return setError(t('Choisissez votre pays de résidence.'));
       setIndex(3);
     } else {
       const international = buildInternationalPhone(country?.phoneCode ?? '', phone, country?.isoCode);
-      if (!country || !isValidPhoneNumber(international)) return setError('Numéro invalide. Vérifiez-le sans l’indicatif du pays.');
+      if (!country || !isValidPhoneNumber(international)) return setError(t('Numéro invalide. Vérifiez-le sans l’indicatif du pays.'));
       sendCode.mutate(international);
     }
   }
@@ -120,18 +123,18 @@ export default function SignupScreen() {
       subtitle={copy.subtitle}
       onBack={goBack}
       step={{ current: SIGNUP_STEP[question], total: SIGNUP_STEPS, label: copy.label }}
-      footer={<OceanButton label="Continuer" onPress={handleContinue} loading={sendCode.isPending} />}
+      footer={<OceanButton label={t('Continuer')} onPress={handleContinue} loading={sendCode.isPending} />}
     >
       {question === 'lastName' ? (
         <TextField
           key="lastName"
-          label="Nom"
+          label={t('Nom')}
           value={lastName}
           onChangeText={(text) => {
             setLastName(text);
             setError(undefined);
           }}
-          placeholder="Diallo"
+          placeholder={t('Diallo')}
           autoCapitalize="words"
           autoComplete="family-name"
           textContentType="familyName"
@@ -145,13 +148,13 @@ export default function SignupScreen() {
       {question === 'firstName' ? (
         <TextField
           key="firstName"
-          label="Prénom"
+          label={t('Prénom')}
           value={firstName}
           onChangeText={(text) => {
             setFirstName(text);
             setError(undefined);
           }}
-          placeholder="Fatoumata"
+          placeholder={t('Fatoumata')}
           autoCapitalize="words"
           autoComplete="given-name"
           textContentType="givenName"
@@ -164,7 +167,7 @@ export default function SignupScreen() {
 
       {question === 'country' ? (
         <CountryField
-          label="Pays de résidence"
+          label={t('Pays de résidence')}
           value={country}
           onSelect={(next) => {
             setCountry(next);
@@ -193,7 +196,7 @@ export default function SignupScreen() {
       {index === 0 ? (
         <View style={styles.already}>
           <AppText variant="sm" color="textSecondary">
-            Déjà un compte ?{' '}
+            {t('Déjà un compte ?')}{' '}
           </AppText>
           <Pressable
             onPress={() => router.replace({ pathname: '/(auth)/login', params: { accountType } })}
@@ -201,7 +204,7 @@ export default function SignupScreen() {
             hitSlop={8}
           >
             <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-              Se connecter
+              {t('Se connecter')}
             </AppText>
           </Pressable>
         </View>

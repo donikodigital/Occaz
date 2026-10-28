@@ -1,4 +1,6 @@
 // mobile/src/components/screens/LegalDocumentScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
+// [28/10/2026] Le texte français (legal.ts) sert de clé de traduction ; en anglais / portugais, un paragraphe sans traduction reste en français.
 // Affiche un texte juridique (politique de confidentialité, conditions générales) à partir de src/content/legal.ts.
 // Un même écran sert aux espaces client et conducteur ; le texte lui-même est identique à celui du site (occaz.sarl).
 
@@ -11,6 +13,7 @@ import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { COMPANY, LEGAL_UPDATED_AT, type LegalBlock, type LegalDocument } from '@/content/legal';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT, translate } from '@/i18n';
 
 interface Props {
   document: LegalDocument;
@@ -29,7 +32,7 @@ function Block({ block }: { block: LegalBlock }) {
               •
             </AppText>
             <AppText variant="sm" color="textSecondary" style={[styles.paragraph, styles.flex]}>
-              {item}
+              {translate(item)}
             </AppText>
           </View>
         ))}
@@ -41,34 +44,35 @@ function Block({ block }: { block: LegalBlock }) {
       <View style={styles.note}>
         <IconInfoCircle size={18} color={OCEAN.deep} />
         <AppText variant="sm" color={OCEAN.deep} weight="medium" style={[styles.paragraph, styles.flex]}>
-          {block.text}
+          {translate(block.text)}
         </AppText>
       </View>
     );
   }
   return (
     <AppText variant="sm" color="textSecondary" style={styles.paragraph}>
-      {block.text}
+      {translate(block.text)}
     </AppText>
   );
 }
 
 export function LegalDocumentScreen({ document, icon, webUrl }: Props) {
+  const t = useT();
   return (
     <ScreenContainer scroll maxWidth="detail">
-      <OceanHeroHeader title={document.title} icon={icon} onBack={() => router.back()} />
+      <OceanHeroHeader title={t(document.title)} icon={icon} onBack={() => router.back()} />
 
       <AppText variant="xs" color="textMuted" style={styles.updated}>
-        Dernière mise à jour : {LEGAL_UPDATED_AT}
+        {t('Dernière mise à jour : {LEGAL_UPDATED_AT}', { LEGAL_UPDATED_AT: t(LEGAL_UPDATED_AT) })}
       </AppText>
       <AppText variant="sm" color="textSecondary" style={[styles.paragraph, styles.intro]}>
-        {document.intro}
+        {t(document.intro)}
       </AppText>
 
       {document.sections.map((section) => (
         <View key={section.title} style={styles.article}>
           <AppText variant="sm" weight="bold" color={OCEAN.deep}>
-            {section.title}
+            {t(section.title)}
           </AppText>
           {section.blocks.map((block, index) => (
             <Block key={index} block={block} />
@@ -77,11 +81,11 @@ export function LegalDocumentScreen({ document, icon, webUrl }: Props) {
       ))}
 
       <AppText variant="xs" color="textMuted" style={styles.footer}>
-        Ce texte est aussi disponible en ligne :{' '}
+        {t('Ce texte est aussi disponible en ligne :')}{' '}
         <AppText variant="xs" color={OCEAN.deep} weight="medium" onPress={() => Linking.openURL(webUrl)}>
           {webUrl.replace('https://', '')}
         </AppText>
-        {'\n'}Questions : {COMPANY.supportEmail}
+        {t('\nQuestions : {supportEmail}', { supportEmail: COMPANY.supportEmail })}
       </AppText>
     </ScreenContainer>
   );

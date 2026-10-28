@@ -1,4 +1,5 @@
 // mobile/src/hooks/useLocationPicker.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Parcours de saisie d'adresse en deux étapes, partagé par
 // LocationPickerScreen (mobile) et LocationAutocompleteField (desktop) :
@@ -22,6 +23,7 @@ import type { City } from '@/types/geography.types';
 import type { GeocodingSuggestion } from '@/types/geocoding.types';
 import type { SavedLocation } from '@/types/location-picker.types';
 import type { TripLocation } from '@/types/trips.types';
+import { useT } from '@/i18n';
 
 export type CityStatus = 'detecting' | 'detected' | 'unresolved';
 
@@ -49,6 +51,7 @@ export function useSearchCountryCodes(explicitCountryCode?: string): string | un
 }
 
 export function useLocationPicker(onPicked: (location: TripLocation) => void) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<LocationDraft | null>(null);
   const [city, setCity] = useState<City | null>(null);
@@ -167,11 +170,11 @@ export function useLocationPicker(onPicked: (location: TripLocation) => void) {
     setErrorMessage(undefined);
 
     if (!city) {
-      setErrorMessage('Choisissez la ville de cette adresse.');
+      setErrorMessage(t('Choisissez la ville de cette adresse.'));
       return;
     }
     if (draft.label.trim().length < 3) {
-      setErrorMessage('Indiquez le nom du lieu (quartier, repère…).');
+      setErrorMessage(t('Indiquez le nom du lieu (quartier, repère…).'));
       return;
     }
 
@@ -200,11 +203,11 @@ export function useLocationPicker(onPicked: (location: TripLocation) => void) {
       reset();
       refreshSaved();
     } catch (error) {
-      setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+      setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
     } finally {
       setSubmitting(false);
     }
-  }, [draft, city, onPicked, refreshSaved, reset]);
+  }, [draft, city, onPicked, refreshSaved, reset, t]);
 
   return {
     step: draft ? ('confirm' as const) : ('search' as const),

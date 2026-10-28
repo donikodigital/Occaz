@@ -1,4 +1,5 @@
 // mobile/app/(customer)/referral.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [07/10/2026] v1.1 — Le message de partage contient le lien d'invitation (page /rejoindre du site) et le code : voir
 // utils/referralShare.ts.
@@ -22,11 +23,12 @@ import { formatDateShort } from '@/utils/date';
 import { buildReferralShareMessage } from '@/utils/referralShare';
 import { ApiError } from '@/services/api/ApiError';
 import type { Referral, ReferralStatus } from '@/types/promotions.types';
+import { useT, translate } from '@/i18n';
 
 const STATUS_LABELS: Record<ReferralStatus, string> = {
-  PENDING: 'En attente',
-  COMPLETED: 'Validé',
-  EXPIRED: 'Expiré',
+  get PENDING() { return translate('En attente'); },
+  get COMPLETED() { return translate('Validé'); },
+  get EXPIRED() { return translate('Expiré'); },
 };
 
 const STATUS_TONES: Record<ReferralStatus, OceanPillTone> = {
@@ -37,10 +39,11 @@ const STATUS_TONES: Record<ReferralStatus, OceanPillTone> = {
 
 function nameOf(referral: Referral): string {
   const profile = referral.referee.driverProfile ?? referral.referee.customerProfile;
-  return profile ? `${profile.firstName} ${profile.lastName}` : 'Utilisateur';
+  return profile ? `${profile.firstName} ${profile.lastName}` : translate('Utilisateur');
 }
 
 function ReferralRow({ referral }: { referral: Referral }) {
+  const t = useT();
   return (
     <OceanCard style={styles.row}>
       <View style={{ flex: 1 }}>
@@ -48,7 +51,7 @@ function ReferralRow({ referral }: { referral: Referral }) {
           {nameOf(referral)}
         </AppText>
         <AppText variant="xs" color="textSecondary">
-          Inscrit le {formatDateShort(referral.createdAt)}
+          {t('Inscrit le {dateShort}', { dateShort: formatDateShort(referral.createdAt) })}
         </AppText>
       </View>
       <OceanPill label={STATUS_LABELS[referral.status]} tone={STATUS_TONES[referral.status]} />
@@ -57,6 +60,7 @@ function ReferralRow({ referral }: { referral: Referral }) {
 }
 
 export default function ReferralScreen() {
+  const t = useT();
   const { data: myCode } = useMyReferralCode();
   const { data: referralsPage, isLoading } = useMyReferrals();
   const applyCode = useApplyReferralCode();
@@ -78,7 +82,7 @@ export default function ReferralScreen() {
         setApplySuccess(true);
         setEnteredCode('');
       },
-      onError: (error) => setApplyError(error instanceof ApiError ? error.message : "Le code n'a pas pu être appliqué."),
+      onError: (error) => setApplyError(error instanceof ApiError ? error.message : t("Le code n'a pas pu être appliqué.")),
     });
   }
 
@@ -87,32 +91,32 @@ export default function ReferralScreen() {
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.headerWrap}>
-        <OceanScreenHeader title="Parrainez des amis" onBack={() => router.back()} />
+        <OceanScreenHeader title={t('Parrainez des amis')} onBack={() => router.back()} />
 
         <View style={styles.codeCard}>
           <IconGift size={26} color={OCEAN.onDark} />
           <AppText variant="xs" color={OCEAN.sky} style={styles.codeLabel}>
-            Votre code de parrainage
+            {t('Votre code de parrainage')}
           </AppText>
           <AppText variant="xxl" weight="bold" color={OCEAN.onDark} style={styles.codeValue}>
             {myCode?.code ?? '…'}
           </AppText>
-          <OceanButton label="Partager mon code" icon={<IconShare size={16} color={OCEAN.deep} />} variant="soft" onPress={handleShare} />
+          <OceanButton label={t('Partager mon code')} icon={<IconShare size={16} color={OCEAN.deep} />} variant="soft" onPress={handleShare} />
         </View>
 
         <View style={styles.applyBlock}>
           <AppText variant="sm" weight="semibold" style={{ marginBottom: spacing.xs }}>
-            Un code à saisir ?
+            {t('Un code à saisir ?')}
           </AppText>
           <View style={styles.applyRow}>
             <TextField
               value={enteredCode}
               onChangeText={(t) => setEnteredCode(t.toUpperCase())}
-              placeholder="Code d'un ami"
+              placeholder={t("Code d'un ami")}
               autoCapitalize="characters"
               containerStyle={styles.applyInput}
             />
-            <OceanButton label="Valider" onPress={handleApply} loading={applyCode.isPending} style={styles.applyButton} />
+            <OceanButton label={t('Valider')} onPress={handleApply} loading={applyCode.isPending} style={styles.applyButton} />
           </View>
           {applyError ? (
             <AppText variant="xs" color="danger">
@@ -121,13 +125,13 @@ export default function ReferralScreen() {
           ) : null}
           {applySuccess ? (
             <AppText variant="xs" color={colors.successDark}>
-              Code appliqué avec succès.
+              {t('Code appliqué avec succès.')}
             </AppText>
           ) : null}
         </View>
 
         <AppText variant="sm" weight="semibold" style={styles.listTitle}>
-          Vos filleuls
+          {t('Vos filleuls')}
         </AppText>
       </View>
 
@@ -140,8 +144,8 @@ export default function ReferralScreen() {
           !isLoading ? (
             <OceanEmpty
               icon={<IconCopy size={26} color={OCEAN.base} />}
-              title="Aucun filleul pour l'instant"
-              text="Partagez votre code pour commencer à parrainer."
+              title={t("Aucun filleul pour l'instant")}
+              text={t('Partagez votre code pour commencer à parrainer.')}
             />
           ) : undefined
         }

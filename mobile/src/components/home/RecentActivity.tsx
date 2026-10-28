@@ -1,4 +1,5 @@
 // mobile/src/components/home/RecentActivity.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [08/10/2026] v2 — « Activité récente » n'est plus réservée aux notifications : c'est une chronologie mêlée (trajets créés ou réservés,
 // envois, recherches de trajet, notifications), triée du plus récent au plus ancien ; chaque ligne ouvre SON élément (le trajet, l'envoi,
@@ -24,6 +25,7 @@ import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { timeAgo } from '@/utils/shipmentDisplay';
 import type { AppNotification, NotificationType } from '@/types/notifications.types';
+import { useT, translate } from '@/i18n';
 
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -72,7 +74,7 @@ export function notificationToActivity(notification: AppNotification, onPress: (
     key: `n-${notification.id}`,
     icon: TYPE_ICON[notification.type] ?? IconBell,
     tone,
-    title: notification.title ?? notification.body ?? 'Notification',
+    title: notification.title ?? notification.body ?? translate('Notification'),
     text: notification.title ? notification.body : null,
     at: notification.createdAt,
     unread: !notification.readAt,
@@ -95,13 +97,14 @@ export function RecentActivity({
   items,
   isLoading,
   onPressAll,
-  allLabel = 'Voir les notifications',
+  allLabel = translate('Voir les notifications'),
 }: {
   items: ActivityItem[];
   isLoading?: boolean;
   onPressAll: () => void;
   allLabel?: string;
 }) {
+  const t = useT();
   return (
     <View style={styles.card}>
       {items.length === 0 ? (
@@ -110,7 +113,7 @@ export function RecentActivity({
             <IconBell size={19} color={OCEAN.base} />
           </View>
           <AppText variant="sm" color="textSecondary" style={styles.rowText}>
-            {isLoading ? 'Chargement…' : 'Rien pour l’instant. Vos trajets, envois, recherches et messages apparaîtront ici.'}
+            {isLoading ? 'Chargement…' : t('Rien pour l’instant. Vos trajets, envois, recherches et messages apparaîtront ici.')}
           </AppText>
         </View>
       ) : (

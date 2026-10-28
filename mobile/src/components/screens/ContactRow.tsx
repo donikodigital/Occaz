@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ContactRow.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Appel et SMS natifs vers un numéro réel — pas de messagerie interne à
 // construire, le téléphone de l'utilisateur (et le réseau GSM) s'en
@@ -11,8 +12,10 @@ import { Linking, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'reac
 import { IconMessageCircle, IconPhone } from '@tabler/icons-react-native';
 import { AppText } from '@/components/ui';
 import { colors, spacing } from '@/theme';
+import { useT } from '@/i18n';
 
 export function ContactRow({ phone, name, style }: { phone: string; name?: string; style?: StyleProp<ViewStyle> }) {
+  const t = useT();
   return (
     <View style={[styles.row, style]}>
       {name ? (
@@ -24,18 +27,18 @@ export function ContactRow({ phone, name, style }: { phone: string; name?: strin
         <Pressable
           onPress={() => Linking.openURL(`tel:${phone}`)}
           accessibilityRole="link"
-          accessibilityLabel={`Appeler le ${phone}`}
+          accessibilityLabel={t('Appeler le {phone}', { phone })}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >
           <IconPhone size={14} color={colors.primary} />
           <AppText variant="xs" color={colors.primary} weight="semibold">
-            Appeler
+            {t('Appeler')}
           </AppText>
         </Pressable>
         <Pressable
           onPress={() => Linking.openURL(`sms:${phone}`)}
           accessibilityRole="link"
-          accessibilityLabel={`Envoyer un SMS au ${phone}`}
+          accessibilityLabel={t('Envoyer un SMS au {phone}', { phone })}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >
           <IconMessageCircle size={14} color={colors.primary} />

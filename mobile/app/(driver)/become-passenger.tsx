@@ -1,4 +1,5 @@
 // mobile/app/(driver)/become-passenger.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v1 — « Utiliser Occa'Z comme passager » : un conducteur ouvre son espace passager avec le MÊME compte.
 // Aucun nouveau SMS ni nouveau numéro : le code PIN de connexion confirme la demande. Son profil conducteur (nom, photo, ville) sert à créer
 // le profil passager. Les deux portefeuilles restent séparés, et il ne peut pas réserver son propre trajet. Un dossier conducteur « en
@@ -14,14 +15,16 @@ import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useActivateCustomerSpace } from '@/hooks/useAccountRoles';
 import { ApiError } from '@/services/api/ApiError';
+import { useT, translate } from '@/i18n';
 
 const POINTS = [
-  { icon: IconUser, text: 'Même numéro de téléphone, même code PIN : rien à recréer.' },
-  { icon: IconWallet, text: 'Votre portefeuille conducteur reste séparé de vos paiements de passager.' },
-  { icon: IconShieldCheck, text: 'Vous ne pouvez pas réserver ni envoyer un colis sur votre propre trajet.' },
+  { icon: IconUser, get text() { return translate('Même numéro de téléphone, même code PIN : rien à recréer.'); } },
+  { icon: IconWallet, get text() { return translate('Votre portefeuille conducteur reste séparé de vos paiements de passager.'); } },
+  { icon: IconShieldCheck, get text() { return translate('Vous ne pouvez pas réserver ni envoyer un colis sur votre propre trajet.'); } },
 ];
 
 export default function BecomePassengerScreen() {
+  const t = useT();
   const [pin, setPin] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const activate = useActivateCustomerSpace();
@@ -29,14 +32,14 @@ export default function BecomePassengerScreen() {
   function handleSubmit(code = pin) {
     setErrorMessage(undefined);
     if (code.length !== PIN_LENGTH) {
-      setErrorMessage('Saisissez votre code PIN de connexion (6 chiffres).');
+      setErrorMessage(t('Saisissez votre code PIN de connexion (6 chiffres).'));
       return;
     }
     activate.mutate(code, {
       onError: (error) => {
         // Quel que soit l'échec, le PIN est effacé : il faut le ressaisir.
         setPin('');
-        setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue. Réessayez.');
+        setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue. Réessayez.'));
       },
     });
   }
@@ -44,12 +47,12 @@ export default function BecomePassengerScreen() {
   return (
     <ScreenContainer scroll maxWidth="form">
       <OceanScreenHeader
-        title="Utiliser Occa'Z comme passager"
-        subtitle="Avec votre compte conducteur"
+        title={t("Utiliser Occa'Z comme passager")}
+        subtitle={t('Avec votre compte conducteur')}
         onBack={() => router.back()}
       />
 
-      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Ce qui change">
+      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title={t('Ce qui change')}>
         {POINTS.map(({ icon: Icon, text }) => (
           <View key={text} style={styles.point}>
             <View style={styles.pointIcon}>
@@ -62,9 +65,9 @@ export default function BecomePassengerScreen() {
         ))}
       </OceanSection>
 
-      <OceanSection icon={<IconLock size={17} color={OCEAN.base} />} title="Confirmez avec votre code PIN">
+      <OceanSection icon={<IconLock size={17} color={OCEAN.base} />} title={t('Confirmez avec votre code PIN')}>
         <PinCodeInput
-          label="Code PIN de connexion"
+          label={t('Code PIN de connexion')}
           value={pin}
           onChange={(next) => {
             setPin(next);
@@ -83,7 +86,7 @@ export default function BecomePassengerScreen() {
       ) : null}
 
       <OceanButton
-        label="Ouvrir mon espace passager"
+        label={t('Ouvrir mon espace passager')}
         onPress={() => handleSubmit()}
         loading={activate.isPending}
         style={styles.submit}

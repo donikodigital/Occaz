@@ -1,4 +1,5 @@
 // mobile/src/components/screens/FormAccordion.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [09/10/2026] v3 — Parcours pas à pas : FormAccordionSection accepte `collapsible={false}` (étape toujours ouverte, sans chevron),
 // WizardProgress (barre « étape en cours ») et WizardNav (pied de page « Retour / Continuer »). Les formulaires de création de trajet
@@ -27,6 +28,7 @@ import { AppText } from '@/components/ui';
 import { OceanButton } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT, translate } from '@/i18n';
 
 // Android : l'animation de mise en page doit être activée une fois.
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -77,6 +79,7 @@ export function StepHero({
   /** Présent : affiche le chevron d'ouverture (`open` = étape ouverte). Absent : étape non repliable. */
   chevron?: { open: boolean };
 }) {
+  const t = useT();
   const deep = tone === 'deep';
   const summaryColor = status === 'error' ? (deep ? ERROR_ON_DEEP : colors.danger) : deep ? OCEAN.sky : colors.textSecondary;
 
@@ -111,7 +114,7 @@ export function StepHero({
       <View style={styles.heroText}>
         {total ? (
           <AppText variant="xs" weight="bold" color={deep ? OCEAN.gold : OCEAN.bright} style={styles.eyebrow}>
-            {`ÉTAPE ${step} SUR ${total}`}
+            {t('ÉTAPE {step} SUR {total}', { step, total })}
           </AppText>
         ) : null}
         <AppText variant="md" weight="bold" color={deep ? OCEAN.onDark : OCEAN.deep} numberOfLines={1}>
@@ -160,6 +163,7 @@ export function FormAccordionSection({
   collapsible?: boolean;
   children: React.ReactNode;
 }) {
+  const t = useT();
   if (!collapsible) {
     return (
       <View style={[styles.card, styles.cardExpanded, status === 'error' && styles.cardError]}>
@@ -174,7 +178,7 @@ export function FormAccordionSection({
         onPress={onToggle}
         accessibilityRole="button"
         accessibilityState={{ expanded }}
-        accessibilityLabel={`${title}${summary ? `, ${summary}` : ''}${status === 'done' ? ', complète' : status === 'error' ? ', à corriger' : ''}`}
+        accessibilityLabel={`${title}${summary ? `, ${summary}` : ''}${status === 'done' ? t(', complète') : status === 'error' ? t(', à corriger') : ''}`}
         style={({ pressed }) => pressed && styles.pressed}
       >
         <StepHero
@@ -284,6 +288,7 @@ export function Disclosure({
 
 /** Barre segmentée : un segment par étape, plein quand l'étape est complète. */
 export function StepProgress({ done, total }: { done: number; total: number }) {
+  const t = useT();
   return (
     <View style={styles.progress} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: total, now: done }}>
       <View style={styles.progressBars}>
@@ -292,7 +297,7 @@ export function StepProgress({ done, total }: { done: number; total: number }) {
         ))}
       </View>
       <AppText variant="xs" weight="semibold" color={done === total ? colors.successDark : 'textSecondary'}>
-        {done === total ? 'Tout est prêt' : `${done} sur ${total} étapes complètes`}
+        {done === total ? t('Tout est prêt') : t('{done} sur {total} étapes complètes', { done, total })}
       </AppText>
     </View>
   );
@@ -302,6 +307,7 @@ export function StepProgress({ done, total }: { done: number; total: number }) {
  * Barre du parcours pas à pas : un segment par étape, plein jusqu'à l'étape en cours. `current` part de 0.
  */
 export function WizardProgress({ current, total }: { current: number; total: number }) {
+  const t = useT();
   const remaining = total - 1 - current;
   return (
     <View
@@ -315,7 +321,7 @@ export function WizardProgress({ current, total }: { current: number; total: num
         ))}
       </View>
       <AppText variant="xs" weight="semibold" color="textSecondary">
-        {remaining <= 0 ? 'Dernière étape' : remaining === 1 ? 'Encore 1 étape après celle-ci' : `Encore ${remaining} étapes après celle-ci`}
+        {remaining <= 0 ? t('Dernière étape') : remaining === 1 ? t('Encore 1 étape après celle-ci') : t('Encore {remaining} étapes après celle-ci', { remaining })}
       </AppText>
     </View>
   );
@@ -328,7 +334,7 @@ export function WizardProgress({ current, total }: { current: number; total: num
 export function WizardNav({
   onBack,
   onNext,
-  nextLabel = 'Continuer',
+  nextLabel = translate('Continuer'),
   loading,
   disabled,
 }: {
@@ -338,9 +344,10 @@ export function WizardNav({
   loading?: boolean;
   disabled?: boolean;
 }) {
+  const t = useT();
   return (
     <View style={styles.wizardNav}>
-      {onBack ? <OceanButton label="Retour" variant="outline" onPress={onBack} disabled={loading} style={styles.wizardBack} /> : null}
+      {onBack ? <OceanButton label={t('Retour')} variant="outline" onPress={onBack} disabled={loading} style={styles.wizardBack} /> : null}
       <OceanButton label={nextLabel} onPress={onNext} loading={loading} disabled={disabled} style={styles.wizardNext} />
     </View>
   );

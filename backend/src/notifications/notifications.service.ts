@@ -1,4 +1,7 @@
 // backend/src/notifications/notifications.service.ts
+// [28/10/2026] v5 — Espaces : une personne client ET conducteur ne voit plus dans l'un les notifications de l'autre. Chaque notification porte son
+// audience (payload.audience = CUSTOMER | DRIVER, posée à l'envoi) ; la boîte, le compteur, « Tout lire » et « Tout vider » savent filtrer par espace
+// (?space=). Sans le paramètre, comportement inchangé (back-office, anciennes versions de l'app). Aucune migration : l'audience vit dans le payload.
 // [25/10/2026] v4 — Push : les tokens sont dédoublonnés avant l'envoi (un téléphone ne reçoit plus la même notification plusieurs fois).
 // [19/10/2026] v3 — Politique SMS (voir integrations/sms/sms-purpose.ts) : les notifications ne partent plus par SMS (coût). Le canal SMS demandé
 // par un appelant est retiré sans bruit : la notification reste dans l'application (cloche) et part par push et e-mail. Réactivation sans
@@ -15,10 +18,50 @@ import { EMAIL_PROVIDER, EmailProvider } from '../integrations/email/email-provi
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResult } from '../common/dto/pagination-response.dto';
 import { OtpSettingsService } from '../otp/otp-settings.service';
+import { NotificationSpace } from './dto/notification-space.dto';
+
+/** Espace de l'application auquel appartient une notification (un compte peut être client ET conducteur). */
+export type NotificationAudience = NotificationSpace;
+
+/**
+ * Audience déduite du type quand l'appelant ne la précise pas, et pour les anciennes lignes (envoyées avant l'audience). Les types
+ * qui peuvent concerner l'un ou l'autre espace (STATUS_CHANGE, SUPPORT_MESSAGE, DISPUTE, SAFETY…) n'y figurent pas : l'appelant doit
+ * préciser `audience`, sinon la notification reste visible dans les deux espaces.
+ */
+const DEFAULT_AUDIENCE_BY_TYPE: Partial<Record<NotificationType, NotificationAudience>> = {
+  BOOKING: 'DRIVER',
+  DRIVER_PAYMENT: 'DRIVER',
+  SHIPMENT_REQUEST: 'DRIVER',
+  SHIPMENT_INVITATION: 'DRIVER',
+  PAYMENT: 'CUSTOMER',
+  DRIVER_ACCEPTED: 'CUSTOMER',
+  DRIVER_REJECTED: 'CUSTOMER',
+  SHIPMENT_EXTENSION: 'CUSTOMER',
+  DELIVERY: 'CUSTOMER',
+  ARRIVAL: 'CUSTOMER',
+};
+
+/** Audience inscrite dans le payload d'une ligne (CUSTOMER, DRIVER, ou STAFF pour les alertes du back-office), sinon null. */
+function taggedAudience(payload: unknown): string | null {
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const value = (payload as Record<string, unknown>).audience;
+    if (typeof value === 'string') return value;
+  }
+  return null;
+}
+
+/** Vrai si la notification doit apparaître dans la boîte de cet espace. Sans audience connue, elle apparaît dans les deux. */
+export function belongsToSpace(row: { type: NotificationType; payload?: unknown }, space: NotificationSpace): boolean {
+  const audience = taggedAudience(row.payload) ?? DEFAULT_AUDIENCE_BY_TYPE[row.type] ?? null;
+  if (audience === 'STAFF') return false;
+  return audience === null || audience === space;
+}
 
 export interface NotifyParams {
   userId: string;
   type: NotificationType;
+  /** Espace concerné (le destinataire peut être client ET conducteur). Par défaut déduit du type ; sans réponse, visible dans les deux. */
+  audience?: NotificationAudience;
   /** Par défaut [PUSH] — section 27 : "SMS pour événements critiques" doit être demandé explicitement par l'appelant. */
   channels?: NotificationChannel[];
   /** Valeurs substituées dans le modèle ({{cle}}) et conservées sur la ligne Notification pour audit. */
@@ -79,6 +122,8 @@ export class NotificationsService {
     // même NotificationType (ex: STATUS_CHANGE couvre validation
     // conducteur, suspension, vérif véhicule/document...), toutes
     // rendues avec le même libellé générique côté mobile.
+    const audience = params.audience ?? DEFAULT_AUDIENCE_BY_TYPE[params.type];
+    const storedPayload = audience ? { ...params.payload, audience } : params.payload;
     const notification = await this.prisma.notification.create({
       data: {
         userId: params.userId,
@@ -87,7 +132,7 @@ export class NotificationsService {
         channel,
         title: subject ?? null,
         body,
-        payload: params.payload as never,
+        payload: storedPayload as never,
       },
     });
 
@@ -183,11 +228,13 @@ export class NotificationsService {
    * d'ajouter une colonne de regroupement en base pour l'instant.
    */
   /** Boîte de réception d'un utilisateur : plus récentes d'abord, un seul élément par événement (voir findMine). */
-  private async dedupedInbox(userId: string) {
-    const rows = await this.prisma.notification.findMany({
+  private async dedupedInbox(userId: string, space?: NotificationSpace) {
+    const all = await this.prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
+    // Avec un espace : seules les notifications de cet espace (ou sans audience connue) ; sans : toute la boîte.
+    const rows = space ? all.filter((row) => belongsToSpace(row, space)) : all;
 
     const DEDUPE_WINDOW_MS = 5_000;
     const deduped: typeof rows = [];
@@ -204,16 +251,16 @@ export class NotificationsService {
     return deduped;
   }
 
-  async findMine(userId: string, query: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
-    const deduped = await this.dedupedInbox(userId);
+  async findMine(userId: string, query: PaginationQueryDto, space?: NotificationSpace): Promise<PaginatedResult<unknown>> {
+    const deduped = await this.dedupedInbox(userId, space);
     const total = deduped.length;
     const data = deduped.slice(query.skip, query.skip + query.take);
     return new PaginatedResult(data, total, query.page, query.limit);
   }
 
   /** Nombre de notifications non lues (un événement envoyé sur plusieurs canaux ne compte qu'une fois) — pour la pastille de la cloche. */
-  async unreadCount(userId: string): Promise<{ count: number }> {
-    const deduped = await this.dedupedInbox(userId);
+  async unreadCount(userId: string, space?: NotificationSpace): Promise<{ count: number }> {
+    const deduped = await this.dedupedInbox(userId, space);
     return { count: deduped.filter((row) => row.readAt === null).length };
   }
 
@@ -247,9 +294,19 @@ export class NotificationsService {
     });
   }
 
-  async markAllRead(userId: string): Promise<void> {
+  /** Tout marquer comme lu — dans l'espace indiqué seulement (l'autre espace garde ses non lues), sinon dans toute la boîte. */
+  async markAllRead(userId: string, space?: NotificationSpace): Promise<void> {
+    if (!space) {
+      await this.prisma.notification.updateMany({
+        where: { userId, readAt: null },
+        data: { readAt: new Date() },
+      });
+      return;
+    }
+    const ids = await this.idsInSpace(userId, space, { unreadOnly: true });
+    if (ids.length === 0) return;
     await this.prisma.notification.updateMany({
-      where: { userId, readAt: null },
+      where: { id: { in: ids }, readAt: null },
       data: { readAt: new Date() },
     });
   }
@@ -278,9 +335,24 @@ export class NotificationsService {
     });
   }
 
-  /** Vide toute la boîte de réception de l'utilisateur. */
-  async removeAll(userId: string): Promise<void> {
-    await this.prisma.notification.deleteMany({ where: { userId } });
+  /** Vide la boîte de réception de l'utilisateur — celle de l'espace indiqué seulement, sinon toute la boîte. */
+  async removeAll(userId: string, space?: NotificationSpace): Promise<void> {
+    if (!space) {
+      await this.prisma.notification.deleteMany({ where: { userId } });
+      return;
+    }
+    const ids = await this.idsInSpace(userId, space);
+    if (ids.length === 0) return;
+    await this.prisma.notification.deleteMany({ where: { id: { in: ids } } });
+  }
+
+  /** Identifiants des lignes (tous canaux confondus, jumelles comprises) qui appartiennent à l'espace donné. */
+  private async idsInSpace(userId: string, space: NotificationSpace, options: { unreadOnly?: boolean } = {}): Promise<string[]> {
+    const rows = await this.prisma.notification.findMany({
+      where: { userId, ...(options.unreadOnly ? { readAt: null } : {}) },
+      select: { id: true, type: true, payload: true },
+    });
+    return rows.filter((row) => belongsToSpace(row, space)).map((row) => row.id);
   }
 
   // ---------------------------------------------------------------------

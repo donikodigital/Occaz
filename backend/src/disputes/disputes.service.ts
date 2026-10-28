@@ -274,6 +274,8 @@ export class DisputesService {
     excludeUserId: string,
   ): Promise<void> {
     const recipientIds = new Set<string>();
+    // Espace de chaque partie dans ce litige (client ou conducteur) ; l'agent assigné n'en a pas.
+    const audienceOf = new Map<string, 'CUSTOMER' | 'DRIVER'>();
 
     if (dispute.booking) {
       const booking = await this.prisma.booking.findUnique({
@@ -283,6 +285,8 @@ export class DisputesService {
       if (booking) {
         recipientIds.add(booking.customer.userId);
         recipientIds.add(booking.trip.driver.userId);
+        audienceOf.set(booking.customer.userId, 'CUSTOMER');
+        audienceOf.set(booking.trip.driver.userId, 'DRIVER');
       }
     }
     if (dispute.shipment) {
@@ -293,6 +297,8 @@ export class DisputesService {
       if (shipment) {
         recipientIds.add(shipment.customer.userId);
         if (shipment.driver) recipientIds.add(shipment.driver.userId);
+        audienceOf.set(shipment.customer.userId, 'CUSTOMER');
+        if (shipment.driver) audienceOf.set(shipment.driver.userId, 'DRIVER');
       }
     }
     if (dispute.assignedAgentId) recipientIds.add(dispute.assignedAgentId);
@@ -302,6 +308,7 @@ export class DisputesService {
       Array.from(recipientIds).map((userId) =>
         this.notifications.notify({
           userId,
+          audience: audienceOf.get(userId),
           type: NotificationType.SUPPORT_MESSAGE,
           channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
           fallbackTitle: 'Nouveau message — litige',
@@ -622,6 +629,8 @@ export class DisputesService {
     resolutionType: DisputeResolutionType,
   ): Promise<void> {
     const recipientIds = new Set<string>();
+    // Espace de chaque partie dans ce litige (client ou conducteur) ; l'agent assigné n'en a pas.
+    const audienceOf = new Map<string, 'CUSTOMER' | 'DRIVER'>();
 
     if (dispute.booking) {
       const booking = await this.prisma.booking.findUnique({
@@ -631,6 +640,8 @@ export class DisputesService {
       if (booking) {
         recipientIds.add(booking.customer.userId);
         recipientIds.add(booking.trip.driver.userId);
+        audienceOf.set(booking.customer.userId, 'CUSTOMER');
+        audienceOf.set(booking.trip.driver.userId, 'DRIVER');
       }
     }
     if (dispute.shipment) {
@@ -641,6 +652,8 @@ export class DisputesService {
       if (shipment) {
         recipientIds.add(shipment.customer.userId);
         if (shipment.driver) recipientIds.add(shipment.driver.userId);
+        audienceOf.set(shipment.customer.userId, 'CUSTOMER');
+        if (shipment.driver) audienceOf.set(shipment.driver.userId, 'DRIVER');
       }
     }
 
@@ -648,6 +661,7 @@ export class DisputesService {
       Array.from(recipientIds).map((userId) =>
         this.notifications.notify({
           userId,
+          audience: audienceOf.get(userId),
           type: NotificationType.DISPUTE,
           channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],
           fallbackTitle: 'Litige résolu',

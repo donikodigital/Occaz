@@ -1,4 +1,5 @@
 // mobile/src/components/ocean/OceanKit.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Briques de l'identité « bleu océan » du profil conducteur, utilisées par
 // tous les écrans de l'espace client : même bandeau sombre aux reflets, même
@@ -11,6 +12,7 @@ import { IconArrowLeft, IconMinus, IconPlus, IconX } from '@tabler/icons-react-n
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 // ---------------------------------------------------------------------------
 // Bandeau
@@ -49,12 +51,13 @@ export function OceanScreenHeader({
   onClose?: () => void;
   right?: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <View style={styles.header}>
       <Pressable
         onPress={onClose ?? onBack}
         accessibilityRole="button"
-        accessibilityLabel={onClose ? 'Fermer et revenir à l’accueil' : 'Retour'}
+        accessibilityLabel={onClose ? t('Fermer et revenir à l’accueil') : t('Retour')}
         style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
       >
         {onClose ? <IconX size={18} color={OCEAN.base} /> : <IconArrowLeft size={18} color={OCEAN.base} />}
@@ -326,13 +329,14 @@ export function OceanStepper({
   max?: number;
   label: string;
 }) {
+  const t = useT();
   return (
     <View style={styles.stepper}>
       <Pressable
         onPress={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min}
         accessibilityRole="button"
-        accessibilityLabel={`Retirer : ${label}`}
+        accessibilityLabel={t('Retirer : {label}', { label })}
         style={[styles.stepperButton, value <= min && styles.buttonDisabled]}
       >
         <IconMinus size={16} color={OCEAN.base} />
@@ -344,7 +348,7 @@ export function OceanStepper({
         onPress={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max}
         accessibilityRole="button"
-        accessibilityLabel={`Ajouter : ${label}`}
+        accessibilityLabel={t('Ajouter : {label}', { label })}
         style={[styles.stepperButton, value >= max && styles.buttonDisabled]}
       >
         <IconPlus size={16} color={OCEAN.base} />

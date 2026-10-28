@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ShipmentTrackingView.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v1 — Affichage d'un suivi de colis, commun à la page publique (numéro de suivi, sans compte) et à l'espace de
 // l'expéditeur : l'essentiel d'abord (où est le colis, où il en est), le détail ensuite (route ville par ville, historique daté).
 import React, { useState } from 'react';
@@ -11,11 +12,12 @@ import { OCEAN } from '@/theme/ocean';
 import { formatDateShort, formatRelativeTime, formatTime } from '@/utils/date';
 import { openInMaps } from '@/utils/maps';
 import type { ShipmentTracking, TrackingJourneyPoint, TrackingLocation, TrackingOutcome } from '@/types/tracking.types';
+import { useT, translate } from '@/i18n';
 
 const KIND_LABELS: Record<TrackingJourneyPoint['kind'], string> = {
-  PICKUP: 'Départ du colis',
-  STOP: 'Ville traversée',
-  DELIVERY: 'Livraison',
+  get PICKUP() { return translate('Départ du colis'); },
+  get STOP() { return translate('Ville traversée'); },
+  get DELIVERY() { return translate('Livraison'); },
 };
 
 function heroColor(outcome: TrackingOutcome): string {
@@ -28,7 +30,7 @@ function heroColor(outcome: TrackingOutcome): string {
 /** « il y a 4 min » jusqu'à une heure, puis l'heure elle-même : « à 14:32 ». */
 function ago(iso: string): string {
   const minutes = (Date.now() - new Date(iso).getTime()) / 60_000;
-  return minutes < 60 ? formatRelativeTime(iso) : `à ${formatTime(iso)}`;
+  return minutes < 60 ? formatRelativeTime(iso) : translate('à {time}', { time: formatTime(iso) });
 }
 
 function when(iso: string): string {
@@ -37,10 +39,10 @@ function when(iso: string): string {
 
 function positionNote(location: TrackingLocation): string | null {
   if (location.source === 'GPS' && location.updatedAt) {
-    const base = location.isStale ? `Dernière position connue ${ago(location.updatedAt)}` : `Position en direct · mise à jour ${ago(location.updatedAt)}`;
-    return location.isApproximate ? `${base} · zone approximative` : base;
+    const base = location.isStale ? translate('Dernière position connue {ago}', { ago: ago(location.updatedAt) }) : translate('Position en direct · mise à jour {ago}', { ago: ago(location.updatedAt) });
+    return location.isApproximate ? translate('{base} · zone approximative', { base }) : base;
   }
-  if (location.source === 'CITIES') return 'Position déduite des villes traversées par le conducteur.';
+  if (location.source === 'CITIES') return translate('Position déduite des villes traversées par le conducteur.');
   return null;
 }
 
@@ -70,6 +72,7 @@ function ProgressBar({ steps }: { steps: ShipmentTracking['progress'] }) {
 }
 
 function JourneyRow({ point, isLast }: { point: TrackingJourneyPoint; isLast: boolean }) {
+  const t = useT();
   return (
     <View style={styles.journeyRow}>
       <View style={styles.journeyColumn}>
@@ -82,7 +85,7 @@ function JourneyRow({ point, isLast }: { point: TrackingJourneyPoint; isLast: bo
         </AppText>
         <AppText variant="xs" color="textSecondary">
           {KIND_LABELS[point.kind]}
-          {point.state === 'NEXT' ? ' · prochaine étape' : ''}
+          {point.state === 'NEXT' ? t(' · prochaine étape') : ''}
         </AppText>
       </View>
       {point.at ? (
@@ -95,6 +98,7 @@ function JourneyRow({ point, isLast }: { point: TrackingJourneyPoint; isLast: bo
 }
 
 export function ShipmentTrackingView({ tracking }: { tracking: ShipmentTracking }) {
+  const t = useT();
   const [showHistory, setShowHistory] = useState(false);
   const { location } = tracking;
   const note = positionNote(location);
@@ -110,7 +114,7 @@ export function ShipmentTrackingView({ tracking }: { tracking: ShipmentTracking 
           </View>
           <View style={styles.heroText}>
             <AppText variant="xs" color={OCEAN.sky}>
-              Colis {tracking.trackingNumberFormatted}
+              {t('Colis {trackingNumberFormatted}', { trackingNumberFormatted: tracking.trackingNumberFormatted })}
             </AppText>
             <AppText variant="lg" weight="bold" color={OCEAN.onDark}>
               {tracking.headline}
@@ -119,14 +123,14 @@ export function ShipmentTrackingView({ tracking }: { tracking: ShipmentTracking 
         </View>
         <AppText variant="sm" color={OCEAN.onDark}>
           {tracking.pickupCity} → {tracking.deliveryCity}
-          {tracking.parcelsCount > 1 ? ` · ${tracking.parcelsCount} colis` : ''}
+          {tracking.parcelsCount > 1 ? t(' · {parcelsCount} colis', { parcelsCount: tracking.parcelsCount }) : ''}
         </AppText>
       </OceanHeroCard>
 
       {tracking.outcome === 'ACTIVE' || tracking.outcome === 'DELIVERED' ? <ProgressBar steps={tracking.progress} /> : null}
 
       {isActive ? (
-        <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Où est mon colis ?">
+        <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title={t('Où est mon colis ?')}>
           <AppText variant="base" weight="semibold" color={OCEAN.deep}>
             {location.label}
           </AppText>
@@ -137,17 +141,17 @@ export function ShipmentTrackingView({ tracking }: { tracking: ShipmentTracking 
           ) : null}
           {hasCoordinates ? (
             <OceanButton
-              label="Voir sur la carte"
+              label={t('Voir sur la carte')}
               variant="soft"
               icon={<IconMapPin size={16} color={OCEAN.base} />}
-              onPress={() => void openInMaps(location.latitude!, location.longitude!, 'Colis Occa’Z')}
+              onPress={() => void openInMaps(location.latitude!, location.longitude!, t('Colis Occa’Z'))}
             />
           ) : null}
         </OceanSection>
       ) : null}
 
       {tracking.journey.length > 1 && tracking.outcome !== 'CANCELLED' ? (
-        <OceanSection icon={<IconRoute size={17} color={OCEAN.base} />} title="Route du colis">
+        <OceanSection icon={<IconRoute size={17} color={OCEAN.base} />} title={t('Route du colis')}>
           <View>
             {tracking.journey.map((point, index) => (
               <JourneyRow key={`${point.cityName}-${index}`} point={point} isLast={index === tracking.journey.length - 1} />
@@ -159,12 +163,12 @@ export function ShipmentTrackingView({ tracking }: { tracking: ShipmentTracking 
       {tracking.events.length > 0 ? (
         <OceanSection
           icon={<IconHistory size={17} color={OCEAN.base} />}
-          title="Historique"
+          title={t('Historique')}
           action={
             <Pressable
               onPress={() => setShowHistory((value) => !value)}
               accessibilityRole="button"
-              accessibilityLabel={showHistory ? "Masquer l'historique" : "Afficher l'historique"}
+              accessibilityLabel={showHistory ? t("Masquer l'historique") : t("Afficher l'historique")}
               hitSlop={8}
             >
               {showHistory ? <IconChevronUp size={18} color={OCEAN.base} /> : <IconChevronDown size={18} color={OCEAN.base} />}
@@ -185,7 +189,7 @@ export function ShipmentTrackingView({ tracking }: { tracking: ShipmentTracking 
           ) : (
             <Pressable onPress={() => setShowHistory(true)} accessibilityRole="button">
               <AppText variant="sm" color="textSecondary">
-                Dernière mise à jour : {tracking.events[0].label} · {when(tracking.events[0].at)}
+                {t('Dernière mise à jour : {label} · {when}', { label: tracking.events[0].label, when: when(tracking.events[0].at) })}
               </AppText>
             </Pressable>
           )}

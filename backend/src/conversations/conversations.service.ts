@@ -287,6 +287,8 @@ export class ConversationsService {
       recipientUserIds.map((userId) =>
         this.notifications.notify({
           userId,
+          // Le message arrive dans l'espace où la personne tient son rôle dans cet échange (client ou conducteur).
+          audience: userId === conversation.driver.userId ? 'DRIVER' : 'CUSTOMER',
           type: NotificationType.CONVERSATION_MESSAGE,
           channels: [NotificationChannel.PUSH],
           fallbackTitle: senderName,

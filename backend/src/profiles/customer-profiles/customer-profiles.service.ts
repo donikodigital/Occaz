@@ -116,6 +116,7 @@ export class CustomerProfilesService {
     });
 
     await this.notifications.notify({
+      audience: 'CUSTOMER',
       userId,
       type: NotificationType.STATUS_CHANGE,
       channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],

@@ -1,4 +1,5 @@
 // mobile/app/(auth)/login.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [22/09/2026] v2 — Habillage bleu Ocean, dans l'esprit Tiime.
 // [11/10/2026] v5 — Connexion par numéro + mot de passe, EN DEUX ÉCRANS comme avant le passage au mot de passe :
 //   1. ce écran : le numéro de téléphone (pays proposé = celui défini par l'administration, indicatif et drapeau, espaces posés selon le
@@ -14,16 +15,19 @@ import { OceanButton } from '@/components/ocean/OceanKit';
 import { AuthStep } from '@/components/auth/AuthStep';
 import { CountryPickerModal } from '@/components/auth/CountryField';
 import { PhoneField } from '@/components/auth/PhoneField';
+import { LanguageSelector } from '@/components/auth/LanguageSelector';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useDefaultSignupCountry } from '@/hooks/useSignupCountry';
 import { buildInternationalPhone, formatNationalPhone, isValidPhoneNumber } from '@/utils/phone';
 import type { Country } from '@/types/geography.types';
 import type { AccountType } from '@/types/auth.types';
+import { useT } from '@/i18n';
 
 type Space = Extract<AccountType, 'CUSTOMER' | 'DRIVER'>;
 
 export default function LoginScreen() {
+  const t = useT();
   const { accountType: accountTypeParam } = useLocalSearchParams<{ accountType?: Space }>();
   const accountType: Space = accountTypeParam === 'DRIVER' ? 'DRIVER' : 'CUSTOMER';
 
@@ -37,7 +41,7 @@ export default function LoginScreen() {
   function handleContinue() {
     const international = buildInternationalPhone(country?.phoneCode ?? '', phone, country?.isoCode);
     if (!country || !isValidPhoneNumber(international)) {
-      setPhoneError('Numéro invalide. Vérifiez-le sans l’indicatif du pays.');
+      setPhoneError(t('Numéro invalide. Vérifiez-le sans l’indicatif du pays.'));
       return;
     }
     setPhoneError(undefined);
@@ -54,11 +58,13 @@ export default function LoginScreen() {
   return (
     <AuthStep
       icon={<IconLogin size={26} color={OCEAN.onDark} />}
-      title="Connexion"
-      subtitle={accountType === 'DRIVER' ? 'Espace conducteur · Indiquez votre numéro de téléphone.' : 'Espace client · Indiquez votre numéro de téléphone.'}
+      title={t('Connexion')}
+      subtitle={accountType === 'DRIVER' ? t('Espace conducteur · Indiquez votre numéro de téléphone.') : t('Espace client · Indiquez votre numéro de téléphone.')}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/onboarding'))}
-      footer={<OceanButton label="Continuer" onPress={handleContinue} />}
+      footer={<OceanButton label={t('Continuer')} onPress={handleContinue} />}
     >
+      <LanguageSelector />
+
       <PhoneField
         country={country}
         value={phone}
@@ -73,7 +79,7 @@ export default function LoginScreen() {
 
       <View style={styles.create}>
         <AppText variant="sm" color="textSecondary">
-          Pas encore de compte ?{' '}
+          {t('Pas encore de compte ?')}{' '}
         </AppText>
         <Pressable
           onPress={() => router.replace({ pathname: '/(auth)/signup', params: { accountType } })}
@@ -81,7 +87,7 @@ export default function LoginScreen() {
           hitSlop={8}
         >
           <AppText variant="sm" weight="semibold" color={OCEAN.base}>
-            Créer un compte
+            {t('Créer un compte')}
           </AppText>
         </Pressable>
       </View>

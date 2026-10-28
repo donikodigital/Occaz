@@ -1,4 +1,5 @@
 // mobile/app/(customer)/rate.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [10/10/2026] v2 — « Merci ! » s'affiche dans la page (écran de remerciement avec « OK ») au lieu d'Alert.alert, sans effet sur le web :
 // avant, l'avis partait mais rien ne confirmait et l'écran restait ouvert.
@@ -11,18 +12,20 @@ import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { spacing } from '@/theme';
 import { useRateBooking, useRateShipment } from '@/hooks/useRatings';
 import { ApiError } from '@/services/api/ApiError';
+import { useT, translate } from '@/i18n';
 
 const SUB_CRITERIA = [
-  { key: 'punctuality', label: 'Ponctualité' },
-  { key: 'respect', label: 'Courtoisie' },
-  { key: 'communication', label: 'Communication' },
-  { key: 'reliability', label: 'Fiabilité' },
-  { key: 'vehicleCondition', label: 'État du véhicule' },
+  { key: 'punctuality', get label() { return translate('Ponctualité'); } },
+  { key: 'respect', get label() { return translate('Courtoisie'); } },
+  { key: 'communication', get label() { return translate('Communication'); } },
+  { key: 'reliability', get label() { return translate('Fiabilité'); } },
+  { key: 'vehicleCondition', get label() { return translate('État du véhicule'); } },
 ] as const;
 
 type SubCriterionKey = (typeof SUB_CRITERIA)[number]['key'];
 
 export default function RateScreen() {
+  const t = useT();
   const { type, id } = useLocalSearchParams<{ type: 'booking' | 'shipment'; id: string }>();
   const [score, setScore] = useState(0);
   const [subScores, setSubScores] = useState<Partial<Record<SubCriterionKey, number>>>({});
@@ -37,7 +40,7 @@ export default function RateScreen() {
   function handleSubmit() {
     setErrorMessage(undefined);
     if (score === 0) {
-      setErrorMessage('Choisissez une note globale.');
+      setErrorMessage(t('Choisissez une note globale.'));
       return;
     }
 
@@ -46,7 +49,7 @@ export default function RateScreen() {
       {
         onSuccess: () => setSubmitted(true),
         onError: (error) => {
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -56,8 +59,8 @@ export default function RateScreen() {
     return (
       <ScreenContainer scroll maxWidth="form">
         <View style={styles.thanks}>
-          <FeedbackBanner tone="success" title="Merci !" text="Votre avis a bien été enregistré." />
-          <Button label="OK" onPress={() => router.back()} />
+          <FeedbackBanner tone="success" title={t('Merci !')} text={t('Votre avis a bien été enregistré.')} />
+          <Button label={t('OK')} onPress={() => router.back()} />
         </View>
       </ScreenContainer>
     );
@@ -66,15 +69,15 @@ export default function RateScreen() {
   return (
     <ScreenContainer scroll maxWidth="form">
       <OceanHeroHeader
-        title="Laisser un avis"
-        subtitle="Votre avis aide la communauté"
+        title={t('Laisser un avis')}
+        subtitle={t('Votre avis aide la communauté')}
         icon={<IconStar />}
         onBack={() => router.back()}
       />
 
       <View style={styles.overallBlock}>
         <AppText variant="base" color="textSecondary" align="center" style={styles.overallLabel}>
-          Comment s'est passé {type === 'booking' ? 'ce trajet' : 'cet envoi'} ?
+          {t("Comment s'est passé {value} ?", { value: type === 'booking' ? t('ce trajet') : t('cet envoi') })}
         </AppText>
         <RatingStars value={score} onChange={setScore} size={36} />
       </View>
@@ -95,10 +98,10 @@ export default function RateScreen() {
       </View>
 
       <TextField
-        label="Commentaire (optionnel)"
+        label={t('Commentaire (optionnel)')}
         value={comment}
         onChangeText={setComment}
-        placeholder="Partagez votre expérience…"
+        placeholder={t('Partagez votre expérience…')}
         multiline
         style={styles.commentField}
       />
@@ -109,7 +112,7 @@ export default function RateScreen() {
         </AppText>
       ) : null}
 
-      <Button label="Envoyer mon avis" onPress={handleSubmit} loading={mutation.isPending} style={styles.submit} />
+      <Button label={t('Envoyer mon avis')} onPress={handleSubmit} loading={mutation.isPending} style={styles.submit} />
     </ScreenContainer>
   );
 }

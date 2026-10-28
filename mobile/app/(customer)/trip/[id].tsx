@@ -1,4 +1,5 @@
 // mobile/app/(customer)/trip/[id].tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // v2 — Refonte bleu océan, sur le modèle de l'écran détail côté conducteur :
 //   - bandeau sombre avec la date, l'heure de départ et l'itinéraire en frise
@@ -46,12 +47,14 @@ import { currencyOf, formatMoney } from '@/utils/money';
 import { formatDateLong, formatTime } from '@/utils/date';
 import { formatSeatsAvailability } from '@/utils/seats';
 import { routePointOptions, segmentAvailableSeats, stopAddress } from '@/utils/tripSegment';
+import { useT } from '@/i18n';
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 export default function TripDetailScreen() {
+  const t = useT();
   const params = useLocalSearchParams<{
     id: string;
     boardingStopId?: string;
@@ -75,7 +78,7 @@ export default function TripDetailScreen() {
       <ScreenContainer maxWidth="detail" style={styles.center}>
         {isError ? (
           <AppText variant="sm" color="danger">
-            Impossible de charger ce trajet.
+            {t('Impossible de charger ce trajet.')}
           </AppText>
         ) : (
           <ActivityIndicator color={OCEAN.base} />
@@ -109,14 +112,14 @@ export default function TripDetailScreen() {
         <View style={styles.footer}>
           <View style={styles.footerPrice}>
             <AppText variant="xs" color="textSecondary">
-              Prix par place
+              {t('Prix par place')}
             </AppText>
             <AppText variant="lg" weight="bold" color={OCEAN.deep}>
               {formatMoney(trip.customerPricePerSeat ?? trip.pricePerSeat, currencyOf(trip))}
             </AppText>
           </View>
           <OceanButton
-            label={isFull ? 'Complet' : 'Réserver'}
+            label={isFull ? t('Complet') : t('Réserver')}
             onPress={() =>
               router.push({
                 pathname: '/(customer)/booking/new',
@@ -134,7 +137,7 @@ export default function TripDetailScreen() {
         </View>
       }
     >
-      <OceanScreenHeader title="Détail du trajet" onBack={() => router.back()} />
+      <OceanScreenHeader title={t('Détail du trajet')} onBack={() => router.back()} />
 
       <OceanHeroCard style={styles.hero}>
         <View style={styles.heroTop}>
@@ -145,7 +148,7 @@ export default function TripDetailScreen() {
           />
           {trip.stops && trip.stops.length > 0 ? (
             <OceanPill
-              label={`${trip.stops.length} ville${trip.stops.length > 1 ? 's' : ''} traversée${trip.stops.length > 1 ? 's' : ''}`}
+              label={t.n(trip.stops.length, '{count} ville traversée', '{count} villes traversées')}
               tone="neutral"
               icon={<IconArrowsSplit2 size={13} color={colors.textSecondary} />}
             />
@@ -161,7 +164,7 @@ export default function TripDetailScreen() {
           </AppText>
           {isPartial && segment ? (
             <AppText variant="sm" color={OCEAN.onDark}>
-              Vous montez à {segment.boardingCityName ?? 'votre étape'} et descendez à {segment.alightingCityName ?? 'votre arrivée'}
+              {t('Vous montez à {value} et descendez à {value2}', { value: segment.boardingCityName ?? t('votre étape'), value2: segment.alightingCityName ?? t('votre arrivée') })}
             </AppText>
           ) : null}
         </View>
@@ -175,7 +178,7 @@ export default function TripDetailScreen() {
           <View style={styles.stops}>
             <View style={styles.stop}>
               <AppText variant="xs" color={OCEAN.sky}>
-                Départ
+                {t('Départ')}
               </AppText>
               <AppText variant="base" weight="bold" color={OCEAN.onDark} numberOfLines={2}>
                 {originLabel}
@@ -190,11 +193,11 @@ export default function TripDetailScreen() {
                     <View key={stop.id} style={styles.stop}>
                       <AppText variant="xs" color={OCEAN.sky}>
                         {stop.id === segment?.boardingStopId
-                          ? 'Votre montée'
+                          ? t('Votre montée')
                           : stop.id === segment?.alightingStopId
-                            ? 'Votre descente'
-                            : 'Étape'}
-                        {stop.estimatedArrivalAt ? ` · vers ${formatTime(stop.estimatedArrivalAt)}` : ''}
+                            ? t('Votre descente')
+                            : t('Étape')}
+                        {stop.estimatedArrivalAt ? t(' · vers {time}', { time: formatTime(stop.estimatedArrivalAt) }) : ''}
                       </AppText>
                       <AppText variant="sm" weight={isMine ? 'bold' : 'regular'} color={OCEAN.onDark} numberOfLines={2}>
                         {stopAddress(stop)}
@@ -205,7 +208,7 @@ export default function TripDetailScreen() {
               : null}
             <View style={styles.stop}>
               <AppText variant="xs" color={OCEAN.sky}>
-                Arrivée
+                {t('Arrivée')}
               </AppText>
               <AppText variant="base" weight="bold" color={OCEAN.onDark} numberOfLines={2}>
                 {destinationLabel}
@@ -215,7 +218,7 @@ export default function TripDetailScreen() {
         </View>
       </OceanHeroCard>
 
-      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title="Conducteur">
+      <OceanSection icon={<IconUser size={17} color={OCEAN.base} />} title={t('Conducteur')}>
         <View style={styles.driverRow}>
           <Avatar initials={initials} imageUri={trip.driver.photoUrl} size={52} />
           <View style={styles.driverText}>
@@ -226,19 +229,19 @@ export default function TripDetailScreen() {
               {trip.driver.isVerifiedBadge ? (
                 <IconRosetteDiscountCheck size={17} color={OCEAN.base} />
               ) : (
-                <OceanPill label="Non vérifié" tone="neutral" />
+                <OceanPill label={t('Non vérifié')} tone="neutral" />
               )}
             </View>
             {trip.driver.averageRating ? (
               <View style={styles.ratingRow}>
                 <IconStarFilled size={13} color={colors.accent} />
                 <AppText variant="sm" color="textSecondary">
-                  {trip.driver.averageRating.toFixed(1)} · {trip.driver.completedTripsCount} trajets effectués
+                  {t('{averageRating} · {completedTripsCount} trajets effectués', { averageRating: trip.driver.averageRating.toFixed(1), completedTripsCount: trip.driver.completedTripsCount })}
                 </AppText>
               </View>
             ) : (
               <AppText variant="sm" color="textSecondary">
-                Nouveau conducteur
+                {t('Nouveau conducteur')}
               </AppText>
             )}
           </View>
@@ -246,7 +249,7 @@ export default function TripDetailScreen() {
       </OceanSection>
 
       <OceanButton
-        label={showDetails ? 'Masquer les détails' : 'Voir tous les détails'}
+        label={showDetails ? t('Masquer les détails') : t('Voir tous les détails')}
         variant="soft"
         icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
         onPress={() => setShowDetails((value) => !value)}
@@ -256,13 +259,13 @@ export default function TripDetailScreen() {
       {showDetails ? (
         <>
       {routeOptions.length > 2 ? (
-        <OceanSection icon={<IconArrowsSplit2 size={17} color={OCEAN.base} />} title="Votre trajet">
+        <OceanSection icon={<IconArrowsSplit2 size={17} color={OCEAN.base} />} title={t('Votre trajet')}>
           <AppText variant="xs" color="textSecondary">
-            Le conducteur traverse plusieurs villes : montez et descendez où vous voulez sur sa route, le prix s'adapte.
+            {t("Le conducteur traverse plusieurs villes : montez et descendez où vous voulez sur sa route, le prix s'adapte.")}
           </AppText>
           <View style={styles.choiceBlock}>
             <AppText variant="sm" weight="medium" color="textSecondary">
-              Je monte à
+              {t('Je monte à')}
             </AppText>
             <View style={styles.choiceRow}>
               {routeOptions.slice(0, alightingIndex).map((point, index) => (
@@ -277,7 +280,7 @@ export default function TripDetailScreen() {
           </View>
           <View style={styles.choiceBlock}>
             <AppText variant="sm" weight="medium" color="textSecondary">
-              Je descends à
+              {t('Je descends à')}
             </AppText>
             <View style={styles.choiceRow}>
               {routeOptions.slice(boardingIndex + 1).map((point, offset) => (
@@ -293,7 +296,7 @@ export default function TripDetailScreen() {
         </OceanSection>
       ) : null}
 
-      <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title="Véhicule">
+      <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title={t('Véhicule')}>
         <View style={styles.vehicleBox}>
           <View style={styles.vehicleIcon}>
             <IconCar size={18} color={OCEAN.base} />
@@ -309,12 +312,12 @@ export default function TripDetailScreen() {
         </View>
       </OceanSection>
 
-      <OceanSection icon={<IconInfoCircle size={17} color={OCEAN.base} />} title="Détails">
+      <OceanSection icon={<IconInfoCircle size={17} color={OCEAN.base} />} title={t('Détails')}>
         <View style={styles.pills}>
-          <OceanPill label={`${trip.totalSeats} place${trip.totalSeats > 1 ? 's' : ''} au total`} icon={<IconUsers size={13} color={OCEAN.base} />} />
+          <OceanPill label={t.n(trip.totalSeats, '{count} place au total', '{count} places au total')} icon={<IconUsers size={13} color={OCEAN.base} />} />
           {trip.allowsShipments ? (
             <OceanPill
-              label={`Accepte les colis${trip.maxShipmentWeightKg ? ` · jusqu’à ${trip.maxShipmentWeightKg} kg` : ''}`}
+              label={t('Accepte les colis{value}', { value: trip.maxShipmentWeightKg ? t(' · jusqu’à {maxShipmentWeightKg} kg', { maxShipmentWeightKg: trip.maxShipmentWeightKg }) : '' })}
               tone="success"
               icon={<IconPackage size={13} color={colors.successDark} />}
             />

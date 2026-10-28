@@ -169,6 +169,7 @@ export class ShipmentOtpService {
       const customer = await this.prisma.customerProfile.findUnique({ where: { id: shipment.customerId }, select: { userId: true } });
       if (!customer) return;
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: customer.userId,
         type: NotificationType.STATUS_CHANGE,
         channels: [NotificationChannel.PUSH],
@@ -351,6 +352,7 @@ export class ShipmentOtpService {
     });
     if (customer) {
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: customer.userId,
         type: NotificationType.DELIVERY,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],

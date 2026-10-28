@@ -1,4 +1,5 @@
 // mobile/app/(customer)/payment.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [09/10/2026] v5 — La confirmation de paiement passait par Alert.alert(), qui ne fait RIEN sur le web (react-native-web
 // n'implémente pas ce module, voir ConfirmDialog.tsx) : le paiement partait bien, mais aucun message ne s'affichait, et un second
@@ -39,16 +40,18 @@ import { useShipment } from '@/hooks/useShipments';
 import { currencyOf, formatMoney } from '@/utils/money';
 import { ApiError } from '@/services/api/ApiError';
 import type { PaymentProvider } from '@/types/payments.types';
+import { useT, translate } from '@/i18n';
 
 const PROVIDER_LABELS: Record<PaymentProvider['type'], string> = {
-  ORANGE_MONEY: 'Orange Money',
-  MOBILE_MONEY_XOF: 'Mobile Money',
-  CARD: 'Carte bancaire',
-  BANK_TRANSFER: 'Virement bancaire',
-  OTHER: 'Autre',
+  get ORANGE_MONEY() { return translate('Orange Money'); },
+  get MOBILE_MONEY_XOF() { return translate('Mobile Money'); },
+  get CARD() { return translate('Carte bancaire'); },
+  get BANK_TRANSFER() { return translate('Virement bancaire'); },
+  get OTHER() { return translate('Autre'); },
 };
 
 export default function PaymentScreen() {
+  const t = useT();
   const { bookingId, shipmentId } = useLocalSearchParams<{ bookingId?: string; shipmentId?: string }>();
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
@@ -94,7 +97,7 @@ export default function PaymentScreen() {
             setJustPaid(true);
             return;
           }
-          setErrorMessage(error instanceof ApiError ? error.message : 'Une erreur est survenue.');
+          setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue.'));
         },
       },
     );
@@ -103,17 +106,17 @@ export default function PaymentScreen() {
   if (paid) {
     return (
       <ScreenContainer scroll maxWidth="form">
-        <OceanScreenHeader title="Paiement" subtitle="Paiement effectué" onBack={goBackToItem} />
+        <OceanScreenHeader title={t('Paiement')} subtitle={t('Paiement effectué')} onBack={goBackToItem} />
 
         <OceanHeroCard style={styles.successHero}>
           <View style={styles.successBadge}>
             <IconCircleCheck size={40} color={OCEAN.onDark} />
           </View>
           <AppText variant="lg" weight="bold" color={OCEAN.onDark} align="center">
-            Paiement confirmé
+            {t('Paiement confirmé')}
           </AppText>
           <AppText variant="sm" color={OCEAN.sky} align="center">
-            Votre paiement a bien été pris en compte.
+            {t('Votre paiement a bien été pris en compte.')}
           </AppText>
           {totalAmount ? (
             <AppText variant="display" weight="bold" color={OCEAN.onDark} align="center" style={styles.successAmount}>
@@ -123,7 +126,7 @@ export default function PaymentScreen() {
         </OceanHeroCard>
 
         <OceanButton
-          label={bookingId ? 'Voir ma réservation' : 'Voir mon envoi'}
+          label={bookingId ? t('Voir ma réservation') : t('Voir mon envoi')}
           onPress={goBackToItem}
           style={styles.submit}
         />
@@ -133,11 +136,11 @@ export default function PaymentScreen() {
 
   return (
     <ScreenContainer scroll maxWidth="form">
-      <OceanScreenHeader title="Paiement" subtitle="Choisissez comment payer" onBack={() => router.back()} />
+      <OceanScreenHeader title={t('Paiement')} subtitle={t('Choisissez comment payer')} onBack={() => router.back()} />
 
       <OceanHeroCard style={styles.amountHero}>
         <AppText variant="sm" color={OCEAN.sky}>
-          Montant à payer
+          {t('Montant à payer')}
         </AppText>
         <AppText variant="display" weight="bold" color={OCEAN.onDark}>
           {isLoadingAmount ? '…' : formatMoney(totalAmount ?? '0', currencyCode)}
@@ -145,13 +148,13 @@ export default function PaymentScreen() {
         <View style={styles.secure}>
           <IconShieldLock size={14} color={OCEAN.gold} />
           <AppText variant="xs" color={OCEAN.sky}>
-            Paiement sécurisé, traité par votre prestataire de paiement.
+            {t('Paiement sécurisé, traité par votre prestataire de paiement.')}
           </AppText>
         </View>
       </OceanHeroCard>
 
       <AppText variant="md" weight="bold" color={OCEAN.deep} style={styles.sectionTitle}>
-        Moyen de paiement
+        {t('Moyen de paiement')}
       </AppText>
 
       {providersLoading ? (
@@ -160,8 +163,8 @@ export default function PaymentScreen() {
         <OceanCard>
           <OceanEmpty
             icon={<IconCreditCard size={28} color={OCEAN.base} />}
-            title="Aucun moyen de paiement"
-            text="Aucun moyen de paiement n'est disponible pour le moment. Contactez le support."
+            title={t('Aucun moyen de paiement')}
+            text={t("Aucun moyen de paiement n'est disponible pour le moment. Contactez le support.")}
           />
         </OceanCard>
       ) : (
@@ -197,7 +200,7 @@ export default function PaymentScreen() {
       ) : null}
 
       <OceanButton
-        label="Payer"
+        label={t('Payer')}
         onPress={handlePay}
         disabled={!selectedProviderId}
         loading={initiatePayment.isPending}

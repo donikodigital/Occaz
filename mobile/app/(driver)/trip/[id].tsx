@@ -1,4 +1,5 @@
 // mobile/app/(driver)/trip/[id].tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [25/10/2026] v+ — bouton « Le client n'est pas venu ? Le déclarer absent » (après l'attente minimale) : le conducteur est payé, le client non remboursé.
 // [19/10/2026] v+ — plus de SMS pour les codes de trajet : le passager est prévenu dans l'application, le message le dit.
 // [10/10/2026] v+ — Plus aucun Alert.alert (sans effet sur le web) : erreurs en bannière dans la page, « Retirer une ville », « Annuler le trajet » et « Prise en charge non validée » en boîte de confirmation. Une action du trajet qui échoue (publier, démarrer…) affiche maintenant son erreur au lieu de ne rien faire.
@@ -118,6 +119,7 @@ import { isGuidedTrip } from '@/utils/driverJourney';
 import { ApiError } from '@/services/api/ApiError';
 import type { Booking } from '@/types/bookings.types';
 import type { Trip, TripLocation, TripStatus, TripStop } from '@/types/trips.types';
+import { useT, translate } from '@/i18n';
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -193,84 +195,84 @@ function getStage(
     case 'DRAFT':
       return {
         icon: IconNotes,
-        title: 'Trajet en brouillon',
-        text: 'Publiez-le pour que les passagers puissent réserver.',
+        title: translate('Trajet en brouillon'),
+        text: translate('Publiez-le pour que les passagers puissent réserver.'),
         tone: 'gold',
       };
     case 'PUBLISHED':
       return hasBookings
         ? {
             icon: IconCircleCheck,
-            title: 'Trajet publié',
-            text: 'Rendez-vous au point de départ, puis signalez votre arrivée.',
+            title: translate('Trajet publié'),
+            text: translate('Rendez-vous au point de départ, puis signalez votre arrivée.'),
             tone: 'ocean',
           }
         : {
             icon: IconUsers,
-            title: 'En attente de réservations',
-            text: 'Votre trajet est visible des passagers. Le bouton « Signaler mon arrivée au départ » apparaîtra dès la première réservation.',
+            title: translate('En attente de réservations'),
+            text: translate('Votre trajet est visible des passagers. Le bouton « Signaler mon arrivée au départ » apparaîtra dès la première réservation.'),
             tone: 'ocean',
           };
     case 'DRIVER_ARRIVED':
       if (onlyStopBookings) {
         return {
           icon: IconRoute,
-          title: 'Personne ne monte au départ',
-          text: 'Vos clients vous attendent aux villes traversées : démarrez le trajet et signalez votre arrivée à chaque étape.',
+          title: translate('Personne ne monte au départ'),
+          text: translate('Vos clients vous attendent aux villes traversées : démarrez le trajet et signalez votre arrivée à chaque étape.'),
           tone: 'ocean',
         };
       }
       return hasBookings
         ? {
             icon: IconUsers,
-            title: 'Prise en charge',
-            text: 'Demandez le code de chaque passager pour valider sa montée.',
+            title: translate('Prise en charge'),
+            text: translate('Demandez le code de chaque passager pour valider sa montée.'),
             tone: 'ocean',
           }
         : {
             icon: IconInfoCircle,
-            title: 'Aucun passager pour l’instant',
-            text: 'Personne n’a réservé ce trajet, et les réservations ne sont plus ouvertes une fois votre arrivée signalée — vous pouvez l’annuler ci-dessous.',
+            title: translate('Aucun passager pour l’instant'),
+            text: translate('Personne n’a réservé ce trajet, et les réservations ne sont plus ouvertes une fois votre arrivée signalée — vous pouvez l’annuler ci-dessous.'),
             tone: 'gold',
           };
     case 'PASSENGER_PICKED_UP':
       return {
         icon: IconCar,
-        title: 'Passagers à bord',
-        text: 'Tout le monde est monté : vous pouvez démarrer le trajet.',
+        title: translate('Passagers à bord'),
+        text: translate('Tout le monde est monté : vous pouvez démarrer le trajet.'),
         tone: 'success',
       };
     case 'IN_PROGRESS':
       if (positionError) {
-        return { icon: IconInfoCircle, title: 'Position non partagée', text: positionError, tone: 'gold' };
+        return { icon: IconInfoCircle, title: translate('Position non partagée'), text: positionError, tone: 'gold' };
       }
       return {
         icon: IconRoute,
-        title: 'En route',
+        title: translate('En route'),
         text:
           positionMode === 'background'
-            ? 'Votre position est partagée avec le passager, même en arrière-plan.'
-            : "Votre position est partagée avec le passager tant que l'application reste ouverte.",
+            ? translate('Votre position est partagée avec le passager, même en arrière-plan.')
+            : translate("Votre position est partagée avec le passager tant que l'application reste ouverte."),
         tone: 'success',
       };
     case 'ARRIVED':
       return hasBookings
         ? {
             icon: IconFlag,
-            title: 'Dépose des passagers',
-            text: 'Validez la dépose de chaque passager avec son code.',
+            title: translate('Dépose des passagers'),
+            text: translate('Validez la dépose de chaque passager avec son code.'),
             tone: 'ocean',
           }
         : {
             icon: IconFlag,
-            title: 'Arrivé à destination',
-            text: 'Il ne reste plus qu’à clôturer le trajet.',
+            title: translate('Arrivé à destination'),
+            text: translate('Il ne reste plus qu’à clôturer le trajet.'),
             tone: 'success',
           };
     case 'COMPLETED':
-      return { icon: IconCircleCheck, title: 'Trajet terminé', text: 'Ce trajet est clôturé.', tone: 'success' };
+      return { icon: IconCircleCheck, title: translate('Trajet terminé'), text: translate('Ce trajet est clôturé.'), tone: 'success' };
     case 'CANCELLED':
-      return { icon: IconInfoCircle, title: 'Trajet annulé', text: 'Ce trajet a été annulé.', tone: 'gold' };
+      return { icon: IconInfoCircle, title: translate('Trajet annulé'), text: translate('Ce trajet a été annulé.'), tone: 'gold' };
     default:
       return null;
   }
@@ -363,6 +365,7 @@ function BookingOtpCard({
   /** La dépose est proposée alors que la prise en charge de ce passager n'a jamais été validée. */
   pickupMissed?: boolean;
 }) {
+  const t = useT();
   const [codeVisible, setCodeVisible] = useState(false);
   const [code, setCode] = useState('');
   // Message affiché dans la carte (Alert.alert ne fait rien sur le web).
@@ -377,7 +380,7 @@ function BookingOtpCard({
   const getOrCreateConversation = useGetOrCreateConversationForBooking();
 
   const names = booking.passengers?.map((p) => p.fullName) ?? [];
-  const passengerNames = names.join(', ') || `${booking.seatsCount} place(s)`;
+  const passengerNames = names.join(', ') || t('{seatsCount} place(s)', { seatsCount: booking.seatsCount });
   const firstName = names[0];
   const initials = firstName
     ? firstName
@@ -401,14 +404,14 @@ function BookingOtpCard({
         if (result.smsDisabled || !result.smsSent) {
           setFeedback({
             tone: 'info',
-            title: 'Code généré',
+            title: t('Code généré'),
             text: result.smsDisabled
-              ? "Le passager vient d'être prévenu dans son application : demandez-lui son code (bouton « Voir mon code » sur sa réservation)."
-              : "Le SMS n'a pas pu être envoyé au passager — demandez-lui de consulter son code directement dans l'application (bouton « Voir mon code » sur sa réservation).",
+              ? t("Le passager vient d'être prévenu dans son application : demandez-lui son code (bouton « Voir mon code » sur sa réservation).")
+              : t("Le SMS n'a pas pu être envoyé au passager — demandez-lui de consulter son code directement dans l'application (bouton « Voir mon code » sur sa réservation)."),
           });
         }
       },
-      onError: () => setFeedback({ tone: 'error', title: 'Erreur', text: 'La demande de code a échoué — réessayez.' }),
+      onError: () => setFeedback({ tone: 'error', title: t('Erreur'), text: t('La demande de code a échoué — réessayez.') }),
     });
   }
 
@@ -422,7 +425,7 @@ function BookingOtpCard({
         setFeedback(null);
       },
       onError: (error) => {
-        setFeedback({ tone: 'error', title: 'Code invalide', text: error instanceof ApiError ? error.message : 'Réessayez.' });
+        setFeedback({ tone: 'error', title: t('Code invalide'), text: error instanceof ApiError ? error.message : t('Réessayez.') });
       },
     });
   }
@@ -433,7 +436,7 @@ function BookingOtpCard({
       onError: (error) => {
         // Attente minimale pas encore écoulée, trajet pas au bon stade… : le message du serveur dit exactement quoi faire.
         setNoShowOpen(false);
-        setFeedback({ tone: 'error', title: 'Impossible pour le moment', text: error instanceof ApiError ? error.message : 'Réessayez dans un instant.' });
+        setFeedback({ tone: 'error', title: t('Impossible pour le moment'), text: error instanceof ApiError ? error.message : t('Réessayez dans un instant.') });
       },
     });
   }
@@ -460,12 +463,12 @@ function BookingOtpCard({
           {isPartialBooking(booking) ? (
             <AppText variant="xs" weight="semibold" color={OCEAN.base} numberOfLines={1}>
               {bookingRoute(booking)?.from} → {bookingRoute(booking)?.to}
-              {booking.boardingStop?.estimatedArrivalAt ? ` · prise en charge vers ${formatTime(booking.boardingStop.estimatedArrivalAt)}` : ''}
+              {booking.boardingStop?.estimatedArrivalAt ? t(' · prise en charge vers {time}', { time: formatTime(booking.boardingStop.estimatedArrivalAt) }) : ''}
             </AppText>
           ) : null}
           <View style={styles.bookingMeta}>
             <AppText variant="xs" color="textSecondary">
-              {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
+              {t.n(booking.seatsCount, '{count} place', '{count} places')}
             </AppText>
             <OceanPill
               label={DRIVER_BOOKING_STATUS_LABELS[booking.status]}
@@ -475,7 +478,7 @@ function BookingOtpCard({
         </View>
         <IconButton
           icon={<IconMessageCircle size={16} color={colors.textPrimary} />}
-          accessibilityLabel="Contacter le passager"
+          accessibilityLabel={t('Contacter le passager')}
           onPress={() =>
             getOrCreateConversation.mutate(booking.id, {
               onSuccess: (conversation) => router.push(`/(driver)/conversation/${conversation.id}`),
@@ -489,25 +492,24 @@ function BookingOtpCard({
       {phase !== 'none' ? (
         <View style={styles.otpPanel}>
           <AppText variant="sm" weight="semibold">
-            {phase === 'pickup' ? 'Valider la prise en charge' : 'Valider la dépose'}
+            {phase === 'pickup' ? t('Valider la prise en charge') : t('Valider la dépose')}
           </AppText>
           {feedback ? <FeedbackBanner tone={feedback.tone} title={feedback.title} text={feedback.text} onDismiss={() => setFeedback(null)} /> : null}
           {phase === 'dropoff' && pickupMissed ? (
             <View style={styles.missedPickup}>
               <IconAlertTriangle size={15} color={colors.danger} />
               <AppText variant="xs" color="danger" style={styles.missedPickupText}>
-                La prise en charge de ce passager n'a pas été validée. Vous pouvez quand même valider sa dépose avec son code :
-                elle sera enregistrée sans prise en charge.
+                {t("La prise en charge de ce passager n'a pas été validée. Vous pouvez quand même valider sa dépose avec son code : elle sera enregistrée sans prise en charge.")}
               </AppText>
             </View>
           ) : null}
           {!codeVisible ? (
             <>
               <AppText variant="xs" color="textSecondary">
-                Le passager reçoit un code à 6 chiffres à vous communiquer.
+                {t('Le passager reçoit un code à 6 chiffres à vous communiquer.')}
               </AppText>
               <OceanButton
-                label={phase === 'pickup' ? 'Demander le code de prise en charge' : 'Demander le code de dépose'}
+                label={phase === 'pickup' ? t('Demander le code de prise en charge') : t('Demander le code de dépose')}
                 variant="soft"
                 onPress={handleRequest}
                 loading={isRequesting}
@@ -516,21 +518,21 @@ function BookingOtpCard({
           ) : (
             <>
               <AppText variant="xs" color="textSecondary">
-                Code envoyé. Saisissez celui que le passager vous donne.
+                {t('Code envoyé. Saisissez celui que le passager vous donne.')}
               </AppText>
               <View style={styles.codeRow}>
                 <TextField
                   value={code}
                   onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
                   keyboardType="number-pad"
-                  placeholder="Code à 6 chiffres"
+                  placeholder={t('Code à 6 chiffres')}
                   maxLength={6}
                   // `style` ne touche que le <TextInput> interne, jamais
                   // son conteneur — d'où le champ resté étroit malgré
                   // codeInput (flex: 1).
                   containerStyle={styles.codeInput}
                 />
-                <OceanButton label="Vérifier" onPress={handleVerify} loading={isVerifying} disabled={code.length !== 6} />
+                <OceanButton label={t('Vérifier')} onPress={handleVerify} loading={isVerifying} disabled={code.length !== 6} />
               </View>
               <Pressable
                 accessibilityRole="button"
@@ -542,9 +544,9 @@ function BookingOtpCard({
                       bookingId: booking.id,
                       reason:
                         phase === 'pickup'
-                          ? 'Passager injoignable ou refuse de communiquer le code de prise en charge'
-                          : 'Passager injoignable ou refuse de communiquer le code de dépose',
-                      description: `Réservation de ${passengerNames}.`,
+                          ? t('Passager injoignable ou refuse de communiquer le code de prise en charge')
+                          : t('Passager injoignable ou refuse de communiquer le code de dépose'),
+                      description: t('Réservation de {passengerNames}.', { passengerNames }),
                     },
                   })
                 }
@@ -552,7 +554,7 @@ function BookingOtpCard({
               >
                 <IconLifebuoy size={14} color={OCEAN.base} />
                 <AppText variant="xs" color={OCEAN.base} weight="semibold">
-                  Passager injoignable ou refuse le code ? Contacter le support
+                  {t('Passager injoignable ou refuse le code ? Contacter le support')}
                 </AppText>
               </Pressable>
             </>
@@ -565,7 +567,7 @@ function BookingOtpCard({
             >
               <IconUserX size={14} color={colors.danger} />
               <AppText variant="xs" color="danger" weight="semibold">
-                Le client n'est pas venu ? Le déclarer absent
+                {t("Le client n'est pas venu ? Le déclarer absent")}
               </AppText>
             </Pressable>
           ) : null}
@@ -573,10 +575,10 @@ function BookingOtpCard({
       ) : null}
       <ConfirmDialog
         visible={noShowOpen}
-        title="Déclarer ce client absent ?"
-        message="Vous avez attendu votre client au rendez-vous. Sa réservation sera clôturée, vous serez payé et il ne sera pas remboursé. Possible après 15 minutes d'attente à l'endroit où il devait monter."
-        confirmLabel="Oui, il est absent"
-        cancelLabel="Non, je l'attends"
+        title={t('Déclarer ce client absent ?')}
+        message={t("Vous avez attendu votre client au rendez-vous. Sa réservation sera clôturée, vous serez payé et il ne sera pas remboursé. Possible après 15 minutes d'attente à l'endroit où il devait monter.")}
+        confirmLabel={t('Oui, il est absent')}
+        cancelLabel={t("Non, je l'attends")}
         destructive
         loading={declareNoShow.isPending}
         onConfirm={handleNoShow}
@@ -595,7 +597,7 @@ function BookingOtpCard({
       >
         <IconFlag size={13} color={colors.textMuted} />
         <AppText variant="xs" color="textMuted">
-          Signaler un problème
+          {t('Signaler un problème')}
         </AppText>
       </Pressable>
     </OceanCard>
@@ -612,6 +614,7 @@ function BookingOtpCard({
  * quand même continuer (client absent), et la dépose de ce client restera possible.
  */
 function usePickupMissedConfirm() {
+  const t = useT();
   const [pending, setPending] = useState<{ title: string; message: string; proceed: () => void } | null>(null);
 
   function confirm(trip: Trip, bookings: Booking[], proceed: () => void): void {
@@ -621,10 +624,8 @@ function usePickupMissedConfirm() {
       return;
     }
     setPending({
-      title: missed.length > 1 ? 'Prises en charge non validées' : 'Prise en charge non validée',
-      message: `${missed.map((booking) => describeUnpicked(booking, trip)).join(' ; ')} ${
-        missed.length > 1 ? "n'ont pas été pris en charge" : "n'a pas été pris en charge"
-      } (code non validé). Validez d'abord la prise en charge si le passager est à bord. Vous pourrez quand même valider sa dépose plus tard.`,
+      title: missed.length > 1 ? t('Prises en charge non validées') : t('Prise en charge non validée'),
+      message: t("{value} {value2} (code non validé). Validez d'abord la prise en charge si le passager est à bord. Vous pourrez quand même valider sa dépose plus tard.", { value: missed.map((booking) => describeUnpicked(booking, trip)).join(' ; '), value2: missed.length > 1 ? t("n'ont pas été pris en charge") : t("n'a pas été pris en charge") }),
       proceed,
     });
   }
@@ -635,8 +636,8 @@ function usePickupMissedConfirm() {
       visible={pending !== null}
       title={pending?.title ?? ''}
       message={pending?.message}
-      confirmLabel="Continuer quand même"
-      cancelLabel="Valider d'abord"
+      confirmLabel={t('Continuer quand même')}
+      cancelLabel={t("Valider d'abord")}
       destructive
       onConfirm={() => {
         const next = pending;
@@ -665,6 +666,7 @@ function TripStopsSection({
   /** false quand le guide pas à pas est affiché : l'arrivée à une ville se signale depuis le guide, jamais depuis la liste. */
   allowArrivalActions?: boolean;
 }) {
+  const t = useT();
   const isDraft = trip.status === 'DRAFT';
   const isRunning = trip.status === 'IN_PROGRESS';
   const stops = trip.stops ?? [];
@@ -694,7 +696,7 @@ function TripStopsSection({
   const nextStopToReach = isRunning && allowArrivalActions ? stops.find((stop) => !stop.arrivedAt) : undefined;
 
   function showError(error: unknown) {
-    setSectionError(error instanceof ApiError ? error.message : 'Réessayez.');
+    setSectionError(error instanceof ApiError ? error.message : t('Réessayez.'));
   }
 
   function startEditing(stop: TripStop) {
@@ -705,7 +707,7 @@ function TripStopsSection({
   function saveFare(stop: TripStop) {
     const value = Number(fareText.replace(',', '.'));
     if (!Number.isFinite(value) || value <= 0) {
-      setSectionError('Prix invalide : indiquez un prix supérieur à zéro.');
+      setSectionError(t('Prix invalide : indiquez un prix supérieur à zéro.'));
       return;
     }
     setSectionError(null);
@@ -725,7 +727,7 @@ function TripStopsSection({
     setAddFieldKey((value) => value + 1);
     setSectionError(null);
     if (!location.cityId) {
-      setSectionError('Ville manquante : choisissez une adresse située dans la ville traversée.');
+      setSectionError(t('Ville manquante : choisissez une adresse située dans la ville traversée.'));
       return;
     }
     if (
@@ -733,7 +735,7 @@ function TripStopsSection({
       location.cityId === trip.destinationCityId ||
       stops.some((stop) => stop.cityId === location.cityId)
     ) {
-      setSectionError('Ville déjà sur la route : cette ville est déjà le départ, l’arrivée ou une ville traversée.');
+      setSectionError(t('Ville déjà sur la route : cette ville est déjà le départ, l’arrivée ou une ville traversée.'));
       return;
     }
     addStop.mutate(
@@ -751,19 +753,18 @@ function TripStopsSection({
   }
 
   return (
-    <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Villes traversées">
+    <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title={t('Villes traversées')}>
       {sectionError ? <FeedbackBanner tone="error" text={sectionError} onDismiss={() => setSectionError(null)} /> : null}
       {isDraft ? (
         <AppText variant="xs" color="textSecondary">
-          Les prix sont calculés automatiquement au prorata de la distance. Vous pouvez les modifier avant de publier ; ils
-          ne changent plus ensuite.
+          {t('Les prix sont calculés automatiquement au prorata de la distance. Vous pouvez les modifier avant de publier ; ils ne changent plus ensuite.')}
         </AppText>
       ) : null}
 
       {!isDraft && trip.seatsByLeg && trip.seatsByLeg.length > 0 ? (
         <View style={styles.legSeats}>
           <AppText variant="xs" weight="semibold" color="textSecondary">
-            Places libres par tronçon
+            {t('Places libres par tronçon')}
           </AppText>
           <View style={styles.legSeatsChips}>
             {trip.seatsByLeg.map((leg) => (
@@ -775,7 +776,7 @@ function TripStopsSection({
             ))}
           </View>
           <AppText variant="xs" color="textMuted">
-            Un client qui descend à une étape libère sa place pour les tronçons suivants.
+            {t('Un client qui descend à une étape libère sa place pour les tronçons suivants.')}
           </AppText>
         </View>
       ) : null}
@@ -803,10 +804,10 @@ function TripStopsSection({
                   </AppText>
                   <AppText variant="xs" color="textSecondary">
                     {reached
-                      ? `Passé à ${formatTime(stop.arrivedAt as string)}`
+                      ? t('Passé à {time}', { time: formatTime(stop.arrivedAt as string) })
                       : stop.estimatedArrivalAt
-                        ? `Passage estimé vers ${formatTime(stop.estimatedArrivalAt)}`
-                        : 'Heure de passage non estimée'}
+                        ? t('Passage estimé vers {time}', { time: formatTime(stop.estimatedArrivalAt) })
+                        : t('Heure de passage non estimée')}
                   </AppText>
                 </View>
                 {isDraft ? (
@@ -823,7 +824,7 @@ function TripStopsSection({
 
               {fare === null ? (
                 <AppText variant="xs" color="danger">
-                  Prix non défini : cette ville n'est pas réservable tant que vous n'avez pas indiqué un prix.
+                  {t("Prix non défini : cette ville n'est pas réservable tant que vous n'avez pas indiqué un prix.")}
                 </AppText>
               ) : (
                 <View style={styles.stopFares}>
@@ -840,8 +841,8 @@ function TripStopsSection({
               {people.boarding > 0 || people.alighting > 0 ? (
                 <AppText variant="xs" weight="semibold" color={OCEAN.base}>
                   {[
-                    people.boarding > 0 ? `${people.boarding} place${people.boarding > 1 ? 's' : ''} à prendre ici` : null,
-                    people.alighting > 0 ? `${people.alighting} place${people.alighting > 1 ? 's' : ''} à déposer ici` : null,
+                    people.boarding > 0 ? t.n(people.boarding, '{count} place à prendre ici', '{count} places à prendre ici') : null,
+                    people.alighting > 0 ? t.n(people.alighting, '{count} place à déposer ici', '{count} places à déposer ici') : null,
                   ]
                     .filter(Boolean)
                     .join(' · ')}
@@ -855,16 +856,16 @@ function TripStopsSection({
                       value={fareText}
                       onChangeText={(text) => setFareText(text.replace(/[^0-9]/g, ''))}
                       keyboardType="number-pad"
-                      placeholder={`Prix de ${trip.originCity.name} à ${stopName(stop)}`}
+                      placeholder={t('Prix de {originCityName} à {stopName}', { originCityName: trip.originCity.name, stopName: stopName(stop) })}
                       containerStyle={styles.codeInput}
                     />
-                    <OceanButton label="Valider" onPress={() => saveFare(stop)} loading={updateStop.isPending} />
+                    <OceanButton label={t('Valider')} onPress={() => saveFare(stop)} loading={updateStop.isPending} />
                   </View>
                 ) : (
                   <View style={styles.stopActionsRow}>
                     {farePriceLocked ? (
                       <AppText variant="xs" color="textSecondary">
-                        Prix fixé par Occa&apos;Z
+                        {t("Prix fixé par Occa'Z")}
                       </AppText>
                     ) : (
                       <Pressable
@@ -874,13 +875,13 @@ function TripStopsSection({
                       >
                         <IconPencil size={14} color={OCEAN.base} />
                         <AppText variant="xs" weight="semibold" color={OCEAN.base}>
-                          Modifier le prix
+                          {t('Modifier le prix')}
                         </AppText>
                       </Pressable>
                     )}
                     <View style={styles.stopSwitch}>
                       <AppText variant="xs" color="textSecondary">
-                        Je prends des passagers ici
+                        {t('Je prends des passagers ici')}
                       </AppText>
                       <Switch
                         value={stop.isBookable !== false}
@@ -893,7 +894,7 @@ function TripStopsSection({
 
               {nextStopToReach?.id === stop.id ? (
                 <OceanButton
-                  label={`Je suis arrivé à ${stopName(stop)}`}
+                  label={t('Je suis arrivé à {stopName}', { stopName: stopName(stop) })}
                   onPress={() =>
                     pickupMissed.confirm(trip, bookings, () => {
                       setSectionError(null);
@@ -916,22 +917,22 @@ function TripStopsSection({
               label=""
               value={null}
               onChange={handleAdd}
-              placeholder="Ajouter une ville traversée (ex. Mamou)"
+              placeholder={t('Ajouter une ville traversée (ex. Mamou)')}
             />
-            <OceanButton label="Fermer" variant="soft" onPress={() => setAdding(false)} />
+            <OceanButton label={t('Fermer')} variant="soft" onPress={() => setAdding(false)} />
           </>
         ) : (
-          <OceanButton label="Ajouter une ville traversée" variant="soft" onPress={() => setAdding(true)} />
+          <OceanButton label={t('Ajouter une ville traversée')} variant="soft" onPress={() => setAdding(true)} />
         )
       ) : null}
 
       {pickupMissed.dialog}
       <ConfirmDialog
         visible={stopToRemove !== null}
-        title={stopToRemove ? `Retirer ${stopName(stopToRemove)} ?` : ''}
-        message="Les prix des autres villes ne changent pas."
-        confirmLabel="Retirer"
-        cancelLabel="Garder"
+        title={stopToRemove ? t('Retirer {stopName} ?', { stopName: stopName(stopToRemove) }) : ''}
+        message={t('Les prix des autres villes ne changent pas.')}
+        confirmLabel={t('Retirer')}
+        cancelLabel={t('Garder')}
         destructive
         loading={removeStop.isPending}
         onConfirm={() => {
@@ -956,6 +957,7 @@ function TripStopsSection({
 // ---------------------------------------------------------------------------
 
 export default function DriverTripDetailScreen() {
+  const t = useT();
   const { id, created } = useLocalSearchParams<{ id: string; created?: string }>();
   const { data: trip, isLoading, isError } = useTrip(id);
   const { data: bookings } = useTripBookings(id);
@@ -979,7 +981,7 @@ export default function DriverTripDetailScreen() {
       <ScreenContainer style={styles.center} maxWidth="detail">
         {isError ? (
           <AppText variant="sm" color="danger">
-            Impossible de charger ce trajet.
+            {t('Impossible de charger ce trajet.')}
           </AppText>
         ) : (
           <ActivityIndicator color={OCEAN.base} />
@@ -1015,7 +1017,7 @@ export default function DriverTripDetailScreen() {
         onSuccess: () => setCancelOpen(false),
         onError: (error) => {
           setCancelOpen(false);
-          setActionError(error instanceof ApiError ? error.message : "L'annulation a échoué — réessayez dans un instant.");
+          setActionError(error instanceof ApiError ? error.message : t("L'annulation a échoué — réessayez dans un instant."));
         },
       },
     );
@@ -1025,30 +1027,30 @@ export default function DriverTripDetailScreen() {
   function attempt(start: (options: { onError: (error: unknown) => void }) => void) {
     setActionError(null);
     start({
-      onError: (error) => setActionError(error instanceof ApiError ? error.message : "L'action a échoué — réessayez dans un instant."),
+      onError: (error) => setActionError(error instanceof ApiError ? error.message : t("L'action a échoué — réessayez dans un instant.")),
     });
   }
 
   // Une seule action possible à la fois, selon l'état du trajet.
   let action: StageAction | null = null;
   if (trip.status === 'DRAFT') {
-    action = { label: 'Publier le trajet', run: () => attempt((options) => publishTrip.mutate(undefined, options)), isPending: publishTrip.isPending };
+    action = { label: t('Publier le trajet'), run: () => attempt((options) => publishTrip.mutate(undefined, options)), isPending: publishTrip.isPending };
   } else if (trip.status === 'PUBLISHED' && hasReservation) {
     action = {
-      label: 'Signaler mon arrivée au départ',
+      label: t('Signaler mon arrivée au départ'),
       run: () => attempt((options) => markDriverArrived.mutate(undefined, options)),
       isPending: markDriverArrived.isPending,
     };
   } else if (trip.status === 'PASSENGER_PICKED_UP' || (trip.status === 'DRIVER_ARRIVED' && onlyStopBookings)) {
-    action = { label: 'Démarrer le trajet', run: () => attempt((options) => startTrip.mutate(undefined, options)), isPending: startTrip.isPending };
+    action = { label: t('Démarrer le trajet'), run: () => attempt((options) => startTrip.mutate(undefined, options)), isPending: startTrip.isPending };
   } else if (trip.status === 'IN_PROGRESS') {
     action = {
-      label: "Signaler l'arrivée à destination",
+      label: t("Signaler l'arrivée à destination"),
       run: () => pickupMissed.confirm(trip, activeBookings, () => attempt((options) => markArrived.mutate(undefined, options))),
       isPending: markArrived.isPending,
     };
   } else if (trip.status === 'ARRIVED' && activeBookings.length === 0) {
-    action = { label: 'Clôturer le trajet', run: () => attempt((options) => completeTrip.mutate(undefined, options)), isPending: completeTrip.isPending };
+    action = { label: t('Clôturer le trajet'), run: () => attempt((options) => completeTrip.mutate(undefined, options)), isPending: completeTrip.isPending };
   }
 
   const stage = getStage(trip.status, trip.status === 'PUBLISHED' ? hasReservation : activeBookings.length > 0, positionError, positionMode, onlyStopBookings);
@@ -1066,21 +1068,21 @@ export default function DriverTripDetailScreen() {
   const canReceiveBookings = ['PUBLISHED', 'BOOKING_PENDING', 'CONFIRMED'].includes(trip.status);
   const showPassengers = activeBookings.length > 0 || canReceiveBookings;
 
-  const luggageLabel = trip.allowsLuggage ? 'Bagages acceptés' : 'Sans bagages';
-  let shipmentsLabel = 'Sans envois';
+  const luggageLabel = trip.allowsLuggage ? t('Bagages acceptés') : t('Sans bagages');
+  let shipmentsLabel = t('Sans envois');
   if (trip.allowsShipments) {
     if (trip.maxShipmentWeightKg != null && trip.availableShipmentWeightKg != null) {
-      shipmentsLabel = `Envois · ${formatKg(trip.availableShipmentWeightKg)}/${formatKg(trip.maxShipmentWeightKg)} kg`;
+      shipmentsLabel = t('Envois · {kg}/{kg2} kg', { kg: formatKg(trip.availableShipmentWeightKg), kg2: formatKg(trip.maxShipmentWeightKg) });
     } else if (trip.maxShipmentWeightKg != null) {
-      shipmentsLabel = `Envois · jusqu'à ${formatKg(trip.maxShipmentWeightKg)} kg`;
+      shipmentsLabel = t("Envois · jusqu'à {kg} kg", { kg: formatKg(trip.maxShipmentWeightKg) });
     } else {
-      shipmentsLabel = 'Envois acceptés';
+      shipmentsLabel = t('Envois acceptés');
     }
   }
 
   const detailsToggle = (
     <OceanButton
-      label={showDetails ? 'Masquer les détails du trajet' : 'Voir tous les détails du trajet'}
+      label={showDetails ? t('Masquer les détails du trajet') : t('Voir tous les détails du trajet')}
       variant="soft"
       icon={showDetails ? <IconChevronUp size={16} color={OCEAN.base} /> : <IconChevronDown size={16} color={OCEAN.base} />}
       onPress={() => setShowDetails((value) => !value)}
@@ -1091,7 +1093,7 @@ export default function DriverTripDetailScreen() {
   return (
     <ScreenContainer scroll maxWidth="detail">
       <OceanScreenHeader
-        title="Détail du trajet"
+        title={t('Détail du trajet')}
         onBack={() => router.back()}
         // Affiché juste après la création du trajet : une croix qui revient à l'accueil, pas la flèche vers le formulaire.
         onClose={created ? () => closeToHome('/(driver)/(tabs)/home') : undefined}
@@ -1144,13 +1146,13 @@ export default function DriverTripDetailScreen() {
                 <View style={styles.railDotDestination} />
               </View>
               <View style={styles.stops}>
-                <RouteStop eyebrow="Départ" city={trip.originCity.name} address={originAddress} />
-                <RouteStop eyebrow="Arrivée" city={trip.destinationCity.name} address={destinationAddress} />
+                <RouteStop eyebrow={t('Départ')} city={trip.originCity.name} address={originAddress} />
+                <RouteStop eyebrow={t('Arrivée')} city={trip.destinationCity.name} address={destinationAddress} />
               </View>
             </View>
             {trip.stops && trip.stops.length > 0 ? (
               <AppText variant="xs" color={HERO_MUTED} numberOfLines={2}>
-                Via {trip.stops.map((stop) => stopName(stop)).join(' · ')}
+                {t('Via {value}', { value: trip.stops.map((stop) => stopName(stop)).join(' · ') })}
               </AppText>
             ) : null}
           </View>
@@ -1166,21 +1168,20 @@ export default function DriverTripDetailScreen() {
           <View style={styles.coupon}>
             <View style={styles.couponColumn}>
               <AppText variant="xs" color="textSecondary">
-                Places
+                {t('Places')}
               </AppText>
               <AppText variant="md" weight="bold">
                 {seatsTitle}
               </AppText>
               <SeatDots total={trip.totalSeats} available={trip.availableSeats} />
               <AppText variant="xs" color="textMuted">
-                {trip.totalSeats} place{trip.totalSeats > 1 ? 's' : ''} au total
-                {trip.stops && trip.stops.length > 0 ? ' · sur tout le trajet' : ''}
+                {t.n(trip.totalSeats, '{count} place au total{value}', '{count} places au total{value}', { value: trip.stops && trip.stops.length > 0 ? t(' · sur tout le trajet') : '' })}
               </AppText>
             </View>
             <View style={styles.couponDivider} />
             <View style={[styles.couponColumn, styles.couponColumnRight]}>
               <AppText variant="xs" color="textSecondary">
-                Prix par place
+                {t('Prix par place')}
               </AppText>
               <AppText variant="md" weight="bold">
                 {formatMoney(trip.pricePerSeat, currencyOf(trip))}
@@ -1197,7 +1198,7 @@ export default function DriverTripDetailScreen() {
 
       {simple && missingFare && !showDetails ? (
         <AppText variant="xs" color="danger" style={styles.missingFareNote}>
-          Une ville traversée n&apos;a pas de prix : ouvrez les détails pour l&apos;indiquer avant de publier.
+          {t("Une ville traversée n'a pas de prix : ouvrez les détails pour l'indiquer avant de publier.")}
         </AppText>
       ) : null}
 
@@ -1209,7 +1210,7 @@ export default function DriverTripDetailScreen() {
 
       {trip.allowsShipments && ['PUBLISHED', 'DRIVER_ARRIVED'].includes(trip.status) ? (
         <OceanButton
-          label="Colis sur ce trajet"
+          label={t('Colis sur ce trajet')}
           variant="soft"
           onPress={() => router.push({ pathname: '/(driver)/shipment-available', params: { tripId: trip.id } })}
           style={styles.shipmentsButton}
@@ -1219,7 +1220,7 @@ export default function DriverTripDetailScreen() {
       {showPassengers ? (
         <OceanSection
           icon={<IconUsers size={17} color={OCEAN.base} />}
-          title="Passagers"
+          title={t('Passagers')}
           action={
             activeBookings.length > 0 ? (
               <View style={styles.countPill}>
@@ -1244,7 +1245,7 @@ export default function DriverTripDetailScreen() {
                   <ReportUserLink
                     space="driver"
                     target={{ customerId: booking.customerId }}
-                    name={booking.passengers?.[0]?.fullName ?? 'Passager'}
+                    name={booking.passengers?.[0]?.fullName ?? t('Passager')}
                     tripId={trip.id}
                     bookingId={booking.id}
                   />
@@ -1257,12 +1258,12 @@ export default function DriverTripDetailScreen() {
                 <IconUsers size={22} color={OCEAN.base} />
               </View>
               <AppText variant="sm" weight="semibold">
-                Aucune réservation confirmée
+                {t('Aucune réservation confirmée')}
               </AppText>
               <AppText variant="xs" color="textSecondary" style={styles.emptyText}>
                 {trip.status === 'DRAFT'
-                  ? 'Publiez le trajet pour recevoir des réservations.'
-                  : 'Les passagers apparaîtront ici dès que leur réservation est confirmée.'}
+                  ? t('Publiez le trajet pour recevoir des réservations.')
+                  : t('Les passagers apparaîtront ici dès que leur réservation est confirmée.')}
               </AppText>
             </View>
           )}
@@ -1271,7 +1272,7 @@ export default function DriverTripDetailScreen() {
 
       {['DRIVER_ARRIVED', 'PASSENGER_PICKED_UP', 'IN_PROGRESS'].includes(trip.status) ? <SosButton tripId={trip.id} /> : null}
 
-      <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title="Détails">
+      <OceanSection icon={<IconCar size={17} color={OCEAN.base} />} title={t('Détails')}>
         <View style={styles.detailCard}>
           {trip.vehicle.photoUrl ? (
             <Image source={{ uri: trip.vehicle.photoUrl }} style={styles.vehiclePhoto} />
@@ -1312,7 +1313,7 @@ export default function DriverTripDetailScreen() {
 
       {['DRAFT', 'PUBLISHED', 'DRIVER_ARRIVED'].includes(trip.status) ? (
         <OceanButton
-          label="Annuler le trajet"
+          label={t('Annuler le trajet')}
           variant="outline"
           onPress={handleCancel}
           loading={cancelTrip.isPending}
@@ -1325,10 +1326,10 @@ export default function DriverTripDetailScreen() {
       {pickupMissed.dialog}
       <ConfirmDialog
         visible={cancelOpen}
-        title="Annuler ce trajet ?"
-        message="Toutes les réservations actives seront annulées."
-        confirmLabel="Annuler le trajet"
-        cancelLabel="Retour"
+        title={t('Annuler ce trajet ?')}
+        message={t('Toutes les réservations actives seront annulées.')}
+        confirmLabel={t('Annuler le trajet')}
+        cancelLabel={t('Retour')}
         destructive
         loading={cancelTrip.isPending}
         onConfirm={confirmCancel}

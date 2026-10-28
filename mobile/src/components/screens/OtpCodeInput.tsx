@@ -1,4 +1,5 @@
 // mobile/src/components/screens/OtpCodeInput.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Saisie d'un code à 6 chiffres en six cases (même rendu que l'écran de connexion). Un champ caché reçoit la frappe ; toucher
 // les cases ramène le clavier. `onComplete` est appelé dès que les 6 chiffres sont saisis, avec le code en paramètre.
@@ -7,6 +8,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { AppText } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 export const OTP_CODE_LENGTH = 6;
 
@@ -21,6 +23,7 @@ export function OtpCodeInput({
   onComplete?: (code: string) => void;
   hasError?: boolean;
 }) {
+  const t = useT();
   const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   function handleChange(text: string) {
@@ -31,7 +34,7 @@ export function OtpCodeInput({
 
   return (
     <View>
-      <Pressable onPress={() => inputRef.current?.focus()} style={styles.row} accessibilityLabel="Saisir le code à 6 chiffres">
+      <Pressable onPress={() => inputRef.current?.focus()} style={styles.row} accessibilityLabel={t('Saisir le code à 6 chiffres')}>
         {Array.from({ length: OTP_CODE_LENGTH }).map((_, index) => (
           <View
             key={index}

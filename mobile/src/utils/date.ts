@@ -1,17 +1,19 @@
 // mobile/src/utils/date.ts
-/** Formatage français natif (Intl) — pas de dépendance date-fns pour un besoin aussi simple. */
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
+/** Formatage natif (Intl), dans la langue choisie — pas de dépendance date-fns pour un besoin aussi simple. */
 
+import { intlLocale, translate } from '@/i18n';
 export function formatDateShort(iso: string): string {
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'short' }).format(new Date(iso));
 }
 
 /** « 17 oct. 2026 » — pour une date passée qu'on veut situer sans ambiguïté (envoi, réservation, historique). */
 export function formatDateWithYear(iso: string): string {
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
 }
 
 export function formatDateLong(iso: string): string {
-  return new Intl.DateTimeFormat('fr-FR', {
+  return new Intl.DateTimeFormat(intlLocale(), {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -19,7 +21,7 @@ export function formatDateLong(iso: string): string {
 }
 
 export function formatTime(iso: string): string {
-  return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 
 /**
@@ -52,8 +54,8 @@ export function upcomingDays(count: number): Date[] {
 /** "à l'instant" / "il y a Ns" / "il y a Nmin" — suffisant ici, le composant appelant se rafraîchit déjà toutes les 10s (voir useTripPosition). */
 export function formatRelativeTime(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 10) return "à l'instant";
-  if (seconds < 60) return `il y a ${seconds} s`;
+  if (seconds < 10) return translate("à l'instant");
+  if (seconds < 60) return translate('il y a {seconds} s', { seconds });
   const minutes = Math.floor(seconds / 60);
-  return `il y a ${minutes} min`;
+  return translate('il y a {minutes} min', { minutes });
 }

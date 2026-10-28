@@ -335,6 +335,7 @@ export class BookingsService {
     // savait pas exister.
     if (booking.status !== BookingStatus.PENDING_PAYMENT) {
       await this.notifications.notify({
+        audience: 'DRIVER',
         userId: trip.driver.userId,
         type: NotificationType.STATUS_CHANGE,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
@@ -427,6 +428,7 @@ export class BookingsService {
     await Promise.all(
       cancelledNow.map((booking) =>
         this.notifications.notify({
+          audience: 'CUSTOMER',
           userId: booking.customer.userId,
           type: NotificationType.STATUS_CHANGE,
           channels: [NotificationChannel.PUSH, NotificationChannel.SMS, NotificationChannel.EMAIL],

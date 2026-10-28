@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ShipmentParcelsSection.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v1 — Liste des colis d'un envoi multiple (poids, dimensions, valeur de chacun ; prix côté client), sous « Voir tous les détails ».
 // Rien ne s'affiche pour un envoi d'un seul colis ou créé avant la saisie colis par colis.
 import React from 'react';
@@ -10,12 +11,13 @@ import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { formatMoney } from '@/utils/money';
 import type { ShipmentItem } from '@/types/shipments.types';
+import { useT, translate } from '@/i18n';
 
 function describe(item: ShipmentItem, currencyCode: string | undefined, showPrice: boolean): string {
   const hasDimensions = item.lengthCm && item.widthCm && item.heightCm;
   return [
     item.weightKg ? `${item.weightKg} kg` : null,
-    hasDimensions ? `${item.lengthCm}×${item.widthCm}×${item.heightCm} cm` : null,
+    hasDimensions ? translate('{lengthCm}×{widthCm}×{heightCm} cm', { lengthCm: item.lengthCm, widthCm: item.widthCm, heightCm: item.heightCm }) : null,
     item.declaredValue && Number(item.declaredValue) > 0 ? `valeur ${formatMoney(item.declaredValue, currencyCode)}` : null,
     showPrice && item.price ? formatMoney(item.price, currencyCode) : null,
   ]
@@ -33,10 +35,11 @@ export function ShipmentParcelsSection({
   /** Côté client seulement : le conducteur n'a pas à voir le prix de chaque colis. */
   showPrice?: boolean;
 }) {
+  const t = useT();
   if (!items || items.length < 2) return null;
 
   return (
-    <OceanSection icon={<IconPackage size={17} color={OCEAN.base} />} title={`Colis (${items.length})`}>
+    <OceanSection icon={<IconPackage size={17} color={OCEAN.base} />} title={t('Colis ({itemsLength})', { itemsLength: items.length })}>
       <View style={styles.list}>
         {items.map((item, index) => (
           <View key={item.id} style={styles.row}>
@@ -44,7 +47,7 @@ export function ShipmentParcelsSection({
               {`Colis ${index + 1}${item.description ? ` · ${item.description}` : ''}`}
             </AppText>
             <AppText variant="xs" color="textSecondary">
-              {describe(item, currencyCode, showPrice) || 'Aucun détail'}
+              {describe(item, currencyCode, showPrice) || t('Aucun détail')}
             </AppText>
           </View>
         ))}

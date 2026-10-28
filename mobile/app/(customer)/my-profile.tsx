@@ -1,4 +1,5 @@
 // mobile/app/(customer)/my-profile.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [22/09/2026] v6 — Déplacé depuis l'onglet Profil (devenu un menu, voir
 // (tabs)/profile.tsx) : cet écran, ouvert via « Mon profil », ne montre
 // plus que la fiche détaillée elle-même. « Mes litiges » et la
@@ -39,8 +40,10 @@ import { OCEAN } from '@/theme/ocean';
 import { useAuthStore } from '@/stores/authStore';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { formatDateShort } from '@/utils/date';
+import { useT } from '@/i18n';
 
 export default function MyProfileScreen() {
+  const t = useT();
   const user = useAuthStore((state) => state.user);
   const { data: profile } = useCustomerProfile();
 
@@ -50,7 +53,7 @@ export default function MyProfileScreen() {
 
   return (
     <ScreenContainer scroll>
-      <OceanScreenHeader title="Mon profil" onBack={() => router.back()} />
+      <OceanScreenHeader title={t('Mon profil')} onBack={() => router.back()} />
 
       <OceanHeroCard style={styles.hero}>
         <View style={styles.heroRow}>
@@ -59,7 +62,7 @@ export default function MyProfileScreen() {
             <Pressable
               onPress={() => router.push('/(customer)/edit-profile')}
               accessibilityRole="button"
-              accessibilityLabel="Modifier la photo"
+              accessibilityLabel={t('Modifier la photo')}
               style={({ pressed }) => [styles.cameraBadge, pressed && styles.pressed]}
             >
               <IconCamera size={13} color={OCEAN.deep} />
@@ -73,7 +76,7 @@ export default function MyProfileScreen() {
                 <IconUser size={13} color={OCEAN.onDark} />
               )}
               <AppText variant="xs" weight="bold" color={OCEAN.onDark} style={styles.statusText}>
-                {isVerified ? 'CLIENT VÉRIFIÉ' : 'COMPTE CLIENT'}
+                {isVerified ? t('CLIENT VÉRIFIÉ') : 'COMPTE CLIENT'}
               </AppText>
             </View>
             <AppText variant="lg" weight="bold" color={OCEAN.onDark} numberOfLines={2}>
@@ -82,7 +85,7 @@ export default function MyProfileScreen() {
             </AppText>
             {profile?.createdAt ? (
               <AppText variant="xs" color={OCEAN.sky}>
-                Membre depuis {formatDateShort(profile.createdAt)}
+                {t('Membre depuis {dateShort}', { dateShort: formatDateShort(profile.createdAt) })}
               </AppText>
             ) : null}
           </View>
@@ -90,7 +93,7 @@ export default function MyProfileScreen() {
       </OceanHeroCard>
 
       <OceanButton
-        label="Modifier mon profil"
+        label={t('Modifier mon profil')}
         icon={<IconEdit size={17} color={OCEAN.onDark} />}
         onPress={() => router.push('/(customer)/edit-profile')}
         style={styles.editButton}
@@ -105,40 +108,40 @@ export default function MyProfileScreen() {
           <IconMapPin size={18} color={OCEAN.goldInk} />
           <View style={styles.bannerText}>
             <AppText variant="sm" weight="semibold" color={OCEAN.goldInk}>
-              Complétez votre localisation
+              {t('Complétez votre localisation')}
             </AppText>
             <AppText variant="xs" color={OCEAN.goldInk}>
-              Ville et pays aident à personnaliser votre expérience.
+              {t('Ville et pays aident à personnaliser votre expérience.')}
             </AppText>
           </View>
           <IconChevronRight size={16} color={OCEAN.goldInk} />
         </Pressable>
       ) : null}
 
-      <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title="Identité & contact">
+      <OceanSection icon={<IconUserCircle size={17} color={OCEAN.base} />} title={t('Identité & contact')}>
         <View style={styles.twoColumns}>
-          <OceanField label="Prénom" value={profile?.firstName ?? '—'} style={styles.column} />
-          <OceanField label="Nom" value={profile?.lastName ?? '—'} style={styles.column} />
+          <OceanField label={t('Prénom')} value={profile?.firstName ?? '—'} style={styles.column} />
+          <OceanField label={t('Nom')} value={profile?.lastName ?? '—'} style={styles.column} />
         </View>
         <OceanField
-          label="Téléphone"
+          label={t('Téléphone')}
           value={user?.phone ?? '—'}
           badge={
             isVerified ? (
-              <OceanPill label="Vérifié" tone="success" icon={<IconCheck size={11} color={colors.successDark} />} />
+              <OceanPill label={t('Vérifié')} tone="success" icon={<IconCheck size={11} color={colors.successDark} />} />
             ) : undefined
           }
         />
-        <OceanField label="Email" value={user?.email ?? 'Non renseigné'} />
-        {profile?.dateOfBirth ? <OceanField label="Date de naissance" value={formatDateShort(profile.dateOfBirth)} /> : null}
+        <OceanField label={t('Email')} value={user?.email ?? t('Non renseigné')} />
+        {profile?.dateOfBirth ? <OceanField label={t('Date de naissance')} value={formatDateShort(profile.dateOfBirth)} /> : null}
       </OceanSection>
 
-      <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title="Localisation">
+      <OceanSection icon={<IconMapPin size={17} color={OCEAN.base} />} title={t('Localisation')}>
         <View style={styles.twoColumns}>
-          <OceanField label="Pays" value={profile?.country?.name ?? 'Non renseigné'} style={styles.column} />
-          <OceanField label="Ville" value={profile?.city?.name ?? 'Non renseignée'} style={styles.column} />
+          <OceanField label={t('Pays')} value={profile?.country?.name ?? t('Non renseigné')} style={styles.column} />
+          <OceanField label={t('Ville')} value={profile?.city?.name ?? t('Non renseignée')} style={styles.column} />
         </View>
-        {profile?.address ? <OceanField label="Adresse" value={profile.address} /> : null}
+        {profile?.address ? <OceanField label={t('Adresse')} value={profile.address} /> : null}
       </OceanSection>
     </ScreenContainer>
   );

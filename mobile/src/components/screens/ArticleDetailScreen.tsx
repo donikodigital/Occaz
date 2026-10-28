@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ArticleDetailScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [07/10/2026] v1 — Détail d'une actualité (partagé client / conducteur), habillé comme les autres écrans bleu océan :
 //   - un bandeau (hero) : la photo de couverture sous un voile bleu profond quand il y en a une, sinon le fond aux reflets ;
@@ -16,6 +17,7 @@ import { colors, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useArticle } from '@/hooks/usePromotions';
 import { formatDateLong } from '@/utils/date';
+import { useT } from '@/i18n';
 
 export interface ArticleDetailScreenProps {
   /** Liste des actualités du groupe appelant : repli du bouton Retour quand l'écran est ouvert sans historique (lien direct). */
@@ -54,6 +56,7 @@ function MetaPill({ icon, label }: { icon: React.ReactNode; label: string }) {
 }
 
 export function ArticleDetailScreen({ newsPath }: ArticleDetailScreenProps) {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: article, isLoading } = useArticle(id);
 
@@ -75,9 +78,9 @@ export function ArticleDetailScreen({ newsPath }: ArticleDetailScreenProps) {
       <ScreenContainer style={styles.center}>
         <OceanEmpty
           icon={<IconSpeakerphone size={28} color={OCEAN.base} />}
-          title="Actualité introuvable"
-          text="Cet article n'est plus disponible."
-          action={<OceanButton label="Retour aux actualités" onPress={goBack} style={styles.emptyButton} />}
+          title={t('Actualité introuvable')}
+          text={t("Cet article n'est plus disponible.")}
+          action={<OceanButton label={t('Retour aux actualités')} onPress={goBack} style={styles.emptyButton} />}
         />
       </ScreenContainer>
     );
@@ -101,7 +104,7 @@ export function ArticleDetailScreen({ newsPath }: ArticleDetailScreenProps) {
           <Pressable
             onPress={goBack}
             accessibilityRole="button"
-            accessibilityLabel="Retour"
+            accessibilityLabel={t('Retour')}
             style={({ pressed }) => [styles.back, pressed && styles.pressed]}
           >
             <IconArrowLeft size={20} color={OCEAN.onDark} />
@@ -109,7 +112,7 @@ export function ArticleDetailScreen({ newsPath }: ArticleDetailScreenProps) {
           <View style={styles.kindPill}>
             <IconSpeakerphone size={14} color={OCEAN.goldInk} />
             <AppText variant="xs" weight="bold" color={OCEAN.goldInk}>
-              ACTUALITÉ
+              {t('Actualité').toUpperCase()}
             </AppText>
           </View>
         </View>
@@ -122,7 +125,7 @@ export function ArticleDetailScreen({ newsPath }: ArticleDetailScreenProps) {
                 label={capitalize(formatDateLong(article.publishedAt))}
               />
             ) : null}
-            <MetaPill icon={<IconClock size={13} color={OCEAN.sky} />} label={`${readingMinutes(article.content)} min de lecture`} />
+            <MetaPill icon={<IconClock size={13} color={OCEAN.sky} />} label={t('{readingMinutes} min de lecture', { readingMinutes: readingMinutes(article.content) })} />
           </View>
           <AppText variant="xxl" weight="bold" color={OCEAN.onDark} style={styles.title}>
             {article.title}

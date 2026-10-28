@@ -1,4 +1,5 @@
 // mobile/src/components/ui/TextField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 import React, { useState } from 'react';
 import {
   TextInput,
@@ -12,6 +13,7 @@ import {
 import { IconEye, IconEyeOff } from '@tabler/icons-react-native';
 import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
 import { AppText } from './AppText';
+import { useT } from '@/i18n';
 
 export interface TextFieldProps extends TextInputProps {
   label?: string;
@@ -43,6 +45,7 @@ export function TextField({
   containerStyle,
   ...rest
 }: TextFieldProps) {
+  const t = useT();
   const [isSecureVisible, setSecureVisible] = useState(false);
   const effectiveSecureEntry = secureTextEntry && !isSecureVisible;
 
@@ -69,7 +72,7 @@ export function TextField({
         {secureTextEntry && toggleableSecureEntry ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={isSecureVisible ? 'Masquer' : 'Afficher'}
+            accessibilityLabel={isSecureVisible ? t('Masquer') : t('Afficher')}
             onPress={() => setSecureVisible((v) => !v)}
             hitSlop={8}
           >

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/OtpCodeCard.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — `smsDisabled` : le SMS est coupé volontairement (coût) ; plus de faux message « SMS non envoyé » quand on affiche son propre code.
 //
 // Carte réutilisable pour un code de vérification (prise en charge,
@@ -19,6 +20,7 @@ import { OceanButton, OceanSection } from '@/components/ocean/OceanKit';
 import { colors, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { ApiError } from '@/services/api/ApiError';
+import { useT } from '@/i18n';
 
 const COPIED_LABEL_DURATION_MS = 2000;
 
@@ -49,6 +51,7 @@ export function OtpCodeCard({
   error,
   onRequest,
 }: OtpCodeCardProps) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -83,8 +86,8 @@ export function OtpCodeCard({
         <Pressable
           onPress={handleCopy}
           accessibilityRole="button"
-          accessibilityLabel="Copier le code"
-          accessibilityHint="Copie le code dans le presse-papiers"
+          accessibilityLabel={t('Copier le code')}
+          accessibilityHint={t('Copie le code dans le presse-papiers')}
           style={({ pressed }) => [styles.codeBox, pressed && styles.pressed]}
         >
           <AppText variant="display" weight="bold" color={OCEAN.deep} style={styles.codeValue} numberOfLines={1}>
@@ -96,16 +99,16 @@ export function OtpCodeCard({
 
       {copied ? (
         <AppText variant="xs" weight="semibold" color={colors.success} align="center">
-          Copié dans le presse-papiers
+          {t('Copié dans le presse-papiers')}
         </AppText>
       ) : code && smsSent === false && !smsDisabled ? (
         <AppText variant="xs" color={colors.accentDark} align="center">
-          Le SMS n'a pas pu être envoyé, mais ce code reste valable — copiez-le directement ci-dessus.
+          {t("Le SMS n'a pas pu être envoyé, mais ce code reste valable — copiez-le directement ci-dessus.")}
         </AppText>
       ) : null}
 
       <OceanButton
-        label={code ? 'Recevoir un nouveau code' : 'Voir mon code'}
+        label={code ? t('Recevoir un nouveau code') : t('Voir mon code')}
         variant="soft"
         onPress={onRequest}
         loading={isPending}
@@ -113,7 +116,7 @@ export function OtpCodeCard({
 
       {isError ? (
         <AppText variant="xs" color="danger">
-          {error instanceof ApiError ? error.message : 'Impossible de récupérer le code pour le moment.'}
+          {error instanceof ApiError ? error.message : t('Impossible de récupérer le code pour le moment.')}
         </AppText>
       ) : null}
     </OceanSection>

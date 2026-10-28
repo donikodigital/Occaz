@@ -1,4 +1,5 @@
 // mobile/app/(customer)/my-reviews.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [07/10/2026] Le titre de la page passe en bandeau (hero) bleu océan : OceanHeroHeader. Le reste de l'écran est inchangé.
 //
 // v1 — « Mes avis » : les notations que le client a données (pas reçues),
@@ -17,6 +18,7 @@ import { OCEAN } from '@/theme/ocean';
 import { useGivenRatings } from '@/hooks/useRatings';
 import { formatDateLong } from '@/utils/date';
 import type { GivenRating } from '@/types/ratings.types';
+import { useT } from '@/i18n';
 
 function Stars({ score }: { score: number }) {
   return (
@@ -74,13 +76,14 @@ function ReviewCard({ rating }: { rating: GivenRating }) {
 }
 
 export default function MyReviewsScreen() {
+  const t = useT();
   const { data, isLoading } = useGivenRatings();
   const ratings = data?.data ?? [];
 
   return (
     <ScreenContainer padded={false} maxWidth="detail">
       <View style={styles.headerWrap}>
-        <OceanHeroHeader title="Mes avis" subtitle="Les notes que vous avez données" icon={<IconStar />} onBack={() => router.back()} />
+        <OceanHeroHeader title={t('Mes avis')} subtitle={t('Les notes que vous avez données')} icon={<IconStar />} onBack={() => router.back()} />
       </View>
 
       {isLoading ? (
@@ -96,11 +99,11 @@ export default function MyReviewsScreen() {
           ListEmptyComponent={
             <OceanEmpty
               icon={<IconMessageStar size={28} color={OCEAN.base} />}
-              title="Aucun avis pour l'instant"
-              text="Notez un conducteur après un trajet ou un envoi terminé — vos avis apparaîtront ici."
+              title={t("Aucun avis pour l'instant")}
+              text={t('Notez un conducteur après un trajet ou un envoi terminé — vos avis apparaîtront ici.')}
               action={
                 <OceanButton
-                  label="Voir mon activité"
+                  label={t('Voir mon activité')}
                   variant="outline"
                   onPress={() => router.push('/(customer)/(tabs)/trips')}
                   style={styles.emptyButton}

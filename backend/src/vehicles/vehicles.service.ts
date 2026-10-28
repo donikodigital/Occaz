@@ -124,6 +124,7 @@ export class VehiclesService {
       action: 'VERIFY',
     });
     await this.notifications.notify({
+      audience: 'DRIVER',
       userId: vehicle.driver.userId,
       type: NotificationType.STATUS_CHANGE,
       channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
@@ -147,6 +148,7 @@ export class VehiclesService {
       action: 'REJECT',
     });
     await this.notifications.notify({
+      audience: 'DRIVER',
       userId: vehicle.driver.userId,
       type: NotificationType.STATUS_CHANGE,
       channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],

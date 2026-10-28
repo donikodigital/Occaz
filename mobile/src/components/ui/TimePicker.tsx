@@ -1,4 +1,5 @@
 // mobile/src/components/ui/TimePicker.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // v1.1 — Corrige la sélection qui ne se validait jamais sur le web :
 // onMomentumScrollEnd ne se déclenche pas de façon fiable pour un
@@ -22,6 +23,7 @@ import { IconClock, IconX } from '@tabler/icons-react-native';
 import { AppText, Button, Card, IconButton } from '@/components/ui';
 import { colors, maxContentWidth, radius, spacing } from '@/theme';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useT } from '@/i18n';
 
 export interface TimeValue {
   hour: number;
@@ -139,6 +141,7 @@ function WheelColumn({
 }
 
 export function TimePicker({ label, value, onChange, startHour = 0, endHour = 23, minuteStep = 15 }: TimePickerProps) {
+  const t = useT();
   const [isOpen, setOpen] = useState(false);
   const { isTablet } = useResponsive();
 
@@ -165,7 +168,7 @@ export function TimePicker({ label, value, onChange, startHour = 0, endHour = 23
     setOpen(false);
   }
 
-  const triggerLabel = value ? `${pad2(value.hour)}h${pad2(value.minute)}` : 'Choisir une heure';
+  const triggerLabel = value ? `${pad2(value.hour)}h${pad2(value.minute)}` : t('Choisir une heure');
 
   return (
     <View>
@@ -189,11 +192,11 @@ export function TimePicker({ label, value, onChange, startHour = 0, endHour = 23
           <View style={[styles.sheet, isTablet && styles.sheetCentered]}>
             <View style={styles.header}>
               <AppText variant="lg" weight="semibold">
-                Choisir une heure
+                {t('Choisir une heure')}
               </AppText>
               <IconButton
                 icon={<IconX size={18} color={colors.textPrimary} />}
-                accessibilityLabel="Fermer"
+                accessibilityLabel={t('Fermer')}
                 onPress={() => setOpen(false)}
               />
             </View>
@@ -221,7 +224,7 @@ export function TimePicker({ label, value, onChange, startHour = 0, endHour = 23
               </View>
             </View>
 
-            <Button label="Valider" onPress={confirm} />
+            <Button label={t('Valider')} onPress={confirm} />
           </View>
         </View>
       </Modal>

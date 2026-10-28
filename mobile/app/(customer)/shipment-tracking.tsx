@@ -1,4 +1,5 @@
 // mobile/app/(customer)/shipment-tracking.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v2 — padding ajouté à la carte « Copiez ce message » (OceanCard n'a pas de padding de base : le texte touchait le cadre).
 // [10/10/2026] v1 — Suivi en direct d'un envoi pour son expéditeur : position exacte du colis, villes traversées, historique daté, et
 // partage du numéro (ou du lien) de suivi avec le destinataire.
@@ -13,8 +14,10 @@ import { useMyShipmentTracking } from '@/hooks/useShipmentTracking';
 import { formatTrackingNumber, trackingLink } from '@/utils/tracking';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useT } from '@/i18n';
 
 export default function ShipmentTrackingScreen() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const query = useMyShipmentTracking(id);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
@@ -24,8 +27,8 @@ export default function ShipmentTrackingScreen() {
     const number = query.data.trackingNumber;
     const link = trackingLink(number);
     const text = link
-      ? `Suivez mon colis Occa’Z (${query.data.pickupCity} → ${query.data.deliveryCity}) : ${link}\nNuméro de suivi : ${formatTrackingNumber(number)}`
-      : `Suivez mon colis Occa’Z (${query.data.pickupCity} → ${query.data.deliveryCity}) avec le numéro de suivi ${formatTrackingNumber(number)} : application Occa’Z, « Suivre un colis ».`;
+      ? t('Suivez mon colis Occa’Z ({pickupCity} → {deliveryCity}) : {link}\nNuméro de suivi : {trackingNumber}', { pickupCity: query.data.pickupCity, deliveryCity: query.data.deliveryCity, link, trackingNumber: formatTrackingNumber(number) })
+      : t('Suivez mon colis Occa’Z ({pickupCity} → {deliveryCity}) avec le numéro de suivi {trackingNumber} : application Occa’Z, « Suivre un colis ».', { pickupCity: query.data.pickupCity, deliveryCity: query.data.deliveryCity, trackingNumber: formatTrackingNumber(number) });
     try {
       await Share.share({ message: text });
       setShareMessage(null);
@@ -37,7 +40,7 @@ export default function ShipmentTrackingScreen() {
 
   return (
     <TrackingScreenShell
-      title="Suivi en direct"
+      title={t('Suivi en direct')}
       subtitle={query.data ? `${query.data.pickupCity} → ${query.data.deliveryCity}` : undefined}
       onBack={() => router.back()}
       tracking={query.data}
@@ -49,7 +52,7 @@ export default function ShipmentTrackingScreen() {
         query.data ? (
           <>
             <OceanButton
-              label="Partager le suivi avec le destinataire"
+              label={t('Partager le suivi avec le destinataire')}
               variant="soft"
               icon={<IconShare size={16} color={OCEAN.base} />}
               onPress={() => void share()}
@@ -57,7 +60,7 @@ export default function ShipmentTrackingScreen() {
             {shareMessage ? (
               <OceanCard style={styles.shareCard}>
                 <AppText variant="xs" color="textSecondary">
-                  Copiez ce message pour l’envoyer :
+                  {t('Copiez ce message pour l’envoyer :')}
                 </AppText>
                 <AppText variant="sm" selectable>
                   {shareMessage}

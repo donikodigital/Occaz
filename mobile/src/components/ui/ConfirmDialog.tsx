@@ -1,4 +1,5 @@
 // mobile/src/components/ui/ConfirmDialog.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // Alert.alert() ne fonctionne pas sur le web : react-native-web
 // n'implémente pas de vraie boîte de dialogue native pour ce module —
@@ -28,6 +29,7 @@ import { Modal, StyleSheet, View } from 'react-native';
 import { AppText, Button } from '@/components/ui';
 import { colors, maxContentWidth, radius, spacing } from '@/theme';
 import { useResponsive } from '@/hooks/useResponsive';
+import { translate } from '@/i18n';
 
 export interface ConfirmDialogProps {
   visible: boolean;
@@ -46,8 +48,8 @@ export function ConfirmDialog({
   visible,
   title,
   message,
-  confirmLabel = 'Confirmer',
-  cancelLabel = 'Retour',
+  confirmLabel = translate('Confirmer'),
+  cancelLabel = translate('Retour'),
   destructive = false,
   loading = false,
   onConfirm,

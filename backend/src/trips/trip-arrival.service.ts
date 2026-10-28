@@ -125,6 +125,7 @@ export class TripArrivalService {
       bookings.map(async (booking) => {
         try {
           await this.notifications.notify({
+            audience: 'CUSTOMER',
             userId: booking.customer.userId,
             type: NotificationType.STATUS_CHANGE,
             channels: [NotificationChannel.PUSH],
@@ -150,6 +151,7 @@ export class TripArrivalService {
     try {
       await Promise.all([
         this.notifications.notify({
+          audience: 'CUSTOMER',
           userId: booking.customer.userId,
           type: kind === 'PICKUP' ? NotificationType.DEPARTURE_IMMINENT : NotificationType.ARRIVAL,
           // Pas de SMS ici : celui du code (ci-dessous) dit déjà la même chose, avec le code.

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/TicketScanner.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Scanner de billets et d'étiquettes (conducteur). Un bouton ouvre la caméra plein écran ; le QR code lu est envoyé au serveur,
 // qui répond « authentique ? concerne-t-il l'un de MES trajets / envois ? » (le code ne contient jamais le code OTP). Le résultat s'affiche en
 // grand (vert / rouge) avec le nom des passagers ou le colis. Sur le web, la caméra n'est pas fiable : on le dit clairement au lieu de planter.
@@ -14,8 +15,10 @@ import { ApiError } from '@/services/api/ApiError';
 import { useScanTicket } from '@/hooks/useScanTicket';
 import type { TicketScanResult } from '@/types/safety.types';
 import { formatDateLong } from '@/utils/date';
+import { useT, translate } from '@/i18n';
 
 function ResultCard({ result }: { result: TicketScanResult }) {
+  const t = useT();
   const ok = result.valid;
   const booking = result.booking;
   const parcel = result.parcel;
@@ -25,7 +28,7 @@ function ResultCard({ result }: { result: TicketScanResult }) {
         {ok ? <IconCircleCheck size={34} color={colors.success} /> : <IconCircleX size={34} color={colors.danger} />}
         <View style={styles.flex}>
           <AppText variant="lg" weight="bold" color={ok ? 'success' : 'danger'}>
-            {ok ? 'Billet valide' : 'Billet refusé'}
+            {ok ? t('Billet valide') : t('Billet refusé')}
           </AppText>
           <AppText variant="sm" color="textSecondary">
             {result.message}
@@ -39,10 +42,10 @@ function ResultCard({ result }: { result: TicketScanResult }) {
             {booking.from} → {booking.to}
           </AppText>
           <AppText variant="xs" color="textSecondary">
-            {formatDateLong(booking.departureAt)} · Réf. {booking.reference}
+            {t('{dateLong} · Réf. {reference}', { dateLong: formatDateLong(booking.departureAt), reference: booking.reference })}
           </AppText>
           <AppText variant="sm">
-            {booking.passengers.length > 0 ? booking.passengers.join(', ') : 'Passager'} · {booking.seatsCount} place{booking.seatsCount > 1 ? 's' : ''}
+            {t.n(booking.seatsCount, '{value} · {count} place', '{value} · {count} places', { value: booking.passengers.length > 0 ? booking.passengers.join(', ') : t('Passager') })}
           </AppText>
         </View>
       ) : null}
@@ -50,12 +53,12 @@ function ResultCard({ result }: { result: TicketScanResult }) {
       {parcel ? (
         <View style={styles.details}>
           <AppText variant="sm" weight="semibold">
-            Colis {parcel.parcelNumber}/{parcel.parcelCount} · {parcel.category}
+            {t('Colis {parcelNumber}/{parcelCount} · {category}', { parcelNumber: parcel.parcelNumber, parcelCount: parcel.parcelCount, category: parcel.category })}
           </AppText>
           <AppText variant="xs" color="textSecondary">
             {parcel.from} → {parcel.to} · {parcel.weightKg} kg
           </AppText>
-          <AppText variant="sm">Destinataire : {parcel.recipientName}</AppText>
+          <AppText variant="sm">{t('Destinataire : {recipientName}', { recipientName: parcel.recipientName })}</AppText>
           <AppText variant="xs" color="textSecondary">
             N° {parcel.trackingNumber}
           </AppText>
@@ -65,7 +68,7 @@ function ResultCard({ result }: { result: TicketScanResult }) {
   );
 }
 
-export function TicketScanButton({ label = 'Scanner un billet' }: { label?: string }) {
+export function TicketScanButton({ label = translate('Scanner un billet') }: { label?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -76,6 +79,7 @@ export function TicketScanButton({ label = 'Scanner un billet' }: { label?: stri
 }
 
 export function TicketScannerModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const t = useT();
   const [permission, requestPermission] = useCameraPermissions();
   const scan = useScanTicket();
   const [result, setResult] = useState<TicketScanResult | null>(null);
@@ -102,7 +106,7 @@ export function TicketScannerModal({ visible, onClose }: { visible: boolean; onC
     scan.mutate(data, {
       onSuccess: (response) => setResult(response),
       onError: (error) => {
-        setErrorText(error instanceof ApiError ? error.message : 'Impossible de contrôler ce billet. Vérifiez votre connexion puis réessayez.');
+        setErrorText(error instanceof ApiError ? error.message : t('Impossible de contrôler ce billet. Vérifiez votre connexion puis réessayez.'));
         busy.current = false;
       },
     });
@@ -114,10 +118,10 @@ export function TicketScannerModal({ visible, onClose }: { visible: boolean; onC
       <View style={styles.center}>
         <IconQrcode size={44} color={OCEAN.base} />
         <AppText variant="base" weight="bold" style={styles.centerText}>
-          Scan disponible sur l’application mobile
+          {t('Scan disponible sur l’application mobile')}
         </AppText>
         <AppText variant="sm" color="textSecondary" style={styles.centerText}>
-          Ouvrez Occa’Z sur votre téléphone pour scanner les billets et les étiquettes.
+          {t('Ouvrez Occa’Z sur votre téléphone pour scanner les billets et les étiquettes.')}
         </AppText>
       </View>
     );
@@ -132,16 +136,16 @@ export function TicketScannerModal({ visible, onClose }: { visible: boolean; onC
       <View style={styles.center}>
         <IconQrcode size={44} color={OCEAN.base} />
         <AppText variant="base" weight="bold" style={styles.centerText}>
-          Autoriser la caméra
+          {t('Autoriser la caméra')}
         </AppText>
         <AppText variant="sm" color="textSecondary" style={styles.centerText}>
-          La caméra sert uniquement à lire le QR code des billets et des étiquettes. Rien n’est enregistré.
+          {t('La caméra sert uniquement à lire le QR code des billets et des étiquettes. Rien n’est enregistré.')}
         </AppText>
         {permission.canAskAgain ? (
-          <OceanButton label="Autoriser" onPress={() => void requestPermission()} />
+          <OceanButton label={t('Autoriser')} onPress={() => void requestPermission()} />
         ) : (
           <AppText variant="sm" color="textSecondary" style={styles.centerText}>
-            L’accès à la caméra est refusé. Autorisez-le dans les réglages de votre téléphone, puis revenez ici.
+            {t('L’accès à la caméra est refusé. Autorisez-le dans les réglages de votre téléphone, puis revenez ici.')}
           </AppText>
         )}
       </View>
@@ -150,8 +154,8 @@ export function TicketScannerModal({ visible, onClose }: { visible: boolean; onC
     body = (
       <View style={styles.resultWrap}>
         <ResultCard result={result} />
-        <OceanButton label="Scanner un autre billet" onPress={reset} />
-        <OceanButton label="Fermer" variant="outline" onPress={close} />
+        <OceanButton label={t('Scanner un autre billet')} onPress={reset} />
+        <OceanButton label={t('Fermer')} variant="outline" onPress={close} />
       </View>
     );
   } else {
@@ -171,7 +175,7 @@ export function TicketScannerModal({ visible, onClose }: { visible: boolean; onC
             <ActivityIndicator color="#fff" />
           ) : (
             <AppText variant="sm" weight="semibold" color="#fff" style={styles.centerText}>
-              Placez le QR code du billet dans le cadre
+              {t('Placez le QR code du billet dans le cadre')}
             </AppText>
           )}
           {errorText ? <FeedbackBanner tone="error" text={errorText} onDismiss={reset} /> : null}
@@ -185,9 +189,9 @@ export function TicketScannerModal({ visible, onClose }: { visible: boolean; onC
       <View style={styles.screen}>
         <View style={styles.header}>
           <AppText variant="lg" weight="bold" color="#fff">
-            Contrôler un billet
+            {t('Contrôler un billet')}
           </AppText>
-          <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Fermer le scanner" hitSlop={12}>
+          <Pressable onPress={close} accessibilityRole="button" accessibilityLabel={t('Fermer le scanner')} hitSlop={12}>
             <IconX size={26} color="#fff" />
           </Pressable>
         </View>

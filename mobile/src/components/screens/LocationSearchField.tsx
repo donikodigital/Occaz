@@ -1,4 +1,5 @@
 // mobile/src/components/screens/LocationSearchField.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // v2 — Un seul champ, trois sources classées par ordre de confiance :
 //   1. les adresses déjà utilisées par l'utilisateur (« Récentes » quand le
@@ -37,6 +38,7 @@ import { useSavedLocations } from '@/hooks/useSavedLocations';
 import { geocodingApi } from '@/services/api/geocoding.api';
 import type { GeocodingSuggestion } from '@/types/geocoding.types';
 import type { SavedLocation } from '@/types/location-picker.types';
+import { useT } from '@/i18n';
 
 /** Ce que renvoie useAddressSearch — pour héberger le champ de saisie hors de ce composant. */
 export type AddressSearchState = ReturnType<typeof useAddressSearch>;
@@ -120,6 +122,7 @@ export function LocationSearchField({
   search,
   hideField = false,
 }: LocationSearchFieldProps) {
+  const t = useT();
   // Toujours appelé (règle des hooks) ; sans requête saisie il ne déclenche rien.
   const ownSearch = useAddressSearch(countryCode);
   const { query, setQuery, suggestions, isSearching } = search ?? ownSearch;
@@ -149,18 +152,18 @@ export function LocationSearchField({
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!permission.granted) {
-        setLocationError('Autorisez la localisation pour utiliser votre position actuelle.');
+        setLocationError(t('Autorisez la localisation pour utiliser votre position actuelle.'));
         return;
       }
       const position = await Location.getCurrentPositionAsync({});
       const suggestion = await geocodingApi.reverse(position.coords.latitude, position.coords.longitude);
       if (!suggestion) {
-        setLocationError('Aucune adresse trouvée à votre position actuelle.');
+        setLocationError(t('Aucune adresse trouvée à votre position actuelle.'));
         return;
       }
       handleSelect(suggestion);
     } catch {
-      setLocationError("Impossible d'obtenir votre position pour le moment.");
+      setLocationError(t("Impossible d'obtenir votre position pour le moment."));
     } finally {
       setIsLocating(false);
     }
@@ -174,7 +177,7 @@ export function LocationSearchField({
           <TextField
             value={query}
             onChangeText={setQuery}
-            placeholder={placeholder ?? 'Rechercher une adresse…'}
+            placeholder={placeholder ?? t('Rechercher une adresse…')}
             autoFocus={autoFocus}
             style={styles.input}
           />
@@ -184,7 +187,7 @@ export function LocationSearchField({
             <Pressable
               onPress={() => setQuery('')}
               accessibilityRole="button"
-              accessibilityLabel="Effacer la recherche"
+              accessibilityLabel={t('Effacer la recherche')}
               hitSlop={10}
               style={styles.trailing}
             >
@@ -200,7 +203,7 @@ export function LocationSearchField({
             onPress={handleUseCurrentLocation}
             disabled={isLocating}
             accessibilityRole="button"
-            accessibilityLabel="Utiliser ma position actuelle"
+            accessibilityLabel={t('Utiliser ma position actuelle')}
             style={({ pressed }) => [styles.locateCard, pressed && styles.rowPressed]}
           >
             <View style={styles.locateIcon}>
@@ -212,7 +215,7 @@ export function LocationSearchField({
             </View>
             <View style={styles.rowText}>
               <AppText variant="sm" weight="bold" color={OCEAN.deep}>
-                Utiliser ma position actuelle
+                {t('Utiliser ma position actuelle')}
               </AppText>
               {locationError ? (
                 <AppText variant="xs" color="danger" numberOfLines={2}>
@@ -220,7 +223,7 @@ export function LocationSearchField({
                 </AppText>
               ) : (
                 <AppText variant="xs" color="textSecondary" numberOfLines={1}>
-                  Remplir l'adresse avec le GPS
+                  {t("Remplir l'adresse avec le GPS")}
                 </AppText>
               )}
             </View>
@@ -230,7 +233,7 @@ export function LocationSearchField({
       ) : null}
 
       {savedItems.length > 0 ? (
-        <ResultGroup title={hasQuery ? 'Mes adresses' : 'Récentes'}>
+        <ResultGroup title={hasQuery ? t('Mes adresses') : t('Récentes')}>
           {savedItems.map((item, index) => (
             <ResultRow
               key={item.id}
@@ -252,7 +255,7 @@ export function LocationSearchField({
       ) : null}
 
       {suggestions.length > 0 ? (
-        <ResultGroup title="Suggestions">
+        <ResultGroup title={t('Suggestions')}>
           {suggestions.map((suggestion, index) => (
             <ResultRow
               key={`${suggestion.latitude}-${suggestion.longitude}-${index}`}
@@ -272,8 +275,8 @@ export function LocationSearchField({
           <ResultRow
             tone="neutral"
             icon={<IconPencil size={18} color={colors.textSecondary} />}
-            title={`Ajouter « ${trimmed} »`}
-            subtitle="Introuvable ? Gardez votre saisie et choisissez la ville."
+            title={t('Ajouter « {trimmed} »', { trimmed })}
+            subtitle={t('Introuvable ? Gardez votre saisie et choisissez la ville.')}
             onPress={() => onManualEntry?.(trimmed)}
             isLast
           />
@@ -286,11 +289,10 @@ export function LocationSearchField({
             <IconMapPin size={26} color={OCEAN.base} strokeWidth={1.7} />
           </View>
           <AppText variant="md" weight="semibold" align="center">
-            Où se trouve ce lieu ?
+            {t('Où se trouve ce lieu ?')}
           </AppText>
           <AppText variant="sm" color="textSecondary" align="center">
-            Tapez un quartier, un repère ou un lieu connu (marché, gare routière, station…). Vos adresses déjà utilisées
-            apparaîtront ici.
+            {t('Tapez un quartier, un repère ou un lieu connu (marché, gare routière, station…). Vos adresses déjà utilisées apparaîtront ici.')}
           </AppText>
         </View>
       ) : null}

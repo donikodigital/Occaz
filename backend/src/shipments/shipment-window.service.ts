@@ -84,6 +84,7 @@ export class ShipmentWindowService implements OnModuleInit, OnModuleDestroy {
       if (claimed.count === 0) continue;
 
       await this.notifications.notify({
+        audience: 'CUSTOMER',
         userId: shipment.customer.userId,
         type: NotificationType.SHIPMENT_EXTENSION,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],

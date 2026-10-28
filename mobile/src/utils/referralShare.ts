@@ -1,4 +1,5 @@
 // mobile/src/utils/referralShare.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [07/10/2026] v1 — Message de parrainage partagé par l'écran « Parrainez des amis » (client et conducteur). Il contient :
 //  - le lien de la page d'invitation du site (https://occaz.sarl/rejoindre?code=…), qui montre le code et mène à l'installation ;
@@ -6,6 +7,7 @@
 //
 // L'adresse du site se change sans toucher au code : variable EXPO_PUBLIC_WEB_URL (EAS), sinon https://occaz.sarl.
 
+import { translate } from '@/i18n';
 const DEFAULT_WEB_URL = 'https://occaz.sarl';
 
 function webBaseUrl(): string {
@@ -21,10 +23,10 @@ export function referralInviteLink(code: string): string {
 /** Texte envoyé par WhatsApp, SMS, etc. quand on touche « Partager mon code ». */
 export function buildReferralShareMessage(code: string): string {
   return [
-    "Rejoins-moi sur Occa'Z, l'appli de transport partagé et d'envoi de colis !",
+    translate("Rejoins-moi sur Occa'Z, l'appli de transport partagé et d'envoi de colis !"),
     '',
-    `Installe-la ici : ${referralInviteLink(code)}`,
+    translate('Installe-la ici : {referralInviteLink}', { referralInviteLink: referralInviteLink(code) }),
     '',
-    `Après ton inscription, va dans Profil › Parrainez des amis et saisis mon code : ${code}`,
+    translate('Après ton inscription, va dans Profil › Parrainez des amis et saisis mon code : {code}', { code }),
   ].join('\n');
 }

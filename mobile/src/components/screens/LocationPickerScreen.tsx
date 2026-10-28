@@ -1,4 +1,5 @@
 // mobile/src/components/screens/LocationPickerScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // v3 — Saisie d'adresse simplifiée. Avant : recherche -> choix de la ville
 // sur un autre écran -> re-saisie de l'adresse. Maintenant :
@@ -26,6 +27,7 @@ import { useLocationSelectionStore } from '@/stores/locationSelectionStore';
 import { LocationConfirmCard } from './LocationConfirmCard';
 import { LocationSearchField } from './LocationSearchField';
 import { SearchHeroHeader, SearchHeroInput } from './SearchHeroHeader';
+import { useT } from '@/i18n';
 
 /**
  * select-location s'ouvre en `presentation: 'modal'` (voir _layout.tsx) —
@@ -68,6 +70,7 @@ export interface LocationPickerScreenProps {
 }
 
 export function LocationPickerScreen({ countryCode }: LocationPickerScreenProps) {
+  const t = useT();
   const { title } = useLocalSearchParams<{ title?: string }>();
   const selectLocation = useLocationSelectionStore((state) => state.select);
   const searchCountryCodes = useSearchCountryCodes(countryCode);
@@ -84,9 +87,9 @@ export function LocationPickerScreen({ countryCode }: LocationPickerScreenProps)
     <ScreenContainer edges={['top', 'bottom']} maxWidth="form" padded={false}>
       <SearchHeroHeader
         icon={<IconMapPin size={24} color={OCEAN.onDark} strokeWidth={1.7} />}
-        caption="Recherche d'adresse"
-        title={title ?? 'Adresse'}
-        subtitle={isSearchStep ? 'Recherchez un lieu, un quartier ou un repère.' : 'Vérifiez avant de confirmer.'}
+        caption={t("Recherche d'adresse")}
+        title={title ?? t('Adresse')}
+        subtitle={isSearchStep ? t('Recherchez un lieu, un quartier ou un repère.') : t('Vérifiez avant de confirmer.')}
         onClose={() => router.back()}
         fieldHidden={!isSearchStep}
       >
@@ -94,7 +97,7 @@ export function LocationPickerScreen({ countryCode }: LocationPickerScreenProps)
         <SearchHeroInput
           value={addressSearch.query}
           onChangeText={addressSearch.setQuery}
-          placeholder="Quartier, marché, gare routière…"
+          placeholder={t('Quartier, marché, gare routière…')}
           autoFocus
           loading={addressSearch.isSearching}
         />

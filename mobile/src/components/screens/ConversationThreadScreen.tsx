@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ConversationThreadScreen.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [08/10/2026] v3 — (1) l'en-tête devient un bandeau (hero) bleu océan : bouton retour, avatar, NOM du correspondant, son RÔLE (« Votre
 // conducteur », « Votre passager », « Expéditeur du colis ») et une pastille de contexte lisible (« Réservation · Lélouma → Conakry »,
@@ -24,6 +25,7 @@ import { setActiveConversation } from '@/utils/messageSound';
 import { useAuthStore } from '@/stores/authStore';
 import { formatTime } from '@/utils/date';
 import type { ConversationDetail, Message } from '@/types/conversations.types';
+import { useT, translate } from '@/i18n';
 
 export interface ConversationThreadScreenProps {
   conversationId: string;
@@ -35,7 +37,7 @@ function MessageBubble({ message, isMine }: { message: Message; isMine: boolean 
       <View style={styles.supportRow}>
         <View style={styles.supportBubble}>
           <AppText variant="xs" weight="bold" color={OCEAN.goldInk} style={styles.supportLabel}>
-            SUPPORT
+            {translate('Support').toUpperCase()}
           </AppText>
           <AppText variant="sm">{message.content}</AppText>
         </View>
@@ -66,7 +68,8 @@ function initialsOf(firstName: string, lastName: string): string {
  * courant est le client ou le conducteur de cette conversation.
  */
 function useThreadHeader(detail: ConversationDetail | undefined, currentUserId: string | undefined) {
-  if (!detail) return { name: 'Conversation', initials: '…', role: undefined, context: undefined, isShipment: false };
+  const t = useT();
+  if (!detail) return { name: t('Conversation'), initials: '…', role: undefined, context: undefined, isShipment: false };
 
   const iAmCustomer = currentUserId === detail.customer.userId;
   const iAmDriver = currentUserId === detail.driver.userId;
@@ -82,17 +85,17 @@ function useThreadHeader(detail: ConversationDetail | undefined, currentUserId: 
   const initials = correspondent ? initialsOf(correspondent.firstName, correspondent.lastName) : '⋯';
 
   let role: string;
-  if (iAmCustomer) role = 'Votre conducteur';
-  else if (iAmDriver) role = detail.shipment ? 'Expéditeur du colis' : 'Votre passager';
-  else role = 'Client et conducteur';
+  if (iAmCustomer) role = t('Votre conducteur');
+  else if (iAmDriver) role = detail.shipment ? t('Expéditeur du colis') : t('Votre passager');
+  else role = t('Client et conducteur');
 
   let context: string | undefined;
   if (detail.booking) {
-    context = `Réservation · ${detail.booking.trip.originCity.name} → ${detail.booking.trip.destinationCity.name}`;
+    context = t('Réservation · {originCityName} → {destinationCityName}', { originCityName: detail.booking.trip.originCity.name, destinationCityName: detail.booking.trip.destinationCity.name });
   } else if (detail.shipment) {
     context = iAmCustomer
-      ? `Votre colis pour ${detail.shipment.recipientName}`
-      : `Colis de ${detail.shipment.senderName} pour ${detail.shipment.recipientName}`;
+      ? t('Votre colis pour {recipientName}', { recipientName: detail.shipment.recipientName })
+      : t('Colis de {senderName} pour {recipientName}', { senderName: detail.shipment.senderName, recipientName: detail.shipment.recipientName });
   }
 
   return { name, initials, role, context, isShipment: Boolean(detail.shipment) };
@@ -115,6 +118,7 @@ function useThreadHeader(detail: ConversationDetail | undefined, currentUserId: 
  * la liste (voir plus bas), jamais comme composant « liste vide ».
  */
 export function ConversationThreadScreen({ conversationId }: ConversationThreadScreenProps) {
+  const t = useT();
   const [draft, setDraft] = useState('');
   const currentUserId = useAuthStore((state) => state.user?.id);
   const { data: detail } = useConversation(conversationId);
@@ -154,7 +158,7 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
           <TextField
             value={draft}
             onChangeText={setDraft}
-            placeholder="Écrire un message…"
+            placeholder={t('Écrire un message…')}
             containerStyle={styles.composerInput}
             style={styles.composerInputText}
             multiline
@@ -164,7 +168,7 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
             disabled={!canSend}
             style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
             accessibilityRole="button"
-            accessibilityLabel="Envoyer"
+            accessibilityLabel={t('Envoyer')}
           >
             <IconSend size={18} color={OCEAN.onDark} />
           </Pressable>
@@ -176,7 +180,7 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
           <Pressable
             onPress={() => router.back()}
             accessibilityRole="button"
-            accessibilityLabel="Retour"
+            accessibilityLabel={t('Retour')}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
             <IconArrowLeft size={18} color={OCEAN.onDark} />
@@ -214,7 +218,7 @@ export function ConversationThreadScreen({ conversationId }: ConversationThreadS
       {messages.length === 0 && !isLoading ? (
         <View style={styles.emptyWrap}>
           <AppText variant="sm" color="textMuted" style={styles.empty}>
-            Aucun message pour le moment — écrivez le premier.
+            {t('Aucun message pour le moment — écrivez le premier.')}
           </AppText>
         </View>
       ) : (

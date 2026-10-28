@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ShipmentParcelCosts.tsx
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] v1 — Coût de chaque colis, majoration d'urgence (une seule fois) et total, à la dernière étape de l'envoi. Les montants
 // viennent du devis du serveur : rien n'est recalculé sur l'appareil.
 import React from 'react';
@@ -9,6 +10,7 @@ import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { formatMoney } from '@/utils/money';
 import type { ShipmentQuote } from '@/types/shipments.types';
+import { useT } from '@/i18n';
 
 function Line({ label, hint, value, bold }: { label: string; hint?: string; value: string; bold?: boolean }) {
   return (
@@ -38,6 +40,7 @@ export function ShipmentParcelCosts({
   /** Libellé de chaque colis, dans l'ordre (ex. « Vêtements »). À défaut : « Colis 1 », « Colis 2 »… */
   labels?: (string | undefined)[];
 }) {
+  const t = useT();
   const parcels = quote.parcels ?? [];
   if (parcels.length === 0) return null;
   const currency = quote.currencyCode ?? undefined;
@@ -46,7 +49,7 @@ export function ShipmentParcelCosts({
   return (
     <OceanCard style={styles.card}>
       <AppText variant="xs" weight="bold" color={OCEAN.base} style={styles.title}>
-        COÛT DE CHAQUE COLIS
+        {t('Coût de chaque colis').toUpperCase()}
       </AppText>
       {parcels.map((parcel) => (
         <Line
@@ -56,9 +59,9 @@ export function ShipmentParcelCosts({
           value={formatMoney(parcel.price, currency)}
         />
       ))}
-      {urgent > 0 ? <Line label="Envoi urgent" hint="Une seule majoration pour tout l'envoi" value={formatMoney(urgent, currency)} /> : null}
+      {urgent > 0 ? <Line label={t('Envoi urgent')} hint={t("Une seule majoration pour tout l'envoi")} value={formatMoney(urgent, currency)} /> : null}
       <View style={styles.separator} />
-      <Line label="Total" value={formatMoney(quote.totalAmount, currency)} bold />
+      <Line label={t('Total')} value={formatMoney(quote.totalAmount, currency)} bold />
     </OceanCard>
   );
 }

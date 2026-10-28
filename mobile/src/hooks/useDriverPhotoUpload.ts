@@ -1,9 +1,11 @@
 // mobile/src/hooks/useDriverPhotoUpload.ts
+// [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { driverProfilesApi } from '@/services/api/driverProfiles.api';
 import type { UploadableContentType } from '@/types/documents.types';
 import type { DriverProfile } from '@/types/profiles.types';
+import { useT } from '@/i18n';
 
 function mimeTypeToContentType(mimeType: string | undefined): UploadableContentType | null {
   if (mimeType === 'image/jpeg' || mimeType === 'image/png' || mimeType === 'image/webp') return mimeType;
@@ -19,6 +21,7 @@ function mimeTypeToContentType(mimeType: string | undefined): UploadableContentT
  * distincts plutôt qu'un seul généralisé à outrance).
  */
 export function useDriverPhotoUpload(onUploaded?: (profile: DriverProfile) => void) {
+  const t = useT();
   const [isUploading, setUploading] = useState(false);
   // Message à afficher dans la page (Alert.alert ne fait rien sur le web) ; effacé au prochain essai.
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +29,7 @@ export function useDriverPhotoUpload(onUploaded?: (profile: DriverProfile) => vo
   async function uploadFromAsset(asset: ImagePicker.ImagePickerAsset) {
     const contentType = mimeTypeToContentType(asset.mimeType);
     if (!contentType) {
-      setError('Format non supporté : choisissez une photo au format JPEG, PNG ou WebP.');
+      setError(t('Format non supporté : choisissez une photo au format JPEG, PNG ou WebP.'));
       return;
     }
 
@@ -44,13 +47,13 @@ export function useDriverPhotoUpload(onUploaded?: (profile: DriverProfile) => vo
         body: fileBlob,
       });
       if (!putResponse.ok) {
-        throw new Error(`Échec de l'envoi vers le stockage (${putResponse.status}).`);
+        throw new Error(t("Échec de l'envoi vers le stockage ({status}).", { status: putResponse.status }));
       }
 
       const profile = await driverProfilesApi.confirmPhoto(storageKey);
       onUploaded?.(profile);
     } catch {
-      setError("Échec de l'envoi : la photo n'a pas pu être envoyée — vérifiez votre connexion et réessayez.");
+      setError(t("Échec de l'envoi : la photo n'a pas pu être envoyée — vérifiez votre connexion et réessayez."));
     } finally {
       setUploading(false);
     }
@@ -60,7 +63,7 @@ export function useDriverPhotoUpload(onUploaded?: (profile: DriverProfile) => vo
     setError(null);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError("Autorisation requise : autorisez l'accès à vos photos pour envoyer votre photo de profil.");
+      setError(t("Autorisation requise : autorisez l'accès à vos photos pour envoyer votre photo de profil."));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -77,7 +80,7 @@ export function useDriverPhotoUpload(onUploaded?: (profile: DriverProfile) => vo
     setError(null);
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      setError("Autorisation requise : autorisez l'accès à l'appareil photo pour envoyer votre photo de profil.");
+      setError(t("Autorisation requise : autorisez l'accès à l'appareil photo pour envoyer votre photo de profil."));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true, aspect: [1, 1] });
