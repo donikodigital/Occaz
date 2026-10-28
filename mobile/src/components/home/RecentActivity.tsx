@@ -1,4 +1,5 @@
 // mobile/src/components/home/RecentActivity.tsx
+// [28/10/2026] v+ — Titres et textes des notifications venus du backend traduits à l'affichage (i18n/notificationText.ts).
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 //
 // [08/10/2026] v2 — « Activité récente » n'est plus réservée aux notifications : c'est une chronologie mêlée (trajets créés ou réservés,
@@ -26,6 +27,7 @@ import { OCEAN } from '@/theme/ocean';
 import { timeAgo } from '@/utils/shipmentDisplay';
 import type { AppNotification, NotificationType } from '@/types/notifications.types';
 import { useT, translate } from '@/i18n';
+import { notificationText } from '@/i18n/notificationText';
 
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -74,8 +76,8 @@ export function notificationToActivity(notification: AppNotification, onPress: (
     key: `n-${notification.id}`,
     icon: TYPE_ICON[notification.type] ?? IconBell,
     tone,
-    title: notification.title ?? notification.body ?? translate('Notification'),
-    text: notification.title ? notification.body : null,
+    title: notificationText(notification.type, notification.title ?? notification.body) ?? translate('Notification'),
+    text: notification.title ? notificationText(notification.type, notification.body) : null,
     at: notification.createdAt,
     unread: !notification.readAt,
     onPress,

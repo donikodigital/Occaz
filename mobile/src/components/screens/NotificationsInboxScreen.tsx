@@ -1,4 +1,5 @@
 // mobile/src/components/screens/NotificationsInboxScreen.tsx
+// [28/10/2026] v+ — Les textes de notifications venus du backend (en français) sont traduits à l'affichage (i18n/notificationText.ts).
 // [28/10/2026] v+ — Prop `space` : la boîte n'affiche que les notifications de l'espace actif (client ou conducteur).
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [23/10/2026] v4 — Suppression en masse plus visible : une barre d'actions sous l'en-tête (au lieu d'icônes dans l'en-tête, qui faisaient
@@ -52,6 +53,7 @@ import { NOTIFICATION_TYPE_LABELS } from '@/utils/notificationLabels';
 import { formatDateLong, formatTime } from '@/utils/date';
 import type { AppNotification, NotificationType } from '@/types/notifications.types';
 import type { Space } from '@/types/roles.types';
+import { notificationText } from '@/i18n/notificationText';
 import { useT, translate } from '@/i18n';
 
 const TYPE_ICON: Record<NotificationType, React.ComponentType<{ size?: number; color?: string }>> = {
@@ -116,7 +118,7 @@ function sectionLabelFor(dateIso: string, now: Date): string {
 
 /** Titre à afficher — repli sur le libellé générique du type uniquement pour les lignes antérieures à la persistance de title/body (voir notifications.types.ts). */
 function titleFor(notification: AppNotification): string {
-  return notification.title ?? NOTIFICATION_TYPE_LABELS[notification.type];
+  return notificationText(notification.type, notification.title) ?? NOTIFICATION_TYPE_LABELS[notification.type];
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +170,7 @@ function NotificationDetailModal({
           </AppText>
           {notification.body ? (
             <AppText variant="sm" color="textSecondary" style={styles.sheetBody}>
-              {notification.body}
+              {notificationText(notification.type, notification.body)}
             </AppText>
           ) : null}
 
@@ -228,7 +230,7 @@ function NotificationRow({
         </AppText>
         {notification.body ? (
           <AppText variant="xs" color="textSecondary" numberOfLines={2} style={styles.rowBody}>
-            {notification.body}
+            {notificationText(notification.type, notification.body)}
           </AppText>
         ) : null}
       </View>
