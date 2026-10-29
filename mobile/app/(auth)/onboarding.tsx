@@ -1,5 +1,6 @@
 // mobile/app/(auth)/onboarding.tsx
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
+// [29/10/2026] v8 — Sélecteur de langue compact en haut à droite de la page (il quitte la page de connexion par numéro et le haut de la carte).
 // [18/10/2026] v7 — Habillage « cadre blanc » : le logo reste au-dessus, et tout le contenu (Bienvenue, phrase, cartes de rôle,
 // « Créer votre compte », « Suivre un colis ») est posé dans une grande carte blanche aux coins arrondis avec ombre douce.
 // Design uniquement : textes, boutons et logique inchangés. La carte « Je suis conducteur » reçoit un contour bleu clair et une
@@ -26,9 +27,11 @@
 import React, { useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconArrowRight, IconPackage, IconSteeringWheel, IconUser, IconX } from '@tabler/icons-react-native';
 import { AppText, ScreenContainer } from '@/components/ui';
 import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
+import { LanguageSelector } from '@/components/auth/LanguageSelector';
 import { colors, maxContentWidth, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import type { AccountType } from '@/types/auth.types';
@@ -143,6 +146,7 @@ function SignupSheet({ visible, onClose, onSelect }: SignupSheetProps) {
 
 export default function OnboardingScreen() {
   const t = useT();
+  const insets = useSafeAreaInsets();
   const [signupOpen, setSignupOpen] = useState(false);
 
   function goToLogin(accountType: AccountType) {
@@ -222,12 +226,21 @@ export default function OnboardingScreen() {
         </View>
       </ScreenContainer>
 
+      <View style={[styles.languageCorner, { top: insets.top + spacing.sm }]}>
+        <LanguageSelector compact />
+      </View>
+
       <SignupSheet visible={signupOpen} onClose={() => setSignupOpen(false)} onSelect={selectSignupRole} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  languageCorner: {
+    position: 'absolute',
+    right: spacing.md,
+    zIndex: 10,
+  },
   trackLink: {
     flexDirection: 'row',
     alignItems: 'center',

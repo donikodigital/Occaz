@@ -1,5 +1,6 @@
 // mobile/app/(auth)/login.tsx
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
+// [29/10/2026] v+ — Le sélecteur de langue n'est plus ici : il est en haut à droite de l'écran d'accueil (onboarding).
 // [22/09/2026] v2 — Habillage bleu Ocean, dans l'esprit Tiime.
 // [11/10/2026] v5 — Connexion par numéro + mot de passe, EN DEUX ÉCRANS comme avant le passage au mot de passe :
 //   1. ce écran : le numéro de téléphone (pays proposé = celui défini par l'administration, indicatif et drapeau, espaces posés selon le
@@ -15,7 +16,6 @@ import { OceanButton } from '@/components/ocean/OceanKit';
 import { AuthStep } from '@/components/auth/AuthStep';
 import { CountryPickerModal } from '@/components/auth/CountryField';
 import { PhoneField } from '@/components/auth/PhoneField';
-import { LanguageSelector } from '@/components/auth/LanguageSelector';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useDefaultSignupCountry } from '@/hooks/useSignupCountry';
@@ -63,8 +63,6 @@ export default function LoginScreen() {
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/onboarding'))}
       footer={<OceanButton label={t('Continuer')} onPress={handleContinue} />}
     >
-      <LanguageSelector />
-
       <PhoneField
         country={country}
         value={phone}

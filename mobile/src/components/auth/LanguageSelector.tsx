@@ -1,4 +1,5 @@
 // mobile/src/components/auth/LanguageSelector.tsx
+// [29/10/2026] v2 — Prop `compact` : pastille réduite (drapeau + code de langue + flèche), sans marge, pour se poser en haut à droite d'un écran.
 // [28/10/2026] v1 — Choix de la langue (Français / English UK / Português PT) depuis la page de connexion : une pastille avec le drapeau
 // de la langue courante, qui ouvre la liste des langues (même habillage que la liste des pays). Le choix est mémorisé sur l'appareil et
 // s'applique tout de suite à tout l'écran.
@@ -12,7 +13,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { flagEmoji } from '@/utils/phone';
 import { LANGUAGE_OPTIONS, useLanguageStore, useT } from '@/i18n';
 
-export function LanguageSelector() {
+export function LanguageSelector({ compact = false }: { compact?: boolean }) {
   const t = useT();
   const { isTablet } = useResponsive();
   const language = useLanguageStore((state) => state.language);
@@ -22,18 +23,18 @@ export function LanguageSelector() {
   const current = LANGUAGE_OPTIONS.find((option) => option.code === language) ?? LANGUAGE_OPTIONS[0];
 
   return (
-    <View style={styles.wrap}>
+    <View style={compact ? undefined : styles.wrap}>
       <Pressable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`${t('Langue')} : ${current.label}`}
-        style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.pill, compact && styles.pillCompact, pressed && styles.pressed]}
       >
-        <AppText variant="lg">{flagEmoji(current.flagIso)}</AppText>
+        <AppText variant={compact ? 'base' : 'lg'}>{flagEmoji(current.flagIso)}</AppText>
         <AppText variant="sm" weight="semibold" color={OCEAN.deep}>
-          {current.label}
+          {compact ? current.code.slice(0, 2).toUpperCase() : current.label}
         </AppText>
-        <IconChevronDown size={14} color={colors.textSecondary} />
+        <IconChevronDown size={compact ? 12 : 14} color={colors.textSecondary} />
       </Pressable>
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
@@ -87,6 +88,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  pillCompact: { minHeight: 32, paddingHorizontal: spacing.sm, gap: 4, borderRadius: radius.md },
   pressed: { opacity: 0.8 },
   modal: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, paddingTop: spacing.xl },
   modalCentered: { maxWidth: 520, alignSelf: 'center', width: '100%' },
