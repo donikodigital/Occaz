@@ -321,7 +321,7 @@ export class BookingsService {
     // temps) passe, les autres s'arrêtent ici. Sans cela, l'événement d'annulation partait deux fois — double remboursement possible.
     // Le statut est relu s'il a changé depuis la lecture du début (paiement confirmé pile pendant l'annulation) : la réclamation vise
     // le statut RÉEL, et c'est lui — pas une valeur périmée — qui décide du code promo rendu et de la notification au conducteur.
-    let statusAtCancel = booking.status;
+    let statusAtCancel: BookingStatus = booking.status;
     const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       let claimedCount = 0;
       for (let attempt = 0; attempt < 3 && claimedCount === 0; attempt += 1) {

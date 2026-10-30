@@ -20,10 +20,12 @@ function build(options: { assessment?: Record<string, unknown>; credential?: Rec
   const user = options.user === undefined ? { id: 'u1', accountType: AccountType.CUSTOMER, isActive: true, isSuspended: false } : options.user;
   const usersService = { findById: jest.fn().mockResolvedValue(user), updateLastLogin: jest.fn().mockResolvedValue(undefined) };
   const devicesService = { findOrCreateForLogin: jest.fn().mockResolvedValue({ id: 'dev1' }) };
-  const accountAuth = { assertCurrentPassword: options.passwordError ? jest.fn().mockRejectedValue(options.passwordError) : jest.fn().mockResolvedValue(undefined) };
+  const accountAuth = {
+    assertCurrentPassword: options.passwordError ? jest.fn().mockRejectedValue(options.passwordError) : jest.fn().mockResolvedValue(undefined),
+    challengeUnknownDevice: jest.fn().mockResolvedValue({ requiresDeviceVerification: true, channel: 'EMAIL' }),
+  };
   const authService = { issueTokens: jest.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'r', expiresIn: 900, user: { id: 'u1' } }) };
   const audit = { log: jest.fn().mockResolvedValue(undefined) };
-  accountAuth.challengeUnknownDevice = jest.fn().mockResolvedValue({ requiresDeviceVerification: true, channel: 'EMAIL' });
   const trustedDevices = {
     assess: jest.fn().mockResolvedValue(options.assessment ?? { verifyRequired: false, trust: { hasTrustedDevice: false, thisDeviceTrusted: false, offer: true } }),
   };
