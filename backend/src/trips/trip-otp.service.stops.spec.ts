@@ -4,7 +4,7 @@ import { BadRequestException } from '@nestjs/common';
 import { BookingStatus, TripStatus } from '@prisma/client';
 import { TripOtpService } from './trip-otp.service';
 
-function build(booking: { boardingStopId: string | null; tripStatus: TripStatus }) {
+function build(booking: { boardingStopId: string | null; tripStatus: TripStatus; boarded?: boolean }) {
   const row = {
     id: 'b1',
     tripId: 'trip1',
@@ -13,6 +13,7 @@ function build(booking: { boardingStopId: string | null; tripStatus: TripStatus 
     boardingStopId: booking.boardingStopId,
     trip: { driverId: 'd1', status: booking.tripStatus },
     customer: { user: { phone: '+224600000000' } },
+    passengers: [{ pickedUpAt: booking.boarded ? new Date() : null }],
   };
   const prisma = { booking: { findUnique: jest.fn().mockResolvedValue(row) } };
   const otp = { generateAndSend: jest.fn().mockResolvedValue({ sent: true }) };
@@ -91,7 +92,7 @@ describe('TripOtpService — le code de dépose ne part plus à la prise en char
   });
 
   it('le conducteur peut toujours renvoyer le code de dépose à la demande', async () => {
-    const { service, otp } = build({ boardingStopId: null, tripStatus: TripStatus.IN_PROGRESS });
+    const { service, otp } = build({ boardingStopId: null, tripStatus: TripStatus.IN_PROGRESS, boarded: true });
     await service.requestDropoffOtp('b1', 'd1');
     expect(otp.generateAndSend).toHaveBeenCalledWith(
       expect.objectContaining({ purpose: 'TRIP_DROPOFF', bookingId: 'b1' }),
@@ -110,6 +111,7 @@ describe('TripOtpService — message de bienvenue après la dépose', () => {
       boardingStopId: null,
       trip: { driverId: 'd1', status: TripStatus.IN_PROGRESS, destinationCity: { name: 'Conakry' } },
       customer: { userId: 'u-client', user: { phone: '+224600000000' } },
+      passengers: [{ pickedUpAt: new Date() }],
       alightingStop: options.alightingCity === null ? null : { city: { name: options.alightingCity ?? 'Kissidougou' } },
     };
     const prisma = {
@@ -174,13 +176,13 @@ describe('TripOtpService — dépose validée une seule fois', () => {
 });
 
 describe('TripOtpService — bon voyage d\'un client qui monte en cours de route', () => {
-  function buildPickup(tripStatus: TripStatus) {
+  function buildPickup(tripStatus: TripStatus, boardingStopId: string | null = 's-kindia') {
     const row = {
       id: 'b1',
       tripId: 'trip1',
       customerId: 'c1',
       status: BookingStatus.CONFIRMED,
-      boardingStopId: 's-kindia',
+      boardingStopId,
       trip: { driverId: 'd1', status: tripStatus },
       customer: { userId: 'u-client', user: { phone: '+224600000000' } },
     };
@@ -203,8 +205,41 @@ describe('TripOtpService — bon voyage d\'un client qui monte en cours de route
   });
 
   it('monté au départ (trajet pas encore démarré) : rien maintenant, le message part au démarrage', async () => {
-    const { service, notifications } = buildPickup(TripStatus.DRIVER_ARRIVED);
+    const { service, notifications } = buildPickup(TripStatus.DRIVER_ARRIVED, null);
     await service.verifyPickupOtp('b1', 'd1', '123456');
     expect(notifications.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe('TripOtpService — dépose seulement pour un client réellement monté', () => {
+  it('le conducteur ne peut pas demander le code de dépose d\'un client jamais pris en charge', async () => {
+    const { service, otp } = build({ boardingStopId: null, tripStatus: TripStatus.IN_PROGRESS, boarded: false });
+    await expect(service.requestDropoffOtp('b1', 'd1')).rejects.toThrow(/pas encore été pris en charge/);
+    expect(otp.generateAndSend).not.toHaveBeenCalled();
+  });
+
+  it('le client non monté ne peut pas non plus faire apparaître son code de dépose', async () => {
+    const { service, otp } = build({ boardingStopId: null, tripStatus: TripStatus.IN_PROGRESS, boarded: false });
+    await expect(service.revealDropoffOtpForCustomer('b1', 'c1')).rejects.toThrow(/pas encore été pris en charge/);
+    expect(otp.generateAndSend).not.toHaveBeenCalled();
+  });
+
+  it('valider la dépose d\'un client jamais monté : refusé, le conducteur n\'est pas payé', async () => {
+    const row = {
+      id: 'b1', tripId: 'trip1', customerId: 'c1', status: BookingStatus.CONFIRMED, boardingStopId: null,
+      trip: { driverId: 'd1', status: TripStatus.IN_PROGRESS, destinationCity: { name: 'Conakry' } },
+      customer: { userId: 'u', user: { phone: '+224' } }, alightingStop: null, passengers: [{ pickedUpAt: null }],
+    };
+    const prisma = { booking: { findUnique: jest.fn().mockResolvedValue(row), updateMany: jest.fn() }, tripPassenger: { updateMany: jest.fn() } };
+    const wallets = { releaseHeldFunds: jest.fn() };
+    const service = new TripOtpService(prisma as never, { verify: jest.fn() } as never, wallets as never, { notify: jest.fn() } as never);
+    await expect(service.verifyDropoffOtp('b1', 'd1', '123456')).rejects.toThrow(/pas encore été pris en charge/);
+    expect(prisma.booking.updateMany).not.toHaveBeenCalled();
+    expect(wallets.releaseHeldFunds).not.toHaveBeenCalled();
+  });
+
+  it('prise en charge : un client d\'une étape ne peut pas être validé tant que le conducteur est au départ', async () => {
+    const { service } = build({ boardingStopId: 's-kindia', tripStatus: TripStatus.DRIVER_ARRIVED });
+    await expect(service.verifyPickupOtp('b1', 'd1', '123456')).rejects.toThrow(/étape/);
   });
 });

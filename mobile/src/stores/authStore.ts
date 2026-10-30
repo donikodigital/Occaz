@@ -1,4 +1,5 @@
 // mobile/src/stores/authStore.ts
+// [30/10/2026] v+ — la déconnexion voulue garde l'accès par empreinte (sans relance automatique).
 // [19/10/2026] v+ — la déconnexion vide aussi l'espace actif (activeSpaceStore).
 import { create } from 'zustand';
 import { authApi } from '@/services/api/auth.api';
@@ -6,6 +7,7 @@ import { usersApi } from '@/services/api/users.api';
 import { registerSessionExpiredHandler } from '@/services/api/client';
 import { ApiError } from '@/services/api/ApiError';
 import { secureStorage } from '@/services/storage/secureStorage';
+import { blockBiometricAutoPrompt } from '@/utils/biometricAutoPrompt';
 import { useActiveSpaceStore } from '@/stores/activeSpaceStore';
 import type { AuthResult, SafeUser } from '@/types/auth.types';
 
@@ -57,6 +59,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+    // Déconnexion voulue : l'empreinte n'est pas désactivée (reconnexion d'un geste), mais elle ne se lance pas toute seule juste après.
+    blockBiometricAutoPrompt();
     await authApi.logout().catch(() => undefined);
     await secureStorage.clearTokens();
     useActiveSpaceStore.getState().setSpace(null);

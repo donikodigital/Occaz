@@ -7,11 +7,16 @@ import { TripExpiryService } from './trip-expiry.service';
  * réservation active, et que son départ est passé de plus de
  * `trip.stale_expiry_hours` (24h par défaut).
  */
-function createService(options: { staleTrips?: { id: string }[]; expiryHours?: number } = {}) {
-  const findMany = jest.fn().mockResolvedValue(options.staleTrips ?? []);
+function createService(options: { staleTrips?: { id: string }[]; abandonedTrips?: { id: string }[]; expiryHours?: number; abandonedHours?: number } = {}) {
+  // 1er appel : trajets sans réservation (expireStale) ; 2e appel : trajets abandonnés AVEC clients payés (cancelAbandoned).
+  const findMany = jest.fn().mockResolvedValueOnce(options.staleTrips ?? []).mockResolvedValue(options.abandonedTrips ?? []);
   const prisma = { trip: { findMany } };
-  const pricing = { getNumericSetting: jest.fn().mockResolvedValue(options.expiryHours ?? 24) };
-  const trips = { expireStale: jest.fn().mockResolvedValue(true) };
+  const pricing = {
+    getNumericSetting: jest.fn().mockImplementation((key: string) =>
+      Promise.resolve(key === 'trip.abandoned_after_hours' ? (options.abandonedHours ?? 12) : (options.expiryHours ?? 24)),
+    ),
+  };
+  const trips = { expireStale: jest.fn().mockResolvedValue(true), cancelAbandoned: jest.fn().mockResolvedValue(true) };
   const service = new TripExpiryService(prisma as never, pricing as never, trips as never);
   return { service, prisma, pricing, trips };
 }
@@ -52,7 +57,8 @@ describe('TripExpiryService.runOnce', () => {
     const first = service.runOnce();
     const second = service.runOnce();
     await Promise.all([first, second]);
-    expect(prisma.trip.findMany).toHaveBeenCalledTimes(1);
+    // Un seul passage (deux requêtes : trajets sans réservation, trajets abandonnés) — jamais deux.
+    expect(prisma.trip.findMany).toHaveBeenCalledTimes(2);
   });
 
   it('interrupteur de l\'administration coupé (jobs.trip_expiry_enabled = 0) : aucun trajet n\'est examiné ni expiré', async () => {
@@ -62,5 +68,41 @@ describe('TripExpiryService.runOnce', () => {
     expect(pricing.getNumericSetting).toHaveBeenCalledWith('jobs.trip_expiry_enabled', 1);
     expect(prisma.trip.findMany).not.toHaveBeenCalled();
     expect(trips.expireStale).not.toHaveBeenCalled();
+  });
+});
+
+describe('TripExpiryService — trajets abandonnés avec des clients payés', () => {
+  it('cherche les trajets non démarrés (publié / arrivé) avec une réservation payée, départ dépassé du délai, sans colis confié', async () => {
+    const { service, prisma, pricing } = createService({ abandonedHours: 10 });
+    await service.runOnce();
+    expect(pricing.getNumericSetting).toHaveBeenCalledWith('trip.abandoned_after_hours', 12);
+    const call = prisma.trip.findMany.mock.calls[1][0];
+    expect(call.where.status).toEqual({ in: [TripStatus.PUBLISHED, TripStatus.DRIVER_ARRIVED] });
+    expect(call.where.bookings).toEqual({ some: { status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] } } });
+    expect(call.where.shipments.none.status.in).toEqual(expect.arrayContaining(['DRIVER_ASSIGNED', 'IN_TRANSIT']));
+    const limit = call.where.departureAt.lt as Date;
+    expect(Math.round((Date.now() - limit.getTime()) / 3_600_000)).toBe(10);
+  });
+
+  it('annule chaque trajet abandonné (remboursement intégral des clients, voir TripsService.cancelAbandoned)', async () => {
+    const { service, trips } = createService({ abandonedTrips: [{ id: 'a1' }, { id: 'a2' }] });
+    await service.runOnce();
+    expect(trips.cancelAbandoned).toHaveBeenCalledTimes(2);
+    expect(trips.cancelAbandoned).toHaveBeenCalledWith('a1', expect.any(String));
+    expect(trips.expireStale).not.toHaveBeenCalled();
+  });
+
+  it('un échec n\'empêche pas les suivants', async () => {
+    const { service, trips } = createService({ abandonedTrips: [{ id: 'a1' }, { id: 'a2' }] });
+    trips.cancelAbandoned.mockRejectedValueOnce(new Error('boom'));
+    await service.runOnce();
+    expect(trips.cancelAbandoned).toHaveBeenCalledTimes(2);
+  });
+
+  it('délai à 0 : fonction désactivée, aucune requête de recherche des abandonnés', async () => {
+    const { service, prisma, trips } = createService({ abandonedHours: 0, abandonedTrips: [{ id: 'a1' }] });
+    await service.runOnce();
+    expect(prisma.trip.findMany).toHaveBeenCalledTimes(1);
+    expect(trips.cancelAbandoned).not.toHaveBeenCalled();
   });
 });

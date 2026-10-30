@@ -72,6 +72,36 @@ export class PayoutGuardrailsService {
     return { minAmount: minAmount < 1n ? 1n : minAmount, dailyMax: read(PAYOUT_DAILY_MAX_KEY, 0n) };
   }
 
+  /**
+   * Second contrôle du plafond, APRÈS l'enregistrement de la demande : deux demandes envoyées en même temps passaient chacune le
+   * premier contrôle (qui ne voit pas encore l'autre) et dépassaient ensemble le plafond. Ici on additionne la demande et celles
+   * enregistrées avant elle (même ordre pour tout le monde) : la première passe, les suivantes sont refusées.
+   */
+  async assertWithinDailyCapAfterCreate(walletId: string, payoutId: string, isoCode: string): Promise<void> {
+    const { dailyMax } = await this.readLimits();
+    if (dailyMax <= 0n) return;
+    const mine = await this.prisma.payout.findUnique({ where: { id: payoutId }, select: { amount: true, requestedAt: true } });
+    if (!mine) return;
+    const since = new Date(Date.now() - 24 * 3_600_000);
+    const before = await this.prisma.payout.aggregate({
+      where: {
+        walletId,
+        id: { not: payoutId },
+        status: { notIn: [PayoutStatus.FAILED, PayoutStatus.CANCELLED] },
+        requestedAt: { gte: since, lte: mine.requestedAt },
+        OR: [{ requestedAt: { lt: mine.requestedAt } }, { requestedAt: mine.requestedAt, id: { lt: payoutId } }],
+      },
+      _sum: { amount: true },
+    });
+    const used = before._sum.amount ?? 0n;
+    if (used + mine.amount > dailyMax) {
+      const left = dailyMax > used ? dailyMax - used : 0n;
+      throw new BadRequestException(
+        `Plafond de retrait atteint : ${formatMoneyWithCurrency(dailyMax, isoCode)} par 24 heures. Il te reste ${formatMoneyWithCurrency(left, isoCode)} à retirer aujourd'hui.`,
+      );
+    }
+  }
+
   private async assertUnderDailyCap(walletId: string, amount: bigint, dailyMax: bigint, isoCode: string): Promise<void> {
     const since = new Date(Date.now() - 24 * 3_600_000);
     const recent = await this.prisma.payout.aggregate({

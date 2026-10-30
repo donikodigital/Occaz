@@ -5,7 +5,7 @@
 // dépose restent affichés dans l'application de leur bénéficiaire (compte Occa'Z). Quand l'expéditeur consulte lui-même son code
 // (revealCodeToCaller), aucun SMS n'est envoyé : il le lit à l'écran. Le résultat indique `smsDisabled` quand le SMS est volontairement coupé,
 // pour que l'application n'affiche pas un faux « échec d'envoi ».
-import { HttpException, HttpStatus, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { OtpPurpose, OtpStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
@@ -175,11 +175,11 @@ export class OtpService {
 
     const latest = candidates[0];
     if (!latest || latest.expiresAt < new Date()) {
-      throw new UnauthorizedException('Code expiré ou introuvable — demandez-en un nouveau.');
+      throw new BadRequestException('Code expiré ou introuvable — demandez-en un nouveau.');
     }
     if (latest.attempts >= latest.maxAttempts) {
       await this.prisma.otpCode.update({ where: { id: latest.id }, data: { status: OtpStatus.FAILED } });
-      throw new UnauthorizedException('Trop de tentatives — demandez un nouveau code.');
+      throw new BadRequestException('Trop de tentatives — demandez un nouveau code.');
     }
 
     // L'essai est consommé AVANT la comparaison, de façon atomique : des requêtes parallèles ne peuvent pas dépasser le
@@ -189,13 +189,13 @@ export class OtpService {
       data: { attempts: { increment: 1 } },
     });
     if (claimed.count === 0) {
-      throw new UnauthorizedException('Trop de tentatives — demandez un nouveau code.');
+      throw new BadRequestException('Trop de tentatives — demandez un nouveau code.');
     }
 
     const now = new Date();
     const match = candidates.find((candidate) => candidate.expiresAt >= now && verifyOtpCode(params.code, candidate.code));
     if (!match) {
-      throw new UnauthorizedException('Code invalide.');
+      throw new BadRequestException('Code invalide.');
     }
 
     // Usage unique : si le conducteur envoie deux fois le bon code en même temps, une seule validation passe.
@@ -204,7 +204,7 @@ export class OtpService {
       data: { status: OtpStatus.VERIFIED, verifiedAt: new Date() },
     });
     if (consumed.count === 0) {
-      throw new UnauthorizedException('Ce code a déjà été utilisé — demandez-en un nouveau.');
+      throw new BadRequestException('Ce code a déjà été utilisé — demandez-en un nouveau.');
     }
 
     // On invalide le reste du lot : une fois un code vérifié, les éventuels

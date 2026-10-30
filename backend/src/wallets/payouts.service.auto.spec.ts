@@ -67,7 +67,7 @@ function build(options: {
   const audit = { log: jest.fn().mockResolvedValue(undefined) };
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
   const providers = { get: () => ({ isSimulated: options.simulated ?? true, disburse }) };
-  const service = new PayoutsService(prisma as never, audit as never, wallets as never, providers as never, notifications as never, { check: jest.fn().mockImplementation(({ rawAmount, rawDestination }: { rawAmount: string; rawDestination?: string }) => Promise.resolve({ amount: BigInt(rawAmount), destinationRef: rawDestination ?? null, manualReason: options.manualReason ?? null })) } as never);
+  const service = new PayoutsService(prisma as never, audit as never, wallets as never, providers as never, notifications as never, { assertWithinDailyCapAfterCreate: jest.fn().mockResolvedValue(undefined), check: jest.fn().mockImplementation(({ rawAmount, rawDestination }: { rawAmount: string; rawDestination?: string }) => Promise.resolve({ amount: BigInt(rawAmount), destinationRef: rawDestination ?? null, manualReason: options.manualReason ?? null })) } as never);
   return { service, prisma, wallets, audit, notifications, disburse };
 }
 

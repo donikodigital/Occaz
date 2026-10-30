@@ -1,4 +1,5 @@
 // web-admin/src/app/(app)/audit-logs/page.tsx
+// [30/10/2026] v+ — libellés français pour les actions de connexion et de sécurité (empreinte, téléphones de confiance, mot de passe, verrouillage…).
 //
 // v2 — Refonte complète, pensée pour se lire comme une histoire et non plus
 // comme une liste de codes en vrac.
@@ -22,14 +23,19 @@ import {
   IconChevronDown,
   IconCircleCheck,
   IconCopy,
+  IconDeviceMobileCheck,
+  IconFingerprint,
   IconHistory,
   IconInfoCircle,
+  IconLock,
   IconLogin,
+  IconLogout,
   IconPencil,
   IconPlayerPause,
   IconPlayerPlay,
   IconPlus,
   IconRobot,
+  IconShieldCheck,
   IconTrash,
 } from '@tabler/icons-react';
 import { Button } from '@/components/ui';
@@ -100,6 +106,30 @@ interface ActionInfo {
 const ACTIONS: Record<string, ActionInfo> = {
   LOGIN_OTP: { label: 'Connexion par code', icon: IconLogin, tone: 'neutral', phrase: () => 'a ouvert une session avec un code de vérification', isSelf: true },
   LOGIN_PASSWORD: { label: 'Connexion par mot de passe', icon: IconLogin, tone: 'neutral', phrase: () => 'a ouvert une session avec son mot de passe', isSelf: true },
+  LOGIN_PHONE_PASSWORD: { label: 'Connexion par mot de passe', icon: IconLogin, tone: 'neutral', phrase: () => 's’est connecté avec son numéro et son mot de passe', isSelf: true },
+  LOGIN_EMAIL_OTP: { label: 'Connexion par e-mail', icon: IconLogin, tone: 'neutral', phrase: () => 's’est connecté avec un code reçu par e-mail', isSelf: true },
+  LOGIN_BIOMETRIC: { label: 'Connexion par empreinte', icon: IconFingerprint, tone: 'neutral', phrase: () => 's’est connecté avec l’empreinte de son téléphone', isSelf: true },
+  LOGIN_LOCKED: { label: 'Compte verrouillé', icon: IconLock, tone: 'danger', phrase: () => 'a vu son compte verrouillé après trop d’erreurs de mot de passe', isSelf: true },
+  LOGIN_NEW_DEVICE_CHALLENGE: { label: 'Nouveau téléphone : code demandé', icon: IconDeviceMobileCheck, tone: 'accent', phrase: () => 'se connecte depuis un téléphone inconnu : un code lui a été envoyé', isSelf: true },
+  LOGIN_NEW_DEVICE_VERIFIED: { label: 'Nouveau téléphone confirmé', icon: IconDeviceMobileCheck, tone: 'success', phrase: () => 'a confirmé un nouveau téléphone avec le code reçu', isSelf: true },
+  SIGNUP_PHONE_VERIFIED: { label: 'Numéro vérifié', icon: IconCheck, tone: 'success', phrase: () => 'a vérifié son numéro à l’inscription', isSelf: true },
+  TRUSTED_DEVICE_ADDED: { label: 'Téléphone de confiance ajouté', icon: IconDeviceMobileCheck, tone: 'success', phrase: () => 'a enregistré un téléphone de confiance', isSelf: true },
+  TRUSTED_DEVICE_REMOVED: { label: 'Téléphone de confiance retiré', icon: IconDeviceMobileCheck, tone: 'accent', phrase: () => 'a retiré un téléphone de confiance', isSelf: true },
+  BIOMETRIC_ENABLED: { label: 'Empreinte activée', icon: IconFingerprint, tone: 'success', phrase: () => 'a activé la connexion par empreinte sur un téléphone', isSelf: true },
+  BIOMETRIC_DISABLED: { label: 'Empreinte désactivée', icon: IconFingerprint, tone: 'accent', phrase: () => 'a désactivé la connexion par empreinte sur un téléphone', isSelf: true },
+  BIOMETRIC_REPLAY_REVOKED: { label: 'Empreinte révoquée (secret copié)', icon: IconFingerprint, tone: 'danger', phrase: () => 'a vu un accès par empreinte révoqué : un ancien secret a été rejoué', isSelf: true },
+  PASSWORD_SET: { label: 'Mot de passe défini', icon: IconLock, tone: 'success', phrase: () => 'a défini son mot de passe', isSelf: true },
+  PASSWORD_CHANGED: { label: 'Mot de passe changé', icon: IconLock, tone: 'primary', phrase: () => 'a changé son mot de passe', isSelf: true },
+  PASSWORD_RESET: { label: 'Mot de passe réinitialisé', icon: IconLock, tone: 'accent', phrase: () => 'a réinitialisé son mot de passe', isSelf: true },
+  PASSWORD_RESET_PHONE: { label: 'Mot de passe réinitialisé', icon: IconLock, tone: 'accent', phrase: () => 'a réinitialisé son mot de passe avec un code', isSelf: true },
+  PIN_CONFIRMATION_FAILED: { label: 'Mot de passe erroné (retrait)', icon: IconLock, tone: 'danger', phrase: () => 'a saisi un mauvais mot de passe pour confirmer un retrait', isSelf: true },
+  PHONE_CHANGED: { label: 'Numéro changé', icon: IconPencil, tone: 'primary', phrase: () => 'a changé son numéro de téléphone', isSelf: true },
+  EMAIL_VERIFIED: { label: 'E-mail vérifié', icon: IconCheck, tone: 'success', phrase: () => 'a vérifié son adresse e-mail', isSelf: true },
+  TWO_FACTOR_ENABLED: { label: 'Double authentification activée', icon: IconShieldCheck, tone: 'success', phrase: () => 'a activé la double authentification', isSelf: true },
+  LOGOUT_ALL_SESSIONS: { label: 'Déconnexion partout', icon: IconLogout, tone: 'accent', phrase: () => 's’est déconnecté de tous ses appareils', isSelf: true },
+  SELF_DELETE: { label: 'Suppression de compte demandée', icon: IconTrash, tone: 'danger', phrase: () => 'a demandé la suppression de son compte', isSelf: true },
+  PURGE_DELETED: { label: 'Compte effacé', icon: IconTrash, tone: 'danger', phrase: (noun) => `a effacé définitivement ${noun.direct}` },
+  PURGE_ANONYMIZED: { label: 'Compte anonymisé', icon: IconTrash, tone: 'danger', phrase: (noun) => `a anonymisé ${noun.direct}` },
   CREATE: { label: 'Création', icon: IconPlus, tone: 'success', phrase: (noun) => `a créé ${noun.direct}` },
   UPDATE: { label: 'Modification', icon: IconPencil, tone: 'primary', phrase: (noun) => `a modifié ${noun.direct}` },
   UPSERT: { label: 'Enregistrement', icon: IconPencil, tone: 'primary', phrase: (noun) => `a enregistré ${noun.direct}` },

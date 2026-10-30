@@ -1,4 +1,5 @@
 // mobile/src/types/auth.types.ts
+// [30/10/2026] v+ — téléphones de confiance : état de confiance après connexion, connexion qui demande un code, secret du téléphone.
 export type AccountType = 'CUSTOMER' | 'DRIVER' | 'SUPPORT' | 'SUPERADMIN';
 
 /** Miroir de UsersService.SafeUser côté backend (Lot 1) — jamais de passwordHash/twoFactorSecret. */
@@ -39,6 +40,10 @@ export interface RequestOtpPayload {
 export interface SignupPhonePayload {
   phone: string;
   accountType: 'CUSTOMER' | 'DRIVER';
+  /** Case « J'accepte les conditions d'utilisation et la politique de confidentialité » cochée (l'API refuse sans). */
+  acceptedTerms: boolean;
+  /** Version des textes affichés (LEGAL_VERSION). */
+  termsVersion?: string;
 }
 
 export interface LoginPhonePayload {
@@ -48,6 +53,8 @@ export interface LoginPhonePayload {
   /** Espace choisi à l'écran d'accueil : sert à expliquer l'erreur quand le compte est de l'autre type. */
   expectedAccountType?: 'CUSTOMER' | 'DRIVER';
   device?: DeviceInfo;
+  /** Preuve que ce téléphone est un téléphone de confiance du compte (absente si aucun n'est enregistré ici). */
+  trustedDevice?: TrustedDeviceCredential;
 }
 
 export type PasswordResetChannel = 'SMS' | 'EMAIL';
@@ -72,4 +79,48 @@ export interface AuthTokens {
 
 export interface AuthResult extends AuthTokens {
   user: SafeUser;
+}
+
+/** Secret de CE téléphone, remis à l'enregistrement comme téléphone de confiance. */
+export interface TrustedDeviceCredential {
+  id: string;
+  secret: string;
+}
+
+/** Ce que l'API dit de ce téléphone après une connexion réussie. */
+export interface DeviceTrustInfo {
+  /** Le compte a au moins un téléphone de confiance. */
+  hasTrustedDevice: boolean;
+  /** CE téléphone en est un. */
+  thisDeviceTrusted: boolean;
+  /** Il faut demander « Enregistrer ce téléphone comme téléphone de confiance ? ». */
+  offer: boolean;
+}
+
+/** Session ouverte + état de confiance du téléphone. */
+export interface TrustedAuthResult extends AuthResult {
+  trust: DeviceTrustInfo;
+}
+
+/** La connexion est arrêtée : ce téléphone n'est pas de confiance, un code vient d'être envoyé (e-mail en priorité, sinon SMS). */
+export interface DeviceVerificationRequired {
+  requiresDeviceVerification: true;
+  challengeToken: string;
+  channel: 'EMAIL' | 'SMS';
+  /** Où le code est parti, masqué. */
+  destination: string;
+  /** Le compte a un e-mail vérifié : on peut proposer « Recevoir le code par SMS à la place ». */
+  canUseSms: boolean;
+  expiresInSeconds: number;
+}
+
+export type PhoneLoginResult = TrustedAuthResult | DeviceVerificationRequired;
+
+export function needsDeviceVerification(result: { requiresDeviceVerification?: true } | object): result is DeviceVerificationRequired {
+  return 'requiresDeviceVerification' in result && result.requiresDeviceVerification === true;
+}
+
+/** Connexion par empreinte : la session habituelle + le NOUVEAU secret à ranger dans le coffre du téléphone. */
+export interface BiometricLoginResult extends TrustedAuthResult {
+  biometricToken: string;
 }

@@ -1,4 +1,5 @@
 // mobile/src/components/screens/ChangePasswordScreen.tsx
+// [30/10/2026] v+ — la connexion par empreinte est réactivée avec le nouveau mot de passe.
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v1 — Changer son mot de passe à 6 chiffres depuis le profil, commun aux espaces Client et Conducteur.
 //   1. Mot de passe actuel  →  2. Nouveau mot de passe  →  3. Confirmation du nouveau  →  « Mot de passe modifié ».
@@ -18,6 +19,7 @@ import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useBiometricStore } from '@/stores/biometricStore';
 import { useT, translate } from '@/i18n';
 
 type Phase = 'current' | 'new' | 'confirm' | 'done';
@@ -67,7 +69,11 @@ export function ChangePasswordScreen() {
     change.mutate(
       { currentPassword: current, newPassword: next },
       {
-        onSuccess: () => setPhase('done'),
+        onSuccess: () => {
+          // Le serveur révoque la connexion par empreinte au changement de mot de passe : on la réactive avec le nouveau (sans rien redemander).
+          void useBiometricStore.getState().reenroll(next);
+          setPhase('done');
+        },
         onError: (error) => {
           setErrorMessage(error instanceof ApiError ? error.message : t('Une erreur est survenue. Réessayez.'));
           // On repart de la saisie du mot de passe actuel : c'est lui qui est le plus souvent en cause.

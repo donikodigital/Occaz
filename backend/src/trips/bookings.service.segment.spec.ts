@@ -1,10 +1,12 @@
 // backend/src/trips/bookings.service.segment.spec.ts
 // Réservation d'un tronçon (ex. Kindia → Labé) : prix du tronçon, commission sur ce prix, étapes enregistrées,
 // et délai d'annulation compté depuis l'heure de montée du client.
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 
-const DEPARTURE = new Date('2026-10-10T06:00:00.000Z');
+// Départ dans le futur (réservations closes une fois le départ passé).
+const BASE = Date.now() + 5 * 86_400_000;
+const DEPARTURE = new Date(BASE);
 
 const trip = {
   id: 'trip1',
@@ -20,11 +22,11 @@ const trip = {
   stops: [
     {
       id: 's-kindia', sequence: 1, cityId: 'kindia', locationId: 'loc-k', fareFromOrigin: 35_000n,
-      distanceFromOriginKm: 135, estimatedArrivalAt: new Date('2026-10-10T08:00:00.000Z'), isBookable: true,
+      distanceFromOriginKm: 135, estimatedArrivalAt: new Date(BASE + 2 * 3_600_000), isBookable: true,
     },
     {
       id: 's-mamou', sequence: 2, cityId: 'mamou', locationId: 'loc-m', fareFromOrigin: 65_000n,
-      distanceFromOriginKm: 270, estimatedArrivalAt: new Date('2026-10-10T10:00:00.000Z'), isBookable: true,
+      distanceFromOriginKm: 270, estimatedArrivalAt: new Date(BASE + 4 * 3_600_000), isBookable: true,
     },
   ],
 };
@@ -37,6 +39,7 @@ function createService(options: { commissionPercent?: number } = {}) {
     booking: {
       create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'b1', ...data })),
       findUnique: jest.fn().mockResolvedValue({ id: 'b1' }),
+      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
     trip: {
@@ -208,5 +211,31 @@ describe('BookingsService — devise de la réservation', () => {
     await service.findOne('b1');
     const include = prisma.booking.findUnique.mock.calls[0][0].include;
     expect(include.trip.include.currency).toEqual({ select: { id: true, isoCode: true, symbol: true } });
+  });
+});
+describe('BookingsService.create — départ passé et plafond de réservations en attente', () => {
+  it('départ déjà passé : réservation refusée, rien n\'est créé', async () => {
+    const { service, tx, prisma } = createService();
+    prisma.trip.findUnique.mockResolvedValue({ ...trip, departureAt: new Date(Date.now() - 60_000) });
+    await expect(service.create('c1', { tripId: 'trip1', seatsCount: 1 })).rejects.toThrow(/déjà parti|closes/);
+    expect(tx.booking.create).not.toHaveBeenCalled();
+  });
+
+  it('délai de fermeture (booking.cutoff_minutes_before_departure) : un départ dans 20 min est refusé avec un délai de 30 min', async () => {
+    const { service, tx, prisma, pricing } = createService();
+    prisma.trip.findUnique.mockResolvedValue({ ...trip, departureAt: new Date(Date.now() + 20 * 60_000) });
+    pricing.getNumericSetting.mockImplementation((key: string, fallback: number) =>
+      Promise.resolve(key === 'booking.cutoff_minutes_before_departure' ? 30 : fallback),
+    );
+    await expect(service.create('c1', { tripId: 'trip1', seatsCount: 1 })).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.booking.create).not.toHaveBeenCalled();
+  });
+
+  it('trop de réservations en attente de paiement sur ce trajet : refusé, compté sous le verrou du trajet', async () => {
+    const { service, tx } = createService();
+    tx.booking.count.mockResolvedValue(2); // plafond par défaut : 2
+    await expect(service.create('c1', { tripId: 'trip1', seatsCount: 1 })).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.booking.create).not.toHaveBeenCalled();
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.booking.count.mock.invocationCallOrder[0]);
   });
 });

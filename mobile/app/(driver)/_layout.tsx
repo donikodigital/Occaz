@@ -1,4 +1,5 @@
 // mobile/app/(driver)/_layout.tsx
+// [30/10/2026] v+ — écran « Connexion par empreinte ».
 // [19/10/2026] v+ — écrans « Mon dossier », « Utiliser comme passager » et « Adresse e-mail ».
 import { Redirect, Stack } from 'expo-router';
 import { colors } from '@/theme';
@@ -29,6 +30,8 @@ export default function DriverLayout() {
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="change-phone" />
       <Stack.Screen name="change-password" />
+      <Stack.Screen name="biometric" />
+      <Stack.Screen name="trusted-devices" />
       <Stack.Screen name="select-city" options={{ presentation: 'modal' }} />
       <Stack.Screen name="select-location" options={{ presentation: 'modal' }} />
       <Stack.Screen name="vehicle-new" />

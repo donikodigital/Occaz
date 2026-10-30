@@ -1,4 +1,5 @@
 // mobile/app/(customer)/_layout.tsx
+// [30/10/2026] v+ — écran « Connexion par empreinte ».
 // [19/10/2026] v+ — écran « Adresse e-mail ».
 import { Redirect, Stack } from 'expo-router';
 import { colors } from '@/theme';
@@ -27,6 +28,8 @@ export default function CustomerLayout() {
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="change-phone" />
       <Stack.Screen name="change-password" />
+      <Stack.Screen name="biometric" />
+      <Stack.Screen name="trusted-devices" />
       <Stack.Screen name="select-city" options={{ presentation: 'modal' }} />
       <Stack.Screen name="select-location" options={{ presentation: 'modal' }} />
       <Stack.Screen name="trip-search" />

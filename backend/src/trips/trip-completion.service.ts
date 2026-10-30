@@ -1,4 +1,5 @@
 // backend/src/trips/trip-completion.service.ts
+// [30/10/2026] v+ — trajets restés « en route » clôturés automatiquement ; plus de repli sur updatedAt pour l'attente d'un client absent.
 // [25/10/2026] v1 — Client absent au rendez-vous (déclaré par le conducteur après une attente) et clôture automatique des trajets restés
 // bloqués à l'arrivée. Modèle repris des grandes plateformes de covoiturage et de VTC : le conducteur qui a fait le déplacement est payé,
 // le client absent n'est pas remboursé (il garde le recours « Signaler un problème »), et un trajet ne reste jamais ouvert indéfiniment.
@@ -25,6 +26,7 @@ const CHECK_INTERVAL_MS = 5 * 60_000;
 const BATCH_SIZE = 50;
 const DEFAULT_NO_SHOW_WAIT_MINUTES = 15;
 const DEFAULT_AUTO_CLOSE_HOURS = 6;
+const DEFAULT_IN_PROGRESS_AUTO_CLOSE_HOURS = 48;
 
 export const NO_SHOW_REASON = 'Client absent au point de rendez-vous';
 
@@ -105,9 +107,9 @@ export class TripCompletionService implements OnModuleInit, OnModuleDestroy {
     } else if (booking.trip.status !== TripStatus.DRIVER_ARRIVED && booking.trip.status !== TripStatus.PASSENGER_PICKED_UP) {
       throw new BadRequestException('Signalez d’abord votre arrivée au point de départ.');
     }
-    const waitingSince = atStop
-      ? (booking.boardingStop?.pickupArrivedAt ?? null)
-      : (booking.trip.driverArrivedAt ?? booking.trip.updatedAt);
+    // Jamais de repli sur la date de dernière modification du trajet (elle change à chaque réservation) : seul le vrai instant d'arrivée
+    // compte. Les trajets déjà « arrivés » avant l'ajout de cette date sont renseignés par la migration 20261030110000.
+    const waitingSince = atStop ? (booking.boardingStop?.pickupArrivedAt ?? null) : (booking.trip.driverArrivedAt ?? null);
     if (!waitingSince) {
       throw new BadRequestException('Signalez d’abord votre arrivée sur les lieux avant de déclarer un client absent.');
     }
@@ -232,6 +234,7 @@ export class TripCompletionService implements OnModuleInit, OnModuleDestroy {
     try {
       if ((await this.pricing.getNumericSetting('jobs.trip_autoclose_enabled', 1)) === 0) return;
       await this.autoCloseStuckTrips();
+      await this.autoCloseAbandonedTrips();
     } catch (error) {
       this.logger.error('Échec de la clôture automatique des trajets', error as Error);
     } finally {
@@ -267,7 +270,41 @@ export class TripCompletionService implements OnModuleInit, OnModuleDestroy {
     return closedCount;
   }
 
-  private async closeStuckTrip(tripId: string, driverId: string): Promise<boolean> {
+  /**
+   * Trajets « en route » dont le conducteur a disparu : le départ prévu est passé depuis plus de `trip.in_progress_auto_close_hours`
+   * (48 h par défaut) et le trajet n'a jamais été marqué « arrivé ». Même clôture que pour un trajet arrivé : les clients pris en
+   * charge sont considérés déposés (le conducteur est payé), les autres traités comme absents. Sans cela un trajet resté « en cours »
+   * bloquait indéfiniment le conducteur, ses clients et l'argent en attente. 0 = désactivé.
+   */
+  async autoCloseAbandonedTrips(): Promise<number> {
+    const hours = await this.pricing.getNumericSetting('trip.in_progress_auto_close_hours', DEFAULT_IN_PROGRESS_AUTO_CLOSE_HOURS);
+    if (hours <= 0) return 0;
+    const before = new Date(Date.now() - hours * 3_600_000);
+    const stuck = await this.prisma.trip.findMany({
+      where: { status: { in: [TripStatus.PASSENGER_PICKED_UP, TripStatus.IN_PROGRESS] }, departureAt: { lt: before } },
+      select: { id: true, driverId: true },
+      take: BATCH_SIZE,
+    });
+
+    let closedCount = 0;
+    for (const trip of stuck) {
+      try {
+        if (await this.closeStuckTrip(trip.id, trip.driverId, [TripStatus.PASSENGER_PICKED_UP, TripStatus.IN_PROGRESS])) {
+          closedCount += 1;
+          this.logger.warn(`Trajet ${trip.id} resté en route ${hours} h après son départ prévu : clôturé automatiquement.`);
+        }
+      } catch (error) {
+        this.logger.error(`Clôture automatique du trajet en route ${trip.id} impossible`, error as Error);
+      }
+    }
+    return closedCount;
+  }
+
+  private async closeStuckTrip(
+    tripId: string,
+    driverId: string,
+    fromStatuses: TripStatus[] = [TripStatus.ARRIVED],
+  ): Promise<boolean> {
     const bookings = await this.prisma.booking.findMany({
       where: { tripId, status: { in: ACTIVE_BOOKING_STATUSES } },
       include: { passengers: true },
@@ -285,7 +322,7 @@ export class TripCompletionService implements OnModuleInit, OnModuleDestroy {
     const claimed = await this.prisma.trip.updateMany({
       where: {
         id: tripId,
-        status: TripStatus.ARRIVED,
+        status: { in: fromStatuses },
         bookings: { none: { status: { notIn: [BookingStatus.COMPLETED, BookingStatus.CANCELLED, BookingStatus.REFUNDED] } } },
       },
       data: { status: TripStatus.COMPLETED },

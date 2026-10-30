@@ -4,10 +4,11 @@ import { BadRequestException } from '@nestjs/common';
 import { PayoutStatus } from '@prisma/client';
 import { MANUAL_REASON_NEW_DESTINATION, PayoutGuardrailsService, normalizeDestination } from './payout-guardrails.service';
 
-function build(options: { settings?: Record<string, number>; used?: bigint; userPhone?: string; paidBefore?: boolean } = {}) {
+function build(options: { settings?: Record<string, number>; used?: bigint; userPhone?: string; paidBefore?: boolean; mine?: bigint } = {}) {
   const prisma = {
     platformSetting: { findMany: jest.fn().mockResolvedValue(Object.entries(options.settings ?? {}).map(([key, value]) => ({ key, value }))) },
     payout: {
+      findUnique: jest.fn().mockResolvedValue({ amount: options.mine ?? 10_000n, requestedAt: new Date('2026-10-30T10:00:00Z') }),
       aggregate: jest.fn().mockResolvedValue({ _sum: { amount: options.used ?? null } }),
       findFirst: jest.fn().mockResolvedValue(options.paidBefore ? { id: 'p0' } : null),
     },
@@ -57,6 +58,27 @@ describe('PayoutGuardrailsService — plafond sur 24 h', () => {
     const { service, prisma } = build({ settings: { 'payout.daily_max_amount': 100_000 } });
     await ask(service, '1000');
     expect(prisma.payout.aggregate.mock.calls[0][0].where.status).toEqual({ notIn: [PayoutStatus.FAILED, PayoutStatus.CANCELLED] });
+  });
+});
+
+describe('PayoutGuardrailsService — plafond revérifié après l\'enregistrement (demandes simultanées)', () => {
+  it('plafond à 0 : aucune vérification', async () => {
+    const { service, prisma } = build();
+    await expect(service.assertWithinDailyCapAfterCreate('w1', 'p1', 'GNF')).resolves.toBeUndefined();
+    expect(prisma.payout.aggregate).not.toHaveBeenCalled();
+  });
+
+  it('seules les demandes enregistrées AVANT celle-ci comptent : la première passe', async () => {
+    const { service, prisma } = build({ settings: { 'payout.daily_max_amount': 100_000 }, used: 0n, mine: 100_000n });
+    await expect(service.assertWithinDailyCapAfterCreate('w1', 'p1', 'GNF')).resolves.toBeUndefined();
+    const where = prisma.payout.aggregate.mock.calls[0][0].where;
+    expect(where.id).toEqual({ not: 'p1' });
+    expect(where.OR).toHaveLength(2);
+  });
+
+  it('la seconde demande simultanée dépasse le plafond : refusée', async () => {
+    const { service } = build({ settings: { 'payout.daily_max_amount': 100_000 }, used: 100_000n, mine: 100_000n });
+    await expect(service.assertWithinDailyCapAfterCreate('w1', 'p2', 'GNF')).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 

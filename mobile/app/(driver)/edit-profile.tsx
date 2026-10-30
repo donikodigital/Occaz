@@ -1,4 +1,5 @@
 // mobile/app/(driver)/edit-profile.tsx
+// [30/10/2026] v+ — ligne « Connexion par empreinte » sous « Changer mon mot de passe ».
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
 // [21/09/2026] v2 — habillage bleu Ocean, comme l'espace client : en-tête,
@@ -6,13 +7,15 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { IconDeviceMobile, IconLock, IconUserCircle } from '@tabler/icons-react-native';
+import { IconDeviceMobile, IconDeviceMobileCheck, IconFingerprint, IconLock, IconUserCircle } from '@tabler/icons-react-native';
 import { AppText, ProfilePhotoField, ScreenContainer, TextField } from '@/components/ui';
 import { OceanButton, OceanSection } from '@/components/ocean/OceanKit';
 import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { LockedField } from '@/components/screens/LockedField';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
+import { useBiometricStore } from '@/stores/biometricStore';
+import { useTrustedDeviceStore } from '@/stores/trustedDeviceStore';
 import { useDriverProfile, useUpdateDriverProfile } from '@/hooks/useDriverProfile';
 import { useDriverPhotoUpload } from '@/hooks/useDriverPhotoUpload';
 import { useAuthStore } from '@/stores/authStore';
@@ -21,6 +24,9 @@ import { useT } from '@/i18n';
 
 export default function DriverEditProfileScreen() {
   const t = useT();
+  const biometricAvailable = useBiometricStore((state) => state.capability.available);
+  const biometricEnabled = useBiometricStore((state) => Boolean(state.record));
+  const trustedDeviceCount = useTrustedDeviceStore((state) => (state.record ? 1 : 0));
   const { data: profile } = useDriverProfile();
   // email vit sur User, pas sur DriverProfile (comme à l'inscription,
   // voir complete-profile.tsx) — sa valeur actuelle vient donc du store
@@ -117,6 +123,28 @@ export default function DriverEditProfileScreen() {
           <IconLock size={15} color={OCEAN.base} />
           <AppText variant="sm" weight="semibold" color={OCEAN.base}>
             {t('Changer mon mot de passe')}
+          </AppText>
+        </Pressable>
+        {biometricAvailable ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/(driver)/biometric')}
+            style={({ pressed }) => [styles.changePhone, pressed && styles.pressed]}
+          >
+            <IconFingerprint size={15} color={OCEAN.base} />
+            <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+              {biometricEnabled ? t('Connexion par empreinte · activée') : t('Connexion par empreinte')}
+            </AppText>
+          </Pressable>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(driver)/trusted-devices')}
+          style={({ pressed }) => [styles.changePhone, pressed && styles.pressed]}
+        >
+          <IconDeviceMobileCheck size={15} color={OCEAN.base} />
+          <AppText variant="sm" weight="semibold" color={OCEAN.base}>
+            {trustedDeviceCount ? t('Téléphones de confiance · {count}', { count: trustedDeviceCount }) : t('Téléphones de confiance')}
           </AppText>
         </Pressable>
         <TextField

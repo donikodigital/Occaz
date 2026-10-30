@@ -13,6 +13,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { PaymentProviderType } from '@prisma/client';
 import { Request } from 'express';
 import { Public } from '../common/decorators/public.decorator';
@@ -53,6 +54,9 @@ export class PaymentsController {
    * l'authenticité selon son propre schéma.
    */
   @Public()
+  // Le prestataire envoie tous ses appels depuis quelques adresses : une limite par IP ferait perdre des confirmations de paiement
+  // en période de pointe. La protection est la signature, vérifiée avant tout effet.
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   @Post('webhooks/:providerType')
   handleWebhook(

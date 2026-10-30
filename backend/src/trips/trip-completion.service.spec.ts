@@ -195,3 +195,52 @@ describe('TripCompletionService.autoCloseStuckTrips', () => {
     expect(prisma.trip.findMany).not.toHaveBeenCalled();
   });
 });
+
+describe('TripCompletionService.autoCloseAbandonedTrips — trajets restés « en route »', () => {
+  it('cherche les trajets pris en charge / en cours dont le départ prévu date de plus de 48 h par défaut', async () => {
+    const { service, prisma } = build();
+    await service.autoCloseAbandonedTrips();
+    const where = prisma.trip.findMany.mock.calls[0][0].where;
+    expect(where.status).toEqual({ in: [TripStatus.PASSENGER_PICKED_UP, TripStatus.IN_PROGRESS] });
+    const limit: Date = where.departureAt.lt;
+    expect(Math.abs(Date.now() - limit.getTime() - 48 * 60 * MIN)).toBeLessThan(5_000);
+  });
+
+  it('clôt le trajet : client monté considéré déposé (conducteur payé), absent traité comme absent, course comptée', async () => {
+    const stuckBookings = [
+      { id: 'b-boarded', passengers: [{ pickedUpAt: ago(3000) }] },
+      { id: 'b-absent', passengers: [{ pickedUpAt: null }] },
+    ];
+    const { service, tripOtp, wallets, prisma, driverProfiles } = build({ stuck: [{ id: 't1', driverId: 'd1' }], stuckBookings });
+    await expect(service.autoCloseAbandonedTrips()).resolves.toBe(1);
+    expect(tripOtp.closeDropoffBySystem).toHaveBeenCalledWith('b-boarded');
+    expect(wallets.releaseHeldFunds).toHaveBeenCalledWith({ driverId: 'd1', bookingId: 'b-absent' });
+    // La clôture n'est « réclamée » que depuis un statut en route (jamais un trajet déjà clos ou annulé entre-temps).
+    expect(prisma.trip.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: { in: [TripStatus.PASSENGER_PICKED_UP, TripStatus.IN_PROGRESS] } }) }),
+    );
+    expect(driverProfiles.incrementCompletedTrips).toHaveBeenCalledWith('d1');
+  });
+
+  it('délai réglable depuis l\'administration ; 0 = désactivé (aucune recherche)', async () => {
+    const { service, prisma } = build();
+    const getSetting = (service as unknown as { pricing: { getNumericSetting: jest.Mock } }).pricing.getNumericSetting;
+    getSetting.mockImplementation((key: string, fallback: number) => Promise.resolve(key === 'trip.in_progress_auto_close_hours' ? 0 : fallback));
+    await expect(service.autoCloseAbandonedTrips()).resolves.toBe(0);
+    expect(getSetting).toHaveBeenCalledWith('trip.in_progress_auto_close_hours', 48);
+    expect(prisma.trip.findMany).not.toHaveBeenCalled();
+  });
+
+  it('trajet déjà clos entre-temps (réclamation perdue) : pas de course comptée deux fois', async () => {
+    const { service, driverProfiles } = build({ stuck: [{ id: 't1', driverId: 'd1' }], tripClaim: 0 });
+    await expect(service.autoCloseAbandonedTrips()).resolves.toBe(0);
+    expect(driverProfiles.incrementCompletedTrips).not.toHaveBeenCalled();
+  });
+
+  it('un échec sur un trajet n\'empêche pas les suivants', async () => {
+    const { service, prisma } = build({ stuck: [{ id: 't1', driverId: 'd1' }, { id: 't2', driverId: 'd2' }] });
+    prisma.booking.findMany.mockRejectedValueOnce(new Error('base indisponible')).mockResolvedValue([]);
+    await expect(service.autoCloseAbandonedTrips()).resolves.toBe(1);
+  });
+});
+

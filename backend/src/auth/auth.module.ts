@@ -5,7 +5,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AccountAuthController } from './account-auth.controller';
+import { TrustedDeviceController } from './trusted-device.controller';
+import { TrustedDeviceService } from './trusted-device.service';
 import { AccountAuthService } from './account-auth.service';
+import { BiometricAuthController } from './biometric-auth.controller';
+import { BiometricAuthService } from './biometric-auth.service';
 import { AuthService } from './auth.service';
 import { SessionsService } from './sessions.service';
 import { TwoFactorService } from './two-factor.service';
@@ -39,8 +43,8 @@ import { OtpModule } from '../otp/otp.module';
       }),
     }),
   ],
-  controllers: [AuthController, AccountAuthController],
-  providers: [AuthService, AccountAuthService, SessionsService, TwoFactorService, PhoneChangeService, JwtStrategy],
+  controllers: [AuthController, AccountAuthController, BiometricAuthController, TrustedDeviceController],
+  providers: [AuthService, AccountAuthService, BiometricAuthService, TrustedDeviceService, SessionsService, TwoFactorService, PhoneChangeService, JwtStrategy],
   exports: [AuthService, SessionsService],
 })
 export class AuthModule {}

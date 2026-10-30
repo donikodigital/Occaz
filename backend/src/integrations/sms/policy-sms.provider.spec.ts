@@ -9,7 +9,7 @@ const make = (env: NodeJS.ProcessEnv = {}) => {
 };
 
 describe('PolicySmsProvider', () => {
-  it.each([SmsPurpose.SIGNUP, SmsPurpose.PASSWORD_RESET, SmsPurpose.PARCEL_RECIPIENT, SmsPurpose.PHONE_CHANGE])('%s : le SMS part', async (purpose) => {
+  it.each([SmsPurpose.SIGNUP, SmsPurpose.PASSWORD_RESET, SmsPurpose.PARCEL_RECIPIENT, SmsPurpose.PHONE_CHANGE, SmsPurpose.DEVICE_VERIFICATION])('%s : le SMS part', async (purpose) => {
     const { inner, policy } = make();
     await policy.send('+224620000001', 'Code 123456', purpose);
     expect(inner.send).toHaveBeenCalledWith('+224620000001', 'Code 123456', purpose);
@@ -34,8 +34,8 @@ describe('PolicySmsProvider', () => {
     await expect(policy.send('+224620000001', 'x', SmsPurpose.NOTIFICATION)).rejects.toBeInstanceOf(SmsPurposeNotAllowedError);
   });
 
-  it('la liste par défaut contient exactement quatre motifs', () => {
-    expect([...DEFAULT_ALLOWED_SMS_PURPOSES].sort()).toEqual(['PARCEL_RECIPIENT', 'PASSWORD_RESET', 'PHONE_CHANGE', 'SIGNUP']);
+  it('la liste par défaut contient exactement cinq motifs', () => {
+    expect([...DEFAULT_ALLOWED_SMS_PURPOSES].sort()).toEqual(['DEVICE_VERIFICATION', 'PARCEL_RECIPIENT', 'PASSWORD_RESET', 'PHONE_CHANGE', 'SIGNUP']);
     expect(isSmsPurposeAllowed(undefined, {})).toBe(false);
   });
 });

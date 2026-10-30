@@ -3,7 +3,9 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 
-const DEPARTURE = new Date('2026-10-10T06:00:00.000Z');
+// Départ dans le futur (les réservations sont closes une fois le départ passé) : dates relatives à « maintenant ».
+const BASE = Date.now() + 5 * 86_400_000;
+const DEPARTURE = new Date(BASE);
 const TOTAL_SEATS = 4;
 
 const trip = {
@@ -19,8 +21,8 @@ const trip = {
   destinationCityId: 'labe',
   destinationLocationId: 'loc-b',
   stops: [
-    { id: 's-kindia', sequence: 1, cityId: 'kindia', locationId: 'loc-k', fareFromOrigin: 35_000n, distanceFromOriginKm: 135, estimatedArrivalAt: new Date('2026-10-10T08:00:00.000Z'), isBookable: true },
-    { id: 's-mamou', sequence: 2, cityId: 'mamou', locationId: 'loc-m', fareFromOrigin: 65_000n, distanceFromOriginKm: 270, estimatedArrivalAt: new Date('2026-10-10T10:00:00.000Z'), isBookable: true },
+    { id: 's-kindia', sequence: 1, cityId: 'kindia', locationId: 'loc-k', fareFromOrigin: 35_000n, distanceFromOriginKm: 135, estimatedArrivalAt: new Date(BASE + 2 * 3_600_000), isBookable: true },
+    { id: 's-mamou', sequence: 2, cityId: 'mamou', locationId: 'loc-m', fareFromOrigin: 65_000n, distanceFromOriginKm: 270, estimatedArrivalAt: new Date(BASE + 4 * 3_600_000), isBookable: true },
   ],
 };
 
@@ -40,6 +42,7 @@ function build(options: { holds?: Hold[]; lockedStatus?: string | null } = {}) {
         return Promise.resolve({ id: 'b1', ...data });
       }),
       findUnique: jest.fn().mockResolvedValue({ id: 'b1' }),
+      count: jest.fn().mockResolvedValue(0), // réservations en attente de paiement de ce client sur ce trajet
       // 1er appel : réservations déjà là (contrôle) ; appels suivants : celles-ci + la nouvelle (recalcul du compteur)
       findMany: jest.fn().mockImplementation(() => Promise.resolve([...holds, ...created])),
     },
@@ -154,6 +157,7 @@ describe('BookingsService.cancel — libère les places du tronçon', () => {
       booking: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'b1' }),
+        findFirst: jest.fn().mockResolvedValue({ status: 'CANCELLED' }),
         findMany: jest.fn().mockResolvedValue(remaining),
       },
       trip: { update: jest.fn(), findUnique: jest.fn().mockResolvedValue(trip) },
@@ -194,5 +198,14 @@ describe('BookingsService.cancel — libère les places du tronçon', () => {
     tx.booking.updateMany.mockResolvedValueOnce({ count: 0 });
     await expect(service.cancel('b1', 'c1', 'Imprévu')).rejects.toBeInstanceOf(BadRequestException);
     expect(tx.trip.update).not.toHaveBeenCalled();
+  });
+
+  it('statut changé pendant l\'annulation (paiement confirmé pile à ce moment) : la réclamation est rejouée sur le statut réel', async () => {
+    const { service, tx } = cancelBuild([]);
+    tx.booking.updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+    tx.booking.findFirst.mockResolvedValueOnce({ status: 'PAID' });
+    await expect(service.cancel('b1', 'c1', 'Imprévu')).resolves.toBeDefined();
+    expect(tx.booking.updateMany).toHaveBeenCalledTimes(2);
+    expect(tx.booking.updateMany.mock.calls[1][0].where.status).toBe('PAID');
   });
 });

@@ -1,4 +1,5 @@
 // mobile/app/(auth)/login.tsx
+// [30/10/2026] v+ — « Se connecter avec l'empreinte » au-dessus de la saisie du numéro quand l'empreinte est active.
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [29/10/2026] v+ — Le sélecteur de langue n'est plus ici : il est en haut à droite de l'écran d'accueil (onboarding).
 // [22/09/2026] v2 — Habillage bleu Ocean, dans l'esprit Tiime.
@@ -16,6 +17,7 @@ import { OceanButton } from '@/components/ocean/OceanKit';
 import { AuthStep } from '@/components/auth/AuthStep';
 import { CountryPickerModal } from '@/components/auth/CountryField';
 import { PhoneField } from '@/components/auth/PhoneField';
+import { BiometricLoginButton } from '@/components/auth/BiometricLoginButton';
 import { spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import { useDefaultSignupCountry } from '@/hooks/useSignupCountry';
@@ -63,6 +65,8 @@ export default function LoginScreen() {
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/onboarding'))}
       footer={<OceanButton label={t('Continuer')} onPress={handleContinue} />}
     >
+      <BiometricLoginButton />
+
       <PhoneField
         country={country}
         value={phone}

@@ -1,4 +1,5 @@
 // backend/src/payments/payments.service.ts
+// [30/10/2026] v4 — initiate refuse un paiement non payable ; webhook : contrôle du montant et de la devise ; paiement tardif jamais perdu (reprise automatique) ; envoi annulé non ressuscité.
 // [25/10/2026] v3 — settleCancelledBooking / settleCancelledShipment (réutilisés par la reprise automatique RefundRecoveryService) ; paiement tardif : pourcentage noté.
 // [21/09/2026] v2 — retenue via Shipment.driverId ; commission déduite une seule fois du montant unique payé (fin du double prélèvement).
 import {
@@ -69,26 +70,39 @@ export class PaymentsService {
       throw new BadRequestException("Ce moyen de paiement n'est plus disponible.");
     }
 
-    let payment = await this.prisma.payment.findUnique({
-      where: dto.bookingId ? { bookingId: dto.bookingId } : { shipmentId: dto.shipmentId },
-    });
+    const paymentWhere = dto.bookingId ? { bookingId: dto.bookingId } : { shipmentId: dto.shipmentId };
+    let payment = await this.prisma.payment.findUnique({ where: paymentWhere });
     if (payment && payment.status === PaymentStatus.CAPTURED) {
       throw new ConflictException('Ce paiement a déjà été effectué.');
     }
+    if (payment && (payment.status === PaymentStatus.REFUNDED || payment.status === PaymentStatus.PARTIALLY_REFUNDED)) {
+      throw new ConflictException('Ce paiement a déjà été remboursé : il ne peut plus être relancé.');
+    }
     if (!payment) {
       const { amount, currencyId } = await this.resolveAmountAndOwnership(requester, dto);
-      payment = await this.prisma.payment.create({
-        data: {
-          bookingId: dto.bookingId,
-          shipmentId: dto.shipmentId,
-          amount,
-          currencyId,
-          status: PaymentStatus.PENDING,
-        },
-      });
+      try {
+        payment = await this.prisma.payment.create({
+          data: {
+            bookingId: dto.bookingId,
+            shipmentId: dto.shipmentId,
+            amount,
+            currencyId,
+            status: PaymentStatus.PENDING,
+          },
+        });
+      } catch (error) {
+        // Double appui : l'autre requête a créé le paiement entre-temps (index unique). On reprend le sien au lieu de répondre 409.
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+        payment = await this.prisma.payment.findUnique({ where: paymentWhere });
+        if (!payment) throw error;
+        await this.assertOwnership(requester, payment);
+      }
     } else {
       await this.assertOwnership(requester, payment);
     }
+    // Seule une réservation « à payer » (ou un envoi tout juste créé) peut être payée : sans ce contrôle, un paiement lancé sur une
+    // réservation déjà annulée / expirée serait débité chez le prestataire puis aussitôt remboursé.
+    await this.assertPayable(payment);
 
     const currency = await this.prisma.currency.findUniqueOrThrow({
       where: { id: payment.currencyId },
@@ -128,6 +142,24 @@ export class PaymentsService {
       redirectUrl: result.redirectUrl,
       instructions: result.instructions,
     };
+  }
+
+  private async assertPayable(payment: { bookingId: string | null; shipmentId: string | null }): Promise<void> {
+    if (payment.bookingId) {
+      const booking = await this.prisma.booking.findUnique({ where: { id: payment.bookingId }, select: { status: true } });
+      if (!booking) throw new NotFoundException('Réservation introuvable.');
+      if (booking.status !== BookingStatus.PENDING_PAYMENT) {
+        throw new ConflictException("Cette réservation n'est plus à payer (déjà payée, annulée ou expirée).");
+      }
+      return;
+    }
+    if (payment.shipmentId) {
+      const shipment = await this.prisma.shipment.findUnique({ where: { id: payment.shipmentId }, select: { status: true } });
+      if (!shipment) throw new NotFoundException('Envoi introuvable.');
+      if (shipment.status !== ShipmentStatus.CREATED) {
+        throw new ConflictException("Cet envoi n'est plus à payer (déjà payé, annulé ou expiré).");
+      }
+    }
   }
 
   private async resolveAmountAndOwnership(
@@ -188,7 +220,10 @@ export class PaymentsService {
     // Lève une exception si la signature/le secret propre au prestataire
     // ne correspond pas — voir chaque adaptateur pour le détail.
     const parsed = await adapter.verifyAndParseWebhook(rawPayload, headers);
-    return this.settleTransaction(providerType, parsed.externalReference, parsed.status, rawPayload);
+    return this.settleTransaction(providerType, parsed.externalReference, parsed.status, rawPayload, {
+      amount: parsed.amount,
+      currencyIsoCode: parsed.currencyIsoCode,
+    });
   }
 
   /**
@@ -204,6 +239,8 @@ export class PaymentsService {
     externalReference: string,
     status: 'CAPTURED' | 'FAILED',
     rawPayload: unknown,
+    /** Montant et devise annoncés par le prestataire (quand son webhook les contient) : comparés à ce qui était attendu. */
+    reported: { amount?: bigint; currencyIsoCode?: string } = {},
   ) {
     void providerType;
     const transaction = await this.prisma.paymentTransaction.findFirst({
@@ -229,6 +266,17 @@ export class PaymentsService {
           status: { notIn: [PaymentStatus.CAPTURED, PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED] },
         },
         data: { status: PaymentStatus.FAILED },
+      });
+      const current = await this.prisma.payment.findUniqueOrThrow({ where: { id: transaction.paymentId } });
+      return { paymentId: current.id, status: current.status };
+    }
+
+    // Le prestataire annonce un autre montant / une autre devise que ceux demandés : on ne crédite rien. La transaction est marquée
+    // en échec avec le contenu reçu, et l'anomalie est journalisée pour le support (vérification chez le prestataire, remboursement).
+    if (await this.reportedAmountMismatch(transaction, reported)) {
+      await this.prisma.paymentTransaction.updateMany({
+        where: { id: transaction.id, status: { not: PaymentStatus.CAPTURED } },
+        data: { status: PaymentStatus.FAILED, ...received },
       });
       const current = await this.prisma.payment.findUniqueOrThrow({ where: { id: transaction.paymentId } });
       return { paymentId: current.id, status: current.status };
@@ -274,6 +322,24 @@ export class PaymentsService {
     return { paymentId: payment.id, status: PaymentStatus.CAPTURED };
   }
 
+  private async reportedAmountMismatch(
+    transaction: { id: string; paymentId: string; amount: bigint; currencyId: string },
+    reported: { amount?: bigint; currencyIsoCode?: string },
+  ): Promise<boolean> {
+    if (reported.amount === undefined && reported.currencyIsoCode === undefined) return false; // webhook sans montant (ex. simulation)
+    let mismatch = reported.amount !== undefined && reported.amount !== transaction.amount;
+    if (!mismatch && reported.currencyIsoCode !== undefined) {
+      const currency = await this.prisma.currency.findUnique({ where: { id: transaction.currencyId }, select: { isoCode: true } });
+      mismatch = currency !== null && currency.isoCode.toUpperCase() !== reported.currencyIsoCode.toUpperCase();
+    }
+    if (mismatch) {
+      this.logger.error(
+        `Webhook de paiement incohérent — transaction ${transaction.id} (paiement ${transaction.paymentId}) : attendu ${transaction.amount} (devise ${transaction.currencyId}), reçu ${reported.amount ?? '?'} ${reported.currencyIsoCode ?? ''}. Rien n'a été crédité : à vérifier chez le prestataire.`,
+      );
+    }
+    return mismatch;
+  }
+
   private async handleCaptured(payment: {
     id: string;
     bookingId: string | null;
@@ -296,7 +362,7 @@ export class PaymentsService {
         this.logger.warn(`Paiement reçu pour la réservation ${booking.id} déjà annulée — remboursement intégral.`);
         // On note la décision (100 %) pour que la reprise automatique finisse le travail si le prestataire échoue maintenant.
         await this.prisma.booking.updateMany({ where: { id: booking.id, status: BookingStatus.CANCELLED }, data: { refundPercentage: 100 } });
-        await this.refundBooking(booking.id, 100);
+        await this.refundLatePayment(() => this.refundBooking(booking.id, 100), `la réservation ${booking.id}`);
         return;
       }
       await this.wallets.holdBookingRevenue({
@@ -340,13 +406,15 @@ export class PaymentsService {
         where: { id: payment.shipmentId },
         include: { customer: true },
       });
-      if (shipment.status === ShipmentStatus.CANCELLED || shipment.status === ShipmentStatus.REFUNDED) {
+      // La décision est prise de façon atomique par confirmPayment (l'envoi n'est jamais ressuscité s'il vient d'être annulé).
+      const outcome = await this.shipmentsService.confirmPayment(shipment.id);
+      if (outcome === 'NOT_PAYABLE') {
         // Même cas pour un envoi : paiement tardif sur une demande déjà annulée → remboursement intégral.
         this.logger.warn(`Paiement reçu pour l'envoi ${shipment.id} déjà annulé — remboursement intégral.`);
-        await this.refundShipment(shipment.id, 100);
+        await this.prisma.shipment.updateMany({ where: { id: shipment.id, status: ShipmentStatus.CANCELLED }, data: { refundPercentage: 100 } });
+        await this.refundLatePayment(() => this.refundShipment(shipment.id, 100), `l'envoi ${shipment.id}`);
         return;
       }
-      await this.shipmentsService.confirmPayment(shipment.id);
       if (shipment.driverId) {
         // Un conducteur était déjà choisi avant le paiement : on peut
         // provisionner tout de suite. Sinon (SEARCHING_DRIVER), le hold
@@ -370,6 +438,20 @@ export class PaymentsService {
         fallbackBody: 'Votre paiement a été confirmé — nous recherchons un conducteur pour votre envoi.',
       });
       await this.notifyReferralOfFirstPayment(shipment.customer.userId);
+    }
+  }
+
+  /**
+   * Remboursement d'un paiement arrivé après l'annulation. S'il échoue (prestataire en panne), on NE défait PAS la capture : le
+   * paiement reste « capturé » avec la décision « remboursement à 100 % » enregistrée sur la réservation / l'envoi, et la reprise
+   * automatique (RefundRecoveryService) rembourse dès que le prestataire répond. Avant, la capture repassait en attente et, sans renvoi
+   * du webhook, le client restait débité sans que rien ne le rembourse jamais.
+   */
+  private async refundLatePayment(refund: () => Promise<unknown>, label: string): Promise<void> {
+    try {
+      await refund();
+    } catch (error) {
+      this.logger.error(`Remboursement du paiement tardif pour ${label} impossible pour l'instant — la reprise automatique réessaiera.`, error as Error);
     }
   }
 

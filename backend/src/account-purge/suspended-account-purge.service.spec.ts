@@ -98,7 +98,7 @@ const COUNT_MODELS = [
 ] as const;
 const TX_MODELS = [
   'onboardingReminderLog', 'tripReminderLog', 'notification', 'savedLocation', 'emergencyContact', 'userBlock', 'cookieConsent',
-  'phoneChangeRequest', 'otpCode', 'session', 'device', 'userRole', 'verification', 'document', 'savedCard', 'wallet', 'message', 'review',
+  'phoneChangeRequest', 'otpCode', 'session', 'device', 'biometricCredential', 'trustedDevice', 'userRole', 'verification', 'document', 'savedCard', 'wallet', 'message', 'review',
   'sosAlert', 'userReport', 'auditLog',
 ] as const;
 

@@ -1,4 +1,5 @@
 // mobile/app.config.js
+// [30/10/2026] v+ — plugin expo-local-authentication (connexion par empreinte).
 //
 // app.config.js prend le dessus sur app.json et reçoit sa config déjà
 // fusionnée dans `config` — on l'étend juste pour injecter :
@@ -50,6 +51,13 @@ module.exports = ({ config }) => ({
       '@rnmapbox/maps',
       {
         RNMapboxMapsDownloadToken: process.env.RNMAPBOX_MAPS_DOWNLOAD_TOKEN,
+      },
+    ],
+    [
+      // Connexion par empreinte digitale / visage : permission Face ID (iOS) et USE_BIOMETRIC (Android).
+      'expo-local-authentication',
+      {
+        faceIDPermission: 'Autorisez Occa\'Z à utiliser Face ID pour vous connecter rapidement.',
       },
     ],
     [

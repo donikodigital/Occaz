@@ -1,4 +1,5 @@
 // mobile/app/(auth)/onboarding.tsx
+// [30/10/2026] v+ — « Se connecter avec l'empreinte » au-dessus des cartes de rôle quand l'empreinte est active.
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [29/10/2026] v8 — Sélecteur de langue compact en haut à droite de la page (il quitte la page de connexion par numéro et le haut de la carte).
 // [18/10/2026] v7 — Habillage « cadre blanc » : le logo reste au-dessus, et tout le contenu (Bienvenue, phrase, cartes de rôle,
@@ -32,6 +33,7 @@ import { IconArrowRight, IconPackage, IconSteeringWheel, IconUser, IconX } from 
 import { AppText, ScreenContainer } from '@/components/ui';
 import { AuthIllustration } from '@/components/illustrations/AuthIllustration';
 import { LanguageSelector } from '@/components/auth/LanguageSelector';
+import { BiometricLoginButton } from '@/components/auth/BiometricLoginButton';
 import { colors, maxContentWidth, radius, spacing } from '@/theme';
 import { OCEAN } from '@/theme/ocean';
 import type { AccountType } from '@/types/auth.types';
@@ -176,6 +178,8 @@ export default function OnboardingScreen() {
               {t('Trajets partagés et envois de colis,\npartout où vous allez.')}
             </AppText>
           </View>
+
+          <BiometricLoginButton autoPrompt />
 
           <View style={styles.options}>
             <RoleOption

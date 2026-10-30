@@ -1,4 +1,5 @@
 // backend/src/trips/trip-otp.service.ts
+// [30/10/2026] v+ — prise en charge : fenêtre d'arrivée aussi exigée à la validation ; dépose : client obligatoirement pris en charge avant.
 // [19/10/2026] v+ — Quand le conducteur demande le code, le passager est prévenu par une notification dans l'application (plus de SMS : politique SMS).
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { BookingStatus, NotificationChannel, NotificationType, OtpPurpose, TripStatus } from '@prisma/client';
@@ -44,10 +45,18 @@ export class TripOtpService {
         trip: { include: { destinationCity: true } },
         customer: { include: { user: true } },
         alightingStop: { include: { city: true } },
+        passengers: { select: { pickedUpAt: true } },
       },
     });
     if (!booking) throw new NotFoundException('Réservation introuvable.');
     return booking;
+  }
+
+  /** La dépose n'a de sens que pour un client réellement pris en charge : sinon le conducteur pourrait être payé pour un client jamais monté. */
+  private assertBoarded(booking: { passengers?: Array<{ pickedUpAt: Date | null }> }): void {
+    if (!booking.passengers?.some((passenger) => Boolean(passenger.pickedUpAt))) {
+      throw new BadRequestException("Ce client n'a pas encore été pris en charge : validez d'abord sa prise en charge.");
+    }
   }
 
   private assertDriverOwnsTrip(booking: { trip: { driverId: string } }, driverId: string) {
@@ -153,6 +162,15 @@ export class TripOtpService {
       );
     }
 
+    // Même fenêtre que pour la demande du code : le conducteur doit être arrivé (au départ ou à l'étape du client).
+    if (!this.isPickupWindowOpen(booking)) {
+      throw new BadRequestException(
+        booking.boardingStopId
+          ? "Ce client monte à une étape : la prise en charge se valide pendant le trajet, une fois arrivé à son étape."
+          : "Signalez d'abord votre arrivée avant de valider la prise en charge.",
+      );
+    }
+
     await this.otpService.verify({ purpose: OtpPurpose.TRIP_PICKUP, bookingId, code });
     await this.markPickedUp(booking);
   }
@@ -215,6 +233,10 @@ export class TripOtpService {
   async requestDropoffOtp(bookingId: string, driverId: string) {
     const booking = await this.getBookingWithContext(bookingId);
     this.assertDriverOwnsTrip(booking, driverId);
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException('Cette réservation ne peut pas être clôturée dans son état actuel.');
+    }
+    this.assertBoarded(booking);
     const result = await this.otpService.generateAndSend(
       { purpose: OtpPurpose.TRIP_DROPOFF, phone: booking.customer.user.phone, bookingId },
       'Communiquez ce code à votre conducteur pour confirmer la fin de votre trajet :',
@@ -232,6 +254,7 @@ export class TripOtpService {
     if (booking.status !== BookingStatus.CONFIRMED) {
       throw new BadRequestException('Cette réservation ne peut pas être clôturée dans son état actuel.');
     }
+    this.assertBoarded(booking);
     return this.otpService.generateAndSend(
       { purpose: OtpPurpose.TRIP_DROPOFF, phone: booking.customer.user.phone, bookingId },
       'Communiquez ce code à votre conducteur pour confirmer la fin de votre trajet :',
@@ -253,6 +276,8 @@ export class TripOtpService {
     if (booking.status !== BookingStatus.CONFIRMED) {
       throw new BadRequestException('Cette réservation ne peut pas être clôturée dans son état actuel.');
     }
+
+    this.assertBoarded(booking);
 
     await this.otpService.verify({ purpose: OtpPurpose.TRIP_DROPOFF, bookingId, code });
     await this.markDroppedOff(booking);

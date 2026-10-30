@@ -1,4 +1,5 @@
 // mobile/app/(auth)/signup.tsx
+// [30/10/2026] v+ — case obligatoire « J'accepte les conditions d'utilisation et la politique de confidentialité » à l'étape du téléphone (avant l'envoi du code).
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v2 — Création de compte pas à pas : UNE question par écran, avec « Continuer » :
 //   1. nom de famille → 2. prénom → 3. pays de résidence (sans indicatif) → 4. téléphone (avec drapeau et indicatif du pays choisi).
@@ -13,6 +14,8 @@ import { IconFlag, IconPhone, IconUser, IconUserPlus } from '@tabler/icons-react
 import { AppText, FeedbackBanner, TextField } from '@/components/ui';
 import { OceanButton } from '@/components/ocean/OceanKit';
 import { AuthStep } from '@/components/auth/AuthStep';
+import { TermsCheckbox } from '@/components/auth/TermsCheckbox';
+import { LEGAL_VERSION } from '@/content/legal';
 import { CountryField } from '@/components/auth/CountryField';
 import { PhoneField } from '@/components/auth/PhoneField';
 import { SIGNUP_STEP, SIGNUP_STEPS } from '@/components/auth/signupSteps';
@@ -47,6 +50,8 @@ export default function SignupScreen() {
   const [firstName, setFirstName] = useState('');
   const [country, setCountry] = useState<Country | null>(null);
   const [phone, setPhone] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [termsError, setTermsError] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | undefined>();
 
@@ -76,7 +81,7 @@ export default function SignupScreen() {
   }, [index]);
 
   const sendCode = useMutation({
-    mutationFn: (international: string) => authApi.signupPhone({ phone: international, accountType }),
+    mutationFn: (international: string) => authApi.signupPhone({ phone: international, accountType, acceptedTerms, termsVersion: LEGAL_VERSION }),
     onSuccess: (_result, international) => {
       setSignup({ accountType, lastName: lastName.trim(), firstName: firstName.trim(), country, phone: international });
       router.push('/(auth)/verify-otp');
@@ -101,6 +106,10 @@ export default function SignupScreen() {
     } else {
       const international = buildInternationalPhone(country?.phoneCode ?? '', phone, country?.isoCode);
       if (!country || !isValidPhoneNumber(international)) return setError(t('Numéro invalide. Vérifiez-le sans l’indicatif du pays.'));
+      if (!acceptedTerms) {
+        setTermsError(true);
+        return setFormError(t('Cochez la case pour accepter les conditions d’utilisation et la politique de confidentialité.'));
+      }
       sendCode.mutate(international);
     }
   }
@@ -188,6 +197,20 @@ export default function SignupScreen() {
           }}
           error={error}
           autoFocus
+        />
+      ) : null}
+
+      {question === 'phone' ? (
+        <TermsCheckbox
+          checked={acceptedTerms}
+          hasError={termsError}
+          onChange={(next) => {
+            setAcceptedTerms(next);
+            if (next) {
+              setTermsError(false);
+              setFormError(undefined);
+            }
+          }}
         />
       ) : null}
 

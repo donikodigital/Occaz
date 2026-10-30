@@ -41,6 +41,12 @@ export interface InitiatePaymentResult {
 export interface WebhookParseResult {
   externalReference: string;
   status: 'CAPTURED' | 'FAILED';
+  /**
+   * Montant (plus petite unité) et devise ISO annoncés par le prestataire dans son webhook. Un adaptateur réel DOIT les renseigner :
+   * PaymentsService refuse de créditer si ils ne correspondent pas à ce qui a été demandé. Facultatifs uniquement pour la simulation.
+   */
+  amount?: bigint;
+  currencyIsoCode?: string;
 }
 
 export interface RefundResult {

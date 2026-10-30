@@ -1,4 +1,5 @@
 // backend/src/account-purge/suspended-account-purge.service.ts
+// [30/10/2026] v+ — suppression aussi des accès par empreinte et des téléphones de confiance (sinon la suppression complète butait sur la base).
 // [20/10/2026] v1 — Suppression définitive des comptes CLIENT et CONDUCTEUR suspendus depuis 6 mois sans avoir été réactivés, lancée par le
 // déclencheur de tâches (POST /jobs/run, toutes les 5 minutes ; au plus une passe par heure et par instance).
 // [20/10/2026] v2 — Même traitement pour les comptes que leur titulaire a supprimés lui-même (« Supprimer votre compte » dans l'application) :
@@ -523,6 +524,8 @@ export class SuspendedAccountPurgeService {
     await tx.otpCode.deleteMany({ where: { userId } });
     await tx.session.deleteMany({ where: { userId } });
     await tx.device.deleteMany({ where: { userId } });
+    await tx.biometricCredential.deleteMany({ where: { userId } });
+    await tx.trustedDevice.deleteMany({ where: { userId } });
     await tx.userRole.deleteMany({ where: { userId } });
     await tx.verification.deleteMany({ where: { userId } });
     await tx.document.deleteMany({ where: { OR: this.documentOwners(target, vehicleIds) } });

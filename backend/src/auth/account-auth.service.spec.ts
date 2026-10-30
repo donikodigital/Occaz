@@ -121,6 +121,10 @@ function build() {
   const authService = { issueTokens: jest.fn(async (user: Row) => ({ accessToken: 'access', refreshToken: 'refresh', expiresIn: 900, user })) };
   const otpSettings = { get: jest.fn(async () => SETTINGS), assertPhoneAllowed: jest.fn() };
   const config = { get: jest.fn(() => 'jwt-secret') };
+  // Téléphones de confiance : par défaut aucun, la connexion se passe comme avant. Les tests dédiés changent la réponse de `assess`.
+  const trustedDevices = {
+    assess: jest.fn(async (): Promise<Row> => ({ verifyRequired: false, trust: { hasTrustedDevice: false, thisDeviceTrusted: false, offer: true } })),
+  };
 
   const service = new AccountAuthService(
     prisma as never,
@@ -134,6 +138,7 @@ function build() {
     sms as never,
     email as never,
     otpSettings as never,
+    trustedDevices as never,
   );
 
   /** Compte déjà inscrit, avec son mot de passe. */
@@ -160,7 +165,7 @@ function build() {
     const [, ...message] = calls[calls.length - 1]!;
     return /(\d{6})/.exec(message.join(' '))![1]!;
   };
-  return { profiles, service, users, otps, prisma, usersService, sms, email, sessions, audit, authService, addUser, lastCode, otpSettings };
+  return { profiles, service, users, otps, prisma, usersService, sms, email, sessions, audit, authService, addUser, lastCode, otpSettings, trustedDevices };
 }
 
 const env = { ...process.env };
@@ -238,6 +243,36 @@ describe('Inscription — le téléphone', () => {
     const { service } = build();
     for (let i = 0; i < 5; i++) await service.requestSignupCode({ phone: PHONE, accountType: 'CUSTOMER' });
     await expect(service.requestSignupCode({ phone: PHONE, accountType: 'CUSTOMER' })).rejects.toMatchObject({ status: 429 });
+  });
+});
+
+describe('Inscription — conditions d’utilisation', () => {
+  it('garde la date et la version des conditions acceptées sur le compte', async () => {
+    const { service, users } = build();
+    await service.requestSignupCode({ phone: PHONE, accountType: 'CUSTOMER', termsVersion: '1.0' });
+    expect(users[0]!.termsVersion).toBe('1.0');
+    expect(users[0]!.termsAcceptedAt).toBeInstanceOf(Date);
+  });
+
+  it('une inscription reprise met à jour la date d’acceptation', async () => {
+    const { service, users } = build();
+    await service.requestSignupCode({ phone: PHONE, accountType: 'CUSTOMER', termsVersion: '1.0' });
+    users[0]!.termsAcceptedAt = new Date('2026-01-01');
+    await service.requestSignupCode({ phone: PHONE, accountType: 'CUSTOMER', termsVersion: '1.1' });
+    expect(users[0]!.termsVersion).toBe('1.1');
+    expect(users[0]!.termsAcceptedAt.getTime()).toBeGreaterThan(new Date('2026-01-01').getTime());
+  });
+
+  it('le DTO refuse une inscription dont la case n’est pas cochée', async () => {
+    const { validate } = await import('class-validator');
+    const { plainToInstance } = await import('class-transformer');
+    const { SignupPhoneDto } = await import('./dto/account-auth.dto');
+    const base = { phone: PHONE, accountType: 'CUSTOMER' };
+    for (const acceptedTerms of [false, undefined, 'true']) {
+      const errors = await validate(plainToInstance(SignupPhoneDto, { ...base, acceptedTerms }));
+      expect(errors.some((error) => error.property === 'acceptedTerms')).toBe(true);
+    }
+    expect(await validate(plainToInstance(SignupPhoneDto, { ...base, acceptedTerms: true, termsVersion: '1.0' }))).toHaveLength(0);
   });
 });
 
@@ -348,7 +383,7 @@ describe('Connexion — numéro + mot de passe', () => {
     const { service, addUser, sms, authService } = build();
     addUser();
     const result = await service.loginWithPhone({ phone: PHONE, password: '482913' }, { ipAddress: '1.2.3.4' });
-    expect(result.accessToken).toBe('access');
+    expect(result).toMatchObject({ accessToken: 'access', trust: { hasTrustedDevice: false, offer: true } });
     expect(sms.send).not.toHaveBeenCalled();
     expect(authService.issueTokens).toHaveBeenCalledTimes(1);
   });
@@ -419,6 +454,143 @@ describe('Connexion — numéro + mot de passe', () => {
     const { service, addUser } = build();
     addUser({ accountType: AccountType.SUPPORT });
     await expect(service.loginWithPhone({ phone: PHONE, password: '482913' }, {})).rejects.toThrow(/incorrect/);
+  });
+});
+
+describe('Connexion — téléphone de confiance', () => {
+  const NEW_PHONE_STATE = { verifyRequired: true, trust: { hasTrustedDevice: true, thisDeviceTrusted: false, offer: true } };
+  const TRUSTED_STATE = { verifyRequired: false, trust: { hasTrustedDevice: true, thisDeviceTrusted: true, offer: false } };
+  const login = (service: AccountAuthService, extra: Row = {}) => service.loginWithPhone({ phone: PHONE, password: '482913', ...extra } as never, { ipAddress: '1.2.3.4' });
+
+  it('le téléphone de confiance se connecte comme avant, sans code ni question', async () => {
+    const { service, addUser, trustedDevices, sms, email } = build();
+    const me = addUser();
+    trustedDevices.assess.mockResolvedValueOnce(TRUSTED_STATE);
+    const result = await login(service, { trustedDevice: { id: 'td1', secret: 'x'.repeat(40) } });
+    expect(result).toMatchObject({ accessToken: 'access', trust: { thisDeviceTrusted: true, offer: false } });
+    expect(trustedDevices.assess).toHaveBeenCalledWith(me.id, { id: 'td1', secret: 'x'.repeat(40) });
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(email.send).not.toHaveBeenCalled();
+  });
+
+  it('téléphone inconnu + e-mail vérifié : le code part par e-mail (pas de SMS) et aucune session n’est ouverte', async () => {
+    const { service, addUser, trustedDevices, sms, email, authService } = build();
+    addUser({ email: 'fatoumata@exemple.com', isEmailVerified: true });
+    trustedDevices.assess.mockResolvedValueOnce(NEW_PHONE_STATE);
+    const result = await login(service);
+    expect(result).toMatchObject({ requiresDeviceVerification: true, channel: 'EMAIL', canUseSms: true });
+    expect((result as Row).destination).not.toContain('fatoumata@');
+    expect(typeof (result as Row).challengeToken).toBe('string');
+    expect(email.send).toHaveBeenCalledTimes(1);
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(authService.issueTokens).not.toHaveBeenCalled();
+  });
+
+  it('téléphone inconnu sans e-mail vérifié : le code part par SMS', async () => {
+    const { service, addUser, trustedDevices, sms, email } = build();
+    addUser();
+    trustedDevices.assess.mockResolvedValueOnce(NEW_PHONE_STATE);
+    const result = await login(service);
+    expect(result).toMatchObject({ requiresDeviceVerification: true, channel: 'SMS', canUseSms: false });
+    expect(sms.send).toHaveBeenCalledTimes(1);
+    expect(email.send).not.toHaveBeenCalled();
+    expect((sms.send.mock.calls as unknown as unknown[][])[0]![2]).toBe('DEVICE_VERIFICATION');
+  });
+
+  it('une adresse e-mail non vérifiée ne compte pas : SMS', async () => {
+    const { service, addUser, trustedDevices, email } = build();
+    addUser({ email: 'pas-verifie@exemple.com', isEmailVerified: false });
+    trustedDevices.assess.mockResolvedValueOnce(NEW_PHONE_STATE);
+    await expect(login(service)).resolves.toMatchObject({ channel: 'SMS', canUseSms: false });
+    expect(email.send).not.toHaveBeenCalled();
+  });
+
+  it('un mauvais mot de passe ne déclenche aucun code (rien n’est envoyé à un inconnu)', async () => {
+    const { service, addUser, trustedDevices, sms, email } = build();
+    addUser({ email: 'fatoumata@exemple.com', isEmailVerified: true });
+    trustedDevices.assess.mockResolvedValue(NEW_PHONE_STATE);
+    await expect(service.loginWithPhone({ phone: PHONE, password: '000111' }, {})).rejects.toMatchObject({ status: 401 });
+    expect(trustedDevices.assess).not.toHaveBeenCalled();
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(email.send).not.toHaveBeenCalled();
+  });
+
+  it('le bon code confirme le nouveau téléphone : la session s’ouvre et l’application propose de l’enregistrer', async () => {
+    const { service, addUser, trustedDevices, email, lastCode, authService } = build();
+    addUser({ email: 'fatoumata@exemple.com', isEmailVerified: true });
+    trustedDevices.assess.mockResolvedValueOnce(NEW_PHONE_STATE);
+    const challenge = (await login(service)) as Row;
+    const result = await service.verifyDeviceCode({ challengeToken: challenge.challengeToken, code: lastCode(email) }, { ipAddress: '1.2.3.4' });
+    expect(result).toMatchObject({ accessToken: 'access', trust: { hasTrustedDevice: true, thisDeviceTrusted: false, offer: true } });
+    expect(authService.issueTokens).toHaveBeenCalledTimes(1);
+  });
+
+  it('un mauvais code est refusé, un code ne sert qu’une fois', async () => {
+    const { service, addUser, trustedDevices, sms, lastCode } = build();
+    addUser();
+    trustedDevices.assess.mockResolvedValueOnce(NEW_PHONE_STATE);
+    const challenge = (await login(service)) as Row;
+    const code = lastCode(sms);
+    const wrong = code === '123456' ? '654321' : '123456';
+    await expect(service.verifyDeviceCode({ challengeToken: challenge.challengeToken, code: wrong }, {})).rejects.toBeDefined();
+    await expect(service.verifyDeviceCode({ challengeToken: challenge.challengeToken, code }, {})).resolves.toMatchObject({ accessToken: 'access' });
+    await expect(service.verifyDeviceCode({ challengeToken: challenge.challengeToken, code }, {})).rejects.toBeDefined();
+  });
+
+  it('un jeton falsifié, ou un jeton d’un autre usage, est refusé', async () => {
+    const { service, addUser } = build();
+    const me = addUser();
+    await expect(service.verifyDeviceCode({ challengeToken: 'pas-un-jeton', code: '123456' }, {})).rejects.toMatchObject({ status: 401 });
+    const jwt = new JwtService({});
+    const other = jwt.sign({ sub: me.id, purpose: 'password-reset' }, { secret: 'jwt-secret:device-verification' });
+    await expect(service.verifyDeviceCode({ challengeToken: other, code: '123456' }, {})).rejects.toMatchObject({ status: 401 });
+    const access = jwt.sign({ sub: me.id, purpose: 'device-verification' }, { secret: 'jwt-secret' });
+    await expect(service.verifyDeviceCode({ challengeToken: access, code: '123456' }, {})).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('« Recevoir le code par SMS » : le nouveau code part par SMS et l’ancien n’est plus valable', async () => {
+    const { service, addUser, trustedDevices, sms, email, lastCode } = build();
+    addUser({ email: 'fatoumata@exemple.com', isEmailVerified: true });
+    trustedDevices.assess.mockResolvedValueOnce(NEW_PHONE_STATE);
+    const challenge = (await login(service)) as Row;
+    const emailCode = lastCode(email);
+    const resent = await service.resendDeviceCode({ challengeToken: challenge.challengeToken, channel: 'SMS' });
+    expect(resent).toMatchObject({ channel: 'SMS' });
+    expect(sms.send).toHaveBeenCalledTimes(1);
+    const smsCode = lastCode(sms);
+    if (smsCode !== emailCode) {
+      await expect(service.verifyDeviceCode({ challengeToken: challenge.challengeToken, code: emailCode }, {})).rejects.toBeDefined();
+    }
+    await expect(service.verifyDeviceCode({ challengeToken: challenge.challengeToken, code: smsCode }, {})).resolves.toMatchObject({ accessToken: 'access' });
+  });
+
+  it('un compte suspendu entre-temps ne peut pas terminer la vérification', async () => {
+    const { service, addUser, trustedDevices, sms, lastCode } = build();
+    const me = addUser();
+    trustedDevices.assess.mockResolvedValueOnce(NEW_PHONE_STATE);
+    const challenge = (await login(service)) as Row;
+    me.isSuspended = true;
+    await expect(service.verifyDeviceCode({ challengeToken: challenge.challengeToken, code: lastCode(sms) }, {})).rejects.toThrow(/suspendu/);
+  });
+
+  it('numéro de test : code fixe 000000, aucun envoi', async () => {
+    process.env.AUTH_TEST_MODE_ENABLED = 'true';
+    process.env.AUTH_TEST_PHONE_NUMBERS = TEST_PHONE;
+    const { service, addUser, trustedDevices, sms, email } = build();
+    addUser({ phone: TEST_PHONE, passwordHash: null });
+    trustedDevices.assess.mockResolvedValueOnce(NEW_PHONE_STATE);
+    const challenge = (await service.loginWithPhone({ phone: TEST_PHONE, password: '000000' }, {})) as Row;
+    expect(challenge.requiresDeviceVerification).toBe(true);
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(email.send).not.toHaveBeenCalled();
+    await expect(service.verifyDeviceCode({ challengeToken: challenge.challengeToken, code: '000000' }, {})).resolves.toMatchObject({ accessToken: 'access' });
+  });
+
+  it('la première connexion (inscription) propose d’enregistrer le téléphone', async () => {
+    const { service, sms, lastCode } = build();
+    await service.requestSignupCode({ phone: PHONE, accountType: 'CUSTOMER' });
+    const result = await service.verifySignupCode({ phone: PHONE, code: lastCode(sms) }, {});
+    expect(result.trust).toEqual({ hasTrustedDevice: false, thisDeviceTrusted: false, offer: true });
   });
 });
 
@@ -632,5 +804,37 @@ describe('Changer son mot de passe (connecté)', () => {
     await expect(
       service.changePassword(me.id, { currentPassword: '482913', newPassword: '705318' }, { sessionId: 's1' }),
     ).rejects.toThrow(/choisissez-en un/);
+  });
+});
+
+describe('assertCurrentPassword — action sensible (activation de l’empreinte)', () => {
+  it('bon mot de passe : accepté, rien n’est modifié', async () => {
+    const { service, addUser, users } = build();
+    const me = addUser();
+    await expect(service.assertCurrentPassword(me.id, '482913')).resolves.toBeUndefined();
+    expect(users[0]!.failedLoginAttempts).toBe(0);
+  });
+
+  it('mauvais mot de passe : refusé en 400, erreur comptée', async () => {
+    const { service, addUser, users } = build();
+    const me = addUser();
+    await expect(service.assertCurrentPassword(me.id, '999000')).rejects.toMatchObject({ status: 400 });
+    expect(users[0]!.failedLoginAttempts).toBe(1);
+  });
+
+  it('les erreurs verrouillent le compte comme à la connexion (429)', async () => {
+    const { service, addUser } = build();
+    const me = addUser();
+    for (let i = 0; i < MAX_LOGIN_FAILURES - 1; i += 1) {
+      await expect(service.assertCurrentPassword(me.id, '999000')).rejects.toMatchObject({ status: 400 });
+    }
+    await expect(service.assertCurrentPassword(me.id, '999000')).rejects.toMatchObject({ status: 429 });
+    await expect(service.assertCurrentPassword(me.id, '482913')).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('compte sans mot de passe : refusé', async () => {
+    const { service, addUser } = build();
+    const me = addUser({ passwordHash: null });
+    await expect(service.assertCurrentPassword(me.id, '482913')).rejects.toThrow(/Aucun mot de passe/);
   });
 });

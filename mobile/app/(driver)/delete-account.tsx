@@ -1,4 +1,5 @@
 // mobile/app/(driver)/delete-account.tsx
+// [30/10/2026] v+ — le compte supprimé n'a plus d'accès par empreinte.
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [20/10/2026] Le texte annonce l'effacement des données sous 30 jours (politique de confidentialité, section 8).
 // [10/10/2026] En-tête en bandeau (héro) bleu océan, comme les autres pages ; le reste de l'écran est inchangé.
@@ -17,6 +18,8 @@ import { OceanHeroHeader } from '@/components/ocean/OceanHeroHeader';
 import { colors, spacing } from '@/theme';
 import { useDeleteAccount } from '@/hooks/useDeleteAccount';
 import { useAuthStore } from '@/stores/authStore';
+import { useBiometricStore } from '@/stores/biometricStore';
+import { useTrustedDeviceStore } from '@/stores/trustedDeviceStore';
 import { ApiError } from '@/services/api/ApiError';
 import { useT } from '@/i18n';
 
@@ -33,6 +36,8 @@ export default function DeleteAccountScreen() {
     deleteAccount.mutate(reason.trim() || undefined, {
       onSuccess: async () => {
         await logout();
+        await useBiometricStore.getState().clear();
+        await useTrustedDeviceStore.getState().clear();
         router.replace('/(auth)/onboarding');
       },
       onError: (error) => {

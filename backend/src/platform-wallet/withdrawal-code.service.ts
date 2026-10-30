@@ -7,7 +7,7 @@
 //    sert pas à retirer autre chose que ce que le SuperAdmin a vu dans l'e-mail ;
 //  - à usage unique (consommé atomiquement) et seul le hash est conservé (HMAC avec OTP_HASH_PEPPER, comme les autres codes) ;
 //  - au plus 5 envois par heure et par compte.
-import { BadRequestException, HttpException, HttpStatus, Inject, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { OtpPurpose, OtpStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -102,7 +102,7 @@ export class WithdrawalCodeService {
       orderBy: { createdAt: 'desc' },
     });
     if (!row) {
-      throw new UnauthorizedException('Code expiré ou ne correspondant pas à ce retrait. Demande un nouveau code.');
+      throw new BadRequestException('Code expiré ou ne correspondant pas à ce retrait. Demande un nouveau code.');
     }
 
     // Essai compté AVANT la comparaison, de façon atomique : deux requêtes simultanées ne peuvent pas dépasser le plafond d'essais.
@@ -112,16 +112,16 @@ export class WithdrawalCodeService {
     });
     if (counted.count === 0) {
       await this.prisma.otpCode.updateMany({ where: { id: row.id, status: OtpStatus.PENDING }, data: { status: OtpStatus.EXPIRED } });
-      throw new UnauthorizedException('Trop d’essais. Demande un nouveau code.');
+      throw new BadRequestException('Trop d’essais. Demande un nouveau code.');
     }
 
     if (!/^\d{6}$/.test(code) || !verifyOtpCode(code, row.code)) {
       const left = row.maxAttempts - (row.attempts + 1);
       if (left <= 0) {
         await this.prisma.otpCode.updateMany({ where: { id: row.id, status: OtpStatus.PENDING }, data: { status: OtpStatus.EXPIRED } });
-        throw new UnauthorizedException('Code incorrect. Trop d’essais : demande un nouveau code.');
+        throw new BadRequestException('Code incorrect. Trop d’essais : demande un nouveau code.');
       }
-      throw new UnauthorizedException(`Code incorrect. Il te reste ${left} essai${left > 1 ? 's' : ''}.`);
+      throw new BadRequestException(`Code incorrect. Il te reste ${left} essai${left > 1 ? 's' : ''}.`);
     }
 
     // Usage unique : seul le premier appel qui passe de PENDING à VERIFIED réussit.
@@ -129,6 +129,6 @@ export class WithdrawalCodeService {
       where: { id: row.id, status: OtpStatus.PENDING },
       data: { status: OtpStatus.VERIFIED, verifiedAt: new Date() },
     });
-    if (used.count === 0) throw new UnauthorizedException('Ce code a déjà été utilisé. Demande un nouveau code.');
+    if (used.count === 0) throw new BadRequestException('Ce code a déjà été utilisé. Demande un nouveau code.');
   }
 }

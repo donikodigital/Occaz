@@ -1,6 +1,7 @@
 // backend/src/wallets/wallets.service.ts
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
+  DisputeStatus,
   NotificationChannel,
   NotificationType,
   Prisma,
@@ -26,8 +27,13 @@ import { toMoneyBigInt, formatMoneyWithCurrency } from '../common/utils/money.ut
 
 type BalanceField = 'balance' | 'pendingBalance';
 
+/** Nombre maximal de lignes lues pour l'historique conducteur (garde-fou mémoire ; un conducteur normal en a quelques centaines). */
+const DRIVER_VIEW_MAX_ROWS = 10_000;
+
 @Injectable()
 export class WalletsService {
+  private readonly logger = new Logger(WalletsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -80,10 +86,28 @@ export class WalletsService {
    * les totaux de TOUTES les catégories sur tout l'historique, pour que l'écran affiche le total de chaque filtre sans tout charger.
    */
   async getTransactionsForDriverView(walletId: string, query: WalletTransactionsQueryDto) {
+    // Seules les colonnes utiles à l'affichage sont lues (pas de références externes ni d'identifiants d'auteur), et la lecture est
+    // plafonnée : l'historique n'est plus chargé sans limite en mémoire à chaque ouverture de l'écran.
     const rows = await this.prisma.walletTransaction.findMany({
       where: { walletId },
       orderBy: { createdAt: 'desc' },
+      take: DRIVER_VIEW_MAX_ROWS,
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        amount: true,
+        currencyId: true,
+        bookingId: true,
+        shipmentId: true,
+        payoutId: true,
+        createdAt: true,
+        metadata: true,
+      },
     });
+    if (rows.length >= DRIVER_VIEW_MAX_ROWS) {
+      this.logger.warn(`Historique du portefeuille ${walletId} tronqué à ${DRIVER_VIEW_MAX_ROWS} lignes — prévoir une pagination SQL.`);
+    }
 
     const history = mergeForDriver(rows as LedgerRow[]);
     const filtered = filterByCategory(history, query.category ?? 'ALL');
@@ -236,7 +260,7 @@ export class WalletsService {
     grossAmount: bigint;
     commission: bigint;
     sourceCurrencyId: string;
-  }) {
+  }, client?: Prisma.TransactionClient) {
     await this.holdRevenue({
       driverId: params.driverId,
       grossAmount: params.grossAmount,
@@ -244,16 +268,17 @@ export class WalletsService {
       sourceCurrencyId: params.sourceCurrencyId,
       revenueType: WalletTransactionType.BOOKING_REVENUE,
       reference: { bookingId: params.bookingId },
-    });
+    }, client);
   }
 
+  /** `client` : transaction englobante — la mise en attente est alors annulée avec le reste si celle-ci échoue (voir ShipmentsService.accept). */
   async holdShipmentRevenue(params: {
     driverId: string;
     shipmentId: string;
     grossAmount: bigint;
     commission: bigint;
     sourceCurrencyId: string;
-  }) {
+  }, client?: Prisma.TransactionClient) {
     await this.holdRevenue({
       driverId: params.driverId,
       grossAmount: params.grossAmount,
@@ -261,7 +286,7 @@ export class WalletsService {
       sourceCurrencyId: params.sourceCurrencyId,
       revenueType: WalletTransactionType.SHIPMENT_REVENUE,
       reference: { shipmentId: params.shipmentId },
-    });
+    }, client);
   }
 
   /**
@@ -276,12 +301,15 @@ export class WalletsService {
     sourceCurrencyId: string;
     revenueType: WalletTransactionType;
     reference: { bookingId: string } | { shipmentId: string };
-  }) {
+  }, client?: Prisma.TransactionClient) {
     const wallet = await this.findByDriverId(params.driverId);
     const gross = await this.exchangeRates.convert(params.grossAmount, params.sourceCurrencyId, wallet.currencyId);
     const commission = await this.exchangeRates.convert(params.commission, params.sourceCurrencyId, wallet.currencyId);
 
-    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const run = async (tx: Prisma.TransactionClient) => {
+      // Verrou sur le portefeuille : deux mises en attente simultanées de la même prestation (webhook rejoué en même temps que la
+      // reprise) passent l'une après l'autre, et la seconde voit la ligne déjà écrite — jamais de revenu compté deux fois.
+      await tx.$queryRaw`SELECT "id" FROM "wallets" WHERE "id" = ${wallet.id} FOR UPDATE`;
       const already = await tx.walletTransaction.findFirst({
         where: { type: params.revenueType, ...params.reference },
         select: { id: true },
@@ -314,7 +342,20 @@ export class WalletsService {
         },
         tx,
       );
+    };
+    await (client ? run(client) : this.prisma.$transaction(run));
+  }
+
+  /** Vrai si un litige encore en cours (sans décision enregistrée) porte sur cette réservation / cet envoi. */
+  private async hasOpenDispute(reference: { bookingId?: string; shipmentId?: string }): Promise<boolean> {
+    const count = await this.prisma.dispute.count({
+      where: {
+        ...(reference.bookingId ? { bookingId: reference.bookingId } : { shipmentId: reference.shipmentId }),
+        status: { notIn: [DisputeStatus.RESOLVED, DisputeStatus.CLOSED] },
+        resolution: { is: null },
+      },
     });
+    return count > 0;
   }
 
   /**
@@ -324,6 +365,8 @@ export class WalletsService {
    */
   async releaseHeldFunds(params: { driverId: string; bookingId?: string; shipmentId?: string }) {
     if (!params.bookingId && !params.shipmentId) return; // sans référence, le filtre prendrait TOUTES les lignes en attente
+    // Litige ouvert : l'argent reste en attente jusqu'à la décision de l'arbitre (le traitement de reprise libère ensuite ce qui doit l'être).
+    if (await this.hasOpenDispute(params)) return;
     const wallet = await this.findByDriverId(params.driverId);
 
     const netAmount = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -477,24 +520,62 @@ export class WalletsService {
     });
   }
 
-  async adjustBalance(driverId: string, amountStr: string, reason: string, actorId: string) {
+  /**
+   * Ajuste le solde disponible (support). Un débit qui rendrait le solde NÉGATIF est refusé, sauf demande explicite `allowDebt`
+   * (dette du conducteur après un remboursement sur des gains déjà retirés) — jamais par une simple faute de frappe.
+   */
+  async adjustBalance(driverId: string, amountStr: string, reason: string, actorId: string, options: { allowDebt?: boolean } = {}) {
     const wallet = await this.findByDriverId(driverId);
     const amount = toMoneyBigInt(amountStr.replace('-', '')) * (amountStr.startsWith('-') ? -1n : 1n);
-    const transaction = await this.applyDelta(wallet.id, 'balance', amount, {
-      type: WalletTransactionType.ADJUSTMENT,
-      metadata: { reason },
-      triggeredByUserId: actorId,
-    });
+
+    const run = async (tx: Prisma.TransactionClient) => {
+      if (amount < 0n && !options.allowDebt) {
+        // Débit conditionnel : le solde doit couvrir le montant AU MOMENT de l'écriture (pas seulement à la lecture).
+        const debited = await tx.wallet.updateMany({
+          where: { id: wallet.id, balance: { gte: -amount } },
+          data: { balance: { increment: amount }, version: { increment: 1 } },
+        });
+        if (debited.count === 0) {
+          throw new BadRequestException(
+            'Ce débit rendrait le solde disponible négatif. Réduisez le montant, ou confirmez explicitement une dette (allowDebt).',
+          );
+        }
+        return tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: WalletTransactionType.ADJUSTMENT,
+            status: WalletTransactionStatus.COMPLETED,
+            amount,
+            currencyId: wallet.currencyId,
+            metadata: { reason },
+            triggeredByUserId: actorId,
+          },
+        });
+      }
+      return this.applyDelta(
+        wallet.id,
+        'balance',
+        amount,
+        { type: WalletTransactionType.ADJUSTMENT, metadata: { reason, ...(amount < 0n ? { allowDebt: true } : {}) }, triggeredByUserId: actorId },
+        tx,
+      );
+    };
+    const transaction = await this.prisma.$transaction(run);
     await this.audit.log({
       actorId,
       entityType: 'Wallet',
       entityId: wallet.id,
       action: 'ADJUST',
-      diff: { amount: amountStr, reason },
+      diff: { amount: amountStr, reason, ...(options.allowDebt ? { allowDebt: true } : {}) },
     });
     return transaction;
   }
 
+  /**
+   * Réserve le montant d'un retrait : il quitte le solde disponible pour aller en « en attente », en UNE écriture conditionnelle
+   * (le solde doit couvrir le montant au moment de l'écriture). Plus de verrou de version : un crédit qui arrive pile pendant la
+   * demande de retrait (libération de fonds, remboursement) ne la fait plus échouer en « conflit » — chaque écriture est atomique.
+   */
   async reserveForPayout(driverId: string, amount: bigint, payoutId: string) {
     const wallet = await this.findByDriverId(driverId);
     if (wallet.balance < amount) {
@@ -502,12 +583,8 @@ export class WalletsService {
     }
 
     return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
-      if (fresh.balance < amount) {
-        throw new BadRequestException('Solde insuffisant pour ce retrait.');
-      }
       const result = await tx.wallet.updateMany({
-        where: { id: wallet.id, version: fresh.version },
+        where: { id: wallet.id, balance: { gte: amount } },
         data: {
           balance: { decrement: amount },
           pendingBalance: { increment: amount },
@@ -515,7 +592,7 @@ export class WalletsService {
         },
       });
       if (result.count === 0) {
-        throw new ConflictException('Conflit de version sur le portefeuille, veuillez réessayer.');
+        throw new BadRequestException('Solde insuffisant pour ce retrait.');
       }
       return tx.walletTransaction.create({
         data: {
@@ -530,30 +607,36 @@ export class WalletsService {
     });
   }
 
+  /** Retrait versé : la somme réservée sort définitivement du portefeuille. Idempotent (la ligne n'est « réclamée » qu'une fois). */
   async finalizePayout(driverId: string, amount: bigint, payoutId: string): Promise<void> {
     const wallet = await this.findByDriverId(driverId);
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
-      const result = await tx.wallet.updateMany({
-        where: { id: wallet.id, version: fresh.version },
-        data: { pendingBalance: { decrement: amount }, version: { increment: 1 } },
-      });
-      if (result.count === 0) {
-        throw new ConflictException('Conflit de version sur le portefeuille, veuillez réessayer.');
-      }
-      await tx.walletTransaction.updateMany({
+      const claimed = await tx.walletTransaction.updateMany({
         where: { payoutId, status: WalletTransactionStatus.PENDING },
         data: { status: WalletTransactionStatus.COMPLETED },
       });
+      if (claimed.count === 0) return; // déjà traité : le solde en attente ne doit pas être débité une seconde fois
+      const result = await tx.wallet.updateMany({
+        where: { id: wallet.id, pendingBalance: { gte: amount } },
+        data: { pendingBalance: { decrement: amount }, version: { increment: 1 } },
+      });
+      if (result.count === 0) {
+        throw new ConflictException('Le solde en attente ne couvre pas ce retrait — vérification manuelle nécessaire.');
+      }
     });
   }
 
+  /** Retrait échoué ou annulé : la somme réservée revient dans le solde disponible. Idempotent. */
   async reversePayout(driverId: string, amount: bigint, payoutId: string): Promise<void> {
     const wallet = await this.findByDriverId(driverId);
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+      const claimed = await tx.walletTransaction.updateMany({
+        where: { payoutId, status: WalletTransactionStatus.PENDING },
+        data: { status: WalletTransactionStatus.REVERSED },
+      });
+      if (claimed.count === 0) return;
       const result = await tx.wallet.updateMany({
-        where: { id: wallet.id, version: fresh.version },
+        where: { id: wallet.id, pendingBalance: { gte: amount } },
         data: {
           pendingBalance: { decrement: amount },
           balance: { increment: amount },
@@ -561,12 +644,8 @@ export class WalletsService {
         },
       });
       if (result.count === 0) {
-        throw new ConflictException('Conflit de version sur le portefeuille, veuillez réessayer.');
+        throw new ConflictException('Le solde en attente ne couvre pas ce retrait — vérification manuelle nécessaire.');
       }
-      await tx.walletTransaction.updateMany({
-        where: { payoutId, status: WalletTransactionStatus.PENDING },
-        data: { status: WalletTransactionStatus.REVERSED },
-      });
     });
   }
 }

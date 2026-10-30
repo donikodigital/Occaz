@@ -4,6 +4,10 @@
 # plus. Cet appel HTTP le réveille ET lance les traitements. À configurer UNE fois dans GitHub → Settings → Secrets and variables → Actions :
 #   JOBS_API_URL  l'adresse de l'API, sans « / » final            (ex. https://api.occaz.sarl)
 #   JOBS_SECRET   la même valeur que la variable JOBS_SECRET de Render (24 caractères au minimum)
+# [30/10/2026] Si ces deux secrets manquent, le workflow ÉCHOUE (et GitHub t'écrit) au lieu de « réussir » sans rien faire : avant, une
+# configuration oubliée laissait tous les traitements arrêtés en silence. En cas d'échec de l'appel, il échoue aussi.
+# Hébergement : une API mise en veille (offre gratuite) retarde les traitements jusqu'au prochain réveil — pour la mise en production, prends
+# un hébergement qui ne s'endort pas.
 name: Traitements automatiques
 
 on:
@@ -26,8 +30,8 @@ jobs:
           JOBS_SECRET: ${{ secrets.JOBS_SECRET }}
         run: |
           if [ -z "$JOBS_API_URL" ] || [ -z "$JOBS_SECRET" ]; then
-            echo "JOBS_API_URL et JOBS_SECRET ne sont pas configurés : rien à faire."
-            exit 0
+            echo "::error::JOBS_API_URL et/ou JOBS_SECRET ne sont pas configurés (GitHub → Settings → Secrets and variables → Actions) : les traitements automatiques de l'API NE TOURNENT PAS."
+            exit 1
           fi
           # Un serveur en veille peut mettre une minute à répondre : on patiente et on réessaie.
           curl --fail-with-body --silent --show-error \

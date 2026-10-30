@@ -1,7 +1,7 @@
 // backend/src/disputes/dto/resolve-dispute.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DisputeResolutionType, OtpPurpose } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 
 export class ResolveDisputeDto {
   @ApiProperty({ enum: DisputeResolutionType })
@@ -15,6 +15,18 @@ export class ResolveDisputeDto {
   @IsOptional()
   @IsString()
   refundAmount?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Part du prix remboursée au client (0 à 100) pour une résolution CANCELLATION. Par défaut 100 : une annulation décidée par l'arbitre rembourse intégralement, le client n'est pas pénalisé.",
+    minimum: 0,
+    maximum: 100,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  refundPercentage?: number;
 
   @ApiPropertyOptional({
     enum: OtpPurpose,

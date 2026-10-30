@@ -1,10 +1,12 @@
 // backend/src/disputes/disputes.service.ts
+// [30/10/2026] v+ — résolution « réclamée » avant tout mouvement d'argent (jamais deux fois) ; annulation décidée par l'arbitre = remboursement (100 % par défaut) ; litige ouvert = gains du conducteur gelés.
 // [25/10/2026] v+ — addEvidence : la clé de stockage doit avoir été fabriquée pour la personne qui envoie la preuve.
 // [21/09/2026] v2 — parties d'un envoi identifiées via Shipment.driverId.
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -58,6 +60,8 @@ const SAFE_USER_SELECT = { id: true, phone: true, email: true } as const;
  */
 @Injectable()
 export class DisputesService {
+  private readonly logger = new Logger(DisputesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -393,19 +397,45 @@ export class DisputesService {
       throw new BadRequestException('Ce litige a déjà une résolution enregistrée.');
     }
 
-    const { refundAmount, currencyId } = await this.applyResolutionConsequences(dispute, dto, actorId);
+    // La décision est « réclamée » AVANT tout mouvement d'argent : DisputeResolution.disputeId est unique, donc de deux arbitres qui
+    // valident en même temps (ou d'un double clic), un seul passe — l'autre reçoit l'erreur ci-dessous sans avoir remboursé ni payé
+    // quoi que ce soit. Tant que cette ligne existe, le litige n'est plus « ouvert » : les gains du conducteur, gelés pendant le
+    // litige, peuvent être libérés par la décision elle-même (DRIVER_PAYOUT, validation manuelle d'une étape).
+    let resolution;
+    try {
+      resolution = await this.prisma.disputeResolution.create({
+        data: {
+          disputeId,
+          type: dto.type,
+          otpPurpose: dto.type === DisputeResolutionType.OTP_MANUAL_VALIDATION ? dto.otpPurpose : undefined,
+          decidedById: actorId,
+          notes: dto.notes,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new BadRequestException('Ce litige vient d\'être résolu par quelqu\'un d\'autre.');
+      }
+      throw error;
+    }
 
-    const resolution = await this.prisma.disputeResolution.create({
-      data: {
-        disputeId,
-        type: dto.type,
-        refundAmount,
-        currencyId,
-        otpPurpose: dto.type === DisputeResolutionType.OTP_MANUAL_VALIDATION ? dto.otpPurpose : undefined,
-        decidedById: actorId,
-        notes: dto.notes,
-      },
-    });
+    let outcome: { refundAmount?: bigint; currencyId?: string };
+    try {
+      outcome = await this.applyResolutionConsequences(dispute, dto, actorId);
+    } catch (error) {
+      // La décision n'a pas pu être appliquée : on rend la main (le litige reste ouvert, l'arbitre peut réessayer).
+      await this.prisma.disputeResolution
+        .delete({ where: { id: resolution.id } })
+        .catch((cleanupError: unknown) => this.logger.error(`Litige ${disputeId} : décision non appliquée et non annulée`, cleanupError as Error));
+      throw error;
+    }
+
+    if (outcome.refundAmount !== undefined || outcome.currencyId !== undefined) {
+      resolution = await this.prisma.disputeResolution.update({
+        where: { id: resolution.id },
+        data: { refundAmount: outcome.refundAmount, currencyId: outcome.currencyId },
+      });
+    }
 
     await this.prisma.dispute.update({ where: { id: disputeId }, data: { status: DisputeStatus.RESOLVED } });
 
@@ -459,34 +489,46 @@ export class DisputesService {
       }
 
       case DisputeResolutionType.CANCELLATION: {
+        // Annulation décidée par l'arbitre : le client est remboursé (100 % par défaut) et le conducteur ne touche pas la part
+        // remboursée — exactement comme une annulation normale (mêmes suites financières, mêmes reprises automatiques).
+        const percentage = dto.refundPercentage ?? 100;
+        const payment = await this.findRefundablePayment(serviceType, targetId);
+
         if (serviceType === ServiceType.TRIP) {
           const booking = await this.prisma.booking.findUnique({ where: { id: targetId } });
           if (booking) {
-            await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+            const claimed = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
               // Annulation réclamée : si la réservation vient d'être annulée par ailleurs, on ne refait rien.
-              const claimed = await tx.booking.updateMany({
+              const result = await tx.booking.updateMany({
                 where: { id: targetId, status: { notIn: [BookingStatus.CANCELLED, BookingStatus.REFUNDED] } },
-                data: { status: BookingStatus.CANCELLED, cancelledAt: new Date(), cancellationReason: dto.notes },
+                data: { status: BookingStatus.CANCELLED, cancelledAt: new Date(), cancellationReason: dto.notes, refundPercentage: percentage },
               });
-              if (claimed.count === 0) return;
+              if (result.count === 0) return false;
               // Places libérées sur les tronçons qu'occupait la réservation (voir trip-seats.ts).
               await syncTripSeats(tx, booking.tripId);
+              return true;
             });
+            // Reprise : la réservation annulée par un essai précédent de cette même décision, dont le remboursement a échoué.
+            const current = claimed ? null : await this.prisma.booking.findUnique({ where: { id: targetId }, select: { status: true, refundPercentage: true } });
+            if (claimed || (current?.status === BookingStatus.CANCELLED && current.refundPercentage === percentage)) {
+              await this.paymentsService.settleCancelledBooking(targetId, percentage, dto.notes ?? 'Annulation décidée suite à un litige');
+            }
           }
         } else {
           const shipment = await this.prisma.shipment.findUnique({ where: { id: targetId } });
           if (shipment) {
-            await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-              const claimed = await tx.shipment.updateMany({
+            const claimed = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+              const result = await tx.shipment.updateMany({
                 where: { id: targetId, status: { notIn: [ShipmentStatus.CANCELLED, ShipmentStatus.REFUNDED] } },
                 data: {
                   status: ShipmentStatus.CANCELLED,
                   cancelledAt: new Date(),
                   cancellationReason: dto.notes,
+                  refundPercentage: percentage,
                 },
               });
               // Capacité rendue une seule fois, et seulement si c'est bien cet appel qui a annulé l'envoi.
-              if (claimed.count === 0) return;
+              if (result.count === 0) return false;
               if (shipment.tripId) {
                 const trip = await tx.trip.findUnique({ where: { id: shipment.tripId } });
                 if (trip && trip.availableShipmentWeightKg !== null) {
@@ -496,10 +538,18 @@ export class DisputesService {
                   });
                 }
               }
+              return true;
             });
+            const current = claimed ? null : await this.prisma.shipment.findUnique({ where: { id: targetId }, select: { status: true, refundPercentage: true } });
+            if (claimed || (current?.status === ShipmentStatus.CANCELLED && current.refundPercentage === percentage)) {
+              await this.paymentsService.settleCancelledShipment(targetId, percentage, dto.notes ?? 'Annulation décidée suite à un litige');
+            }
           }
         }
-        return {};
+
+        if (!payment || percentage <= 0) return {};
+        const refundAmount = BigInt(Math.round(Number(payment.amount) * (Math.min(100, percentage) / 100)));
+        return refundAmount > 0n ? { refundAmount, currencyId: payment.currencyId } : {};
       }
 
       case DisputeResolutionType.SUSPENSION: {

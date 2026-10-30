@@ -1,6 +1,6 @@
 // backend/src/platform-wallet/withdrawal-code.service.spec.ts
 // Code de retrait du SuperAdmin envoyé par e-mail : lié au retrait, 3 essais, usage unique, un seul code actif, 5 envois/heure.
-import { BadRequestException, HttpStatus, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { OtpPurpose, OtpStatus } from '@prisma/client';
 import { hashOtpCode } from '../common/utils/otp.util';
 import { WithdrawalCodeService } from './withdrawal-code.service';
@@ -101,11 +101,11 @@ describe('WithdrawalCodeService.consume', () => {
 
   it('autre montant => autre cible => aucun code valable', async () => {
     const { service, prisma } = build({ row: null });
-    await expect(service.consume('u1', { ...TARGET, amount: 900000n }, '123456')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.consume('u1', { ...TARGET, amount: 900000n }, '123456')).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.otpCode.findFirst.mock.calls[0][0].where.target).toBe('withdrawal:b1:xof:900000');
   });
 
-  it('mauvais code : 401 avec le nombre d\'essais restants, essai compté', async () => {
+  it('mauvais code : 400 avec le nombre d\'essais restants, essai compté', async () => {
     const { service, prisma } = build();
     await expect(service.consume('u1', TARGET, '000111')).rejects.toThrow(/2 essais/);
     expect(prisma.otpCode.updateMany.mock.calls[0][0].data).toEqual({ attempts: { increment: 1 } });
@@ -118,7 +118,7 @@ describe('WithdrawalCodeService.consume', () => {
   });
 
   it('format invalide : refusé sans deviner', async () => {
-    await expect(build().service.consume('u1', TARGET, 'abc')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(build().service.consume('u1', TARGET, 'abc')).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejeu : deuxième utilisation du même code refusée', async () => {

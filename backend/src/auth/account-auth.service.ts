@@ -1,4 +1,7 @@
 // backend/src/auth/account-auth.service.ts
+// [30/10/2026] v6 — Inscription : date et version des conditions acceptées (case à cocher) gardées sur le compte.
+// [30/10/2026] v5 — Téléphones de confiance : une connexion depuis un téléphone inconnu, alors que le compte en a un, exige un code (e-mail en priorité, SMS sinon).
+// [30/10/2026] v4 — assertCurrentPassword : vérification du mot de passe avant une action sensible (activation de la connexion par empreinte).
 // [19/10/2026] v3 — Compte à deux profils : la connexion « en tant que client / conducteur » est acceptée dès que le compte a ce profil ; l'inscription d'un numéro déjà utilisé oriente vers l'ouverture du second espace depuis le profil.
 // [19/10/2026] v2 — Politique SMS : chaque SMS précise son motif (inscription ou mot de passe oublié, les deux seuls motifs ouverts pour les
 // comptes Client et Conducteur) ; voir integrations/sms/sms-purpose.ts.
@@ -45,6 +48,7 @@ import { addDuration } from '../common/utils/duration.util';
 import { TEST_CODE, isTestPhone } from '../common/utils/test-mode.util';
 import { isPinFormat, pinDigest, pinWeakness } from '../common/utils/pin.util';
 import { DeviceInfoDto } from './dto/device-info.dto';
+import { DeviceTrustInfo, TrustedDeviceCredential, TrustedDeviceService } from './trusted-device.service';
 
 const DAY_MS = 24 * 3_600_000;
 
@@ -56,9 +60,27 @@ export const LOGIN_LOCK_MINUTES = 15;
 const RESET_TOKEN_TTL = '10m';
 
 
-const SMS_PURPOSES: OtpPurpose[] = [OtpPurpose.LOGIN, OtpPurpose.PHONE_VERIFICATION, OtpPurpose.PASSWORD_RESET];
+const SMS_PURPOSES: OtpPurpose[] = [OtpPurpose.LOGIN, OtpPurpose.PHONE_VERIFICATION, OtpPurpose.PASSWORD_RESET, OtpPurpose.DEVICE_VERIFICATION];
+
+/** Durée de validité du jeton remis par une connexion qui demande la confirmation d'un nouveau téléphone. */
+const DEVICE_CHALLENGE_TTL = '10m';
 
 type RequestContext = { ipAddress?: string; userAgent?: string };
+
+/** Connexion arrêtée en route : ce téléphone n'est pas de confiance, un code vient d'être envoyé. */
+export interface DeviceVerificationRequired {
+  requiresDeviceVerification: true;
+  challengeToken: string;
+  /** Où le code est parti. */
+  channel: 'EMAIL' | 'SMS';
+  /** Destination masquée (« f•••a@exemple.com », « +224•••0010 »). */
+  destination: string;
+  /** Le compte a une adresse e-mail : l'application peut proposer « Recevoir le code par SMS à la place ». */
+  canUseSms: boolean;
+  expiresInSeconds: number;
+}
+
+export type PhoneLoginResult = (AuthResult & { trust: DeviceTrustInfo }) | DeviceVerificationRequired;
 
 const isCustomerOrDriver = (user: Pick<User, 'accountType'>) =>
   user.accountType === AccountType.CUSTOMER || user.accountType === AccountType.DRIVER;
@@ -84,6 +106,7 @@ export class AccountAuthService {
     @Inject(SMS_PROVIDER) private readonly smsProvider: SmsProvider,
     @Inject(EMAIL_PROVIDER) private readonly emailProvider: EmailProvider,
     private readonly otpSettings: OtpSettingsService,
+    private readonly trustedDevices: TrustedDeviceService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -113,7 +136,12 @@ export class AccountAuthService {
    * Crée le compte (numéro non vérifié) et envoie tout de suite le code SMS. Un numéro dont l'inscription n'a pas été terminée
    * (pas encore de mot de passe) peut reprendre là où il s'était arrêté ; un numéro qui a déjà un mot de passe est refusé.
    */
-  async requestSignupCode(dto: { phone: string; accountType: 'CUSTOMER' | 'DRIVER' }): Promise<{ expiresInSeconds: number }> {
+  async requestSignupCode(dto: {
+    phone: string;
+    accountType: 'CUSTOMER' | 'DRIVER';
+    /** Version des conditions affichée quand la case a été cochée (le DTO exige que la case le soit). */
+    termsVersion?: string;
+  }): Promise<{ expiresInSeconds: number }> {
     const test = isTestPhone(dto.phone);
     const settings = await this.otpSettings.get();
     if (!test) await this.assertSmsPlatformAllowed(dto.phone, settings);
@@ -136,6 +164,12 @@ export class AccountAuthService {
     }
     if (user.isSuspended) throw new BadRequestException('Ce compte est suspendu.');
 
+    // Case cochée : on garde la date et la version des textes acceptés (preuve en cas de litige). Une inscription reprise les remet à jour.
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { termsAcceptedAt: new Date(), termsVersion: dto.termsVersion?.trim() || null },
+    });
+
     return this.sendSmsCode(user, OtpPurpose.PHONE_VERIFICATION, 'votre code de vérification', settings, test);
   }
 
@@ -156,7 +190,7 @@ export class AccountAuthService {
   async verifySignupCode(
     dto: { phone: string; code: string; device?: DeviceInfoDto },
     context: RequestContext,
-  ): Promise<AuthResult> {
+  ): Promise<AuthResult & { trust: DeviceTrustInfo }> {
     const user = await this.usersService.findByPhone(dto.phone);
     if (!user || !isCustomerOrDriver(user)) {
       throw new BadRequestException("Aucune demande de code n'a été faite pour ce numéro.");
@@ -187,7 +221,8 @@ export class AccountAuthService {
       action: 'SIGNUP_PHONE_VERIFIED',
       ipAddress: context.ipAddress,
     });
-    return result;
+    // Première connexion de ce compte : l'application propose d'enregistrer ce téléphone comme téléphone de confiance.
+    return { ...result, trust: { hasTrustedDevice: false, thisDeviceTrusted: false, offer: true } };
   }
 
   // ---------------------------------------------------------------------
@@ -320,14 +355,44 @@ export class AccountAuthService {
     return { message: 'Mot de passe modifié.' };
   }
 
+  /**
+   * Vérifie le mot de passe actuel d'une personne déjà connectée avant une action sensible (ex. activer la connexion par empreinte).
+   * Les erreurs comptent dans le même verrouillage que la connexion : un téléphone déverrouillé ne permet pas d'essayer les
+   * 1 000 000 de combinaisons.
+   */
+  async assertCurrentPassword(userId: string, password: string): Promise<void> {
+    const user = await this.requireUser(userId);
+    if (!isCustomerOrDriver(user)) {
+      throw new BadRequestException("Ce type de compte n'utilise pas de mot de passe à 6 chiffres.");
+    }
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) throw this.lockedError(user.lockedUntil);
+    if (isTestPhone(user.phone) && password === TEST_CODE) return;
+    if (!user.passwordHash) {
+      throw new BadRequestException("Aucun mot de passe n'est encore défini : choisissez-en un d'abord.");
+    }
+    const valid = await bcrypt.compare(pinDigest(password), user.passwordHash);
+    if (!valid) {
+      const lockedUntil = await this.registerFailedAttempt(user.id);
+      if (lockedUntil) throw this.lockedError(lockedUntil);
+      throw new BadRequestException('Mot de passe incorrect.');
+    }
+  }
+
   // ---------------------------------------------------------------------
   // Connexion : numéro + mot de passe
   // ---------------------------------------------------------------------
 
   async loginWithPhone(
-    dto: { phone: string; password: string; expectedAccountType?: 'CUSTOMER' | 'DRIVER'; device?: DeviceInfoDto },
+    dto: {
+      phone: string;
+      password: string;
+      expectedAccountType?: 'CUSTOMER' | 'DRIVER';
+      device?: DeviceInfoDto;
+      /** Preuve que ce téléphone est un téléphone de confiance du compte (voir TrustedDeviceService). */
+      trustedDevice?: TrustedDeviceCredential;
+    },
     context: RequestContext,
-  ): Promise<AuthResult> {
+  ): Promise<PhoneLoginResult> {
     const wrong = () => new UnauthorizedException('Numéro ou mot de passe incorrect.');
 
     const user = await this.usersService.findByPhone(dto.phone);
@@ -374,6 +439,19 @@ export class AccountAuthService {
         ? await this.prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } })
         : user;
 
+    // Mot de passe correct. Si le compte a des téléphones de confiance et que celui-ci n'en est pas un : un code est exigé avant d'ouvrir la session.
+    const assessment = await this.trustedDevices.assess(fresh.id, dto.trustedDevice);
+    if (assessment.verifyRequired) {
+      await this.audit.log({
+        actorId: fresh.id,
+        entityType: 'User',
+        entityId: fresh.id,
+        action: 'LOGIN_NEW_DEVICE_CHALLENGE',
+        ipAddress: context.ipAddress,
+      });
+      return this.startDeviceVerification(fresh, false);
+    }
+
     const device = await this.devicesService.findOrCreateForLogin(fresh.id, dto.device);
     const result = await this.authService.issueTokens(fresh, {
       deviceId: device?.id,
@@ -388,7 +466,117 @@ export class AccountAuthService {
       action: 'LOGIN_PHONE_PASSWORD',
       ipAddress: context.ipAddress,
     });
-    return result;
+    return { ...result, trust: assessment.trust };
+  }
+
+  // ---------------------------------------------------------------------
+  // Nouveau téléphone : code par e-mail (en priorité) ou par SMS
+  // ---------------------------------------------------------------------
+
+  /**
+   * Envoie le code de confirmation d'un nouveau téléphone : par e-mail si le compte a une adresse vérifiée (un SMS coûte cher), sinon par
+   * SMS. `forceSms` = la personne a demandé le SMS (adresse e-mail inaccessible). Renvoie le jeton qui relie la suite à ce compte.
+   */
+  private async startDeviceVerification(user: User, forceSms: boolean): Promise<DeviceVerificationRequired> {
+    const test = isTestPhone(user.phone);
+    const settings = await this.otpSettings.get();
+    const hasEmail = Boolean(user.email && user.isEmailVerified);
+    const channel: 'EMAIL' | 'SMS' = hasEmail && !forceSms ? 'EMAIL' : 'SMS';
+    let destination: string;
+    let expiresInSeconds = settings.expirySeconds;
+
+    if (channel === 'EMAIL') {
+      if (!test) await this.assertCodeRequestAllowed(user.id, OtpPurpose.DEVICE_VERIFICATION, settings);
+      const code = test ? TEST_CODE : generateOtpCode();
+      const otp = await this.storeCode(user.id, OtpPurpose.DEVICE_VERIFICATION, code, settings);
+      if (test) {
+        this.logger.warn(`[MODE TEST] Code e-mail fixe pour ${maskPhone(user.phone)} : ${TEST_CODE} — aucun e-mail envoyé.`);
+      } else {
+        try {
+          await this.emailProvider.send(
+            user.email!,
+            'Confirmez ce nouveau téléphone — Occa’Z',
+            `Quelqu'un se connecte à votre compte Occa’Z depuis un nouveau téléphone. Votre code est ${code}. Il expire dans ${Math.round(settings.expirySeconds / 60)} minutes. Si ce n'est pas vous, ne communiquez pas ce code et changez votre mot de passe.`,
+          );
+        } catch (error) {
+          await this.prisma.otpCode.delete({ where: { id: otp.id } }).catch(() => undefined);
+          this.logger.error(`E-mail de confirmation non envoyé à ${maskEmail(user.email!)} : ${(error as Error).message}`);
+          throw new ServiceUnavailableException("L'e-mail n'a pas pu être envoyé. Réessayez dans un instant.");
+        }
+      }
+      destination = maskEmail(user.email!);
+    } else {
+      if (!test) await this.assertSmsPlatformAllowed(user.phone, settings);
+      ({ expiresInSeconds } = await this.sendSmsCode(user, OtpPurpose.DEVICE_VERIFICATION, 'votre code pour confirmer ce nouveau téléphone', settings, test));
+      destination = maskPhone(user.phone);
+    }
+
+    const challengeToken = this.jwtService.sign(
+      { sub: user.id, purpose: 'device-verification' },
+      { secret: this.deviceChallengeSecret(), expiresIn: DEVICE_CHALLENGE_TTL },
+    );
+    return { requiresDeviceVerification: true, challengeToken, channel, destination, canUseSms: hasEmail, expiresInSeconds };
+  }
+
+  /** Pour la connexion par empreinte : même arrêt « code requis » que la connexion par mot de passe. */
+  async challengeUnknownDevice(userId: string, context: RequestContext): Promise<DeviceVerificationRequired> {
+    const user = await this.usersService.findById(userId);
+    if (!user || !isCustomerOrDriver(user)) throw new UnauthorizedException('Connexion par empreinte expirée : connectez-vous avec votre mot de passe.');
+    await this.audit.log({
+      actorId: user.id,
+      entityType: 'User',
+      entityId: user.id,
+      action: 'LOGIN_NEW_DEVICE_CHALLENGE',
+      ipAddress: context.ipAddress,
+    });
+    return this.startDeviceVerification(user, false);
+  }
+
+  /** Lit le jeton d'une vérification en cours et renvoie le compte (client / conducteur, non suspendu). */
+  private async userOfDeviceChallenge(challengeToken: string): Promise<User> {
+    const expired = () => new UnauthorizedException('Cette étape a expiré. Reconnectez-vous.');
+    let payload: { sub: string; purpose: string };
+    try {
+      payload = this.jwtService.verify(challengeToken, { secret: this.deviceChallengeSecret() });
+    } catch {
+      throw expired();
+    }
+    if (payload.purpose !== 'device-verification') throw expired();
+    const user = await this.usersService.findById(payload.sub);
+    if (!user || !isCustomerOrDriver(user)) throw expired();
+    if (user.isSuspended) throw new UnauthorizedException('Ce compte est suspendu.');
+    return user;
+  }
+
+  /** Renvoie un code pour la vérification en cours (éventuellement par SMS plutôt que par e-mail). */
+  async resendDeviceCode(dto: { challengeToken: string; channel?: 'SMS' }): Promise<DeviceVerificationRequired> {
+    const user = await this.userOfDeviceChallenge(dto.challengeToken);
+    return this.startDeviceVerification(user, dto.channel === 'SMS');
+  }
+
+  /** Le bon code confirme ce téléphone : la session s'ouvre. L'application propose ensuite de l'enregistrer comme téléphone de confiance. */
+  async verifyDeviceCode(
+    dto: { challengeToken: string; code: string; device?: DeviceInfoDto },
+    context: RequestContext,
+  ): Promise<AuthResult & { trust: DeviceTrustInfo }> {
+    const user = await this.userOfDeviceChallenge(dto.challengeToken);
+    await this.consumeCode(user.id, OtpPurpose.DEVICE_VERIFICATION, dto.code);
+
+    const device = await this.devicesService.findOrCreateForLogin(user.id, dto.device);
+    const result = await this.authService.issueTokens(user, {
+      deviceId: device?.id,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
+    await this.usersService.updateLastLogin(user.id);
+    await this.audit.log({
+      actorId: user.id,
+      entityType: 'User',
+      entityId: user.id,
+      action: 'LOGIN_NEW_DEVICE_VERIFIED',
+      ipAddress: context.ipAddress,
+    });
+    return { ...result, trust: { hasTrustedDevice: true, thisDeviceTrusted: false, offer: true } };
   }
 
   /** Le compte a-t-il ce profil (client ou conducteur) ? */
@@ -610,7 +798,11 @@ export class AccountAuthService {
         await this.smsProvider.send(
           user.phone,
           `Occa'Z : ${code} est ${wording}. Valable ${Math.round(settings.expirySeconds / 60)} min. Ne le communiquez à personne.`,
-          purpose === OtpPurpose.PASSWORD_RESET ? SmsPurpose.PASSWORD_RESET : SmsPurpose.SIGNUP,
+          purpose === OtpPurpose.PASSWORD_RESET
+            ? SmsPurpose.PASSWORD_RESET
+            : purpose === OtpPurpose.DEVICE_VERIFICATION
+              ? SmsPurpose.DEVICE_VERIFICATION
+              : SmsPurpose.SIGNUP,
         );
       } catch (error) {
         await this.prisma.otpCode.delete({ where: { id: otp.id } }).catch(() => undefined);
@@ -677,6 +869,11 @@ export class AccountAuthService {
   private resetSecret(): string {
     // Secret distinct de celui des jetons d'accès : un jeton de réinitialisation n'ouvre jamais une session.
     return `${this.configService.get<string>('jwt.accessSecret')!}:password-reset`;
+  }
+
+  private deviceChallengeSecret(): string {
+    // Secret distinct de celui des jetons d'accès : ce jeton n'ouvre jamais une session, il relie seulement un code à un compte.
+    return `${this.configService.get<string>('jwt.accessSecret')!}:device-verification`;
   }
 
   private passwordFingerprint(passwordHash: string | null): string {

@@ -3,11 +3,13 @@ import { api } from './client';
 import type {
   AuthResult,
   LoginPhonePayload,
+  PhoneLoginResult,
   PasswordResetChannel,
   PasswordResetRequestResult,
   RequestOtpPayload,
   SafeUser,
   SignupPhonePayload,
+  TrustedAuthResult,
   VerifyOtpPayload,
 } from '@/types/auth.types';
 
@@ -27,7 +29,7 @@ export const authApi = {
 
   /** Le bon code prouve le numéro et ouvre la session ; l'inscription se termine ensuite (e-mail facultatif, mot de passe). */
   verifySignupPhone: (payload: VerifyOtpPayload) =>
-    api.post<AuthResult>('/auth/signup/phone/verify', payload, { auth: false }),
+    api.post<TrustedAuthResult>('/auth/signup/phone/verify', payload, { auth: false }),
 
   /** E-mail facultatif : un code part à cette adresse (compte connecté). */
   requestEmailCode: (email: string) => api.post<{ expiresInSeconds: number }>('/auth/email/request', { email }),
@@ -41,7 +43,8 @@ export const authApi = {
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/password/change', { currentPassword, newPassword }),
 
-  loginWithPhone: (payload: LoginPhonePayload) => api.post<AuthResult>('/auth/login/phone', payload, { auth: false }),
+  /** Mot de passe correct : session ouverte, ou « code demandé » si ce téléphone n'est pas de confiance alors que le compte en a un. */
+  loginWithPhone: (payload: LoginPhonePayload) => api.post<PhoneLoginResult>('/auth/login/phone', payload, { auth: false }),
 
   requestPasswordReset: (phone: string, channel: PasswordResetChannel) =>
     api.post<PasswordResetRequestResult>('/auth/forgot-password/request', { phone, channel }, { auth: false }),

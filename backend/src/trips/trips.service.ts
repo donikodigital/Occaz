@@ -1,4 +1,5 @@
 // backend/src/trips/trips.service.ts
+// [30/10/2026] v+ — recherche : seulement les trajets pas encore partis (tri SQL cohérent) ; annulation refusée avec colis confiés ; clôture du trajet « réclamée ».
 // [25/10/2026] v+ — recherche, détail et trajets proches : le conducteur n'est plus renvoyé en entier (date de naissance, numéro Mobile Money…) mais
 // avec les seuls champs publics (PUBLIC_DRIVER_SELECT).
 // [19/10/2026] v+ — create() et publish() vérifient la régularisation du dossier conducteur (DriverComplianceService, délai de tolérance).
@@ -60,11 +61,20 @@ import { TripRoutePlanner, loadRouteSettings } from './trip-route.planner';
 import { freeSeatsOnSegment, seatsByLeg, seatsOccupiedByLeg, type SeatHoldInput } from './trip-seats';
 import { SEAT_HOLDING_STATUSES, SEAT_HOLD_SELECT } from './trip-seats.db';
 import { PUBLIC_DRIVER_SELECT } from '../common/selects/public-profiles';
+import { BOOKING_CUTOFF_SETTING_KEY } from './bookings.service';
 
 const DEFAULT_SEARCH_RADIUS_KM = 5;
 /** Nombre maximal de trajets examinés par une recherche par villes (le tri exact par tronçon se fait ensuite en mémoire). */
 const SEARCH_CANDIDATE_LIMIT = 300;
 const DAY_MS = 24 * 3_600_000;
+/** Envois confiés à un conducteur et pas encore livrés. */
+const ACTIVE_SHIPMENT_STATUSES: ShipmentStatus[] = [
+  ShipmentStatus.DRIVER_ASSIGNED,
+  ShipmentStatus.PICKUP_PENDING,
+  ShipmentStatus.PICKED_UP,
+  ShipmentStatus.IN_TRANSIT,
+  ShipmentStatus.DELIVERY_PENDING,
+];
 
 /** Trajet avec ses villes ; les étapes ne sont pas chargées dans toutes les listes (ex. trajets proches). */
 type TripLike = Omit<RouteTripInput, 'stops'> & {
@@ -524,10 +534,25 @@ export class TripsService {
       );
     }
 
-    await this.prisma.trip.update({
-      where: { id },
+    // Un envoi accepté sur ce trajet et pas encore livré : annuler le trajet laisserait le client avec un colis attribué à un trajet
+    // qui n'existe plus (et le conducteur avec son revenu en attente). Même règle que l'expiration automatique (expireStale).
+    const activeShipments = await this.prisma.shipment.count({
+      where: { tripId: id, status: { in: ACTIVE_SHIPMENT_STATUSES } },
+    });
+    if (activeShipments > 0) {
+      throw new BadRequestException(
+        `${activeShipments} colis ${activeShipments > 1 ? 'vous sont confiés' : 'vous est confié'} sur ce trajet : il ne peut pas être annulé. Contactez le support pour faire réattribuer le colis.`,
+      );
+    }
+
+    // Annulation « réclamée » : un trajet déjà annulé ou parti entre-temps ne repasse pas par ici (pas de double compteur).
+    const claimedCancel = await this.prisma.trip.updateMany({
+      where: { id, status: { notIn: [TripStatus.CANCELLED, TripStatus.COMPLETED, TripStatus.PASSENGER_PICKED_UP, TripStatus.IN_PROGRESS, TripStatus.ARRIVED] } },
       data: { status: TripStatus.CANCELLED },
     });
+    if (claimedCancel.count === 0) {
+      throw new BadRequestException('Ce trajet ne peut plus être annulé.');
+    }
 
     await this.bookingsService.cancelAllForTrip(id, reason, CancellationInitiator.DRIVER);
     await this.driverProfilesService.incrementCancellations(driverId);
@@ -737,12 +762,23 @@ export class TripsService {
       );
     }
 
-    const updated = await this.prisma.trip.update({
-      where: { id },
+    // Clôture « réclamée » (comme la clôture automatique) : si le conducteur et la clôture automatique agissent en même temps, un seul
+    // des deux compte le trajet terminé — avant, le compteur du conducteur pouvait être incrémenté deux fois.
+    const claimed = await this.prisma.trip.updateMany({
+      where: {
+        id,
+        status: TripStatus.ARRIVED,
+        bookings: { none: { status: { notIn: [BookingStatus.COMPLETED, BookingStatus.CANCELLED, BookingStatus.REFUNDED] } } },
+      },
       data: { status: TripStatus.COMPLETED },
     });
+    if (claimed.count === 0) {
+      const current = await this.prisma.trip.findUniqueOrThrow({ where: { id } });
+      if (current.status === TripStatus.COMPLETED) return current; // déjà clôturé : rien à recompter
+      throw new BadRequestException('Ce trajet ne peut pas être clôturé dans son état actuel.');
+    }
     await this.driverProfilesService.incrementCompletedTrips(driverId);
-    return updated;
+    return this.prisma.trip.findUniqueOrThrow({ where: { id } });
   }
 
   /**
@@ -768,6 +804,31 @@ export class TripsService {
     if (claimed.count === 0) return false;
 
     await this.audit.log({ actorId: null, entityType: 'Trip', entityId: id, action: 'AUTO_EXPIRE', diff: { reason } });
+    return true;
+  }
+
+  /**
+   * Trajet ABANDONNÉ : le conducteur n'a jamais démarré (statut resté « publié » ou « arrivé ») alors que des clients ont payé et que
+   * le départ est passé depuis longtemps. Sans cela le trajet restait ouvert, les clients bloqués et l'argent en attente (aucun
+   * traitement ne touchait aux trajets avec réservation). Le trajet est annulé, chaque client payé est remboursé INTÉGRALEMENT
+   * (comme une annulation par le conducteur) et l'annulation est comptée au conducteur. Sans effet s'il reste un colis confié.
+   */
+  async cancelAbandoned(id: string, reason: string): Promise<boolean> {
+    const trip = await this.prisma.trip.findUnique({ where: { id }, select: { driverId: true } });
+    if (!trip) return false;
+    const claimed = await this.prisma.trip.updateMany({
+      where: {
+        id,
+        status: { in: [TripStatus.PUBLISHED, TripStatus.DRIVER_ARRIVED] },
+        shipments: { none: { status: { in: ACTIVE_SHIPMENT_STATUSES } } },
+      },
+      data: { status: TripStatus.CANCELLED },
+    });
+    if (claimed.count === 0) return false;
+
+    await this.bookingsService.cancelAllForTrip(id, reason, CancellationInitiator.SYSTEM);
+    await this.driverProfilesService.incrementCancellations(trip.driverId);
+    await this.audit.log({ actorId: null, entityType: 'Trip', entityId: id, action: 'AUTO_CANCEL_ABANDONED', diff: { reason } });
     return true;
   }
 
@@ -1062,13 +1123,17 @@ export class TripsService {
       stops: { some: { cityId, isBookable: true, fareFromOrigin: { not: null } } },
     });
     const passengersCount = dto.passengersCount ?? 1;
+    // Seuls les trajets pas encore partis sont proposés (même règle que la réservation) : un trajet dont l'heure est passée mais
+    // que le conducteur n'a pas marqué « arrivé » n'est plus réservable, et ne doit pas occuper les 300 places de candidats.
+    const bookableAfter = await this.bookableAfter();
     const where: Prisma.TripWhereInput = {
       status: TripStatus.PUBLISHED,
+      departureAt: { gt: bookableAfter },
       ...(dto.requiresShipmentCapacity ? { allowsShipments: true } : {}),
       ...(dto.verifiedDriverOnly ? { driver: { isVerifiedBadge: true } } : {}),
       // Un trajet de nuit peut passer à l'étape le jour demandé en étant parti la veille : fenêtre élargie d'un jour,
       // le jour exact est vérifié ensuite sur l'heure de passage à la montée.
-      ...(dto.departureDate ? this.dayWindowPrefilter(dto.departureDate) : {}),
+      ...(dto.departureDate ? this.dayWindowPrefilter(dto.departureDate, bookableAfter) : {}),
       AND: [
         originCityId && destinationCityId
           ? {
@@ -1142,11 +1207,15 @@ export class TripsService {
     const limit = dto.take;
     const offset = dto.skip;
 
+    const bookableAfter = await this.bookableAfter();
+    // Un trajet n'a qu'un point de départ (jointure 1-1) : pas de DISTINCT, et le tri par heure de départ rend la pagination
+    // (LIMIT/OFFSET) cohérente avec l'ordre affiché — avant, la page était prise par identifiant puis triée après coup.
     const tripIds = await this.prisma.$queryRaw<{ id: string }[]>`
-      SELECT DISTINCT t.id
+      SELECT t.id
       FROM trips t
       JOIN locations lo ON lo.id = t."originLocationId"
       WHERE t.status = 'PUBLISHED'
+        AND t."departureAt" > ${bookableAfter}
         AND t."availableSeats" >= ${dto.passengersCount ?? 1}
         AND lo."geoPoint" IS NOT NULL
         AND ST_DWithin(
@@ -1154,7 +1223,7 @@ export class TripsService {
           ST_SetSRID(ST_MakePoint(${dto.originLongitude}, ${dto.originLatitude}), 4326)::geography,
           ${radiusMeters}
         )
-      ORDER BY t.id
+      ORDER BY t."departureAt" ASC, t.id ASC
       LIMIT ${limit} OFFSET ${offset};
     `;
 
@@ -1164,7 +1233,7 @@ export class TripsService {
 
     const trips = await this.prisma.trip.findMany({
       where: { id: { in: tripIds.map((row) => row.id) } },
-      orderBy: { departureAt: 'asc' },
+      orderBy: [{ departureAt: 'asc' }, { id: 'asc' }],
       include: { driver: { select: PUBLIC_DRIVER_SELECT }, vehicle: true, originCity: true, destinationCity: true, currency: CURRENCY_SELECT },
     });
 
@@ -1180,10 +1249,17 @@ export class TripsService {
   }
 
   /** Départ de la veille jusqu'à la fin du jour demandé : couvre les trajets qui passent à une étape ce jour-là. */
-  private dayWindowPrefilter(dateOnly: string): Prisma.TripWhereInput {
+  private dayWindowPrefilter(dateOnly: string, bookableAfter: Date): Prisma.TripWhereInput {
     const start = new Date(`${dateOnly}T00:00:00.000Z`);
     const end = new Date(`${dateOnly}T23:59:59.999Z`);
-    return { departureAt: { gte: new Date(start.getTime() - DAY_MS), lte: end } };
+    const from = new Date(start.getTime() - DAY_MS);
+    return { departureAt: { gt: from > bookableAfter ? from : bookableAfter, lte: end } };
+  }
+
+  /** Instant avant lequel un départ n'est plus réservable : maintenant + délai de clôture des réservations (0 par défaut). */
+  private async bookableAfter(): Promise<Date> {
+    const cutoffMinutes = await this.pricing.getNumericSetting(BOOKING_CUTOFF_SETTING_KEY, 0);
+    return new Date(Date.now() + cutoffMinutes * 60_000);
   }
 
   private isOnDay(date: Date, dateOnly: string): boolean {

@@ -1,4 +1,6 @@
 // mobile/app/(auth)/login-password.tsx
+// [30/10/2026] v+ — téléphones de confiance : le secret de ce téléphone accompagne la connexion ; téléphone inconnu → écran du code.
+// [30/10/2026] v+ — proposition d'activer la connexion par empreinte après une connexion réussie.
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [19/10/2026] v+ — la connexion ouvre l'espace choisi à l'accueil (un compte peut avoir les deux espaces).
 // [11/10/2026] v1 — Connexion, étape 2 : le mot de passe à 6 chiffres du numéro saisi à l'écran précédent. La connexion part toute seule au
@@ -22,7 +24,10 @@ import { useCountries } from '@/hooks/useCities';
 import { formatInternationalPhone } from '@/utils/phone';
 import { useActiveSpaceStore } from '@/stores/activeSpaceStore';
 import { HOME_HREF } from '@/utils/spaces';
-import type { AccountType } from '@/types/auth.types';
+import { needsDeviceVerification, type AccountType } from '@/types/auth.types';
+import { useDeviceChallengeStore } from '@/stores/deviceChallengeStore';
+import { useTrustedDeviceStore } from '@/stores/trustedDeviceStore';
+import { useBiometricStore } from '@/stores/biometricStore';
 import { useT } from '@/i18n';
 
 type Space = Extract<AccountType, 'CUSTOMER' | 'DRIVER'>;
@@ -58,11 +63,23 @@ export default function LoginPasswordScreen() {
         password,
         expectedAccountType: accountType,
         device: { platform: Platform.OS as 'ios' | 'android' },
+        trustedDevice: useTrustedDeviceStore.getState().credential(),
       }),
-    onSuccess: async (result) => {
+    onSuccess: async (result, password) => {
+      // Mot de passe correct, mais ce téléphone n'est pas de confiance alors que le compte en a un : un code vient d'être envoyé.
+      if (needsDeviceVerification(result)) {
+        useDeviceChallengeStore.getState().start(result, { space: accountType, origin: 'password' });
+        setPin('');
+        router.push('/(auth)/verify-device');
+        return;
+      }
       await setSession(result);
+      // La question « Enregistrer ce téléphone ? » s'affichera à l'arrivée dans l'espace (TrustedDevicePromptHost).
+      await useTrustedDeviceStore.getState().noteLogin(result.trust);
       // Le serveur a accepté cet espace (compte de ce type, ou compte qui possède aussi ce profil) : on l'ouvre.
       useActiveSpaceStore.getState().setSpace(accountType);
+      // Connexion réussie avec le mot de passe : on propose l'empreinte (une seule fois par téléphone) tant qu'on connaît le mot de passe.
+      await useBiometricStore.getState().offerAfterLogin(password).catch(() => undefined);
       router.replace(HOME_HREF[accountType]);
     },
     onError: (error) => {

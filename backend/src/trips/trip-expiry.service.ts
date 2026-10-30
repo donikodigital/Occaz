@@ -1,4 +1,5 @@
 // backend/src/trips/trip-expiry.service.ts
+// [30/10/2026] v+ — trajets abandonnés AVEC clients payés : annulation automatique et remboursement intégral (cancelAbandonedTrips).
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { BookingStatus, ShipmentStatus, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -65,6 +66,7 @@ export class TripExpiryService implements OnModuleInit, OnModuleDestroy {
       // Interrupteur de l'administration (Paramètres → Tâches automatiques) : lu à chaque passage, aucun redémarrage requis.
       if ((await this.pricing.getNumericSetting('jobs.trip_expiry_enabled', 1)) === 0) return;
       await this.expireStaleTrips();
+      await this.cancelAbandonedTrips();
     } catch (error) {
       this.logger.error('Échec de la vérification des trajets sans réservation', error as Error);
     } finally {
@@ -93,6 +95,37 @@ export class TripExpiryService implements OnModuleInit, OnModuleDestroy {
         await this.trips.expireStale(trip.id, 'Trajet resté sans réservation bien après son départ.');
       } catch (error) {
         this.logger.error(`Échec de l'expiration du trajet ${trip.id}`, error as Error);
+      }
+    }
+  }
+
+  /**
+   * Trajets AVEC clients payés que le conducteur n'a jamais démarrés : le départ est passé depuis plus de `trip.abandoned_after_hours`
+   * (12 h par défaut) et le trajet est toujours « publié » ou « arrivé ». Annulés avec remboursement intégral des clients (voir
+   * TripsService.cancelAbandoned). Les trajets sans réservation sont traités par expireStaleTrips (délai plus long, aucun impact).
+   */
+  private async cancelAbandonedTrips(): Promise<void> {
+    const hours = await this.pricing.getNumericSetting('trip.abandoned_after_hours', 12);
+    if (hours <= 0) return; // 0 = désactivé
+    const departedBefore = new Date(Date.now() - hours * 3_600_000);
+
+    const abandoned = await this.prisma.trip.findMany({
+      where: {
+        status: { in: [TripStatus.PUBLISHED, TripStatus.DRIVER_ARRIVED] },
+        departureAt: { lt: departedBefore },
+        bookings: { some: { status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED] } } },
+        shipments: { none: { status: { in: [ShipmentStatus.DRIVER_ASSIGNED, ShipmentStatus.PICKUP_PENDING, ShipmentStatus.PICKED_UP, ShipmentStatus.IN_TRANSIT, ShipmentStatus.DELIVERY_PENDING] } } },
+      },
+      select: { id: true },
+      take: BATCH_SIZE,
+    });
+
+    for (const trip of abandoned) {
+      try {
+        const cancelled = await this.trips.cancelAbandoned(trip.id, 'Trajet non démarré par le conducteur longtemps après l’heure de départ.');
+        if (cancelled) this.logger.warn(`Trajet ${trip.id} abandonné : annulé, clients remboursés.`);
+      } catch (error) {
+        this.logger.error(`Échec de l'annulation du trajet abandonné ${trip.id}`, error as Error);
       }
     }
   }

@@ -3,8 +3,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { AccountType } from '@prisma/client';
-import { IsEmail, IsIn, IsOptional, IsPhoneNumber, IsString, Length, Matches, ValidateNested } from 'class-validator';
+import { Equals, IsEmail, IsIn, IsOptional, IsPhoneNumber, IsString, Length, Matches, MaxLength, ValidateNested } from 'class-validator';
 import { DeviceInfoDto } from './device-info.dto';
+import { TrustedDeviceCredentialDto } from './trusted-device.dto';
 
 const PHONE_MESSAGE = { message: 'Numéro de téléphone invalide (format international requis).' };
 const PIN_MESSAGE = { message: 'Le mot de passe doit contenir exactement 6 chiffres.' };
@@ -17,6 +18,16 @@ export class SignupPhoneDto {
   @ApiProperty({ enum: [AccountType.CUSTOMER, AccountType.DRIVER] })
   @IsIn([AccountType.CUSTOMER, AccountType.DRIVER])
   accountType: 'CUSTOMER' | 'DRIVER';
+
+  @ApiProperty({ example: true, description: "Case « J'accepte les conditions d'utilisation et la politique de confidentialité » cochée (obligatoire)." })
+  @Equals(true, { message: 'Vous devez accepter les conditions d’utilisation et la politique de confidentialité pour créer un compte.' })
+  acceptedTerms: boolean;
+
+  @ApiPropertyOptional({ example: '1.0', description: 'Version des textes affichés au moment de l’acceptation.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  termsVersion?: string;
 }
 
 export class RequestEmailCodeDto {
@@ -70,6 +81,12 @@ export class LoginPhoneDto {
   @ValidateNested()
   @Type(() => DeviceInfoDto)
   device?: DeviceInfoDto;
+
+  @ApiPropertyOptional({ type: TrustedDeviceCredentialDto, description: 'Preuve que ce téléphone est un téléphone de confiance du compte.' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TrustedDeviceCredentialDto)
+  trustedDevice?: TrustedDeviceCredentialDto;
 }
 
 export class ForgotPasswordRequestDto {

@@ -1,4 +1,5 @@
 // backend/src/integrations/sms/sms-purpose.ts
+// [30/10/2026] v3 — 5e motif ouvert : DEVICE_VERIFICATION (code pour confirmer la connexion depuis un téléphone qui n'est pas de confiance, envoyé par SMS seulement quand le compte n'a pas d'e-mail vérifié ou que la personne le demande).
 // [19/10/2026] v2 — Le changement de numéro (Client et Conducteur) devient un 4e motif ouvert : le code est TOUJOURS envoyé par SMS au NOUVEAU
 // numéro (preuve qu'on le possède). L'alerte envoyée à l'ANCIEN numéro est un motif à part (PHONE_CHANGE_ALERT), fermé par défaut : elle part
 // par e-mail. L'équipe (Support, SuperAdmin) ne reçoit jamais de SMS : son code de changement de numéro part par e-mail.
@@ -19,6 +20,8 @@ export enum SmsPurpose {
   PARCEL_RECIPIENT = 'PARCEL_RECIPIENT',
   /** Code de changement de numéro, envoyé au NOUVEAU numéro (Client et Conducteur uniquement). */
   PHONE_CHANGE = 'PHONE_CHANGE',
+  /** Code de confirmation d'un nouveau téléphone à la connexion (Client et Conducteur) — l'e-mail est utilisé en priorité. */
+  DEVICE_VERIFICATION = 'DEVICE_VERIFICATION',
 
   // Motifs fermés par défaut.
   /** SMS d'alerte envoyé à l'ANCIEN numéro après un changement (par défaut l'alerte part par e-mail). */
@@ -35,6 +38,7 @@ export const DEFAULT_ALLOWED_SMS_PURPOSES: readonly SmsPurpose[] = [
   SmsPurpose.PASSWORD_RESET,
   SmsPurpose.PARCEL_RECIPIENT,
   SmsPurpose.PHONE_CHANGE,
+  SmsPurpose.DEVICE_VERIFICATION,
 ];
 
 /** Motifs réactivés par SMS_EXTRA_PURPOSES (valeurs inconnues ignorées). */
@@ -55,7 +59,7 @@ export function isSmsPurposeAllowed(purpose: SmsPurpose | undefined, env: NodeJS
 export class SmsPurposeNotAllowedError extends Error {
   constructor(readonly purpose: SmsPurpose | undefined) {
     super(
-      `SMS refusé par la politique d'envoi (motif ${purpose ?? 'non précisé'}) : seuls l'inscription, le mot de passe oublié, le destinataire d'un colis et le nouveau numéro d'un changement de numéro envoient un SMS.`,
+      `SMS refusé par la politique d'envoi (motif ${purpose ?? 'non précisé'}) : seuls l'inscription, le mot de passe oublié, le destinataire d'un colis, le nouveau numéro d'un changement de numéro et la confirmation d'un nouveau téléphone envoient un SMS.`,
     );
     this.name = 'SmsPurposeNotAllowedError';
   }

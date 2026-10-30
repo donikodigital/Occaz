@@ -475,15 +475,31 @@ export class ShipmentsService {
    * trajet avait déjà été choisi à la création) ou SEARCHING_DRIVER — auquel
    * cas tous les conducteurs validés sont prévenus.
    */
-  async confirmPayment(id: string): Promise<void> {
-    const shipment = await this.prisma.shipment.findUniqueOrThrow({ where: { id } });
-    if (shipment.status !== ShipmentStatus.CREATED) return; // déjà traité, idempotent
+  async confirmPayment(id: string): Promise<'CONFIRMED' | 'ALREADY_CONFIRMED' | 'NOT_PAYABLE'> {
+    const shipment = await this.prisma.shipment.findUnique({ where: { id } });
+    if (!shipment) return 'NOT_PAYABLE';
+    if (shipment.status !== ShipmentStatus.CREATED) {
+      // Un envoi annulé ou remboursé ne revient jamais à la vie : l'appelant rembourse le paiement tardif.
+      return shipment.status === ShipmentStatus.CANCELLED || shipment.status === ShipmentStatus.REFUNDED
+        ? 'NOT_PAYABLE'
+        : 'ALREADY_CONFIRMED';
+    }
 
     const nextStatus = shipment.driverId ? ShipmentStatus.DRIVER_ASSIGNED : ShipmentStatus.SEARCHING_DRIVER;
-    await this.prisma.$transaction([
-      this.prisma.shipment.update({ where: { id }, data: { status: nextStatus } }),
-      this.prisma.shipmentTracking.create({ data: { shipmentId: id, status: nextStatus } }),
-    ]);
+    // Passage « réclamé » (comme pour les réservations) : si l'envoi vient d'être annulé / expiré entre la lecture et l'écriture,
+    // il n'est PAS ressuscité — une seule des deux opérations concurrentes gagne.
+    const claimed = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const result = await tx.shipment.updateMany({ where: { id, status: ShipmentStatus.CREATED }, data: { status: nextStatus } });
+      if (result.count === 0) return false;
+      await tx.shipmentTracking.create({ data: { shipmentId: id, status: nextStatus } });
+      return true;
+    });
+    if (!claimed) {
+      const current = await this.prisma.shipment.findUnique({ where: { id }, select: { status: true } });
+      return !current || current.status === ShipmentStatus.CANCELLED || current.status === ShipmentStatus.REFUNDED
+        ? 'NOT_PAYABLE'
+        : 'ALREADY_CONFIRMED';
+    }
 
     // Les étiquettes des colis partent par e-mail dès que l'envoi est payé (une seule fois : le statut CREATED n'est quitté qu'ici).
     this.eventEmitter.emit(DOMAIN_EVENTS.SHIPMENT_PAID, new ShipmentPaidEvent(id));
@@ -491,6 +507,7 @@ export class ShipmentsService {
     if (nextStatus === ShipmentStatus.SEARCHING_DRIVER) {
       this.eventEmitter.emit(DOMAIN_EVENTS.SHIPMENT_SEARCH_OPENED, new ShipmentSearchOpenedEvent(id));
     }
+    return 'CONFIRMED';
   }
 
   // -----------------------------------------------------------------------
@@ -674,27 +691,32 @@ export class ShipmentsService {
         data: { shipmentId, status: ShipmentStatus.DRIVER_ASSIGNED },
       });
 
+      // Le client a payé un montant unique (Shipment.totalAmount, déjà net
+      // d'un éventuel code promo — voir create()) ; la commission
+      // (Shipment.platformFee, déjà réduite du même rabais) en est déduite du
+      // gain du conducteur : ex. 150 000 payés, 10 % de commission,
+      // 135 000 crédités à la livraison, qu'il y ait eu un code promo ou non.
+      // Dans la MÊME transaction que l'attribution : si la mise en attente échoue, l'envoi n'est pas attribué (avant, il restait
+      // attribué sans que le conducteur ait la moindre ligne de gain en attente).
+      await this.wallets.holdShipmentRevenue(
+        {
+          driverId,
+          shipmentId,
+          grossAmount: shipment.totalAmount,
+          commission: shipment.platformFee,
+          // Devise dans laquelle le client a payé (Shipment.currencyId) — peut
+          // différer de la devise du wallet du conducteur ; conversion faite
+          // dans WalletsService.holdShipmentRevenue.
+          sourceCurrencyId: shipment.currencyId,
+        },
+        tx,
+      );
+
       return tx.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
     });
 
     // Le destinataire (s'il a donné son e-mail) apprend qu'un colis lui est destiné et peut le suivre.
     this.eventEmitter.emit(DOMAIN_EVENTS.SHIPMENT_STATUS_CHANGED, new ShipmentStatusChangedEvent(shipmentId, ShipmentStatus.DRIVER_ASSIGNED));
-
-    // Le client a payé un montant unique (Shipment.totalAmount, déjà net
-    // d'un éventuel code promo — voir create()) ; la commission
-    // (Shipment.platformFee, déjà réduite du même rabais) en est déduite du
-    // gain du conducteur : ex. 150 000 payés, 10 % de commission,
-    // 135 000 crédités à la livraison, qu'il y ait eu un code promo ou non.
-    await this.wallets.holdShipmentRevenue({
-      driverId,
-      shipmentId,
-      grossAmount: shipment.totalAmount,
-      commission: shipment.platformFee,
-      // Devise dans laquelle le client a payé (Shipment.currencyId) — peut
-      // différer de la devise du wallet du conducteur ; conversion faite
-      // dans WalletsService.holdShipmentRevenue.
-      sourceCurrencyId: shipment.currencyId,
-    });
 
     const customer = await this.prisma.customerProfile.findUnique({
       where: { id: shipment.customerId },

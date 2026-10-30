@@ -1,6 +1,6 @@
 // backend/src/otp/otp.service.spec.ts
 // Codes de remise (prise en charge, dépose, colis) : génération, SMS en « meilleur effort », plafond de SMS, vérification.
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { OtpPurpose, OtpStatus } from '@prisma/client';
 import { hashOtpCode } from '../common/utils/otp.util';
 import { OtpService } from './otp.service';
@@ -179,7 +179,7 @@ describe('OtpService.verify', () => {
     await expect(service.verify({ ...verifyParams, code: '222222' })).resolves.toBeUndefined();
   });
 
-  it('mauvais code : essai compté sur le code le plus récent, 401', async () => {
+  it('mauvais code : essai compté sur le code le plus récent, 400', async () => {
     const { service, prisma } = build({ candidates: [row('c1', '123456')] });
     await expect(service.verify({ ...verifyParams, code: '000000' })).rejects.toThrow('Code invalide.');
     expect(prisma.otpCode.updateMany).toHaveBeenCalledWith({
@@ -205,8 +205,8 @@ describe('OtpService.verify', () => {
     expect(prisma.otpCode.update).toHaveBeenCalledWith({ where: { id: 'c1' }, data: { status: OtpStatus.FAILED } });
   });
 
-  it('code expiré ou absent : 401 explicite', async () => {
-    await expect(build({ candidates: [] }).service.verify({ ...verifyParams, code: '123456' })).rejects.toBeInstanceOf(UnauthorizedException);
+  it('code expiré ou absent : erreur 400 explicite (jamais 401 : le client y verrait un jeton périmé)', async () => {
+    await expect(build({ candidates: [] }).service.verify({ ...verifyParams, code: '123456' })).rejects.toBeInstanceOf(BadRequestException);
     const expired = build({ candidates: [row('c1', '123456', { expiresAt: new Date(Date.now() - 1000) })] });
     await expect(expired.service.verify({ ...verifyParams, code: '123456' })).rejects.toThrow(/expiré/);
   });

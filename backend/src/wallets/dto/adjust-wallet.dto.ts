@@ -1,6 +1,6 @@
 // backend/src/wallets/dto/adjust-wallet.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class AdjustWalletDto {
   @ApiProperty({ description: 'Montant signé (plus petite unité) — positif = crédit, négatif = débit' })
@@ -11,4 +11,12 @@ export class AdjustWalletDto {
   @IsString()
   @MinLength(3)
   reason: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Autorise un débit qui rend le solde disponible négatif (dette du conducteur). Refusé par défaut.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  allowDebt?: boolean;
 }

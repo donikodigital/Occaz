@@ -169,6 +169,7 @@ export class PayoutsService {
     // ci-dessus doit être annulé pour ne pas laisser une demande
     // orpheline sans réservation de fonds derrière elle.
     try {
+      await this.guardrails.assertWithinDailyCapAfterCreate(wallet.id, payout.id, wallet.currency?.isoCode ?? '');
       await this.wallets.reserveForPayout(driverId, amount, payout.id);
     } catch (error) {
       await this.prisma.payout.update({

@@ -3,7 +3,7 @@
 import { PaymentProviderType, PaymentStatus, ShipmentStatus } from '@prisma/client';
 import { PaymentsService } from './payments.service';
 
-type Tx = { id: string; paymentId: string; status: PaymentStatus };
+type Tx = { id: string; paymentId: string; status: PaymentStatus; amount?: bigint; currencyId?: string };
 
 function build(options: {
   transaction?: Partial<Tx>;
@@ -13,9 +13,10 @@ function build(options: {
   holdFails?: boolean;
   shipmentStatus?: ShipmentStatus;
   paymentOf?: 'booking' | 'shipment';
+  refundFails?: boolean;
   bookingAmounts?: { totalAmount: bigint; platformFee: bigint };
 } = {}) {
-  const transaction: Tx = { id: 'tx1', paymentId: 'pay1', status: PaymentStatus.PENDING, ...options.transaction };
+  const transaction: Tx = { id: 'tx1', paymentId: 'pay1', status: PaymentStatus.PENDING, currencyId: 'GNF', ...options.transaction };
   const payment =
     options.paymentOf === 'shipment'
       ? { id: 'pay1', bookingId: null, shipmentId: 's1', status: PaymentStatus.CAPTURED }
@@ -50,7 +51,8 @@ function build(options: {
       update: jest.fn().mockResolvedValue({}),
     },
     booking: { findUniqueOrThrow: jest.fn().mockResolvedValue(booking), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
-    shipment: { findUniqueOrThrow: jest.fn().mockResolvedValue(shipment) },
+    shipment: { findUniqueOrThrow: jest.fn().mockResolvedValue(shipment), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    currency: { findUnique: jest.fn().mockResolvedValue({ isoCode: 'GNF' }) },
   };
   const wallets = {
     holdBookingRevenue: options.holdFails
@@ -59,7 +61,14 @@ function build(options: {
     holdShipmentRevenue: jest.fn().mockResolvedValue(undefined),
   };
   const bookingsService = { confirmPayment: jest.fn().mockResolvedValue(options.confirmOutcome ?? 'CONFIRMED') };
-  const shipmentsService = { confirmPayment: jest.fn().mockResolvedValue(undefined) };
+  const shipmentsService = {
+    // Même décision atomique que ShipmentsService.confirmPayment : un envoi annulé n'est jamais ressuscité.
+    confirmPayment: jest
+      .fn()
+      .mockResolvedValue(
+        shipment.status === ShipmentStatus.CANCELLED || shipment.status === ShipmentStatus.REFUNDED ? 'NOT_PAYABLE' : 'CONFIRMED',
+      ),
+  };
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
   const referrals = { handleFirstPaymentConfirmed: jest.fn().mockResolvedValue(undefined) };
   const service = new PaymentsService(
@@ -72,17 +81,24 @@ function build(options: {
     notifications as never,
     referrals as never,
   );
-  const refundBooking = jest.spyOn(service, 'refundBooking').mockResolvedValue(0n);
-  const refundShipment = jest.spyOn(service, 'refundShipment').mockResolvedValue(0n);
+  const refundBooking = jest.spyOn(service, 'refundBooking');
+  const refundShipment = jest.spyOn(service, 'refundShipment');
+  if (options.refundFails) {
+    refundBooking.mockRejectedValue(new Error('prestataire indisponible'));
+    refundShipment.mockRejectedValue(new Error('prestataire indisponible'));
+  } else {
+    refundBooking.mockResolvedValue(0n);
+    refundShipment.mockResolvedValue(0n);
+  }
   return { service, prisma, wallets, bookingsService, shipmentsService, refundBooking, refundShipment };
 }
 
 const settle = (service: PaymentsService, status: 'CAPTURED' | 'FAILED') =>
   service.handleWebhook(PaymentProviderType.ORANGE_MONEY, { externalReference: 'ref', status }, {});
 // handleWebhook délègue l'authentification à l'adaptateur : on court-circuite le registre pour tester le règlement seul.
-function withAdapter(service: PaymentsService, status: 'CAPTURED' | 'FAILED') {
+function withAdapter(service: PaymentsService, status: 'CAPTURED' | 'FAILED', reported: { amount?: bigint; currencyIsoCode?: string } = {}) {
   (service as unknown as { registry: unknown }).registry = {
-    resolve: () => ({ verifyAndParseWebhook: async () => ({ externalReference: 'ref', status }) }),
+    resolve: () => ({ verifyAndParseWebhook: async () => ({ externalReference: 'ref', status, ...reported }) }),
   };
   return settle(service, status);
 }
@@ -140,7 +156,49 @@ describe('PaymentsService — règlement des paiements', () => {
     });
     await withAdapter(service, 'CAPTURED');
     expect(refundShipment).toHaveBeenCalledWith('s1', 100);
-    expect(shipmentsService.confirmPayment).not.toHaveBeenCalled();
+    // La décision est prise par confirmPayment (atomique) : l'envoi annulé n'est pas ressuscité, et la décision « 100 % » est notée.
+    expect(shipmentsService.confirmPayment).toHaveBeenCalledWith('s1');
+  });
+
+  it('paiement tardif dont le remboursement échoue : la capture reste enregistrée et la reprise automatique prend le relais', async () => {
+    const { service, prisma } = build({ confirmOutcome: 'NOT_PAYABLE', refundFails: true });
+    await expect(withAdapter(service, 'CAPTURED')).resolves.toEqual({ paymentId: 'pay1', status: PaymentStatus.CAPTURED });
+    // Décision « rembourser 100 % » notée sur la réservation annulée (c'est ce que cherche RefundRecoveryService)…
+    expect(prisma.booking.updateMany).toHaveBeenCalledWith({ where: { id: 'b1', status: 'CANCELLED' }, data: { refundPercentage: 100 } });
+    // …et le paiement ne repasse PAS en attente (sinon plus rien ne le rembourserait si le prestataire n'envoie pas de second webhook).
+    expect(prisma.payment.update).not.toHaveBeenCalled();
+    expect(prisma.paymentTransaction.update).not.toHaveBeenCalled();
+  });
+
+  it('même chose pour un envoi annulé : décision notée, aucune annulation de la capture', async () => {
+    const { service, prisma } = build({ paymentOf: 'shipment', shipmentStatus: ShipmentStatus.CANCELLED, refundFails: true });
+    await expect(withAdapter(service, 'CAPTURED')).resolves.toEqual({ paymentId: 'pay1', status: PaymentStatus.CAPTURED });
+    expect(prisma.shipment.updateMany).toHaveBeenCalledWith({ where: { id: 's1', status: 'CANCELLED' }, data: { refundPercentage: 100 } });
+    expect(prisma.payment.update).not.toHaveBeenCalled();
+  });
+
+  describe('contrôle du montant et de la devise annoncés par le prestataire', () => {
+    it('montant différent de celui demandé : rien n\'est crédité, la transaction est marquée en échec', async () => {
+      const { service, wallets, bookingsService, prisma } = build({ transaction: { amount: 115_000n } as never });
+      await withAdapter(service, 'CAPTURED', { amount: 1_000n, currencyIsoCode: 'GNF' });
+      expect(wallets.holdBookingRevenue).not.toHaveBeenCalled();
+      expect(bookingsService.confirmPayment).not.toHaveBeenCalled();
+      expect(prisma.paymentTransaction.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: PaymentStatus.FAILED }) }),
+      );
+    });
+
+    it('devise différente : refusé de la même façon', async () => {
+      const { service, wallets } = build({ transaction: { amount: 115_000n } as never });
+      await withAdapter(service, 'CAPTURED', { amount: 115_000n, currencyIsoCode: 'XOF' });
+      expect(wallets.holdBookingRevenue).not.toHaveBeenCalled();
+    });
+
+    it('montant et devise conformes : traité normalement', async () => {
+      const { service, wallets } = build({ transaction: { amount: 115_000n } as never });
+      await withAdapter(service, 'CAPTURED', { amount: 115_000n, currencyIsoCode: 'gnf' });
+      expect(wallets.holdBookingRevenue).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('si le crédit du conducteur échoue, la transaction repasse en attente pour que le webhook rejoué la reprenne', async () => {

@@ -1,5 +1,5 @@
 // backend/src/integrations/sms/sms.module.ts
-// [19/10/2026] v2 — Politique d'envoi : le fournisseur est enveloppé par PolicySmsProvider (4 motifs autorisés seulement).
+// [19/10/2026] v2 — Politique d'envoi : le fournisseur est enveloppé par PolicySmsProvider (5 motifs autorisés seulement).
 import { Module } from '@nestjs/common';
 import { ConsoleSmsProvider } from './console-sms.provider';
 import { InfobipSmsProvider } from './infobip-sms.provider';

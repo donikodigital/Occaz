@@ -1,4 +1,5 @@
 // mobile/app/(auth)/verify-otp.tsx
+// [30/10/2026] v+ — téléphones de confiance : la question « Enregistrer ce téléphone ? » sera posée une fois l'inscription terminée.
 // [28/10/2026] v+ — Textes passés par t() (français / English UK / Português PT) ; logique inchangée.
 // [11/10/2026] v3 — Création de compte, étape 2 : le code à 6 chiffres envoyé par SMS au numéro de l'étape précédente. Le bon code prouve le
 // numéro et ouvre la session ; le profil client (nom, prénom, pays) est alors créé avec ce qui a été saisi à l'étape 1 (le conducteur le
@@ -14,8 +15,10 @@ import { authApi } from '@/services/api/auth.api';
 import { ApiError } from '@/services/api/ApiError';
 import { useAuthStore } from '@/stores/authStore';
 import { useAuthFlowStore } from '@/stores/authFlowStore';
+import { useTrustedDeviceStore } from '@/stores/trustedDeviceStore';
 import { useCreateCustomerProfile } from '@/hooks/useCustomerProfile';
 import { SIGNUP_STEP, SIGNUP_STEPS } from '@/components/auth/signupSteps';
+import { LEGAL_VERSION } from '@/content/legal';
 import { useT } from '@/i18n';
 
 export default function VerifyPhoneCodeScreen() {
@@ -38,6 +41,7 @@ export default function VerifyPhoneCodeScreen() {
     verify.mutate(code, {
       onSuccess: async (result) => {
         await setSession(result);
+        await useTrustedDeviceStore.getState().noteLogin(result.trust);
         if (accountType === 'CUSTOMER') {
           // Un échec ici n'arrête pas l'inscription : « Complétez votre profil » reprendra la saisie au premier lancement.
           await createCustomerProfile
@@ -66,7 +70,8 @@ export default function VerifyPhoneCodeScreen() {
       onClearError={() => setErrorMessage(undefined)}
       onResend={async () => {
         try {
-          await authApi.signupPhone({ phone, accountType });
+          // La case a été cochée à l'étape précédente (on ne peut pas arriver ici sans) : le renvoi du code la reprend.
+          await authApi.signupPhone({ phone, accountType, acceptedTerms: true, termsVersion: LEGAL_VERSION });
         } catch (error) {
           setErrorMessage(error instanceof ApiError ? error.message : t('Impossible de renvoyer le code pour le moment.'));
           throw error;

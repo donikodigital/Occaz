@@ -7,7 +7,8 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { UserThrottlerGuard } from './common/guards/user-throttler.guard';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 
@@ -73,11 +74,11 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
       load: [configuration],
       validate,
     }),
-    // Anti-brute-force générique (section 42, "rate limiting, protection
-    // brute force") — 60 requêtes / minute par IP par défaut ; des
-    // limites plus strictes peuvent être posées route par route plus
-    // tard (ex: /auth/otp/request) avec @Throttle(...).
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
+    // Anti-abus générique (section 42, "rate limiting, protection brute force") — 300 requêtes / minute PAR UTILISATEUR connecté
+    // (par adresse IP pour les appels sans jeton valable : voir UserThrottlerGuard). Les actualisations automatiques de l'app
+    // (messages, notifications, suivi de trajet…) tiennent largement dans ce plafond. Les routes sensibles (connexion, codes…)
+    // gardent leurs limites strictes posées route par route avec @Throttle(...).
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
     EventEmitterModule.forRoot(),
 
     PrismaModule,
@@ -135,7 +136,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     // README.md pour la correspondance Lot / section.
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: UserThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Applique HttpExceptionFilter / PrismaExceptionFilter (mêmes réponses) et remonte les vraies erreurs serveur à Sentry.

@@ -1,4 +1,6 @@
 // mobile/app/_layout.tsx
+// [30/10/2026] v+ — téléphones de confiance : secret lu au démarrage, question « Enregistrer ce téléphone ? » montée ici.
+// [30/10/2026] v+ — connexion par empreinte : état lu au démarrage.
 // [19/10/2026] v+ — bandeau « Pas de connexion » (OfflineBanner) et écran « Mise à jour requise » quand la version est sous app.min_version.
 // [28/10/2026] v+ — langue choisie (français / English UK / Português PT) lue au démarrage, avant le premier écran.
 import React, { useEffect, useState } from 'react';
@@ -20,6 +22,9 @@ import {
 import { queryClient } from '@/services/queryClient';
 import { useAuthStore } from '@/stores/authStore';
 import { useLanguageStore } from '@/i18n';
+import { useBiometricStore } from '@/stores/biometricStore';
+import { useTrustedDeviceStore } from '@/stores/trustedDeviceStore';
+import { TrustedDevicePromptHost } from '@/components/auth/TrustedDevicePromptHost';
 import { colors } from '@/theme';
 import { usePushNotificationRegistration } from '@/hooks/usePushNotifications';
 import { AnimatedSplash } from '@/components/screens/AnimatedSplash';
@@ -61,6 +66,8 @@ function RootLayout() {
   const isHydrating = useAuthStore((state) => state.isHydrating);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const hydrateLanguage = useLanguageStore((state) => state.hydrate);
+  const loadBiometric = useBiometricStore((state) => state.load);
+  const loadTrustedDevice = useTrustedDeviceStore((state) => state.load);
   const isLanguageReady = useLanguageStore((state) => state.isHydrated);
   usePushNotificationRegistration(isAuthenticated);
   // Le splash natif (SplashScreen) est une image statique — aucune
@@ -80,6 +87,14 @@ function RootLayout() {
   }, [hydrateLanguage]);
 
   useEffect(() => {
+    void loadBiometric();
+  }, [loadBiometric]);
+
+  useEffect(() => {
+    void loadTrustedDevice();
+  }, [loadTrustedDevice]);
+
+  useEffect(() => {
     if (fontsLoaded && !isHydrating && isLanguageReady) {
       SplashScreen.hideAsync().catch(() => undefined);
     }
@@ -95,6 +110,7 @@ function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <StatusBar style="dark" />
           <AppGate />
+          <TrustedDevicePromptHost />
           <OfflineBanner />
           {showIntro ? <AnimatedSplash onFinish={() => setShowIntro(false)} /> : null}
         </QueryClientProvider>

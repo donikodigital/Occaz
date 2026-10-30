@@ -15,7 +15,7 @@ const trip = {
   status: 'PUBLISHED',
   originCity: { countryId: 'country-1' },
   // Route : sans étapes, la réservation porte sur le trajet entier.
-  departureAt: new Date('2026-10-10T06:00:00.000Z'),
+  departureAt: new Date(Date.now() + 5 * 86_400_000),
   originCityId: 'conakry',
   originLocationId: 'loc-a',
   destinationCityId: 'labe',
@@ -31,6 +31,7 @@ function createService(options: { rawDiscount?: bigint; platformFee?: bigint } =
     booking: {
       create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'b1', ...data })),
       findUnique: jest.fn().mockResolvedValue({ id: 'b1' }),
+      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
     trip: {

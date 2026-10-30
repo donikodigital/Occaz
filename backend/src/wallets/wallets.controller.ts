@@ -64,6 +64,6 @@ export class WalletsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     await this.scope.assertDriver(user, PERMISSIONS.WALLET_ADJUST, driverId);
-    return this.walletsService.adjustBalance(driverId, dto.amount, dto.reason, user.id);
+    return this.walletsService.adjustBalance(driverId, dto.amount, dto.reason, user.id, { allowDebt: dto.allowDebt });
   }
 }

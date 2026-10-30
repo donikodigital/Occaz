@@ -33,6 +33,13 @@ import { PUBLIC_CUSTOMER_SELECT, PUBLIC_DRIVER_SELECT } from '../common/selects/
  * Centralisé ici pour que ce bug ne puisse pas resurgir ailleurs dans ce
  * fichier faute d'avoir pensé à dupliquer le bon include partout.
  */
+/** Réservations closes N minutes avant l'heure de départ (0 = jusqu'à l'heure de départ). Réglable dans l'administration. */
+export const BOOKING_CUTOFF_SETTING_KEY = 'booking.cutoff_minutes_before_departure';
+const DEFAULT_BOOKING_CUTOFF_MINUTES = 0;
+/** Nombre maximal de réservations « à payer » d'un même client sur un même trajet (0 = pas de limite). */
+const MAX_PENDING_PER_TRIP_SETTING_KEY = 'booking.max_pending_per_trip';
+const DEFAULT_MAX_PENDING_PER_TRIP = 2;
+
 const TRIP_INCLUDE_FOR_BOOKING = {
   originCity: true,
   destinationCity: true,
@@ -135,6 +142,12 @@ export class BookingsService {
     if (trip.status !== TripStatus.PUBLISHED) {
       throw new BadRequestException("Ce trajet n'accepte plus de réservations.");
     }
+    // Un trajet dont l'heure de départ est passée (conducteur pas encore « arrivé » dans l'app) n'est plus réservable : la
+    // réservation serait expirée par BookingExpiryService dans la minute, après avoir bloqué une place et un paiement.
+    const cutoffMinutes = await this.pricing.getNumericSetting(BOOKING_CUTOFF_SETTING_KEY, DEFAULT_BOOKING_CUTOFF_MINUTES);
+    if (trip.departureAt.getTime() <= Date.now() + cutoffMinutes * 60_000) {
+      throw new BadRequestException('Ce trajet est déjà parti : les réservations sont closes.');
+    }
 
     // Tronçon réservé (ex. Kindia → Labé) : le prix par place est celui du tronçon, jamais celui du trajet entier. Sans
     // étapes dans la demande, c'est le trajet entier — comportement inchangé.
@@ -198,6 +211,18 @@ export class BookingsService {
       if (!locked || locked.status !== TripStatus.PUBLISHED) {
         throw new BadRequestException("Ce trajet n'accepte plus de réservations.");
       }
+      // Au plus quelques réservations « à payer » en même temps pour un même client sur un même trajet : sans cette limite, un
+      // client (ou un script) pouvait immobiliser toutes les places pendant le délai de paiement sans jamais payer.
+      const maxPending = await this.pricing.getNumericSetting(MAX_PENDING_PER_TRIP_SETTING_KEY, DEFAULT_MAX_PENDING_PER_TRIP);
+      const pendingForCustomer = await tx.booking.count({
+        where: { tripId: dto.tripId, customerId, status: BookingStatus.PENDING_PAYMENT },
+      });
+      if (maxPending > 0 && pendingForCustomer >= maxPending) {
+        throw new ConflictException(
+          'Vous avez déjà des réservations en attente de paiement sur ce trajet : payez-les ou annulez-les avant d’en créer une autre.',
+        );
+      }
+
       const occupiedByLeg = seatsOccupiedByLeg(buildRoute(trip), await loadSeatHolds(tx, dto.tripId));
       const freeSeats = freeSeatsOnSegment(
         locked.totalSeats,
@@ -294,29 +319,40 @@ export class BookingsService {
 
     // L'annulation est « réclamée » d'un seul coup : seul le premier appel (double appui, deux onglets, conducteur et client en même
     // temps) passe, les autres s'arrêtent ici. Sans cela, l'événement d'annulation partait deux fois — double remboursement possible.
+    // Le statut est relu s'il a changé depuis la lecture du début (paiement confirmé pile pendant l'annulation) : la réclamation vise
+    // le statut RÉEL, et c'est lui — pas une valeur périmée — qui décide du code promo rendu et de la notification au conducteur.
+    let statusAtCancel = booking.status;
     const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const claimed = await tx.booking.updateMany({
-        where: {
-          id,
-          customerId,
-          status: { in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED] },
-        },
-        data: {
-          status: BookingStatus.CANCELLED,
-          cancelledAt: new Date(),
-          cancelledBy: CancellationInitiator.CUSTOMER,
-          cancellationReason: reason,
-          refundPercentage: refundEligiblePercentage,
-        },
-      });
-      if (claimed.count === 0) {
+      let claimedCount = 0;
+      for (let attempt = 0; attempt < 3 && claimedCount === 0; attempt += 1) {
+        const claimed = await tx.booking.updateMany({
+          where: { id, customerId, status: statusAtCancel },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancelledBy: CancellationInitiator.CUSTOMER,
+            cancellationReason: reason,
+            refundPercentage: refundEligiblePercentage,
+          },
+        });
+        claimedCount = claimed.count;
+        if (claimedCount === 0) {
+          const fresh = await tx.booking.findFirst({ where: { id, customerId }, select: { status: true } });
+          const cancellable: BookingStatus[] = [BookingStatus.PENDING_PAYMENT, BookingStatus.PAID, BookingStatus.CONFIRMED];
+          if (!fresh || !cancellable.includes(fresh.status)) {
+            throw new BadRequestException('Cette réservation ne peut plus être annulée.');
+          }
+          statusAtCancel = fresh.status;
+        }
+      }
+      if (claimedCount === 0) {
         throw new BadRequestException('Cette réservation ne peut plus être annulée.');
       }
 
       // Les places de ce client sont libérées sur les tronçons qu'il occupait — recalcul plutôt qu'incrément.
       await syncTripSeats(tx, booking.tripId);
       // Annulation sans rien perdre (rien n'avait été payé, ou remboursement intégral) : le code promo est rendu.
-      if (booking.status === BookingStatus.PENDING_PAYMENT || refundEligiblePercentage >= 100) {
+      if (statusAtCancel === BookingStatus.PENDING_PAYMENT || refundEligiblePercentage >= 100) {
         await this.promoCodes.release({ bookingId: id }, tx);
       }
 
@@ -333,7 +369,7 @@ export class BookingsService {
     // réservation encore PENDING_PAYMENT ne lui a jamais été signalée, pas
     // la peine de le prévenir de l'annulation de quelque chose qu'il ne
     // savait pas exister.
-    if (booking.status !== BookingStatus.PENDING_PAYMENT) {
+    if (statusAtCancel !== BookingStatus.PENDING_PAYMENT) {
       await this.notifications.notify({
         audience: 'DRIVER',
         userId: trip.driver.userId,

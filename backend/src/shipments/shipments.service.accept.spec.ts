@@ -99,10 +99,19 @@ describe('ShipmentsService.accept', () => {
       }),
     );
     expect(tx.trip.updateMany).not.toHaveBeenCalled();
+    // Mise en attente dans LA MÊME transaction que l'attribution (le client `tx` est transmis).
     expect(wallets.holdShipmentRevenue).toHaveBeenCalledWith(
       expect.objectContaining({ driverId: 'd1', grossAmount: 150_000n, commission: 15_000n }),
+      tx,
     );
     expect(notifications.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('la mise en attente du revenu échoue : l\'attribution est annulée avec elle (transaction), le client n\'est pas prévenu', async () => {
+    const { service, wallets, notifications } = createService({});
+    wallets.holdShipmentRevenue.mockRejectedValue(new Error('portefeuille indisponible'));
+    await expect(service.accept('s1', 'u1')).rejects.toThrow('portefeuille indisponible');
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 
   it('refuse un envoi dont la plage de dates est terminée', async () => {

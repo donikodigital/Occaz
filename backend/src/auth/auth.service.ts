@@ -648,7 +648,9 @@ export class AuthService {
     const isTestAccount = user.email ? this.isTestStaffEmail(user.email) : false;
     const isValid = isTestAccount && code === '000000' ? true : this.twoFactorService.verify(code, user.twoFactorSecret);
     if (!isValid) {
-      throw new UnauthorizedException('Code invalide.');
+      // Code saisi par un utilisateur DÉJÀ connecté : une erreur métier (400), pas un refus d'authentification (401), sinon le
+      // client la prendrait pour un jeton périmé et déconnecterait la personne.
+      throw new BadRequestException('Code invalide.');
     }
     if (isTestAccount) {
       this.logger.warn(
@@ -691,7 +693,7 @@ export class AuthService {
       throw new UnauthorizedException('Compte introuvable, désactivé ou suspendu.');
     }
 
-    return this.signTokenPair(user, session.id, true);
+    return this.signTokenPair(user, session.id, refreshToken);
   }
 
   async logout(sessionId: string): Promise<void> {
@@ -736,21 +738,20 @@ export class AuthService {
     return { ...tokens, user: this.usersService.toSafeUser(user) };
   }
 
-  /** Rotation : émet une nouvelle paire de tokens pour une session existante. */
+  /** Rotation : émet une nouvelle paire de tokens pour une session existante, en remplaçant le refresh token présenté. */
   private async signTokenPair(
     user: User,
     sessionId: string,
-    rotate: boolean,
+    presentedRefreshToken: string,
   ): Promise<AuthTokens> {
     const tokens = this.signTokenPairRaw(user, sessionId);
-    if (rotate) {
-      const refreshExpiresIn = this.configService.get<string>('jwt.refreshExpiresIn')!;
-      await this.sessionsService.rotateRefreshToken(
-        sessionId,
-        tokens.refreshToken,
-        addDuration(refreshExpiresIn),
-      );
-    }
+    const refreshExpiresIn = this.configService.get<string>('jwt.refreshExpiresIn')!;
+    await this.sessionsService.rotateRefreshToken(
+      sessionId,
+      presentedRefreshToken,
+      tokens.refreshToken,
+      addDuration(refreshExpiresIn),
+    );
     return tokens;
   }
 
@@ -772,6 +773,8 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(refreshPayload, {
       secret: this.configService.get<string>('jwt.refreshSecret')!,
       expiresIn: refreshExpiresIn,
+      // Identifiant unique : deux jetons émis dans la même seconde ne sont jamais identiques (le hash stocké les distingue).
+      jwtid: randomUUID(),
     });
 
     return {

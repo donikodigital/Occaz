@@ -199,6 +199,8 @@ enum OtpPurpose {
   WITHDRAWAL
   // Lien envoyé par e-mail à un compte d'équipe créé par le SuperAdmin : il sert une seule fois, à choisir le premier mot de passe.
   STAFF_INVITATION
+  // Code envoyé (e-mail en priorité, sinon SMS) pour confirmer la connexion depuis un téléphone qui n'est pas un téléphone de confiance.
+  DEVICE_VERIFICATION
 }
 
 enum OtpStatus {
@@ -342,6 +344,10 @@ model User {
   isActive        Boolean     @default(true)
   isSuspended     Boolean     @default(false)
   suspendedReason String?
+  // Acceptation des conditions d'utilisation et de la politique de confidentialité à l'inscription (case à cocher) : date et version du texte
+  // affiché. Vides pour les comptes créés avant cette case et pour l'équipe du back-office.
+  termsAcceptedAt DateTime?
+  termsVersion    String?
   // Début de la suspension en cours (null si le compte n'est pas suspendu). Un compte client ou conducteur suspendu et non réactivé pendant
   // 6 mois est supprimé définitivement (rappel mensuel par e-mail avant) — voir account-purge/suspended-account-purge.service.ts.
   suspendedAt     DateTime?
@@ -368,6 +374,8 @@ model User {
   userRoles UserRole[]
   devices   Device[]
   sessions  Session[]
+  biometricCredentials BiometricCredential[]
+  trustedDevices       TrustedDevice[]
 
   phoneChangeRequests PhoneChangeRequest[]
   onboardingReminders OnboardingReminderLog[]
@@ -578,6 +586,9 @@ model Session {
   deviceId         String?
   device           Device?  @relation(fields: [deviceId], references: [id])
   refreshTokenHash String
+  // Jeton précédent + instant de la rotation : accepté une fois pendant une courte période de grâce (réponse de renouvellement perdue).
+  previousRefreshTokenHash String?
+  refreshRotatedAt         DateTime?
   ipAddress        String?
   userAgent        String?
   isRevoked        Boolean  @default(false)
@@ -586,6 +597,44 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+// Connexion rapide par empreinte digitale / visage : le téléphone garde un secret aléatoire (jamais le mot de passe), déverrouillé
+// par la biométrie de l'appareil. Seul son hash est stocké ici. Le secret change à chaque connexion (rotation) ; l'ancien reste
+// accepté une courte période (réponse perdue), puis sa réutilisation révoque l'accès. Tout changement de mot de passe, toute
+// déconnexion globale révoque ces accès.
+model BiometricCredential {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  tokenHash         String
+  previousTokenHash String?
+  rotatedAt         DateTime?
+  platform          String? // ios | android
+  label             String?
+  createdAt         DateTime  @default(now())
+  lastUsedAt        DateTime?
+  revokedAt         DateTime?
+
+  @@index([userId])
+  @@map("biometric_credentials")
+}
+
+// Téléphone de confiance : dès qu'un compte en a un, toute connexion depuis un autre téléphone exige un code (e-mail ou SMS). Le téléphone
+// garde un secret remis à l'enregistrement ; seul son hash est stocké ici.
+model TrustedDevice {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  secretHash String
+  platform   String? // ios | android
+  label      String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
+  @@map("trusted_devices")
 }
 
 // =============================================================================
