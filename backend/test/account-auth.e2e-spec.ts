@@ -1,4 +1,5 @@
 // backend/test/account-auth.e2e-spec.ts
+// [30/10/2026] v3 — l'inscription envoie la case « conditions acceptées » (obligatoire) ; sans elle, 400 et aucun SMS.
 // [11/10/2026] v2 — Nettoyage complet : le compte de test et ses lignes du journal d'audit sont supprimés à la fin ; les comptes laissés par
 // d'anciennes exécutions (adresse « e2e.<nombre>@exemple.com ») sont supprimés au début.
 // [11/10/2026] v1 — Parcours complet client, de bout en bout, sur l'application Nest réelle et une VRAIE base PostgreSQL (celle de la CI) :
@@ -105,12 +106,18 @@ describe('Compte client — inscription, connexion, mot de passe (e2e)', () => {
   }, STARTUP_TIMEOUT_MS);
 
   it('refuse un numéro mal formé avant d’envoyer le moindre SMS', async () => {
-    await post('signup/phone', { phone: '12', accountType: 'CUSTOMER' }).expect(400);
+    await post('signup/phone', { phone: '12', accountType: 'CUSTOMER', acceptedTerms: true }).expect(400);
+    expect(sms).toHaveLength(0);
+  });
+
+  it('refuse une inscription dont la case des conditions n’est pas cochée, sans envoyer de SMS', async () => {
+    await post('signup/phone', { phone: PHONE, accountType: 'CUSTOMER' }).expect(400);
+    await post('signup/phone', { phone: PHONE, accountType: 'CUSTOMER', acceptedTerms: false }).expect(400);
     expect(sms).toHaveLength(0);
   });
 
   it('inscription 1 : le numéro reçoit un code SMS immédiatement', async () => {
-    await post('signup/phone', { phone: PHONE, accountType: 'CUSTOMER' }).expect(200);
+    await post('signup/phone', { phone: PHONE, accountType: 'CUSTOMER', acceptedTerms: true, termsVersion: '1.0' }).expect(200);
     expect(sms).toHaveLength(1);
     expect(lastSmsCode()).toMatch(/^\d{6}$/);
   });
