@@ -342,10 +342,18 @@ export class ShipmentsService {
       availableShipmentWeightKg: number | null;
     } | null = null;
     if (dto.tripId) {
-      trip = await this.prisma.trip.findUnique({ where: { id: dto.tripId } });
-      if (!trip) throw new NotFoundException('Trajet introuvable.');
-      if (trip.status !== TripStatus.PUBLISHED || !trip.allowsShipments) {
+      const chosenTrip = await this.prisma.trip.findUnique({
+        where: { id: dto.tripId },
+        include: { driver: { select: { status: true } } },
+      });
+      if (!chosenTrip) throw new NotFoundException('Trajet introuvable.');
+      trip = chosenTrip;
+      if (chosenTrip.status !== TripStatus.PUBLISHED || !chosenTrip.allowsShipments) {
         throw new BadRequestException("Ce trajet n'accepte pas d'envois pour le moment.");
+      }
+      // Colis réservés aux conducteurs validés, sans délai de tolérance (même règle que l'acceptation d'un envoi par le conducteur).
+      if (chosenTrip.driver?.status !== DriverAccountStatus.VALIDATED) {
+        throw new BadRequestException("Le conducteur de ce trajet n'est pas encore validé : il ne peut pas transporter de colis.");
       }
       if (trip.departureAt < windowStart || trip.departureAt > windowEnd) {
         throw new BadRequestException("Le départ de ce trajet est en dehors de la plage de dates choisie.");

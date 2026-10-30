@@ -104,14 +104,22 @@ function amountColor(amount: string | number): 'success' | 'danger' | 'textPrima
 function WalletHero({
   balance,
   pending,
+  payoutsInProgress,
   currencyCode,
 }: {
   balance: string | undefined;
   pending: string | undefined;
+  /** Part de `pending` qui est le propre retrait du conducteur (en attente de validation / en cours d'envoi). */
+  payoutsInProgress: string | undefined;
   currencyCode: string;
 }) {
   const t = useT();
-  const hasPending = pending !== undefined && Number(pending) > 0;
+  const payoutHeld = payoutsInProgress !== undefined ? BigInt(payoutsInProgress) : 0n;
+  // `pendingBalance` mélange gains en attente de dépose et argent déjà demandé en retrait : on les affiche séparément,
+  // sinon « libéré après la dépose » s'applique à tort à l'argent que le conducteur a lui-même demandé à retirer.
+  const earningsHeld = pending !== undefined ? BigInt(pending) - payoutHeld : 0n;
+  const hasPending = earningsHeld > 0n;
+  const hasPayoutInProgress = payoutHeld > 0n;
   return (
     <OceanHeroCard style={styles.hero}>
       <View style={styles.heroTop}>
@@ -145,7 +153,16 @@ function WalletHero({
         <View style={styles.pendingPill}>
           <IconClockHour4 size={14} color={OCEAN.onDark} />
           <AppText variant="xs" color={OCEAN.sky}>
-            {t('+ {money} en attente · libéré après la dépose', { money: formatMoney(pending, currencyCode) })}
+            {t('+ {money} en attente · libéré après la dépose', { money: formatMoney(earningsHeld.toString(), currencyCode) })}
+          </AppText>
+        </View>
+      ) : null}
+
+      {hasPayoutInProgress ? (
+        <View style={styles.pendingPill}>
+          <IconClockHour4 size={14} color={OCEAN.onDark} />
+          <AppText variant="xs" color={OCEAN.sky}>
+            {t('{money} en cours de retrait · déjà retiré de votre solde', { money: formatMoney(payoutHeld.toString(), currencyCode) })}
           </AppText>
         </View>
       ) : null}
@@ -352,7 +369,12 @@ export default function DriverWalletScreen() {
   return (
     <ScreenContainer scroll padded={false} maxWidth="wide">
       <View style={styles.heroWrap}>
-        <WalletHero balance={wallet?.balance} pending={wallet?.pendingBalance} currencyCode={currencyCode} />
+        <WalletHero
+          balance={wallet?.balance}
+          pending={wallet?.pendingBalance}
+          payoutsInProgress={wallet?.payoutsInProgress}
+          currencyCode={currencyCode}
+        />
       </View>
 
       <View style={styles.body}>

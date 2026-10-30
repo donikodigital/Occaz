@@ -1,4 +1,5 @@
 // web-admin/src/app/(app)/sos/page.tsx
+// [30/10/2026] v2 — carte compacte : nom jamais coupé, statut sous le nom, bloc identité (téléphone, e-mail, pays · ville, type de compte, ID copiables).
 // [11/10/2026] v1 — Alertes SOS : les alertes actives en haut et en rouge, avec le téléphone de la personne, la carte de sa position et les
 // proches enregistrés (à appeler en cas de besoin). La page se rafraîchit toute seule. « J’ai vu » accuse réception, « Clôturer » ferme avec une note.
 'use client';
@@ -8,10 +9,12 @@ import {
   IconAlertOctagon,
   IconCalendar,
   IconCheck,
+  IconCopy,
   IconEye,
   IconMapPin,
   IconMessage,
   IconPhone,
+  IconRosetteDiscountCheck,
   IconUsersGroup,
 } from '@tabler/icons-react';
 import { Badge, Button, Modal, TextArea } from '@/components/ui';
@@ -20,6 +23,7 @@ import { useHandleSos, useSosList } from '@/hooks/useSafety';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PERMISSIONS } from '@/utils/permissions';
 import { ApiError } from '@/services/api/ApiError';
+import { ACCOUNT_TYPE_LABELS } from '@/utils/userLabels';
 import type { SosAlertItem, SosStatus } from '@/types/safety.types';
 
 const STATUS_LABEL: Record<SosStatus, string> = {
@@ -37,6 +41,56 @@ const STATUS_TONE: Record<SosStatus, Tone> = {
 const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as SosStatus[]).map((value) => ({ value, label: STATUS_LABEL[value] }));
 
 const dateFormatter = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/** Une information d'identité : petit libellé au-dessus de la valeur (pleine largeur si `wide`), avec une coche « vérifié » facultative. */
+function IdentityItem({
+  label,
+  verified,
+  wide = false,
+  children,
+}: {
+  label: string;
+  verified?: boolean;
+  wide?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`min-w-0 ${wide ? 'col-span-2' : ''}`}>
+      <dt className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-text-muted">
+        {label}
+        {verified === true ? <IconRosetteDiscountCheck size={12} className="text-success" aria-label="Vérifié" /> : null}
+        {verified === false ? <span className="font-semibold normal-case text-amber-700">non vérifié</span> : null}
+      </dt>
+      <dd className="break-words font-medium text-text-primary">{children}</dd>
+    </div>
+  );
+}
+
+/** Identifiant raccourci, copiable en un clic (l'identifiant complet est dans l'infobulle). */
+function CopyId({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Presse-papiers indisponible : l'identifiant complet reste dans l'infobulle.
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title={`Copier l’ID ${label.toLowerCase()} : ${value}`}
+      className="inline-flex items-center gap-1 rounded-md bg-surface px-1.5 py-0.5 font-mono text-[11px] text-text-secondary ring-1 ring-inset ring-border transition hover:text-primary"
+    >
+      <span className="font-sans font-semibold">{label}</span>
+      {value.slice(0, 8)}…
+      {copied ? <IconCheck size={11} className="text-success" /> : <IconCopy size={11} />}
+    </button>
+  );
+}
 
 export default function SosPage() {
   const { can } = usePermissions();
@@ -97,7 +151,7 @@ export default function SosPage() {
       {isError ? (
         <Notice tone="danger">Impossible de charger les alertes.</Notice>
       ) : isLoading ? (
-        <ListSkeleton count={3} heightClass="h-56" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
+        <ListSkeleton count={3} heightClass="h-64" gridClass="sm:grid-cols-2 xl:grid-cols-3" />
       ) : alerts.length === 0 ? (
         <EmptyState
           icon={<IconAlertOctagon size={26} />}
@@ -109,28 +163,58 @@ export default function SosPage() {
           {alerts.map((alert) => {
             const isActive = alert.status === 'OPEN' || alert.status === 'ACKNOWLEDGED';
             return (
-              <CardShell key={alert.id} tone={STATUS_TONE[alert.status]} muted={!isActive} className="p-3.5 pl-5">
-                <div className="flex items-start gap-3">
+              <CardShell key={alert.id} tone={STATUS_TONE[alert.status]} muted={!isActive} className="p-3 pl-4">
+                {/* En-tête : le nom en entier (jamais coupé), puis le statut et l'heure sur la ligne du dessous */}
+                <div className="flex items-start gap-2.5">
                   <IconTile tone={STATUS_TONE[alert.status]}>
                     <IconAlertOctagon size={20} />
                   </IconTile>
                   <div className="min-w-0 flex-1">
-                    <h2 className="break-words font-semibold leading-snug text-text-primary">{alert.user.name}</h2>
-                    <p className="mt-0.5 text-xs text-text-muted">{dateFormatter.format(new Date(alert.createdAt))}</p>
+                    <h2 className="break-words text-base font-semibold leading-snug text-text-primary">{alert.user.name}</h2>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Badge label={STATUS_LABEL[alert.status]} tone={STATUS_TONE[alert.status]} />
+                      <span className="text-xs text-text-muted">{dateFormatter.format(new Date(alert.createdAt))}</span>
+                    </div>
                   </div>
-                  <Badge label={STATUS_LABEL[alert.status]} tone={STATUS_TONE[alert.status]} />
                 </div>
 
-                <div className="mt-3 space-y-1.5">
-                  <a href={`tel:${alert.user.phone}`} className="block">
-                    <MetaItem icon={<IconPhone size={15} />}>
-                      <span className="font-semibold text-primary">{alert.user.phone}</span>
-                    </MetaItem>
-                  </a>
+                {/* Identité du lanceur d'alerte : de quoi le reconnaître et le joindre */}
+                <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-xl bg-surface-muted p-2.5 text-xs">
+                  <IdentityItem label="Téléphone" verified={alert.user.isPhoneVerified}>
+                    <a href={`tel:${alert.user.phone}`} className="font-semibold text-primary hover:underline">
+                      {alert.user.phone}
+                    </a>
+                  </IdentityItem>
+                  <IdentityItem label="Compte">{ACCOUNT_TYPE_LABELS[alert.user.accountType]}</IdentityItem>
+                  <IdentityItem label="E-mail" verified={alert.user.email ? alert.user.isEmailVerified : undefined} wide>
+                    {alert.user.email ? (
+                      <a href={`mailto:${alert.user.email}`} className="break-all font-semibold text-primary hover:underline">
+                        {alert.user.email}
+                      </a>
+                    ) : (
+                      <span className="text-text-muted">Non renseigné</span>
+                    )}
+                  </IdentityItem>
+                  <IdentityItem label="Pays · Ville" wide>
+                    {alert.user.country || alert.user.city ? (
+                      [alert.user.country, alert.user.city].filter(Boolean).join(' · ')
+                    ) : (
+                      <span className="text-text-muted">Non renseigné</span>
+                    )}
+                  </IdentityItem>
+                  <IdentityItem label="ID" wide>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <CopyId value={alert.user.id} label="Utilisateur" />
+                      {alert.user.driverProfileId ? <CopyId value={alert.user.driverProfileId} label="Conducteur" /> : null}
+                    </span>
+                  </IdentityItem>
+                </dl>
+
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
                   {alert.mapUrl ? (
-                    <a href={alert.mapUrl} target="_blank" rel="noopener noreferrer" className="block">
+                    <a href={alert.mapUrl} target="_blank" rel="noopener noreferrer">
                       <MetaItem icon={<IconMapPin size={15} />}>
-                        <span className="font-semibold text-primary">Voir la position sur la carte</span>
+                        <span className="font-semibold text-primary">Voir la position</span>
                       </MetaItem>
                     </a>
                   ) : (
@@ -144,13 +228,13 @@ export default function SosPage() {
                 </div>
 
                 {alert.message ? (
-                  <p className="mt-2.5 flex gap-2 break-words rounded-xl bg-surface-muted p-2.5 text-sm text-text-secondary">
+                  <p className="mt-2 flex gap-2 break-words rounded-xl bg-surface-muted p-2 text-sm text-text-secondary">
                     <IconMessage size={16} className="mt-0.5 shrink-0 text-text-muted" />« {alert.message} »
                   </p>
                 ) : null}
 
                 {alert.user.emergencyContacts.length > 0 && isActive ? (
-                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     {alert.user.emergencyContacts.map((contact) => (
                       <a
                         key={contact.phone}
@@ -167,20 +251,20 @@ export default function SosPage() {
                 {alert.resolutionNote ? <p className="mt-2 break-words text-xs text-text-muted">Note : {alert.resolutionNote}</p> : null}
 
                 {canManage && isActive ? (
-                  <div className="mt-3 flex flex-wrap gap-2 border-t border-border/70 pt-2.5">
+                  <div className="mt-2.5 flex flex-wrap gap-2 border-t border-border/70 pt-2.5">
                     {alert.status === 'OPEN' ? (
-                      <Button type="button" variant="secondary" onClick={() => acknowledge(alert)} loading={handle.isPending}>
+                      <Button type="button" variant="secondary" className="!px-3 !py-2" onClick={() => acknowledge(alert)} loading={handle.isPending}>
                         <IconEye size={16} />
                         J’ai vu
                       </Button>
                     ) : null}
-                    <Button type="button" variant="success" onClick={() => setClosing(alert)}>
+                    <Button type="button" variant="success" className="!px-3 !py-2" onClick={() => setClosing(alert)}>
                       <IconCheck size={16} />
                       Clôturer
                     </Button>
                   </div>
                 ) : (
-                  <p className="mt-3 inline-flex items-center gap-1.5 border-t border-border/70 pt-2.5 text-xs text-text-muted">
+                  <p className="mt-2.5 inline-flex items-center gap-1.5 border-t border-border/70 pt-2 text-xs text-text-muted">
                     <IconCalendar size={14} />
                     {alert.handledAt ? `Terminée le ${dateFormatter.format(new Date(alert.handledAt))}` : 'En attente'}
                   </p>

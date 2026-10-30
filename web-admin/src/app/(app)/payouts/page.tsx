@@ -407,8 +407,9 @@ function ModeCard({
 
       {config.providerSimulated ? (
         <Notice>
-          Orange Money n’est pas encore branché sur le serveur : en mode Automatique, un retrait est marqué « payé » sans qu’aucun argent ne
-          parte. En mode Manuel, tu valides puis tu fais le virement toi-même depuis ton compte Orange Money, avant de marquer le retrait payé.
+          Orange Money n’est pas encore branché sur le serveur : aucun virement ne peut partir tout seul, même en mode Automatique. En
+          production, les retraits restent donc « En attente de validation » : tu valides, tu fais le virement toi-même depuis ton compte Orange
+          Money, puis tu marques le retrait payé. (En environnement de test, un retrait automatique est seulement simulé : marqué « payé » sans argent réel.)
         </Notice>
       ) : null}
 

@@ -18,6 +18,8 @@ export interface Wallet {
   driverId: string;
   balance: Money;
   pendingBalance: Money;
+  /** Part de pendingBalance réservée pour les retraits du conducteur (REQUESTED / PROCESSING) ; le reste attend la dépose. */
+  payoutsInProgress?: Money;
   currencyId: string;
   /** Ajouté — WalletsService.findByDriverId inclut désormais la devise ; évite un "GNF" codé en dur côté mobile, faux en zone XOF. */
   currency: { id: string; isoCode: string };

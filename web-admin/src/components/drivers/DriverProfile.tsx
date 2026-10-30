@@ -6,9 +6,15 @@ import { useRouter } from 'next/navigation';
 import {
   IconActivity,
   IconAlertTriangle,
+  IconAddressBook,
   IconCar,
+  IconCheck,
+  IconCopy,
   IconEye,
+  IconFingerprint,
   IconId,
+  IconMail,
+  IconPhone,
   IconMapPin,
   IconPackage,
   IconPlayerPause,
@@ -27,6 +33,82 @@ import { useDriver, useReactivateDriver, useSuspendDriver, useVerifyDriver } fro
 import { ApiError } from '@/services/api/ApiError';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PERMISSIONS } from '@/utils/permissions';
+
+/** Une ligne de coordonnées : icône, libellé, valeur (lien cliquable si `href`), badge facultatif et bouton « Copier ». */
+function ContactRow({
+  icon,
+  label,
+  value,
+  href,
+  badge,
+  mono = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | null | undefined;
+  href?: string;
+  badge?: { text: string; ok: boolean };
+  mono?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Presse-papiers indisponible : la valeur reste sélectionnable à l'écran.
+    }
+  }
+
+  const valueClass = `break-all text-sm font-semibold text-slate-900 ${mono ? 'font-mono text-[13px]' : ''}`;
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 shadow-sm ring-1 ring-inset ring-slate-200/70">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-primary shadow-sm ring-1 ring-slate-900/5">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+          {badge ? (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${
+                badge.ok ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200'
+              }`}
+            >
+              {badge.text}
+            </span>
+          ) : null}
+        </div>
+        {value ? (
+          href ? (
+            <a href={href} className={`${valueClass} hover:text-primary hover:underline`}>
+              {value}
+            </a>
+          ) : (
+            <p className={valueClass}>{value}</p>
+          )
+        ) : (
+          <p className="text-sm font-medium text-slate-400">Non renseigné</p>
+        )}
+      </div>
+      {value ? (
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label={`Copier : ${label}`}
+          title={copied ? 'Copié' : 'Copier'}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-slate-500 shadow-sm ring-1 ring-slate-900/5 transition hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary active:scale-95"
+        >
+          {copied ? <IconCheck size={16} className="text-emerald-600" /> : <IconCopy size={16} />}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 type DriverProfileProps = {
   driverId: string;
@@ -235,6 +317,32 @@ export function DriverProfile({ driverId, showFullPageLink = false }: DriverProf
             </div>
           </div>
         ) : null}
+      </Panel>
+
+      {/* ---------- Coordonnées ---------- */}
+      <Panel title="Coordonnées" icon={<IconAddressBook size={18} />} delay={110}>
+        <div className="space-y-2.5">
+          <ContactRow
+            icon={<IconPhone size={18} />}
+            label="Téléphone"
+            value={driver.user?.phone}
+            href={driver.user?.phone ? `tel:${driver.user.phone}` : undefined}
+            badge={driver.user ? { text: driver.user.isPhoneVerified ? 'Vérifié' : 'Non vérifié', ok: driver.user.isPhoneVerified } : undefined}
+          />
+          <ContactRow
+            icon={<IconMail size={18} />}
+            label="E-mail"
+            value={driver.user?.email}
+            href={driver.user?.email ? `mailto:${driver.user.email}` : undefined}
+            badge={
+              driver.user?.email
+                ? { text: driver.user.isEmailVerified ? 'Vérifié' : 'Non vérifié', ok: driver.user.isEmailVerified }
+                : undefined
+            }
+          />
+          <ContactRow icon={<IconFingerprint size={18} />} label="ID conducteur" value={driver.id} mono />
+          {driver.user?.id ? <ContactRow icon={<IconId size={18} />} label="ID du compte (utilisateur)" value={driver.user.id} mono /> : null}
+        </div>
       </Panel>
 
       {/* ---------- Activité ---------- */}

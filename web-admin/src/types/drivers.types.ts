@@ -20,6 +20,14 @@ export interface Vehicle {
 export interface DriverProfile {
   id: string;
   userId: string;
+  /** Coordonnées du compte (renvoyées par GET /driver-profiles/:id uniquement). */
+  user?: {
+    id: string;
+    phone: string;
+    email: string | null;
+    isPhoneVerified: boolean;
+    isEmailVerified: boolean;
+  };
   firstName: string;
   lastName: string;
   photoUrl: string | null;

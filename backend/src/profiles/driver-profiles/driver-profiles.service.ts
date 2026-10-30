@@ -52,7 +52,14 @@ export class DriverProfilesService {
   async findOne(id: string) {
     const profile = await this.prisma.driverProfile.findUnique({
       where: { id },
-      include: { country: true, city: true, vehicles: true, wallet: true },
+      include: {
+        country: true,
+        city: true,
+        vehicles: true,
+        wallet: true,
+        // Coordonnées affichées sur la fiche conducteur du back-office (jamais le mot de passe ni les secrets du compte).
+        user: { select: { id: true, phone: true, email: true, isPhoneVerified: true, isEmailVerified: true } },
+      },
     });
     if (!profile) throw new NotFoundException('Profil conducteur introuvable.');
     return profile;

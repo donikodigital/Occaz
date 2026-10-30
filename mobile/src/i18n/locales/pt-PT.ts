@@ -120,6 +120,7 @@ export const pt: Record<string, string> = {
   "{value}Le montant a été remis dans votre solde : vous pouvez réessayer avec un autre numéro.": "{value}O montante foi devolvido ao seu saldo: pode tentar novamente com outro número.",
   "© {getFullYear} Occaz — Tous droits réservés": "© {getFullYear} Occaz — Todos os direitos reservados",
   "+ {money} en attente · libéré après la dépose": "+ {money} pendentes · libertados após a largada",
+  "{money} en cours de retrait · déjà retiré de votre solde": "{money} em levantamento · já retirados do seu saldo",
   "1 trajet avec vous": "1 viagem consigo",
   "6 chiffres, qui remplaceront l’ancien mot de passe.": "6 dígitos, que substituirão a palavra-passe anterior.",
   "6 chiffres. Évitez les suites (123456) et les chiffres répétés.": "6 dígitos. Evite sequências (123456) e dígitos repetidos.",

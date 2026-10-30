@@ -32,7 +32,6 @@ import {
   Notice,
   PageHero,
   SavedNotice,
-  SegmentedControl,
   Tabs,
   type Tone,
 } from '@/components/admin/AdminUi';
@@ -439,11 +438,13 @@ export default function AccountingPage() {
 
       {/* Réglages d'affichage et exports */}
       <CardShell tone="primary" className="space-y-3 p-3.5 pl-5">
-        <div className="grid gap-3 sm:grid-cols-3">
+        {/* Trois listes sur la même ligne, y compris sur téléphone */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <Select
             label="Année"
             value={String(activeYear)}
             onChange={(event) => setYear(Number(event.target.value))}
+            className="!px-2.5 !pr-7 sm:!px-3.5 sm:!pr-9"
           >
             {(data?.years ?? [activeYear]).map((value) => (
               <option key={value} value={value}>
@@ -451,35 +452,38 @@ export default function AccountingPage() {
               </option>
             ))}
           </Select>
-          <div className="sm:col-span-2">
-            <p className="mb-1.5 text-sm font-medium text-text-secondary">Devise</p>
-            {data && data.currencies.length > 0 ? (
-              <SegmentedControl
-                ariaLabel="Devise"
-                value={currency?.currencyId ?? ''}
-                onChange={setCurrencyId}
-                options={data.currencies.map((item) => ({ value: item.currencyId, label: item.isoCode }))}
-              />
-            ) : (
-              <div className="h-10 animate-pulse rounded-xl bg-surface-muted" />
-            )}
-          </div>
+          {data && data.currencies.length > 0 ? (
+            <Select
+              label="Devise"
+              value={currency?.currencyId ?? ''}
+              onChange={(event) => setCurrencyId(event.target.value)}
+              className="!px-2.5 !pr-7 sm:!px-3.5 sm:!pr-9"
+            >
+              {data.currencies.map((item) => (
+                <option key={item.currencyId} value={item.currencyId}>
+                  {item.isoCode}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-text-secondary">Devise</p>
+              <div className="h-10 animate-pulse rounded-lg bg-surface-muted" />
+            </div>
+          )}
+          <Select
+            label="Période"
+            value={granularity}
+            onChange={(event) => setGranularity(event.target.value as Granularity)}
+            disabled={tab !== 'summary'}
+            title={tab !== 'summary' ? 'La période ne s’applique qu’à l’onglet Synthèse.' : undefined}
+            className="!px-2.5 !pr-7 sm:!px-3.5 sm:!pr-9"
+          >
+            <option value="month">Mois</option>
+            <option value="semester">Semestres</option>
+            <option value="year">Année</option>
+          </Select>
         </div>
-        {tab === 'summary' ? (
-          <div>
-            <p className="mb-1.5 text-sm font-medium text-text-secondary">Période</p>
-            <SegmentedControl<Granularity>
-              ariaLabel="Période"
-              value={granularity}
-              onChange={setGranularity}
-              options={[
-                { value: 'month', label: 'Mois' },
-                { value: 'semester', label: 'Semestres' },
-                { value: 'year', label: 'Année' },
-              ]}
-            />
-          </div>
-        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
           <p className="min-w-0 text-xs text-text-secondary">Exporter toute l’année {activeYear}, toutes devises.</p>
           <div className="flex shrink-0 gap-2">

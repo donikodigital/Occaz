@@ -2,6 +2,7 @@
 // [30/10/2026] v+ — recherche : seulement les trajets pas encore partis (tri SQL cohérent) ; annulation refusée avec colis confiés ; clôture du trajet « réclamée ».
 // [25/10/2026] v+ — recherche, détail et trajets proches : le conducteur n'est plus renvoyé en entier (date de naissance, numéro Mobile Money…) mais
 // avec les seuls champs publics (PUBLIC_DRIVER_SELECT).
+// [30/10/2026] v+ — la recherche « avec capacité colis » ne propose que les trajets de conducteurs validés (colis : aucun délai de tolérance).
 // [19/10/2026] v+ — create() et publish() vérifient la régularisation du dossier conducteur (DriverComplianceService, délai de tolérance).
 // [10/10/2026] v+ — markArrivedAtStop annonce le passage dans la ville (suivi des colis).
 // [03/10/2026] v+ — Étapes (villes traversées) : un trajet Conakry → Labé peut desservir Kindia, Mamou… Chaque étape a
@@ -19,6 +20,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   BookingStatus,
   CancellationInitiator,
+  DriverAccountStatus,
   Prisma,
   ServiceType,
   ShipmentStatus,
@@ -1129,8 +1131,17 @@ export class TripsService {
     const where: Prisma.TripWhereInput = {
       status: TripStatus.PUBLISHED,
       departureAt: { gt: bookableAfter },
+      // Les colis sont réservés aux conducteurs validés (aucun délai de tolérance) : un trajet d'un conducteur en attente
+      // de validation n'est jamais proposé quand le client cherche un trajet pour un envoi.
       ...(dto.requiresShipmentCapacity ? { allowsShipments: true } : {}),
-      ...(dto.verifiedDriverOnly ? { driver: { isVerifiedBadge: true } } : {}),
+      ...(dto.verifiedDriverOnly || dto.requiresShipmentCapacity
+        ? {
+            driver: {
+              ...(dto.verifiedDriverOnly ? { isVerifiedBadge: true } : {}),
+              ...(dto.requiresShipmentCapacity ? { status: DriverAccountStatus.VALIDATED } : {}),
+            },
+          }
+        : {}),
       // Un trajet de nuit peut passer à l'étape le jour demandé en étant parti la veille : fenêtre élargie d'un jour,
       // le jour exact est vérifié ensuite sur l'heure de passage à la montée.
       ...(dto.departureDate ? this.dayWindowPrefilter(dto.departureDate, bookableAfter) : {}),

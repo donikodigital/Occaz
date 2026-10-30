@@ -25,7 +25,7 @@ export class WalletsController {
   @Get('mine')
   async findMine(@CurrentUser() user: AuthenticatedUser) {
     const driverId = await this.driverProfilesService.getProfileIdForUser(user.id);
-    return this.walletsService.findByDriverId(driverId);
+    return this.walletsService.findMineView(driverId);
   }
 
   @Get('mine/transactions')

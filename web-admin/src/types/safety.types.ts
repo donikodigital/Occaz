@@ -68,7 +68,17 @@ export interface SosAlertItem {
   handledAt: string | null;
   createdAt: string;
   updatedAt: string;
-  user: ReportParty & { emergencyContacts: { name: string; phone: string }[] };
+  user: ReportParty & {
+    email: string | null;
+    isPhoneVerified: boolean;
+    isEmailVerified: boolean;
+    accountType: 'CUSTOMER' | 'DRIVER' | 'SUPPORT' | 'SUPERADMIN';
+    /** Identifiant du profil conducteur (fiche conducteur) quand la personne en a un. */
+    driverProfileId: string | null;
+    country: string | null;
+    city: string | null;
+    emergencyContacts: { name: string; phone: string }[];
+  };
 }
 
 export interface HandleSosPayload {

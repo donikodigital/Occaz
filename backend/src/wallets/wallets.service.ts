@@ -4,6 +4,7 @@ import {
   DisputeStatus,
   NotificationChannel,
   NotificationType,
+  PayoutStatus,
   Prisma,
   WalletTransactionStatus,
   WalletTransactionType,
@@ -48,6 +49,24 @@ export class WalletsService {
     });
     if (!wallet) throw new NotFoundException('Portefeuille introuvable.');
     return wallet;
+  }
+
+  /**
+   * Portefeuille tel que le conducteur le voit : `pendingBalance` mélange deux choses très différentes — les gains
+   * d'un trajet/envoi pas encore déposé (libérés après la dépose) et l'argent du conducteur mis de côté pour ses propres
+   * retraits en cours (REQUESTED / PROCESSING). `payoutsInProgress` isole la seconde part pour que l'appli ne dise pas
+   * « libéré après la dépose » d'un montant que le conducteur vient lui-même de demander à retirer.
+   */
+  async findMineView(driverId: string) {
+    const wallet = await this.findByDriverId(driverId);
+    const inProgress = await this.prisma.payout.aggregate({
+      where: { walletId: wallet.id, status: { in: [PayoutStatus.REQUESTED, PayoutStatus.PROCESSING] } },
+      _sum: { amount: true },
+    });
+    let payoutsInProgress = inProgress._sum.amount ?? 0n;
+    // Garde-fou : jamais plus que ce qui est réellement « en attente » dans le portefeuille.
+    if (payoutsInProgress > wallet.pendingBalance) payoutsInProgress = wallet.pendingBalance;
+    return { ...wallet, payoutsInProgress };
   }
 
   async findOne(id: string) {

@@ -169,3 +169,41 @@ describe('SosService.handle (support)', () => {
     await expect(service.handle('a1', { status: 'ACKNOWLEDGED' }, 'agent1')).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('SosService.findAll — identité du lanceur d\'alerte pour le support', () => {
+  it('renvoie téléphone, e-mail, pays, ville, type de compte et identifiants', async () => {
+    const { service, prisma } = build();
+    const row = {
+      ...alertRow({ message: null, tripId: null, bookingId: null, shipmentId: null, resolutionNote: null, handledAt: null, updatedAt: new Date() }),
+      user: {
+        id: 'u1', phone: '+224620000001', email: 'fatou@example.com', isPhoneVerified: true, isEmailVerified: false, accountType: 'DRIVER',
+        customerProfile: null,
+        driverProfile: { id: 'dp1', firstName: 'Fatoumata', lastName: 'Diallo', country: { name: 'Guinée' }, city: { name: 'Labé' } },
+        emergencyContacts: [{ name: 'Mariama', phone: '+224620000002' }],
+      },
+    };
+    Object.assign(prisma, { $transaction: jest.fn().mockResolvedValue([[row], 1]) });
+    Object.assign(prisma.sosAlert, { count: jest.fn(), findMany: jest.fn() });
+    const page = await service.findAll({ skip: 0, take: 20, page: 1, limit: 20 } as never, {});
+    expect(page.data[0].user).toEqual({
+      id: 'u1', name: 'Fatoumata Diallo', phone: '+224620000001', email: 'fatou@example.com',
+      isPhoneVerified: true, isEmailVerified: false, accountType: 'DRIVER', driverProfileId: 'dp1',
+      country: 'Guinée', city: 'Labé', emergencyContacts: [{ name: 'Mariama', phone: '+224620000002' }],
+    });
+  });
+
+  it('un client sans e-mail ni pays renseignés : valeurs nulles, pas d\'erreur', async () => {
+    const { service, prisma } = build();
+    const row = {
+      ...alertRow({ message: null, tripId: null, bookingId: null, shipmentId: null, resolutionNote: null, handledAt: null, updatedAt: new Date() }),
+      user: {
+        id: 'u2', phone: '+224600000004', email: null, isPhoneVerified: true, isEmailVerified: false, accountType: 'CUSTOMER',
+        customerProfile: { firstName: 'A', lastName: 'B', country: null, city: null }, driverProfile: null, emergencyContacts: [],
+      },
+    };
+    Object.assign(prisma, { $transaction: jest.fn().mockResolvedValue([[row], 1]) });
+    Object.assign(prisma.sosAlert, { count: jest.fn(), findMany: jest.fn() });
+    const page = await service.findAll({ skip: 0, take: 20, page: 1, limit: 20 } as never, {});
+    expect(page.data[0].user).toMatchObject({ email: null, country: null, city: null, driverProfileId: null });
+  });
+});

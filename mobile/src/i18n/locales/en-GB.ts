@@ -120,6 +120,7 @@ export const en: Record<string, string> = {
   "{value}Le montant a été remis dans votre solde : vous pouvez réessayer avec un autre numéro.": "{value}The amount has been returned to your balance: you can try again with another number.",
   "© {getFullYear} Occaz — Tous droits réservés": "© {getFullYear} Occaz — All rights reserved",
   "+ {money} en attente · libéré après la dépose": "+ {money} pending · released after drop-off",
+  "{money} en cours de retrait · déjà retiré de votre solde": "{money} being withdrawn · already taken off your balance",
   "1 trajet avec vous": "1 trip with you",
   "6 chiffres, qui remplaceront l’ancien mot de passe.": "6 digits, which will replace your old password.",
   "6 chiffres. Évitez les suites (123456) et les chiffres répétés.": "6 digits. Avoid sequences (123456) and repeated digits.",

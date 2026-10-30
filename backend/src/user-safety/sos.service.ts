@@ -1,4 +1,5 @@
 // backend/src/user-safety/sos.service.ts
+// [30/10/2026] v3 — la liste du support renvoie aussi l'e-mail, le pays, la ville, le type de compte et les identifiants du lanceur d'alerte.
 // [19/10/2026] v2 — Politique SMS : les SMS aux proches portent le motif SOS, fermé par défaut pour limiter le coût (voir integrations/sms/sms-purpose.ts).
 // L'alerte reste enregistrée et le support est prévenu (cloche + e-mail). Pour que les proches reçoivent de nouveau un SMS : SMS_EXTRA_PURPOSES=SOS.
 // [11/10/2026] v1 — alerte SOS : enregistre l'alerte (position, trajet concerné), prévient par SMS les proches enregistrés et alerte le
@@ -26,6 +27,18 @@ const USER_SELECT = {
   phone: true,
   customerProfile: { select: { firstName: true, lastName: true } },
   driverProfile: { select: { firstName: true, lastName: true } },
+} satisfies Prisma.UserSelect;
+
+/** Identité complète du lanceur d'alerte pour le support : de quoi le reconnaître et le joindre vite (jamais de données secrètes). */
+const SUPPORT_USER_SELECT = {
+  ...USER_SELECT,
+  email: true,
+  isPhoneVerified: true,
+  isEmailVerified: true,
+  accountType: true,
+  customerProfile: { select: { firstName: true, lastName: true, country: { select: { name: true } }, city: { select: { name: true } } } },
+  driverProfile: { select: { id: true, firstName: true, lastName: true, country: { select: { name: true } }, city: { select: { name: true } } } },
+  emergencyContacts: { select: { name: true, phone: true } },
 } satisfies Prisma.UserSelect;
 
 @Injectable()
@@ -162,7 +175,7 @@ export class SosService {
         orderBy: { createdAt: 'desc' },
         skip: query.skip,
         take: query.take,
-        include: { user: { select: { ...USER_SELECT, emergencyContacts: { select: { name: true, phone: true } } } } },
+        include: { user: { select: SUPPORT_USER_SELECT } },
       }),
       this.prisma.sosAlert.count({ where }),
     ]);
@@ -186,6 +199,14 @@ export class SosService {
         id: row.user.id,
         name: fullName(row.user),
         phone: row.user.phone,
+        email: row.user.email,
+        isPhoneVerified: row.user.isPhoneVerified,
+        isEmailVerified: row.user.isEmailVerified,
+        accountType: row.user.accountType,
+        // Identifiant du profil conducteur (celui de la fiche conducteur du back-office) quand la personne en a un.
+        driverProfileId: row.user.driverProfile?.id ?? null,
+        country: (row.user.driverProfile ?? row.user.customerProfile)?.country?.name ?? null,
+        city: (row.user.driverProfile ?? row.user.customerProfile)?.city?.name ?? null,
         emergencyContacts: row.user.emergencyContacts,
       },
     }));

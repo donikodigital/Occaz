@@ -1,7 +1,7 @@
 // backend/src/trips/trips.service.route.spec.ts
 // Villes traversées : recherche par tronçon, création avec prix automatiques, étapes, arrivée à une étape.
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { BookingStatus, TripStatus } from '@prisma/client';
+import { BookingStatus, DriverAccountStatus, TripStatus } from '@prisma/client';
 import { TripsService } from './trips.service';
 
 const DEPARTURE = new Date('2026-10-10T06:00:00.000Z');
@@ -904,5 +904,29 @@ describe('TripsService — prix fixé par la plateforme (modes de prix)', () => 
     });
     await expect(service.publish('trip1', 'driver1')).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.trip.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('TripsService.search — colis : conducteurs validés seulement', () => {
+  const base = { page: 1, limit: 20, skip: 0, take: 20, passengersCount: 1, originCityId: 'kindia', destinationCityId: 'labe' };
+
+  it('avec capacité colis demandée, seuls les trajets de conducteurs validés sont cherchés', async () => {
+    const { service, prisma } = build({ candidates: [] });
+    await service.search({ ...base, requiresShipmentCapacity: true } as never);
+    const where = prisma.trip.findMany.mock.calls[0][0].where;
+    expect(where.allowsShipments).toBe(true);
+    expect(where.driver).toEqual({ status: DriverAccountStatus.VALIDATED });
+  });
+
+  it('se combine avec « conducteurs vérifiés seulement »', async () => {
+    const { service, prisma } = build({ candidates: [] });
+    await service.search({ ...base, requiresShipmentCapacity: true, verifiedDriverOnly: true } as never);
+    expect(prisma.trip.findMany.mock.calls[0][0].where.driver).toEqual({ isVerifiedBadge: true, status: DriverAccountStatus.VALIDATED });
+  });
+
+  it('une recherche de places (passagers) n\'écarte pas les conducteurs en attente : ils ont le délai de tolérance', async () => {
+    const { service, prisma } = build({ candidates: [] });
+    await service.search({ ...base } as never);
+    expect(prisma.trip.findMany.mock.calls[0][0].where.driver).toBeUndefined();
   });
 });
