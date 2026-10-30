@@ -20,6 +20,8 @@ export interface SafeUser {
   suspendedReason: string | null;
   lastLoginAt: string | null;
   isTwoFactorEnabled: boolean;
+  /** Langue mémorisée sur le compte (le serveur écrit notifications, SMS et e-mails dans cette langue). */
+  language?: 'fr' | 'en-GB' | 'pt-PT';
   createdAt: string;
   updatedAt: string;
 }

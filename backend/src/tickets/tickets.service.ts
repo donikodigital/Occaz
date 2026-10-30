@@ -11,6 +11,7 @@ import { CountryScopeService } from '../common/scope/country-scope.service';
 import { AuthenticatedUser } from '../common/types/request-with-user.interface';
 import { BookingPaidEvent, DOMAIN_EVENTS, ShipmentPaidEvent } from '../common/events/domain-events';
 import { formatMoneyWithCurrency } from '../common/utils/money.util';
+import { runWithLanguage } from '../i18n/language-context';
 import { renderBookingTicket, type BookingTicketData } from './booking-ticket.pdf';
 import { renderParcelLabels, type ParcelLabelData } from './parcel-label.pdf';
 import {
@@ -42,6 +43,22 @@ const TICKET_STATUSES: BookingStatus[] = [
 const NO_LABEL_STATUSES: ShipmentStatus[] = [ShipmentStatus.CREATED, ShipmentStatus.CANCELLED, ShipmentStatus.REFUNDED];
 
 const DEFAULT_TIME_ZONE = 'Africa/Conakry';
+
+/** Billet chargé, avec la langue du client : l'e-mail qui l'accompagne est écrit dans cette langue, même si c'est l'équipe qui le renvoie. */
+export interface LoadedBookingTicket {
+  data: BookingTicketData;
+  email: string | null;
+  language?: string | null;
+  firstName: string;
+  status: BookingStatus;
+}
+export interface LoadedParcelLabels {
+  labels: ParcelLabelData[];
+  email: string | null;
+  language?: string | null;
+  firstName: string;
+  status: ShipmentStatus;
+}
 
 @Injectable()
 export class TicketsService {
@@ -121,7 +138,7 @@ export class TicketsService {
   // -----------------------------------------------------------------------
 
   /** Données imprimées sur le billet d'une réservation, avec l'adresse e-mail du client (pour l'envoi). */
-  async loadBookingTicket(bookingId: string): Promise<{ data: BookingTicketData; email: string | null; firstName: string; status: BookingStatus }> {
+  async loadBookingTicket(bookingId: string): Promise<LoadedBookingTicket> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -135,7 +152,7 @@ export class TicketsService {
             vehicle: { select: { brand: true, model: true, color: true, plateNumber: true } },
           },
         },
-        customer: { select: { firstName: true, lastName: true, user: { select: { email: true } } } },
+        customer: { select: { firstName: true, lastName: true, user: { select: { email: true, language: true } } } },
         passengers: true,
         boardingStop: { include: { location: true, city: true } },
         alightingStop: { include: { location: true, city: true } },
@@ -174,7 +191,7 @@ export class TicketsService {
       amountPaid: formatMoneyWithCurrency(booking.totalAmount, booking.currency.isoCode),
       bookedAt: booking.createdAt,
     };
-    return { data, email: booking.customer.user?.email ?? null, firstName: booking.customer.firstName, status: booking.status };
+    return { data, email: booking.customer.user?.email ?? null, language: booking.customer.user?.language, firstName: booking.customer.firstName, status: booking.status };
   }
 
   /** PDF du billet (sans contrôle d'accès : l'appelant l'a fait, ou le jeton de lien en tient lieu). */
@@ -188,7 +205,7 @@ export class TicketsService {
   // Étiquettes de colis
   // -----------------------------------------------------------------------
 
-  async loadParcelLabels(shipmentId: string): Promise<{ labels: ParcelLabelData[]; email: string | null; firstName: string; status: ShipmentStatus }> {
+  async loadParcelLabels(shipmentId: string): Promise<LoadedParcelLabels> {
     const shipment = await this.prisma.shipment.findUnique({
       where: { id: shipmentId },
       include: {
@@ -197,7 +214,7 @@ export class TicketsService {
         items: { orderBy: { createdAt: 'asc' } },
         senderLocation: { include: { city: { include: { country: true } } } },
         recipientLocation: { include: { city: { include: { country: true } } } },
-        customer: { select: { firstName: true, user: { select: { email: true } } } },
+        customer: { select: { firstName: true, user: { select: { email: true, language: true } } } },
       },
     });
     if (!shipment) throw new NotFoundException('Envoi introuvable.');
@@ -257,7 +274,7 @@ export class TicketsService {
         timeZone: this.timeZone,
       }),
     );
-    return { labels, email: shipment.customer.user?.email ?? null, firstName: shipment.customer.firstName, status: shipment.status };
+    return { labels, email: shipment.customer.user?.email ?? null, language: shipment.customer.user?.language, firstName: shipment.customer.firstName, status: shipment.status };
   }
 
   async shipmentLabelsPdf(shipmentId: string): Promise<PdfFile> {
@@ -292,7 +309,12 @@ export class TicketsService {
 
   /** Envoie le billet par e-mail si le client a une adresse. Renvoie false (sans erreur) quand il n'en a pas. */
   async emailBookingTicket(bookingId: string): Promise<boolean> {
-    const { data, email, firstName, status } = await this.loadBookingTicket(bookingId);
+    const loaded = await this.loadBookingTicket(bookingId);
+    if (!loaded.email) return false;
+    return runWithLanguage(loaded.language, () => this.sendBookingTicketEmail(loaded));
+  }
+
+  private async sendBookingTicketEmail({ data, email, firstName, status }: LoadedBookingTicket): Promise<boolean> {
     if (!email) return false;
     this.assertTicketStatus(status);
 
@@ -324,7 +346,12 @@ export class TicketsService {
 
   /** Envoie les étiquettes par e-mail si le client a une adresse. Renvoie false (sans erreur) quand il n'en a pas. */
   async emailShipmentLabels(shipmentId: string): Promise<boolean> {
-    const { labels, email, firstName, status } = await this.loadParcelLabels(shipmentId);
+    const loaded = await this.loadParcelLabels(shipmentId);
+    if (!loaded.email) return false;
+    return runWithLanguage(loaded.language, () => this.sendShipmentLabelsEmail(shipmentId, loaded));
+  }
+
+  private async sendShipmentLabelsEmail(shipmentId: string, { labels, email, firstName, status }: LoadedParcelLabels): Promise<boolean> {
     if (!email) return false;
     this.assertLabelStatus(status);
 
@@ -337,9 +364,13 @@ export class TicketsService {
       [
         `Bonjour ${firstName},`,
         '',
-        `Votre paiement est confirmé. ${count > 1 ? `Les ${count} étiquettes de vos colis sont` : "L'étiquette de votre colis est"} en pièce jointe (PDF, une page A5 par colis).`,
+        count > 1
+          ? `Votre paiement est confirmé. Les ${count} étiquettes de vos colis sont en pièce jointe (PDF, une page A5 par colis).`
+          : "Votre paiement est confirmé. L'étiquette de votre colis est en pièce jointe (PDF, une page A5 par colis).",
         '',
-        `Imprimez-${count > 1 ? 'les' : 'la'} et collez ${count > 1 ? 'chaque étiquette sur le colis correspondant (1/' + count + ', 2/' + count + '…)' : "l'étiquette sur le colis"}, bien visible, sans cacher le code-barres. Cela évite de mélanger les colis lorsque le conducteur en transporte plusieurs.`,
+        count > 1
+          ? `Imprimez-les et collez chaque étiquette sur le colis correspondant (1/${count}, 2/${count}…), bien visible, sans cacher le code-barres. Cela évite de mélanger les colis lorsque le conducteur en transporte plusieurs.`
+          : "Imprimez-la et collez l'étiquette sur le colis, bien visible, sans cacher le code-barres. Cela évite de mélanger les colis lorsque le conducteur en transporte plusieurs.",
         '',
         `Numéro de suivi : ${formatTrackingNumber(tracking)}`,
         `Destinataire : ${labels[0].recipientName} · ${labels[0].recipientCity}`,

@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
+import { languageFromRequest } from '../../i18n/language';
+import { translateMessage } from '../../i18n/server-text';
 
 /**
  * Traduit les erreurs Prisma connues en réponses HTTP propres, pour ne
@@ -51,7 +53,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       success: false,
       error: {
         statusCode: status,
-        message,
+        message: translateMessage(message, languageFromRequest(request)),
         path: request.url,
         timestamp: new Date().toISOString(),
       },

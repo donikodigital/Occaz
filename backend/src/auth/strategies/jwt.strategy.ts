@@ -8,6 +8,7 @@ import { AuthenticatedUser } from '../../common/types/request-with-user.interfac
 import { UsersService } from '../../users/users.service';
 import { SessionsService } from '../sessions.service';
 import { UserRolesService } from '../../rbac/user-roles.service';
+import { DEFAULT_LANGUAGE, parseLanguage } from '../../i18n/language';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -53,6 +54,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       phone: user.phone,
       accountType: user.accountType,
       sessionId: payload.sessionId,
+      language: parseLanguage(user.language) ?? DEFAULT_LANGUAGE,
       permissions,
       scopedCountryIds,
       countryScopes,

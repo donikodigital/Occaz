@@ -5,6 +5,8 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { BookingStatus, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { currentLanguage } from '../i18n/language-context';
+import { translateText } from '../i18n/server-text';
 import { bookingReference, formatTrackingNumber, shipmentTrackingNumber, verifyCode } from './ticket-codes';
 
 /** Statuts d'une réservation dont le billet est valable (mêmes que pour le PDF). */
@@ -60,11 +62,11 @@ export class TicketScanService {
     if (!driver) throw new ForbiddenException('Seuls les conducteurs peuvent scanner un billet.');
 
     const verified = verifyCode(code);
-    if (!verified) return refuse('INVALID', 'Ce QR code n’est pas un billet Occa’Z valide.');
-
-    return verified.kind === 'BOOKING'
-      ? this.scanBooking(driver.id, verified.bookingId)
-      : this.scanParcel(driver.id, verified.shipmentId, verified.parcelNumber);
+    let result: ScanResult;
+    if (!verified) result = refuse('INVALID', 'Ce QR code n’est pas un billet Occa’Z valide.');
+    else if (verified.kind === 'BOOKING') result = await this.scanBooking(driver.id, verified.bookingId);
+    else result = await this.scanParcel(driver.id, verified.shipmentId, verified.parcelNumber);
+    return { ...result, message: translateText(result.message, currentLanguage()) };
   }
 
   private async scanBooking(driverId: string, bookingId: string): Promise<ScanResult> {

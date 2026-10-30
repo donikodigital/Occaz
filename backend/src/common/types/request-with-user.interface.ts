@@ -1,6 +1,7 @@
 // backend/src/common/types/request-with-user.interface.ts
 import { AccountType } from '@prisma/client';
 import { Request } from 'express';
+import type { AppLanguage } from '../../i18n/language';
 
 /**
  * Forme de l'utilisateur posée sur `request.user` par JwtAuthGuard.
@@ -13,6 +14,8 @@ export interface AuthenticatedUser {
   phone: string;
   accountType: AccountType;
   sessionId: string;
+  /** Langue choisie par la personne dans l'application (voir i18n/language.ts). */
+  language?: AppLanguage;
   /** Permissions effectives résolues à partir des UserRole (voir PermissionsGuard). */
   permissions: string[];
   /** Pays de portée pour les rôles Support scopés géographiquement (peut être vide = accès global). */

@@ -25,6 +25,7 @@ import { useLanguageStore } from '@/i18n';
 import { useBiometricStore } from '@/stores/biometricStore';
 import { useTrustedDeviceStore } from '@/stores/trustedDeviceStore';
 import { TrustedDevicePromptHost } from '@/components/auth/TrustedDevicePromptHost';
+import { LanguageSyncHost } from '@/components/auth/LanguageSyncHost';
 import { colors } from '@/theme';
 import { usePushNotificationRegistration } from '@/hooks/usePushNotifications';
 import { AnimatedSplash } from '@/components/screens/AnimatedSplash';
@@ -111,6 +112,7 @@ function RootLayout() {
           <StatusBar style="dark" />
           <AppGate />
           <TrustedDevicePromptHost />
+          <LanguageSyncHost />
           <OfflineBanner />
           {showIntro ? <AnimatedSplash onFinish={() => setShowIntro(false)} /> : null}
         </QueryClientProvider>

@@ -5,6 +5,7 @@
 //
 // Un échec (e-mail refusé, notification impossible) est journalisé et n'empêche JAMAIS le conducteur d'avancer : tout passe par des
 // événements asynchrones (voir DOMAIN_EVENTS.SHIPMENT_STATUS_CHANGED et TRIP_STOP_REACHED).
+import { runWithLanguage } from '../i18n/language-context';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationChannel, NotificationType } from '@prisma/client';
@@ -66,7 +67,7 @@ export class TrackingNotificationsService {
     const shipment = await this.prisma.shipment.findUnique({
       where: { id: shipmentId },
       include: {
-        customer: { select: { firstName: true, user: { select: { id: true, email: true } } } },
+        customer: { select: { firstName: true, user: { select: { id: true, email: true, language: true } } } },
         senderLocation: { include: { city: true } },
         recipientLocation: { include: { city: true } },
         driver: { select: { firstName: true } },
@@ -86,26 +87,29 @@ export class TrackingNotificationsService {
       { audience: 'RECIPIENT', email: shipment.recipientEmail ?? null, firstName: firstWord(shipment.recipientName) },
     ];
 
-    for (const target of targets) {
-      if (!target.email || !EMAIL_AUDIENCES[status].includes(target.audience)) continue;
-      const { subject, body } = trackingEmail({
-        audience: target.audience,
-        status,
-        firstName: target.firstName,
-        senderName: shipment.senderName,
-        pickupCity,
-        deliveryCity,
-        driverFirstName,
-        parcelsCount: shipment.quantity,
-        trackingNumber: formatted,
-        trackingUrl: url,
-      });
-      try {
-        await this.emailProvider.send(target.email, subject, body, url ? { url, label: 'Suivre mon colis' } : undefined);
-      } catch (error) {
-        this.logger.warn(`E-mail de suivi (${target.audience}, ${status}) non envoyé pour l'envoi ${shipmentId} : ${(error as Error).message}`);
+    // Les e-mails de suivi (expéditeur ET destinataire, qui n'a pas de compte) sont écrits dans la langue de l'expéditeur.
+    await runWithLanguage(shipment.customer?.user?.language, async () => {
+      for (const target of targets) {
+        if (!target.email || !EMAIL_AUDIENCES[status].includes(target.audience)) continue;
+        const { subject, body } = trackingEmail({
+          audience: target.audience,
+          status,
+          firstName: target.firstName,
+          senderName: shipment.senderName,
+          pickupCity,
+          deliveryCity,
+          driverFirstName,
+          parcelsCount: shipment.quantity,
+          trackingNumber: formatted,
+          trackingUrl: url,
+        });
+        try {
+          await this.emailProvider.send(target.email, subject, body, url ? { url, label: 'Suivre mon colis' } : undefined);
+        } catch (error) {
+          this.logger.warn(`E-mail de suivi (${target.audience}, ${status}) non envoyé pour l'envoi ${shipmentId} : ${(error as Error).message}`);
+        }
       }
-    }
+    });
 
     const text = statusNotification(status, { deliveryCity, driverFirstName });
     const senderUserId = shipment.customer?.user?.id;

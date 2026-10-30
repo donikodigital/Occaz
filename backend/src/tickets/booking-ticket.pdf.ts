@@ -9,6 +9,11 @@ import { BRAND_LOGO_PNG } from '../platform-wallet/brand-logo';
 import { COLORS, fitText, paragraph, type Doc } from './pdf-kit';
 import { qrPng } from './barcodes';
 import { pdfSafe } from './pdf-text';
+import { currentLanguage, intlLocale } from '../i18n/language-context';
+import { translateText } from '../i18n/server-text';
+
+/** Texte du billet dans la langue de la personne (français si aucune traduction n'existe). */
+const T = (text: string): string => translateText(text, currentLanguage());
 
 export interface BookingTicketData {
   reference: string;
@@ -46,16 +51,16 @@ function capitalize(text: string): string {
 
 function formatDate(date: Date, timeZone: string): string {
   return capitalize(
-    new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone }).format(date),
+    new Intl.DateTimeFormat(intlLocale(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone }).format(date),
   );
 }
 
 function formatTime(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone }).format(date);
+  return new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', timeZone }).format(date);
 }
 
 function formatShortDate(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone }).format(date);
+  return new Intl.DateTimeFormat(intlLocale(), { day: '2-digit', month: '2-digit', year: 'numeric', timeZone }).format(date);
 }
 
 /** « 3h20 » ou « 45 min » ; null si l'arrivée n'est pas après le départ. */
@@ -116,7 +121,7 @@ function ticketPanel(doc: Doc, data: BookingTicketData, qr: Buffer) {
   doc.circle(PAD + 14, 62, 26).fillOpacity(0.14).fill(COLORS.bright);
   doc.restore();
   doc.rect(PAD, 52, CW, 2.5).fill(COLORS.gold);
-  doc.font('Helvetica-Bold').fontSize(12).fillColor(COLORS.white).text('Mon billet', PAD, 33.5, { width: CW, align: 'center', lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(COLORS.white).text(T('Mon billet'), PAD, 33.5, { width: CW, align: 'center', lineBreak: false });
 
   // QR code et référence
   const qrSize = 104;
@@ -143,7 +148,7 @@ function ticketPanel(doc: Doc, data: BookingTicketData, qr: Buffer) {
     if (time && known) {
       doc.font('Helvetica-Bold').fontSize(11).fillColor(COLORS.ink).text(formatTime(time, tz), timeX, y - 1.5, { width: timeW, lineBreak: false });
     } else {
-      doc.font('Helvetica-Oblique').fontSize(6.8).fillColor(COLORS.muted).text('heure à confirmer', timeX, y + 1, { width: timeW, lineBreak: false });
+      doc.font('Helvetica-Oblique').fontSize(6.8).fillColor(COLORS.muted).text(T('heure à confirmer'), timeX, y + 1, { width: timeW, lineBreak: false });
     }
     if (filled) doc.circle(dotX, y + 5, 5).fill(COLORS.base);
     else doc.circle(dotX, y + 5, 5).lineWidth(2.2).fillAndStroke(COLORS.white, COLORS.base);
@@ -157,9 +162,9 @@ function ticketPanel(doc: Doc, data: BookingTicketData, qr: Buffer) {
   if (duration && data.boardingTimeKnown) {
     doc.font('Helvetica').fontSize(6.8).fillColor(COLORS.muted).text(duration, timeX, midY + 2, { width: timeW, lineBreak: false });
   }
-  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.base).text('Trajet partagé', textX, midY - 1, { width: textW, lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.base).text(T('Trajet partagé'), textX, midY - 1, { width: textW, lineBreak: false });
   doc.font('Helvetica').fontSize(7.8).fillColor(COLORS.ink).text(
-    `${data.seatsCount} place${data.seatsCount > 1 ? 's' : ''} réservée${data.seatsCount > 1 ? 's' : ''}`,
+    data.seatsCount > 1 ? T(`${data.seatsCount} places réservées`) : T('1 place réservée'),
     textX,
     midY + 11,
     { width: textW, lineBreak: false },
@@ -179,27 +184,27 @@ function dossierPanel(doc: Doc, data: BookingTicketData) {
   const logoX = PW + PW - PAD - logoSize;
   doc.image(BRAND_LOGO_PNG, logoX, 22, { width: logoSize, height: logoSize });
   doc.font('Helvetica-Bold').fontSize(18).fillColor(COLORS.deep).text("Occa'Z", x0, 24, { width: logoX - 10 - x0, align: 'right', lineBreak: false });
-  doc.font('Helvetica').fontSize(6.6).fillColor(COLORS.muted).text('Transport partagé · Voyageurs & colis', x0, 46, { width: logoX - 10 - x0, align: 'right', lineBreak: false });
+  doc.font('Helvetica').fontSize(6.6).fillColor(COLORS.muted).text(T('Transport partagé · Voyageurs & colis'), x0, 46, { width: logoX - 10 - x0, align: 'right', lineBreak: false });
 
   // Dossier
   let y = 92;
-  doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.muted).text('Dossier voyage : ', x0, y + 1.5, { lineBreak: false });
-  const labelWidth = doc.widthOfString('Dossier voyage : ');
+  doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.muted).text(T('Dossier voyage : '), x0, y + 1.5, { lineBreak: false });
+  const labelWidth = doc.widthOfString(T('Dossier voyage : '));
   fitText(doc, pdfSafe(data.reference), x0 + labelWidth, y - 1, CW - labelWidth, { font: 'Helvetica-Bold', size: 12, minSize: 8, color: COLORS.base });
   y += 22;
-  y += keyValue(doc, data.passengers.length > 1 ? 'Voyageurs' : 'Voyageur', data.passengers.join(', '), x0, y, CW, 2);
-  y += keyValue(doc, 'Places', String(data.seatsCount), x0, y, CW);
-  y += keyValue(doc, 'Conducteur', data.driverName, x0, y, CW);
-  y += keyValue(doc, 'Véhicule', data.vehicle ?? '', x0, y, CW);
-  y += keyValue(doc, 'Réservé le', formatShortDate(data.bookedAt, tz), x0, y, CW);
-  y += keyValue(doc, 'Prix', data.amountPaid, x0, y, CW, 1, COLORS.deep);
+  y += keyValue(doc, T(data.passengers.length > 1 ? 'Voyageurs' : 'Voyageur'), data.passengers.join(', '), x0, y, CW, 2);
+  y += keyValue(doc, T('Places'), String(data.seatsCount), x0, y, CW);
+  y += keyValue(doc, T('Conducteur'), data.driverName, x0, y, CW);
+  y += keyValue(doc, T('Véhicule'), data.vehicle ?? '', x0, y, CW);
+  y += keyValue(doc, T('Réservé le'), formatShortDate(data.bookedAt, tz), x0, y, CW);
+  y += keyValue(doc, T('Prix'), data.amountPaid, x0, y, CW, 1, COLORS.deep);
 
   // Prêts ? Embarquez !
   // Sous le dossier, mais jamais plus haut qu'à l'accoutumée (les lignes du dossier peuvent s'allonger avec de longs noms).
   const headY = Math.max(226, y + 14);
   doc.circle(x0 + 11, headY + 8, 11).fill(COLORS.base);
   checkMark(doc, x0 + 11, headY + 8, 11, COLORS.white);
-  doc.font('Helvetica-Bold').fontSize(11.5).fillColor(COLORS.base).text('PRÊTS ? EMBARQUEZ !', x0 + 30, headY + 3, { width: CW - 30, lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(11.5).fillColor(COLORS.base).text(T('PRÊTS ? EMBARQUEZ !'), x0 + 30, headY + 3, { width: CW - 30, lineBreak: false });
 
   const items = [
     'Je télécharge mon billet sur mon téléphone, ou je l’imprime.',
@@ -211,7 +216,7 @@ function dossierPanel(doc: Doc, data: BookingTicketData) {
   let itemY = headY + 32;
   for (const item of items) {
     doc.roundedRect(x0, itemY + 1, 9, 9, 2).lineWidth(0.9).strokeColor(COLORS.base).stroke();
-    const used = paragraph(doc, pdfSafe(item), x0 + 17, itemY, CW - 17, { font: 'Helvetica', size: 7.8, color: COLORS.ink, maxLines: 2, lineGap: 1.2 });
+    const used = paragraph(doc, pdfSafe(T(item)), x0 + 17, itemY, CW - 17, { font: 'Helvetica', size: 7.8, color: COLORS.ink, maxLines: 2, lineGap: 1.2 });
     itemY += Math.max(used, 11) + 9;
   }
 }
@@ -220,7 +225,7 @@ function dossierPanel(doc: Doc, data: BookingTicketData) {
 
 function infoPanel(doc: Doc, data: BookingTicketData) {
   const y0 = PH;
-  let y = panelTitle(doc, 'Bon à savoir', PAD, y0 + 28);
+  let y = panelTitle(doc, T('Bon à savoir'), PAD, y0 + 28);
 
   const sections: Array<[string, string]> = [
     [
@@ -241,8 +246,8 @@ function infoPanel(doc: Doc, data: BookingTicketData) {
     ],
   ];
   for (const [title, body] of sections) {
-    doc.font('Helvetica-Bold').fontSize(8.6).fillColor(COLORS.deep).text(pdfSafe(title), PAD, y, { width: CW, lineBreak: false });
-    const used = paragraph(doc, pdfSafe(body), PAD, y + 12, CW, { font: 'Helvetica', size: 7.6, color: COLORS.muted, maxLines: 4, lineGap: 1.4 });
+    doc.font('Helvetica-Bold').fontSize(8.6).fillColor(COLORS.deep).text(pdfSafe(T(title)), PAD, y, { width: CW, lineBreak: false });
+    const used = paragraph(doc, pdfSafe(T(body)), PAD, y + 12, CW, { font: 'Helvetica', size: 7.6, color: COLORS.muted, maxLines: 4, lineGap: 1.4 });
     y += 12 + used + 11;
   }
 
@@ -250,8 +255,8 @@ function infoPanel(doc: Doc, data: BookingTicketData) {
   const footY = y0 + PH - 52;
   doc.moveTo(PAD, footY).lineTo(PAD + CW, footY).lineWidth(0.8).strokeColor(COLORS.line).stroke();
   doc.image(BRAND_LOGO_PNG, PAD, footY + 10, { width: 22, height: 22 });
-  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(COLORS.deep).text("Occa'Z · Transport partagé", PAD + 30, footY + 11, { width: CW - 30, lineBreak: false });
-  doc.font('Helvetica').fontSize(6.8).fillColor(COLORS.muted).text(`Billet ${pdfSafe(data.reference)} · généré le ${formatShortDate(new Date(), data.timeZone)}`, PAD + 30, footY + 23, { width: CW - 30, lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(COLORS.deep).text(T("Occa'Z · Transport partagé"), PAD + 30, footY + 11, { width: CW - 30, lineBreak: false });
+  doc.font('Helvetica').fontSize(6.8).fillColor(COLORS.muted).text(T(`Billet ${pdfSafe(data.reference)} · généré le ${formatShortDate(new Date(), data.timeZone)}`), PAD + 30, footY + 23, { width: CW - 30, lineBreak: false });
 }
 
 // ─── ④ Volet illustré ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -358,7 +363,7 @@ function illustrationPanel(doc: Doc) {
   });
 
   // Pastille
-  const tag = 'TRANSPORT PARTAGÉ · VOYAGEURS & COLIS';
+  const tag = T('TRANSPORT PARTAGÉ · VOYAGEURS & COLIS');
   doc.font('Helvetica-Bold').fontSize(6.8);
   const tagW = doc.widthOfString(tag) + tag.length * 0.5 + 22;
   doc.roundedRect(pw - 14 - tagW, 130, tagW, 17, 8.5).fill(COLORS.white);

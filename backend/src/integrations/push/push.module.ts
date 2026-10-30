@@ -2,6 +2,7 @@
 import { Module } from '@nestjs/common';
 import { ExpoPushProvider } from './expo-push.provider';
 import { PUSH_PROVIDER } from './push-provider.interface';
+import { TranslatingPushProvider } from '../translating-providers';
 
 /**
  * Contrairement à SMS/paiement (qui exigent un vrai compte avant de
@@ -14,7 +15,7 @@ import { PUSH_PROVIDER } from './push-provider.interface';
   providers: [
     {
       provide: PUSH_PROVIDER,
-      useClass: ExpoPushProvider,
+      useFactory: () => new TranslatingPushProvider(new ExpoPushProvider()),
     },
   ],
   exports: [PUSH_PROVIDER],

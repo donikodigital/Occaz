@@ -2,6 +2,7 @@
 import { Module } from '@nestjs/common';
 import { ResendEmailProvider } from './resend-email.provider';
 import { EMAIL_PROVIDER } from './email-provider.interface';
+import { TranslatingEmailProvider } from '../translating-providers';
 
 /**
  * Basculé sur Resend dès maintenant plutôt que de laisser
@@ -12,7 +13,7 @@ import { EMAIL_PROVIDER } from './email-provider.interface';
  * existe, ça fonctionne sans autre changement de code.
  */
 @Module({
-  providers: [{ provide: EMAIL_PROVIDER, useClass: ResendEmailProvider }],
+  providers: [{ provide: EMAIL_PROVIDER, useFactory: () => new TranslatingEmailProvider(new ResendEmailProvider()) }],
   exports: [EMAIL_PROVIDER],
 })
 export class EmailModule {}

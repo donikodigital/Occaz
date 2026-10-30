@@ -5,6 +5,7 @@
 // [19/10/2026] v+ — JobsModule (déclencheur externe des traitements automatiques) et AppConfigModule (version minimale de l'application).
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { LanguageInterceptor } from './i18n/language.interceptor';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -141,6 +142,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Applique HttpExceptionFilter / PrismaExceptionFilter (mêmes réponses) et remonte les vraies erreurs serveur à Sentry.
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: LanguageInterceptor },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformResponseInterceptor },
   ],

@@ -8,6 +8,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { languageFromRequest } from '../../i18n/language';
+import { translateMessage } from '../../i18n/server-text';
 
 /**
  * Format d'erreur unique pour toute l'API — le frontend n'a qu'une seule
@@ -24,10 +26,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = exception.getStatus();
     const body = exception.getResponse();
 
-    const message =
+    // Le message est écrit en français dans tout le code : il est traduit ici, une seule fois, dans la langue de l'application.
+    const message = translateMessage(
       typeof body === 'string'
         ? body
-        : ((body as Record<string, unknown>).message ?? exception.message);
+        : ((body as Record<string, unknown>).message ?? exception.message),
+      languageFromRequest(request),
+    );
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(

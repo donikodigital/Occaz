@@ -1,6 +1,8 @@
 // backend/src/tracking/tracking.service.ts
 // [10/10/2026] v1 — Suivi d'un envoi : par numéro de suivi (public, position approximative) ou par l'expéditeur / le support
 // (position exacte). Les règles d'affichage sont dans tracking-view.ts ; ici on charge les données et on assemble la réponse.
+import { currentLanguage } from '../i18n/language-context';
+import { translateDeep } from '../i18n/server-text';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -130,7 +132,9 @@ export class TrackingService {
       .filter((entry): entry is { status: string; label: string; at: Date } => entry.label !== null)
       .reverse();
 
-    return {
+    // Le suivi est lu par l'application et par la page publique : ses libellés sont écrits dans la langue demandée.
+    return translateDeep(
+      {
       trackingNumber,
       trackingNumberFormatted: formatTrackingNumber(trackingNumber),
       status: shipment.status,
@@ -145,7 +149,9 @@ export class TrackingService {
       location: { ...where, isStale },
       events,
       updatedAt: shipment.tracking.length > 0 ? shipment.tracking[shipment.tracking.length - 1].recordedAt : shipment.updatedAt,
-    };
+      },
+      currentLanguage(),
+    );
   }
 
   /**

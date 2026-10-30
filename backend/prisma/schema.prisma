@@ -352,6 +352,9 @@ model User {
   // 6 mois est supprimé définitivement (rappel mensuel par e-mail avant) — voir account-purge/suspended-account-purge.service.ts.
   suspendedAt     DateTime?
   lastLoginAt     DateTime?
+  // Langue choisie dans l'application ('fr', 'en-GB' ou 'pt-PT') : le serveur s'en sert pour écrire les notifications, SMS, e-mails et
+  // messages d'erreur dans la langue de la personne. L'application la met à jour dès que la personne change de langue.
+  language        String      @default("fr")
 
   // Connexion par numéro + mot de passe à 6 chiffres : après trop d'erreurs, le compte est verrouillé quelques minutes
   // (un code à 6 chiffres n'a que 1 000 000 de valeurs, le verrouillage est ce qui empêche de les essayer toutes).

@@ -330,7 +330,6 @@ export class TripOtpService {
    */
   private async sendWelcome(booking: Awaited<ReturnType<TripOtpService['getBookingWithContext']>>): Promise<void> {
     const city = booking.alightingStop?.city?.name ?? booking.trip.destinationCity?.name;
-    const place = city ? ` à ${city}` : '';
     try {
       await this.notifications.notify({
         audience: 'CUSTOMER',
@@ -338,7 +337,9 @@ export class TripOtpService {
         type: NotificationType.ARRIVAL,
         channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
         fallbackTitle: city ? `Bienvenue à ${city} !` : 'Bienvenue !',
-        fallbackBody: `Vous êtes bien arrivé${place}. Toute l'équipe Occa'Z vous souhaite un excellent séjour${place} et vous remercie d'avoir voyagé avec nous.`,
+        fallbackBody: city
+          ? `Vous êtes bien arrivé à ${city}. Toute l'équipe Occa'Z vous souhaite un excellent séjour à ${city} et vous remercie d'avoir voyagé avec nous.`
+          : "Vous êtes bien arrivé. Toute l'équipe Occa'Z vous souhaite un excellent séjour et vous remercie d'avoir voyagé avec nous.",
         pushData: { type: 'ARRIVAL', tripId: booking.tripId, bookingId: booking.id },
       });
     } catch (error) {

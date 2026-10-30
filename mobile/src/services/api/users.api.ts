@@ -7,7 +7,7 @@ export const usersApi = {
   /** Sert aussi à vérifier qu'un jeton stocké est toujours valide au démarrage de l'app. */
   getMe: () => api.get<SafeUser>('/users/me'),
 
-  updateMe: (payload: { email?: string }) => api.patch<SafeUser>('/users/me', payload),
+  updateMe: (payload: { email?: string; language?: 'fr' | 'en-GB' | 'pt-PT' }) => api.patch<SafeUser>('/users/me', payload),
 
   /** Refuse tant qu'une réservation, un envoi ou un trajet est en cours — voir le message d'erreur renvoyé. */
   deleteMe: (payload: { reason?: string } = {}) => api.post<SafeUser>('/users/me/delete', payload),

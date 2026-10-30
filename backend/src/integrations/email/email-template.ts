@@ -9,6 +9,9 @@
 // Couleurs alignées sur OCEAN (voir mobile/src/theme/ocean.ts et
 // web-admin/globals.css) : même identité que l'app et le back-office.
 
+import { currentLanguage } from '../../i18n/language-context';
+import { translateText } from '../../i18n/server-text';
+
 const OCEAN = {
   base: '#0B6BA8',
   deep: '#083A63',
@@ -60,9 +63,13 @@ export function renderNotificationEmailHtml({ title, body, actionUrl, actionLabe
       `
       : '';
 
+  const language = currentLanguage();
+  const htmlLang = language === 'fr' ? 'fr' : language === 'en-GB' ? 'en' : 'pt';
+  const footer = translateText('Cet email a été envoyé automatiquement par OCCAZ — merci de ne pas y répondre.', language);
+
   return `
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="${htmlLang}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -100,7 +107,7 @@ export function renderNotificationEmailHtml({ title, body, actionUrl, actionLabe
             <tr>
               <td style="padding: 16px 28px; background-color: ${OCEAN.mist}; border-top: 1px solid ${OCEAN.line};">
                 <span style="font-size: 11px; color: #6b7a85;">
-                  Cet email a été envoyé automatiquement par OCCAZ — merci de ne pas y répondre.
+                  ${escapeHtml(footer)}
                 </span>
               </td>
             </tr>

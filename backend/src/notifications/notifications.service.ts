@@ -9,6 +9,7 @@
 // [21/09/2026] v2 — pushData et pushOptions transmis au fournisseur push.
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AccountType, NotificationChannel, NotificationType, Prisma } from '@prisma/client';
+import { runWithLanguage } from '../i18n/language-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationTemplatesService } from './notification-templates.service';
 import { SMS_PROVIDER, SmsProvider } from '../integrations/sms/sms-provider.interface';
@@ -161,6 +162,20 @@ export class NotificationsService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('Utilisateur introuvable.');
 
+    // Le texte stocké (cloche) reste en français — l'application le traduit à l'affichage ; le push, le SMS et l'e-mail partent
+    // dans la langue choisie par CE destinataire (pas celle de la personne dont la requête a déclenché la notification).
+    return runWithLanguage(user.language, () => this.sendOnChannel(user, channel, title, body, pushData, pushOptions));
+  }
+
+  private async sendOnChannel(
+    user: { id: string; phone: string; email: string | null },
+    channel: NotificationChannel,
+    title: string,
+    body: string,
+    pushData?: Record<string, unknown>,
+    pushOptions?: PushOptions,
+  ): Promise<void> {
+    const userId = user.id;
     switch (channel) {
       case NotificationChannel.PUSH: {
         const devices = await this.prisma.device.findMany({
@@ -430,10 +445,13 @@ export class NotificationsService {
     const panelUrl = process.env.ADMIN_PANEL_URL?.trim().replace(/\/+$/, '');
     const action = panelUrl && params.link ? { url: `${panelUrl}${params.link}`, label: 'Ouvrir dans le back-office' } : undefined;
 
-    const results = await Promise.allSettled(
-      staff
-        .filter((member): member is { id: string; email: string } => Boolean(member.email))
-        .map((member) => this.emailProvider.send(member.email, params.title, params.body, action)),
+    // L'équipe lit le back-office en français, quelle que soit la langue de la personne qui a déclenché l'alerte (SOS, litige…).
+    const results = await runWithLanguage('fr', () =>
+      Promise.allSettled(
+        staff
+          .filter((member): member is { id: string; email: string } => Boolean(member.email))
+          .map((member) => this.emailProvider.send(member.email, params.title, params.body, action)),
+      ),
     );
     for (const result of results) {
       if (result.status === 'rejected') {

@@ -1,4 +1,6 @@
 // mobile/src/services/api/client.ts
+// [30/10/2026] v+ — chaque requête envoie la langue choisie (en-tête X-App-Language) : le serveur répond dans cette langue ;
+// les liens ouverts dans le navigateur (apiUrl) la portent dans l'adresse (?lang=).
 // [25/10/2026] v++ — réseau faible : un rafraîchissement qui échoue faute de réseau (ou à cause d'une erreur serveur passagère) ne déconnecte plus
 // et ne supprime plus les jetons ; seul un refus définitif du serveur (jeton refusé, expiré ou révoqué) met fin à la session.
 // [19/10/2026] v+ — alimente connectivityStore : échec réseau (hors délai dépassé) => hors connexion ; toute réponse du serveur => en ligne.
@@ -6,7 +8,7 @@ import Constants from 'expo-constants';
 import { secureStorage } from '../storage/secureStorage';
 import { ApiError, SessionExpiredError } from './ApiError';
 import { useConnectivityStore } from '@/stores/connectivityStore';
-import { translate } from '@/i18n';
+import { translate, useLanguageStore } from '@/i18n';
 import type { ApiErrorEnvelope, ApiSuccessEnvelope } from './types';
 
 const API_URL =
@@ -56,7 +58,8 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
 
 /** Adresse complète d'un chemin de l'API — pour ouvrir un lien (PDF) dans le navigateur ou la visionneuse du téléphone. */
 export function apiUrl(path: string, query?: RequestOptions['query']): string {
-  return buildUrl(path, query);
+  // Un lien ouvert dans le navigateur n'envoie pas l'en-tête de langue : elle voyage dans l'adresse (billet PDF dans la bonne langue).
+  return buildUrl(path, { lang: useLanguageStore.getState().language, ...query });
 }
 
 async function rawFetch<T>(path: string, options: RequestOptions, accessToken?: string | null): Promise<T> {
@@ -69,6 +72,8 @@ async function rawFetch<T>(path: string, options: RequestOptions, accessToken?: 
         method: options.method ?? 'GET',
         headers: {
           'Content-Type': 'application/json',
+          // Langue de l'app : le serveur y traduit ses messages d'erreur (et le SMS du code de connexion, avant même d'être connecté).
+          'X-App-Language': useLanguageStore.getState().language,
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
